@@ -79,39 +79,6 @@ static void rope_neox(const T * x, T * dst, const int ne0, const int ne1, const 
                       const int32_t * pos, const float freq_scale, const float ext_factor, const float attn_factor,
                       const rope_corr_dims corr_dims, const float theta_scale, const float * freq_factors,
                       const sycl::nd_item<3> & item_ct1) {
-    const int i0 = 2 * (item_ct1.get_local_range(1) * item_ct1.get_group(1) + item_ct1.get_local_id(1));
-
-    if (i0 >= ne0) {
-        return;
-    }
-
-    const int row = item_ct1.get_local_range(2) * item_ct1.get_group(2) + item_ct1.get_local_id(2);
-
-    const int row0     = row % ne1;
-    const int channel0 = row / ne1;
-
-    const int i  = row * ne0 + i0 / 2;
-    const int i2 = channel0 * s2 + row0 * s1 + i0 / 2;
-
-    if (i0 >= n_dims) {
-        *reinterpret_cast<sycl::vec<T, 2> *>(dst + i + i0 / 2) = *reinterpret_cast<const sycl::vec<T, 2> *>(x + i2 + i0 / 2);
-        return;
-    }
-
-    const float theta_base = pos[channel0] * sycl::pow(theta_scale, i0 / 2.0f);
-
-    const float freq_factor = has_ff ? freq_factors[i0 / 2] : 1.0f;
-
-    float cos_theta;
-    float sin_theta;
-
-    rope_yarn(theta_base / freq_factor, freq_scale, corr_dims, i0, ext_factor, attn_factor, &cos_theta, &sin_theta);
-
-    const float x0 = x[i2 + 0];
-    const float x1 = x[i2 + n_dims / 2];
-
-    dst[i + 0]          = x0 * cos_theta - x1 * sin_theta;
-    dst[i + n_dims / 2] = x0 * sin_theta + x1 * cos_theta;
 }
 
 template <typename T, bool has_ff>

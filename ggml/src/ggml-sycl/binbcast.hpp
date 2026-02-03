@@ -8,16 +8,8 @@ static __dpct_inline__ float op_repeat(const float a, const float b) {
     GGML_UNUSED(a);
 }
 
-static __dpct_inline__ float op_add(const float a, const float b) {
-    return a + b;
-}
-
 static __dpct_inline__ float op_sub(const float a, const float b) {
     return a - b;
-}
-
-static __dpct_inline__ float op_mul(const float a, const float b) {
-    return a * b;
 }
 
 static __dpct_inline__ float op_div(const float a, const float b) {

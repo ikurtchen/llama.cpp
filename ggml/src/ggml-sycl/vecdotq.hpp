@@ -638,16 +638,6 @@ template <int vdr>
 static __dpct_inline__ float vec_dot_q8_0_q8_1_impl(const int *v, const int *u,
                                                     const float &d8_0,
                                                     const float &d8_1) {
-
-    int sumi = 0;
-
-#pragma unroll
-    for (int i = 0; i < vdr; ++i) {
-        // SIMD dot product of quantized values
-        sumi = dpct::dp4a(v[i], u[i], sumi);
-    }
-
-    return d8_0*d8_1 * sumi;
 }
 
 template <int vdr>
@@ -788,20 +778,7 @@ vec_dot_q5_1_q8_1(const void *__restrict__ vbq,
 static __dpct_inline__ float
 vec_dot_q8_0_q8_1(const void *__restrict__ vbq,
                   const block_q8_1 *__restrict__ bq8_1, const int &iqs) {
-
-    const block_q8_0 * bq8_0 = (const block_q8_0 *) vbq;
-
-    int v[VDR_Q8_0_Q8_1_MMVQ];
-    int u[VDR_Q8_0_Q8_1_MMVQ];
-
-#pragma unroll
-    for (int i = 0; i < VDR_Q8_0_Q8_1_MMVQ; ++i) {
-        v[i] = get_int_from_int8(bq8_0->qs, iqs + i);
-        u[i] = get_int_from_int8_aligned(bq8_1->qs, iqs + i);
-    }
-
-    return vec_dot_q8_0_q8_1_impl<VDR_Q8_0_Q8_1_MMVQ>(v, u, bq8_0->d,
-                                                      bq8_1->ds[0]);
+    return 0;
 }
 
 static __dpct_inline__ float

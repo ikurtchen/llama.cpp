@@ -89,29 +89,6 @@ static void k_set_rows(
         const size_t src_type_size, const size_t dst_type_size,
         const int64_t total_elements,
         const sycl::nd_item<1> & item_ct1) {
-
-    const int64_t i = item_ct1.get_global_linear_id();
-    if (i >= total_elements) {
-        return;
-    }
-
-    const int64_t i03 = i / (ne00 * ne01 * ne02);
-    const int64_t i02 = (i - i03 * ne00 * ne01 * ne02) / (ne00 * ne01);
-    const int64_t i01 = (i - i03 * ne00 * ne01 * ne02 - i02 * ne00 * ne01) / ne00;
-    const int64_t i00 = i - i03 * ne00 * ne01 * ne02 - i02 * ne00 * ne01 - i01 * ne00;
-
-    const int64_t i12 = i03 % ne12;
-    const int64_t i11 = i02 % ne11;
-    const int64_t i10 = i01;
-
-    const int64_t dst_row = *(const TIdx *)((const char *)src1 + calculate_offset<3>({nb10, nb11, nb12}, {i10, i11, i12}));
-
-    const char * src0_row = src0 + calculate_offset<3>({nb01, nb02, nb03}, {i01, i02, i03});
-    const char * src_elem = src0_row + i00 * src_type_size;
-    char * dst_row_ptr = dst + dst_row*nb1 + i02*nb2 + i03*nb3;
-    char * dst_elem = dst_row_ptr + i00 * dst_type_size;
-
-    convert<TIn, TOut>(src_elem, dst_elem);
 }
 
 template<typename TIn, typename TIdx, typename TOut>
