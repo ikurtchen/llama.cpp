@@ -5,11 +5,13 @@
 #define SYCL_RMS_NORM_BLOCK_SIZE 256
 
 // Block reduction for sum using shared memory
+// Returns the sum in all threads (broadcasts result)
 template <int block_size>
 static inline float block_reduce_sum(float val, float * shared_mem, const sycl::nd_item<3> & item_ct1) {
     const int tid = item_ct1.get_local_id(2);
     const int warp_id = tid / WARP_SIZE;
     const int lane_id = tid % WARP_SIZE;
+    constexpr int num_warps = block_size / WARP_SIZE;
 
     // First, reduce within warp
     val = warp_reduce_sum(val, item_ct1);
@@ -20,13 +22,18 @@ static inline float block_reduce_sum(float val, float * shared_mem, const sycl::
     }
     item_ct1.barrier(sycl::access::fence_space::local_space);
 
-    // Final reduction in first warp
-    if (warp_id == 0) {
-        val = (tid < (block_size / WARP_SIZE)) ? shared_mem[lane_id] : 0.0f;
-        val = warp_reduce_sum(val, item_ct1);
+    // Sequential reduction in shared memory by thread 0
+    // This handles any num_warps value and broadcasts result to all threads
+    if (tid == 0) {
+        float sum_val = shared_mem[0];
+        for (int i = 1; i < num_warps; i++) {
+            sum_val += shared_mem[i];
+        }
+        shared_mem[0] = sum_val;
     }
+    item_ct1.barrier(sycl::access::fence_space::local_space);
 
-    return val;
+    return shared_mem[0];
 }
 
 template <int block_size>
@@ -92,14 +99,13 @@ static void rms_norm_f32_sycl(
     if (ncols < 1024) {
         constexpr int block_size = SYCL_RMS_NORM_BLOCK_SIZE;
         const sycl::range<3> block_dims(1, 1, block_size);
-        const size_t shared_mem_size = (block_size / WARP_SIZE) * sizeof(float);
 
         stream->submit([&](sycl::handler & cgh) {
             sycl::local_accessor<float, 1> shared_sum_acc(sycl::range<1>(block_size / WARP_SIZE), cgh);
 
             cgh.parallel_for(
                 sycl::nd_range<3>(blocks_num * block_dims, block_dims),
-                [=](sycl::nd_item<3> item_ct1) {
+                [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
                     rms_norm_f32_kernel<block_size>(
                         x, dst, ncols, stride_row, stride_channel, stride_sample, eps,
                         item_ct1, shared_sum_acc.get_multi_ptr<sycl::access::decorated::no>().get());
@@ -114,7 +120,7 @@ static void rms_norm_f32_sycl(
 
             cgh.parallel_for(
                 sycl::nd_range<3>(blocks_num * block_dims, block_dims),
-                [=](sycl::nd_item<3> item_ct1) {
+                [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
                     rms_norm_f32_kernel<block_size>(
                         x, dst, ncols, stride_row, stride_channel, stride_sample, eps,
                         item_ct1, shared_sum_acc.get_multi_ptr<sycl::access::decorated::no>().get());

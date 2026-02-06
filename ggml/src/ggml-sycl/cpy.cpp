@@ -106,6 +106,140 @@ static void ggml_cpy_contiguous_sycl(
         });
 }
 
+// Block dequantization functions for Q -> F32 copy
+static void cpy_blck_q8_0_f32(const char * cxi, char * cdsti) {
+    const block_q8_0 * xi = (const block_q8_0 *)cxi;
+    float * dsti = (float *)cdsti;
+
+    const float d = xi->d;
+    for (int j = 0; j < QK8_0; ++j) {
+        dsti[j] = xi->qs[j] * d;
+    }
+}
+
+static void cpy_blck_q4_0_f32(const char * cxi, char * cdsti) {
+    const block_q4_0 * xi = (const block_q4_0 *)cxi;
+    float * dsti = (float *)cdsti;
+
+    const float d = xi->d;
+    for (int j = 0; j < QK4_0/2; ++j) {
+        const int v0 = (xi->qs[j] & 0x0F) - 8;
+        const int v1 = (xi->qs[j] >> 4) - 8;
+        dsti[j]          = v0 * d;
+        dsti[j + QK4_0/2] = v1 * d;
+    }
+}
+
+static void cpy_blck_q4_1_f32(const char * cxi, char * cdsti) {
+    const block_q4_1 * xi = (const block_q4_1 *)cxi;
+    float * dsti = (float *)cdsti;
+
+    const float d = xi->dm[0];
+    const float m = xi->dm[1];
+    for (int j = 0; j < QK4_1/2; ++j) {
+        const int v0 = (xi->qs[j] & 0x0F);
+        const int v1 = (xi->qs[j] >> 4);
+        dsti[j]          = v0 * d + m;
+        dsti[j + QK4_1/2] = v1 * d + m;
+    }
+}
+
+static void cpy_blck_q5_0_f32(const char * cxi, char * cdsti) {
+    const block_q5_0 * xi = (const block_q5_0 *)cxi;
+    float * dsti = (float *)cdsti;
+
+    const float d = xi->d;
+    uint32_t qh;
+    memcpy(&qh, xi->qh, sizeof(qh));
+
+    for (int j = 0; j < QK5_0/2; ++j) {
+        const int xh_0 = ((qh >> (j + 0))  << 4) & 0x10;
+        const int xh_1 = ((qh >> (j + 12))     ) & 0x10;
+        const int v0 = ((xi->qs[j] & 0x0F) | xh_0) - 16;
+        const int v1 = ((xi->qs[j] >> 4)   | xh_1) - 16;
+        dsti[j]          = v0 * d;
+        dsti[j + QK5_0/2] = v1 * d;
+    }
+}
+
+static void cpy_blck_q5_1_f32(const char * cxi, char * cdsti) {
+    const block_q5_1 * xi = (const block_q5_1 *)cxi;
+    float * dsti = (float *)cdsti;
+
+    const float d = xi->dm[0];
+    const float m = xi->dm[1];
+    uint32_t qh;
+    memcpy(&qh, xi->qh, sizeof(qh));
+
+    for (int j = 0; j < QK5_1/2; ++j) {
+        const int xh_0 = ((qh >> (j + 0))  << 4) & 0x10;
+        const int xh_1 = ((qh >> (j + 12))     ) & 0x10;
+        const int v0 = (xi->qs[j] & 0x0F) | xh_0;
+        const int v1 = (xi->qs[j] >> 4)   | xh_1;
+        dsti[j]          = v0 * d + m;
+        dsti[j + QK5_1/2] = v1 * d + m;
+    }
+}
+
+// Dequantization copy: Q -> F32
+template <cpy_kernel_t cpy_blck, int qk>
+static void cpy_q_f32_kernel(
+        const char * cx,
+        char * cdst,
+        const int64_t ne,
+        const int64_t ne00, const int64_t ne01, const int64_t ne02,
+        const int64_t nb00, const int64_t nb01, const int64_t nb02, const int64_t nb03,
+        const int64_t ne10, const int64_t ne11, const int64_t ne12,
+        const int64_t nb10, const int64_t nb11, const int64_t nb12, const int64_t nb13,
+        const sycl::nd_item<1> & item_ct1) {
+
+    const int64_t i = item_ct1.get_global_id(0) * qk;
+
+    if (i >= ne) {
+        return;
+    }
+
+    const int64_t i03 = i / (ne00 * ne01 * ne02);
+    const int64_t i02 = (i - i03 * ne00 * ne01 * ne02) / (ne00 * ne01);
+    const int64_t i01 = (i - i03 * ne00 * ne01 * ne02 - i02 * ne01 * ne00) / ne00;
+    const int64_t i00 = i - i03 * ne00 * ne01 * ne02 - i02 * ne01 * ne00 - i01 * ne00;
+    const int64_t x_offset = (i00 / qk) * nb00 + i01 * nb01 + i02 * nb02 + i03 * nb03;
+
+    const int64_t i13 = i / (ne10 * ne11 * ne12);
+    const int64_t i12 = (i - i13 * ne10 * ne11 * ne12) / (ne10 * ne11);
+    const int64_t i11 = (i - i13 * ne10 * ne11 * ne12 - i12 * ne10 * ne11) / ne10;
+    const int64_t i10 = i - i13 * ne10 * ne11 * ne12 - i12 * ne10 * ne11 - i11 * ne10;
+    const int64_t dst_offset = i10 * nb10 + i11 * nb11 + i12 * nb12 + i13 * nb13;
+
+    cpy_blck(cx + x_offset, cdst + dst_offset);
+}
+
+// Launcher for Q -> F32 copy
+template <cpy_kernel_t cpy_blck, int qk>
+static void ggml_cpy_q_f32_sycl(
+        const char * cx,
+        char * cdst,
+        const int64_t ne,
+        const int64_t ne00, const int64_t ne01, const int64_t ne02,
+        const int64_t nb00, const int64_t nb01, const int64_t nb02, const int64_t nb03,
+        const int64_t ne10, const int64_t ne11, const int64_t ne12,
+        const int64_t nb10, const int64_t nb11, const int64_t nb12, const int64_t nb13,
+        dpct::queue_ptr stream) {
+
+    GGML_ASSERT(ne % qk == 0);
+    const int64_t num_blocks = ne / qk;
+
+    stream->parallel_for(
+        sycl::nd_range<1>(sycl::range<1>(num_blocks), sycl::range<1>(1)),
+        [=](sycl::nd_item<1> item_ct1) {
+            cpy_q_f32_kernel<cpy_blck, qk>(
+                cx, cdst, ne,
+                ne00, ne01, ne02, nb00, nb01, nb02, nb03,
+                ne10, ne11, ne12, nb10, nb11, nb12, nb13,
+                item_ct1);
+        });
+}
+
 // Quantization copy: f32 -> q8_0
 template <cpy_kernel_t cpy_blck, int qk>
 static void cpy_f32_q_kernel(
@@ -291,6 +425,46 @@ void ggml_sycl_cpy(ggml_backend_sycl_context & ctx, const ggml_tensor * src0, co
     // F32 -> IQ4_NL
     else if (src0->type == GGML_TYPE_F32 && src1->type == GGML_TYPE_IQ4_NL) {
         ggml_cpy_f32_q_sycl<cpy_blck_f32_iq4_nl, QK4_NL>(
+            src0_ddc, src1_ddc, ne,
+            ne00, ne01, ne02, nb00, nb01, nb02, nb03,
+            ne10, ne11, ne12, nb10, nb11, nb12, nb13,
+            main_stream);
+    }
+    // Q8_0 -> F32
+    else if (src0->type == GGML_TYPE_Q8_0 && src1->type == GGML_TYPE_F32) {
+        ggml_cpy_q_f32_sycl<cpy_blck_q8_0_f32, QK8_0>(
+            src0_ddc, src1_ddc, ne,
+            ne00, ne01, ne02, nb00, nb01, nb02, nb03,
+            ne10, ne11, ne12, nb10, nb11, nb12, nb13,
+            main_stream);
+    }
+    // Q4_0 -> F32
+    else if (src0->type == GGML_TYPE_Q4_0 && src1->type == GGML_TYPE_F32) {
+        ggml_cpy_q_f32_sycl<cpy_blck_q4_0_f32, QK4_0>(
+            src0_ddc, src1_ddc, ne,
+            ne00, ne01, ne02, nb00, nb01, nb02, nb03,
+            ne10, ne11, ne12, nb10, nb11, nb12, nb13,
+            main_stream);
+    }
+    // Q4_1 -> F32
+    else if (src0->type == GGML_TYPE_Q4_1 && src1->type == GGML_TYPE_F32) {
+        ggml_cpy_q_f32_sycl<cpy_blck_q4_1_f32, QK4_1>(
+            src0_ddc, src1_ddc, ne,
+            ne00, ne01, ne02, nb00, nb01, nb02, nb03,
+            ne10, ne11, ne12, nb10, nb11, nb12, nb13,
+            main_stream);
+    }
+    // Q5_0 -> F32
+    else if (src0->type == GGML_TYPE_Q5_0 && src1->type == GGML_TYPE_F32) {
+        ggml_cpy_q_f32_sycl<cpy_blck_q5_0_f32, QK5_0>(
+            src0_ddc, src1_ddc, ne,
+            ne00, ne01, ne02, nb00, nb01, nb02, nb03,
+            ne10, ne11, ne12, nb10, nb11, nb12, nb13,
+            main_stream);
+    }
+    // Q5_1 -> F32
+    else if (src0->type == GGML_TYPE_Q5_1 && src1->type == GGML_TYPE_F32) {
+        ggml_cpy_q_f32_sycl<cpy_blck_q5_1_f32, QK5_1>(
             src0_ddc, src1_ddc, ne,
             ne00, ne01, ne02, nb00, nb01, nb02, nb03,
             ne10, ne11, ne12, nb10, nb11, nb12, nb13,

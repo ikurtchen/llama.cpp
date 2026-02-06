@@ -37,45 +37,58 @@ struct soft_max_params {
 };
 
 // Block reduction for max using shared memory
-template <int block_size>
-static inline float block_reduce_max(float val, float * shared_mem, const sycl::nd_item<3> & item_ct1) {
+// block_size_param: runtime or compile-time block size
+// Handles cases where num_warps > WARP_SIZE by doing iterative shared memory reduction
+static inline float block_reduce_max(float val, float * shared_mem, const int block_size_param, const sycl::nd_item<3> & item_ct1) {
     const int tid = item_ct1.get_local_id(2);
     const int warp_id = tid / WARP_SIZE;
     const int lane_id = tid % WARP_SIZE;
+    const int num_warps = block_size_param / WARP_SIZE;
 
     // First, reduce within warp
     val = warp_reduce_max(val, item_ct1);
 
+    // If only one warp, we're done
+    if (block_size_param <= WARP_SIZE) {
+        return val;
+    }
+
     // Write reduced warp value to shared memory
     if (lane_id == 0) {
         shared_mem[warp_id] = val;
     }
     item_ct1.barrier(sycl::access::fence_space::local_space);
 
-    // Final reduction in first warp
-    if (warp_id == 0) {
-        val = (tid < (block_size / WARP_SIZE)) ? shared_mem[lane_id] : -INFINITY;
-        val = warp_reduce_max(val, item_ct1);
+    // Sequential reduction in shared memory by thread 0
+    // This is simple and correct, though not as fast as parallel reduction
+    if (tid == 0) {
+        float max_val = shared_mem[0];
+        for (int i = 1; i < num_warps; i++) {
+            max_val = sycl::fmax(max_val, shared_mem[i]);
+        }
+        shared_mem[0] = max_val;
     }
+    item_ct1.barrier(sycl::access::fence_space::local_space);
 
-    // Broadcast the result to all threads
-    item_ct1.barrier(sycl::access::fence_space::local_space);
-    if (warp_id == 0 && lane_id == 0) {
-        shared_mem[0] = val;
-    }
-    item_ct1.barrier(sycl::access::fence_space::local_space);
     return shared_mem[0];
 }
 
 // Block reduction for sum using shared memory
-template <int block_size>
-static inline float block_reduce_sum(float val, float * shared_mem, const sycl::nd_item<3> & item_ct1) {
+// block_size_param: runtime or compile-time block size
+// Handles cases where num_warps > WARP_SIZE by doing sequential shared memory reduction
+static inline float block_reduce_sum(float val, float * shared_mem, const int block_size_param, const sycl::nd_item<3> & item_ct1) {
     const int tid = item_ct1.get_local_id(2);
     const int warp_id = tid / WARP_SIZE;
     const int lane_id = tid % WARP_SIZE;
+    const int num_warps = block_size_param / WARP_SIZE;
 
     // First, reduce within warp
     val = warp_reduce_sum(val, item_ct1);
+
+    // If only one warp, we're done
+    if (block_size_param <= WARP_SIZE) {
+        return val;
+    }
 
     // Write reduced warp value to shared memory
     if (lane_id == 0) {
@@ -83,18 +96,17 @@ static inline float block_reduce_sum(float val, float * shared_mem, const sycl::
     }
     item_ct1.barrier(sycl::access::fence_space::local_space);
 
-    // Final reduction in first warp
-    if (warp_id == 0) {
-        val = (tid < (block_size / WARP_SIZE)) ? shared_mem[lane_id] : 0.0f;
-        val = warp_reduce_sum(val, item_ct1);
+    // Sequential reduction in shared memory by thread 0
+    // This is simple and correct, though not as fast as parallel reduction
+    if (tid == 0) {
+        float sum_val = shared_mem[0];
+        for (int i = 1; i < num_warps; i++) {
+            sum_val += shared_mem[i];
+        }
+        shared_mem[0] = sum_val;
     }
+    item_ct1.barrier(sycl::access::fence_space::local_space);
 
-    // Broadcast the result to all threads
-    item_ct1.barrier(sycl::access::fence_space::local_space);
-    if (warp_id == 0 && lane_id == 0) {
-        shared_mem[0] = val;
-    }
-    item_ct1.barrier(sycl::access::fence_space::local_space);
     return shared_mem[0];
 }
 
@@ -139,12 +151,13 @@ static void soft_max_f32_kernel(
     float * dst_row = dst + int64_t(rowx) * ncols;
 
     const int block_size = block_size_template == 0 ? item_ct1.get_local_range(2) : block_size_template;
+    const int num_warps = block_size / WARP_SIZE;
 
     const float slope = get_alibi_slope(p.max_bias, i02, p.n_head_log2, p.m0, p.m1);
 
-    // Shared memory layout: buf_iw for inter-warp communication, vals for caching
+    // Shared memory layout: buf_iw (num_warps floats) for inter-warp communication, vals for caching
     float * buf_iw = buf_shared;
-    float * vals = use_shared ? buf_iw + WARP_SIZE : dst_row;
+    float * vals = use_shared ? buf_iw + num_warps : dst_row;
 
     // Pass 1: find max value
     float max_val = sinks ? sinks[i02] : -INFINITY;
@@ -153,18 +166,16 @@ static void soft_max_f32_kernel(
     for (int col0 = 0; col0 < ncols; col0 += block_size) {
         const int col = col0 + tid;
 
-        if (ncols_template == 0 && col >= ncols) {
-            break;
+        if (col < ncols) {
+            const float val = x_row[col] * p.scale + (mask_row ? slope * t2f32(mask_row[col]) : 0.0f);
+
+            vals[col] = val;
+            max_val = sycl::fmax(max_val, val);
         }
-
-        const float val = x_row[col] * p.scale + (mask_row ? slope * t2f32(mask_row[col]) : 0.0f);
-
-        vals[col] = val;
-        max_val = sycl::fmax(max_val, val);
     }
 
     // Block reduction for max
-    max_val = block_reduce_max<block_size_template == 0 ? SYCL_SOFT_MAX_BLOCK_SIZE : block_size_template>(max_val, buf_iw, item_ct1);
+    max_val = block_reduce_max(max_val, buf_iw, block_size, item_ct1);
 
     // Pass 2: compute exp(x - max) and sum
     float tmp = 0.0f;
@@ -173,17 +184,15 @@ static void soft_max_f32_kernel(
     for (int col0 = 0; col0 < ncols; col0 += block_size) {
         const int col = col0 + tid;
 
-        if (ncols_template == 0 && col >= ncols) {
-            break;
+        if (col < ncols) {
+            const float val = sycl::exp(vals[col] - max_val);
+            tmp += val;
+            vals[col] = val;
         }
-
-        const float val = sycl::exp(vals[col] - max_val);
-        tmp += val;
-        vals[col] = val;
     }
 
     // Block reduction for sum
-    tmp = block_reduce_sum<block_size_template == 0 ? SYCL_SOFT_MAX_BLOCK_SIZE : block_size_template>(tmp, buf_iw, item_ct1);
+    tmp = block_reduce_sum(tmp, buf_iw, block_size, item_ct1);
 
     if (sinks) {
         tmp += sycl::exp(sinks[i02] - max_val);
@@ -196,11 +205,9 @@ static void soft_max_f32_kernel(
     for (int col0 = 0; col0 < ncols; col0 += block_size) {
         const int col = col0 + tid;
 
-        if (ncols_template == 0 && col >= ncols) {
-            return;
+        if (col < ncols) {
+            dst_row[col] = vals[col] * inv_sum;
         }
-
-        dst_row[col] = vals[col] * inv_sum;
     }
 }
 
@@ -247,8 +254,13 @@ static void soft_max_f32_sycl(const float *x, const T *mask,
     const sycl::range<3> block_dims(1, 1, nth);
     const sycl::range<3> block_nums(params.ne03, params.ne02, params.ne01);
 
-    // Shared memory: WARP_SIZE for inter-warp communication + ncols for caching values
-    const size_t nbytes_shared = (GGML_PAD(ncols_x, WARP_SIZE) + WARP_SIZE) * sizeof(float);
+    // Number of warps in the block - needed for inter-warp reduction buffer
+    const int num_warps = nth / WARP_SIZE;
+
+    // Shared memory: num_warps for inter-warp communication + ncols for caching values
+    // Note: CUDA uses WARP_SIZE for buf_iw, but that only works when num_warps <= WARP_SIZE
+    // With WARP_SIZE=16 and block_size=1024, we have num_warps=64, so we need 64 floats
+    const size_t nbytes_shared = (GGML_PAD(ncols_x, WARP_SIZE) + num_warps) * sizeof(float);
 
     // Check if we can use shared memory for caching intermediate values
     // For now, we use a simplified approach: always use shared memory if it fits
@@ -257,7 +269,7 @@ static void soft_max_f32_sycl(const float *x, const T *mask,
     if (nbytes_shared <= max_shared_mem) {
         // Launch with shared memory caching (use_shared = true)
         stream->submit([&](sycl::handler & cgh) {
-            sycl::local_accessor<float, 1> buf_shared_acc(sycl::range<1>(GGML_PAD(ncols_x, WARP_SIZE) + WARP_SIZE), cgh);
+            sycl::local_accessor<float, 1> buf_shared_acc(sycl::range<1>(GGML_PAD(ncols_x, WARP_SIZE) + num_warps), cgh);
 
             cgh.parallel_for(
                 sycl::nd_range<3>(block_nums * block_dims, block_dims),
@@ -269,8 +281,9 @@ static void soft_max_f32_sycl(const float *x, const T *mask,
     } else {
         // Launch without shared memory caching (use_shared = false)
         // Values are stored directly in destination array
+        // Still need num_warps floats for inter-warp reduction
         stream->submit([&](sycl::handler & cgh) {
-            sycl::local_accessor<float, 1> buf_shared_acc(sycl::range<1>(WARP_SIZE), cgh);
+            sycl::local_accessor<float, 1> buf_shared_acc(sycl::range<1>(num_warps), cgh);
 
             cgh.parallel_for(
                 sycl::nd_range<3>(block_nums * block_dims, block_dims),

@@ -97,8 +97,9 @@ static void rope_neox(const T * x, T * dst, const int ne0, const int ne1, const 
 
     if (i0 >= n_dims) {
         // Copy unchanged values for dimensions beyond n_dims
-        dst[idst + 0]          = x[ix + 0];
-        dst[idst + n_dims / 2] = x[ix + n_dims / 2];
+        // i0/2 is already factored into idst and ix, so we add i0/2 to get the correct offset
+        dst[idst + i0 / 2 + 0] = x[ix + i0 / 2 + 0];
+        dst[idst + i0 / 2 + 1] = x[ix + i0 / 2 + 1];
         return;
     }
 
