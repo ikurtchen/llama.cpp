@@ -22,6 +22,7 @@
 #include <sycl/nd_item.hpp>
 
 #include "ggml-sycl/dpct/helper.hpp"
+#include "ggml-common.h"
 
 template <int ElementsPerWI>
 __dpct_inline__ static void quantize_q8_1_impl(const float * __restrict__ x,
@@ -94,6 +95,42 @@ template <int ElementsPerWI> struct quantize_and_reorder_q8_1_soa {
 template <int ElementsPerWI> struct quantize_q8_1 {
     __dpct_inline__ void operator()(const float * __restrict__ x, void * q8_tensor, const int kx, const int kx_padded,
                                     const sycl::nd_item<1> & it) const {
+        /*
+        Quantizes float values to Q8_1 format and stores in standard block_q8_1 layout (AOS format).
+        Each sub-group (warp) calculates one quant block: QK8_1 quant values and the d and sum values.
+
+        block_q8_1 layout:
+        - ds: half2 containing (d, sum) where d = scale, sum = d * sum(qs[i])
+        - qs[QK8_1]: int8_t quantized values
+        */
+        auto subgroup_id = it.get_group(0);
+        auto wi_id       = it.get_local_id(0);
+
+        sycl::vec<int8_t, ElementsPerWI> quantized_values;
+        float                            d   = 0.0f;
+        float                            sum = 0.0f;
+        quantize_q8_1_impl<ElementsPerWI>(x, quantized_values, d, sum, it);
+
+        const int num_blocks_per_row = kx / QK8_1;
+        auto      row                = subgroup_id / num_blocks_per_row;
+        auto      col                = subgroup_id % num_blocks_per_row;
+
+        // Calculate block index within the padded output
+        // Each row has (kx_padded / QK8_1) blocks
+        const int blocks_per_row_padded = kx_padded / QK8_1;
+        const int block_idx = row * blocks_per_row_padded + col;
+
+        // Get pointer to the block_q8_1 structure
+        block_q8_1 * block_ptr = reinterpret_cast<block_q8_1 *>(q8_tensor) + block_idx;
+
+        // Store quantized values - each work item stores ElementsPerWI int8 values
+        const int qs_offset = wi_id * ElementsPerWI;
+        *reinterpret_cast<sycl::vec<int8_t, ElementsPerWI> *>(block_ptr->qs + qs_offset) = quantized_values;
+
+        // First work item stores the ds (scale and sum) values
+        if (wi_id == 0) {
+            block_ptr->ds = sycl::half2(sycl::half(d), sycl::half(sum));
+        }
     }
 };
 
