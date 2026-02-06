@@ -795,7 +795,7 @@ vec_dot_q8_0_q8_1(const void *__restrict__ vbq,
 
 #pragma unroll
     for (int i = 0; i < VDR_Q8_0_Q8_1_MMVQ; ++i) {
-        v[i] = get_int_from_uint8(bq8_0->qs, iqs + i);
+        v[i] = get_int_from_int8(bq8_0->qs, iqs + i);
         u[i] = get_int_from_int8_aligned(bq8_1->qs, iqs + i);
     }
 
