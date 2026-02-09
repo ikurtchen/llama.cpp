@@ -20,7 +20,8 @@
       "priority": 3,
       "complexity": "low",
       "category": "misc",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-02-09T00:00:00Z",
       "description": "Migrate FILL operation: fill tensor with constant value",
       "source_files": [
         "ggml/src/ggml-cuda/fill.cu",
@@ -43,7 +44,7 @@
       ],
       "test_command": "./syclgen/remote_run.sh unit FILL",
       "estimated_lines": 40,
-      "notes": "Simplest possible kernel: single element-wise assignment. Templated on type (f32, f16)."
+      "notes": "Completed. Created fill.hpp and fill.cpp with templated SYCL kernel supporting F32 and F16. Registered dispatch and supports_op in ggml-sycl.cpp. CMakeLists auto-globs so no change needed. All 4 unit tests pass on Intel BMG GPU."
     },
     {
       "id": "task_002",

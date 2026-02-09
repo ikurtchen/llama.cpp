@@ -7,8 +7,8 @@ Last updated: 2026-02-09
 Kernel Inventory
 ----------------
 Total CUDA __global__ kernels:     121
-Already migrated to SYCL:           96  (across ~78 operations)
-Unmigrated kernels:                  25  (across 21 operations)
+Already migrated to SYCL:           97  (across ~79 operations)
+Unmigrated kernels:                  24  (across 20 operations)
 
   Unmigrated by category:
     attention:    7 kernels  (FLASH_ATTN_EXT: ck_052-ck_058)
@@ -16,7 +16,7 @@ Unmigrated kernels:                  25  (across 21 operations)
     training:     4 kernels  (CROSS_ENTROPY_LOSS, CROSS_ENTROPY_LOSS_BACK, SILU_BACK, GET_ROWS_BACK)
     state_space:  2 kernels  (SSM_SCAN: Mamba-1, Mamba-2)
     optimizer:    2 kernels  (OPT_STEP_ADAMW, OPT_STEP_SGD)
-    misc:         6 kernels  (DIAG, CUMSUM x2, SOLVE_TRI x2, FILL, TOP_K, TOPK_MOE)
+    misc:         5 kernels  (DIAG, CUMSUM x2, SOLVE_TRI x2, TOP_K, TOPK_MOE)
     unary:        0 kernels  (XIELU, EXPM1 — ops without separate __global__ but need dispatch)
 
   Note: ROPE_BACK, TOP_K, and EXPM1 use existing kernel infrastructure
@@ -30,15 +30,15 @@ Total migration tasks:              21
   Priority 4 (medium complexity):    9  (task_010 through task_018)
   Priority 5 (high complexity):      3  (task_019 through task_021)
 
-Tasks completed:                     0
+Tasks completed:                     1  (task_001 FILL)
 Tasks in progress:                   0
-Tasks pending:                      21
+Tasks pending:                      20
 
 Estimated total new SYCL lines:   ~2950
 
 Task List (by priority)
 -----------------------
-task_001  FILL                     priority=3  pending
+task_001  FILL                     priority=3  COMPLETED
 task_002  DIAG                     priority=3  pending
 task_003  UNARY_EXPM1              priority=3  pending
 task_004  UNARY_XIELU              priority=3  pending
@@ -59,6 +59,17 @@ task_018  SOLVE_TRI                priority=4  pending
 task_019  SSM_SCAN                 priority=5  pending
 task_020  TOPK_MOE                 priority=5  pending
 task_021  FLASH_ATTN_EXT           priority=5  pending
+
+Session Log
+-----------
+Session 1 (2026-02-09):
+  - Completed task_001: FILL kernel migration
+  - Created: ggml/src/ggml-sycl/fill.hpp, ggml/src/ggml-sycl/fill.cpp
+  - Modified: ggml/src/ggml-sycl/ggml-sycl.cpp (dispatch + supports_op)
+  - Build: PASS (CMakeLists auto-globs .cpp files, no change needed)
+  - Unit tests: 4/4 PASS on Intel BMG GPU (Intel Graphics [0xe211])
+  - No issues discovered
+  - Next: task_002 (DIAG) — another simple kernel
 
 Files
 -----

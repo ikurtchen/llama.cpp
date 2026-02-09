@@ -52,6 +52,7 @@
 #include "ggml-sycl/getrows.hpp"
 #include "ggml-sycl/repeat_back.hpp"
 #include "ggml-sycl/quantize.hpp"
+#include "ggml-sycl/fill.hpp"
 #include "ggml-sycl/ssm_conv.hpp"
 #include "ggml.h"
 
@@ -4028,6 +4029,9 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
         case GGML_OP_ARANGE:
             ggml_sycl_arange(ctx, dst);
             break;
+        case GGML_OP_FILL:
+            ggml_sycl_op_fill(ctx, dst);
+            break;
         default:
             return false;
     }
@@ -4733,6 +4737,8 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
             return op->type == GGML_TYPE_F32;
         case GGML_OP_ARANGE:
             return op->type == GGML_TYPE_F32;
+        case GGML_OP_FILL:
+            return op->type == GGML_TYPE_F32 || op->type == GGML_TYPE_F16;
         default:
             return false;
     }
