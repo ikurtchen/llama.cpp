@@ -1,0 +1,69 @@
+SYCL Migration Progress Tracker
+================================
+Project: llama.cpp
+Phase: CUDA-to-SYCL kernel migration
+Last updated: 2026-02-09
+
+Kernel Inventory
+----------------
+Total CUDA __global__ kernels:     121
+Already migrated to SYCL:           96  (across ~78 operations)
+Unmigrated kernels:                  25  (across 21 operations)
+
+  Unmigrated by category:
+    attention:    7 kernels  (FLASH_ATTN_EXT: ck_052-ck_058)
+    convolution:  4 kernels  (CONV_2D, CONV_2D_DW, CONV_TRANSPOSE_2D, IM2COL_3D)
+    training:     4 kernels  (CROSS_ENTROPY_LOSS, CROSS_ENTROPY_LOSS_BACK, SILU_BACK, GET_ROWS_BACK)
+    state_space:  2 kernels  (SSM_SCAN: Mamba-1, Mamba-2)
+    optimizer:    2 kernels  (OPT_STEP_ADAMW, OPT_STEP_SGD)
+    misc:         6 kernels  (DIAG, CUMSUM x2, SOLVE_TRI x2, FILL, TOP_K, TOPK_MOE)
+    unary:        0 kernels  (XIELU, EXPM1 — ops without separate __global__ but need dispatch)
+
+  Note: ROPE_BACK, TOP_K, and EXPM1 use existing kernel infrastructure
+  (dispatched via existing kernels in rope.cu, top-k.cu, unary.cu)
+  but have no SYCL dispatch entry.
+
+Task Summary
+------------
+Total migration tasks:              21
+  Priority 3 (low complexity):       9  (task_001 through task_009)
+  Priority 4 (medium complexity):    9  (task_010 through task_018)
+  Priority 5 (high complexity):      3  (task_019 through task_021)
+
+Tasks completed:                     0
+Tasks in progress:                   0
+Tasks pending:                      21
+
+Estimated total new SYCL lines:   ~2950
+
+Task List (by priority)
+-----------------------
+task_001  FILL                     priority=3  pending
+task_002  DIAG                     priority=3  pending
+task_003  UNARY_EXPM1              priority=3  pending
+task_004  UNARY_XIELU              priority=3  pending
+task_005  OPT_STEP_SGD             priority=3  pending
+task_006  OPT_STEP_ADAMW           priority=3  pending
+task_007  SILU_BACK                priority=3  pending
+task_008  GET_ROWS_BACK            priority=3  pending
+task_009  IM2COL_3D                priority=3  pending
+task_010  ROPE_BACK                priority=4  pending
+task_011  CONV_2D                  priority=4  pending
+task_012  CONV_2D_DW               priority=4  pending
+task_013  CONV_TRANSPOSE_2D        priority=4  pending
+task_014  CROSS_ENTROPY_LOSS       priority=4  pending
+task_015  CROSS_ENTROPY_LOSS_BACK  priority=4  pending  (depends: task_014)
+task_016  TOP_K                    priority=4  pending
+task_017  CUMSUM                   priority=4  pending
+task_018  SOLVE_TRI                priority=4  pending
+task_019  SSM_SCAN                 priority=5  pending
+task_020  TOPK_MOE                 priority=5  pending
+task_021  FLASH_ATTN_EXT           priority=5  pending
+
+Files
+-----
+syclgen/kernel_spec.json   — Full kernel catalog (121 CUDA kernels, 13 SYCL kernel groups)
+syclgen/task_spec.json     — Migration task list (21 tasks)
+syclgen/progress.txt       — This file
+syclgen/remote_run.sh      — Remote GPU test runner (DO NOT MODIFY)
+syclgen/remote_run.md      — Remote run documentation (DO NOT MODIFY)

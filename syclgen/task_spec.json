@@ -1,0 +1,753 @@
+{
+  "metadata": {
+    "project": "llama.cpp",
+    "phase": "SYCL kernel migration",
+    "created": "2026-02-09",
+    "total_tasks": 20,
+    "test_infrastructure": {
+      "remote_run_script": "./syclgen/remote_run.sh",
+      "remote_run_docs": "./syclgen/remote_run.md",
+      "unit_test_pattern": "./syclgen/remote_run.sh unit <OP_NAME>",
+      "build_test": "./syclgen/remote_run.sh 'upload,build'",
+      "integration_test": "./syclgen/remote_run.sh run"
+    }
+  },
+  "tasks": [
+    {
+      "id": "task_001",
+      "op": "FILL",
+      "type": "kernel",
+      "priority": 3,
+      "complexity": "low",
+      "category": "misc",
+      "status": "pending",
+      "description": "Migrate FILL operation: fill tensor with constant value",
+      "source_files": [
+        "ggml/src/ggml-cuda/fill.cu",
+        "ggml/src/ggml-cuda/fill.cuh"
+      ],
+      "target_files": [
+        "ggml/src/ggml-sycl/fill.cpp",
+        "ggml/src/ggml-sycl/fill.hpp"
+      ],
+      "cuda_kernels": ["ck_059"],
+      "dependencies": [],
+      "cuda_features_used": [],
+      "steps": [
+        "Create ggml/src/ggml-sycl/fill.hpp with declaration for ggml_sycl_op_fill",
+        "Create ggml/src/ggml-sycl/fill.cpp with SYCL kernel: parallel_for over elements, set each to constant value",
+        "Register GGML_OP_FILL in ggml-sycl.cpp dispatch switch (ggml_sycl_compute_forward)",
+        "Add fill.cpp to ggml/src/ggml-sycl/CMakeLists.txt",
+        "Build test: ./syclgen/remote_run.sh 'upload,build'",
+        "Unit test: ./syclgen/remote_run.sh unit FILL"
+      ],
+      "test_command": "./syclgen/remote_run.sh unit FILL",
+      "estimated_lines": 40,
+      "notes": "Simplest possible kernel: single element-wise assignment. Templated on type (f32, f16)."
+    },
+    {
+      "id": "task_002",
+      "op": "DIAG",
+      "type": "kernel",
+      "priority": 3,
+      "complexity": "low",
+      "category": "misc",
+      "status": "pending",
+      "description": "Migrate DIAG operation: extract or create diagonal matrix",
+      "source_files": [
+        "ggml/src/ggml-cuda/diag.cu",
+        "ggml/src/ggml-cuda/diag.cuh"
+      ],
+      "target_files": [
+        "ggml/src/ggml-sycl/diag.cpp",
+        "ggml/src/ggml-sycl/diag.hpp"
+      ],
+      "cuda_kernels": ["ck_050"],
+      "dependencies": [],
+      "cuda_features_used": ["half_precision"],
+      "steps": [
+        "Create ggml/src/ggml-sycl/diag.hpp with declaration for ggml_sycl_op_diag",
+        "Create ggml/src/ggml-sycl/diag.cpp with SYCL kernel: 2D parallel_for, output[i][j] = (i==j) ? src[i] : 0",
+        "Handle half precision using sycl::half type",
+        "Register GGML_OP_DIAG in ggml-sycl.cpp dispatch switch",
+        "Add diag.cpp to ggml/src/ggml-sycl/CMakeLists.txt",
+        "Build test: ./syclgen/remote_run.sh 'upload,build'",
+        "Unit test: ./syclgen/remote_run.sh unit DIAG"
+      ],
+      "test_command": "./syclgen/remote_run.sh unit DIAG",
+      "estimated_lines": 50,
+      "notes": "Simple indexing kernel. Template on T (float, sycl::half). Note: different from DIAG_MASK_INF which already exists in SYCL."
+    },
+    {
+      "id": "task_003",
+      "op": "UNARY_EXPM1",
+      "type": "kernel",
+      "priority": 3,
+      "complexity": "low",
+      "category": "unary",
+      "status": "pending",
+      "description": "Migrate EXPM1 unary operation: compute exp(x)-1 with numerical stability",
+      "source_files": [
+        "ggml/src/ggml-cuda/unary.cu"
+      ],
+      "target_files": [
+        "ggml/src/ggml-sycl/element_wise.cpp",
+        "ggml/src/ggml-sycl/element_wise.hpp"
+      ],
+      "cuda_kernels": [],
+      "dependencies": [],
+      "cuda_features_used": ["half_precision"],
+      "steps": [
+        "Add op_expm1 functor to element_wise.cpp following existing pattern (op_elu already uses sycl::expm1 internally)",
+        "Add ggml_sycl_expm1 wrapper function following existing unary op pattern",
+        "Declare ggml_sycl_expm1 in element_wise.hpp",
+        "Register GGML_UNARY_OP_EXPM1 case in ggml-sycl.cpp dispatch",
+        "Build test: ./syclgen/remote_run.sh 'upload,build'",
+        "Unit test: ./syclgen/remote_run.sh unit EXPM1"
+      ],
+      "test_command": "./syclgen/remote_run.sh unit EXPM1",
+      "estimated_lines": 15,
+      "notes": "Minimal addition to existing element_wise.cpp. sycl::expm1 is already available. Just add the functor and dispatch entry."
+    },
+    {
+      "id": "task_004",
+      "op": "UNARY_XIELU",
+      "type": "kernel",
+      "priority": 3,
+      "complexity": "low",
+      "category": "unary",
+      "status": "pending",
+      "description": "Migrate XiELU activation function",
+      "source_files": [
+        "ggml/src/ggml-cuda/unary.cu"
+      ],
+      "target_files": [
+        "ggml/src/ggml-sycl/element_wise.cpp",
+        "ggml/src/ggml-sycl/element_wise.hpp"
+      ],
+      "cuda_kernels": ["ck_112"],
+      "dependencies": [],
+      "cuda_features_used": ["half_precision"],
+      "steps": [
+        "Study xielu_kernel in unary.cu (lines 422-478): computes xielu with alpha_n, alpha_p, beta, eps parameters",
+        "Add xielu_kernel SYCL implementation in element_wise.cpp with sycl::half support",
+        "Add ggml_sycl_op_xielu wrapper function",
+        "Declare ggml_sycl_op_xielu in element_wise.hpp",
+        "Register GGML_UNARY_OP_XIELU in ggml-sycl.cpp dispatch",
+        "Build test: ./syclgen/remote_run.sh 'upload,build'",
+        "Unit test: ./syclgen/remote_run.sh unit XIELU"
+      ],
+      "test_command": "./syclgen/remote_run.sh unit XIELU",
+      "estimated_lines": 50,
+      "notes": "XiELU is a custom activation: parametric ELU variant. Needs alpha_n, alpha_p, beta, eps from op_params."
+    },
+    {
+      "id": "task_005",
+      "op": "OPT_STEP_SGD",
+      "type": "kernel",
+      "priority": 3,
+      "complexity": "low",
+      "category": "optimizer",
+      "status": "pending",
+      "description": "Migrate SGD optimizer step kernel",
+      "source_files": [
+        "ggml/src/ggml-cuda/opt-step-sgd.cu",
+        "ggml/src/ggml-cuda/opt-step-sgd.cuh"
+      ],
+      "target_files": [
+        "ggml/src/ggml-sycl/opt-step-sgd.cpp",
+        "ggml/src/ggml-sycl/opt-step-sgd.hpp"
+      ],
+      "cuda_kernels": ["ck_080"],
+      "dependencies": [],
+      "cuda_features_used": [],
+      "steps": [
+        "Create ggml/src/ggml-sycl/opt-step-sgd.hpp with declaration for ggml_sycl_op_opt_step_sgd",
+        "Create ggml/src/ggml-sycl/opt-step-sgd.cpp: simple element-wise x -= lr * grad",
+        "Register GGML_OP_OPT_STEP_SGD in ggml-sycl.cpp dispatch",
+        "Add opt-step-sgd.cpp to ggml/src/ggml-sycl/CMakeLists.txt",
+        "Build test: ./syclgen/remote_run.sh 'upload,build'",
+        "Unit test: ./syclgen/remote_run.sh unit OPT_STEP_SGD"
+      ],
+      "test_command": "./syclgen/remote_run.sh unit OPT_STEP_SGD",
+      "estimated_lines": 30,
+      "notes": "Pure element-wise: x = x - lr * gradient. No special CUDA features."
+    },
+    {
+      "id": "task_006",
+      "op": "OPT_STEP_ADAMW",
+      "type": "kernel",
+      "priority": 3,
+      "complexity": "low",
+      "category": "optimizer",
+      "status": "pending",
+      "description": "Migrate AdamW optimizer step kernel",
+      "source_files": [
+        "ggml/src/ggml-cuda/opt-step-adamw.cu",
+        "ggml/src/ggml-cuda/opt-step-adamw.cuh"
+      ],
+      "target_files": [
+        "ggml/src/ggml-sycl/opt-step-adamw.cpp",
+        "ggml/src/ggml-sycl/opt-step-adamw.hpp"
+      ],
+      "cuda_kernels": ["ck_079"],
+      "dependencies": [],
+      "cuda_features_used": [],
+      "steps": [
+        "Create ggml/src/ggml-sycl/opt-step-adamw.hpp with declaration for ggml_sycl_op_opt_step_adamw",
+        "Create ggml/src/ggml-sycl/opt-step-adamw.cpp: element-wise AdamW update (m, v momentum updates, weight decay, bias correction)",
+        "Read op params: lr, beta1, beta2, eps, weight_decay from ggml_tensor op_params",
+        "Register GGML_OP_OPT_STEP_ADAMW in ggml-sycl.cpp dispatch",
+        "Add opt-step-adamw.cpp to ggml/src/ggml-sycl/CMakeLists.txt",
+        "Build test: ./syclgen/remote_run.sh 'upload,build'",
+        "Unit test: ./syclgen/remote_run.sh unit OPT_STEP_ADAMW"
+      ],
+      "test_command": "./syclgen/remote_run.sh unit OPT_STEP_ADAMW",
+      "estimated_lines": 50,
+      "notes": "Element-wise but with multiple buffers (x, grad, m, v). No special CUDA features needed."
+    },
+    {
+      "id": "task_007",
+      "op": "SILU_BACK",
+      "type": "kernel",
+      "priority": 3,
+      "complexity": "low",
+      "category": "training",
+      "status": "pending",
+      "description": "Migrate backward pass for SiLU activation",
+      "source_files": [
+        "ggml/src/ggml-cuda/unary.cu"
+      ],
+      "target_files": [
+        "ggml/src/ggml-sycl/element_wise.cpp",
+        "ggml/src/ggml-sycl/element_wise.hpp"
+      ],
+      "cuda_kernels": ["ck_113"],
+      "dependencies": [],
+      "cuda_features_used": ["half_precision"],
+      "steps": [
+        "Study silu_back_kernel in unary.cu (lines 480-525): grad * (sigmoid(x) + x * sigmoid(x) * (1 - sigmoid(x)))",
+        "Add silu_back_kernel SYCL implementation in element_wise.cpp with sycl::half support",
+        "Add ggml_sycl_op_silu_back wrapper function",
+        "Declare ggml_sycl_op_silu_back in element_wise.hpp",
+        "Register GGML_OP_SILU_BACK in ggml-sycl.cpp dispatch",
+        "Build test: ./syclgen/remote_run.sh 'upload,build'",
+        "Unit test: ./syclgen/remote_run.sh unit SILU_BACK"
+      ],
+      "test_command": "./syclgen/remote_run.sh unit SILU_BACK",
+      "estimated_lines": 40,
+      "notes": "Two input tensors (grad, x), one output. SiLU backward: d/dx[x*sigmoid(x)] * grad. Add to existing element_wise.cpp."
+    },
+    {
+      "id": "task_008",
+      "op": "GET_ROWS_BACK",
+      "type": "kernel",
+      "priority": 3,
+      "complexity": "low",
+      "category": "training",
+      "status": "pending",
+      "description": "Migrate backward pass for get_rows: scatter-accumulate gradients",
+      "source_files": [
+        "ggml/src/ggml-cuda/getrows.cu"
+      ],
+      "target_files": [
+        "ggml/src/ggml-sycl/getrows.cpp",
+        "ggml/src/ggml-sycl/getrows.hpp"
+      ],
+      "cuda_kernels": ["ck_062"],
+      "dependencies": [],
+      "cuda_features_used": ["atomic_ops"],
+      "steps": [
+        "Study k_get_rows_back_float in getrows.cu (lines 72-100): uses atomicAdd for scatter-accumulate",
+        "Add get_rows_back SYCL kernel to existing getrows.cpp using sycl::atomic_ref for atomic adds",
+        "Add ggml_sycl_op_get_rows_back wrapper function",
+        "Declare ggml_sycl_op_get_rows_back in getrows.hpp",
+        "Register GGML_OP_GET_ROWS_BACK in ggml-sycl.cpp dispatch",
+        "Build test: ./syclgen/remote_run.sh 'upload,build'",
+        "Unit test: ./syclgen/remote_run.sh unit GET_ROWS_BACK"
+      ],
+      "test_command": "./syclgen/remote_run.sh unit GET_ROWS_BACK",
+      "estimated_lines": 45,
+      "notes": "Key challenge: CUDA atomicAdd -> sycl::atomic_ref<float, memory_order::relaxed, memory_scope::device, access::address_space::global_space>. Extend existing getrows.cpp."
+    },
+    {
+      "id": "task_009",
+      "op": "IM2COL_3D",
+      "type": "kernel",
+      "priority": 3,
+      "complexity": "low",
+      "category": "convolution",
+      "status": "pending",
+      "description": "Migrate 3D im2col transformation for 3D convolution",
+      "source_files": [
+        "ggml/src/ggml-cuda/im2col.cu"
+      ],
+      "target_files": [
+        "ggml/src/ggml-sycl/im2col.cpp",
+        "ggml/src/ggml-sycl/im2col.hpp"
+      ],
+      "cuda_kernels": ["ck_065"],
+      "dependencies": [],
+      "cuda_features_used": [],
+      "steps": [
+        "Study im2col_3d_kernel in im2col.cu (lines 118-170): extends 2D im2col to 3 spatial dims",
+        "Add im2col_3d_kernel SYCL implementation to existing im2col.cpp (2D version already there)",
+        "Add ggml_sycl_op_im2col_3d wrapper function",
+        "Declare ggml_sycl_op_im2col_3d in im2col.hpp",
+        "Register GGML_OP_IM2COL_3D in ggml-sycl.cpp dispatch (separate from IM2COL)",
+        "Build test: ./syclgen/remote_run.sh 'upload,build'",
+        "Unit test: ./syclgen/remote_run.sh unit IM2COL_3D"
+      ],
+      "test_command": "./syclgen/remote_run.sh unit IM2COL_3D",
+      "estimated_lines": 60,
+      "notes": "Extends existing SYCL im2col.cpp. No special CUDA features, just nested loop with bounds checks. Float-only (no half)."
+    },
+    {
+      "id": "task_010",
+      "op": "ROPE_BACK",
+      "type": "kernel",
+      "priority": 4,
+      "complexity": "medium",
+      "category": "training",
+      "status": "pending",
+      "description": "Migrate backward pass for rotary position embedding",
+      "source_files": [
+        "ggml/src/ggml-cuda/rope.cu"
+      ],
+      "target_files": [
+        "ggml/src/ggml-sycl/rope.cpp",
+        "ggml/src/ggml-sycl/rope.hpp"
+      ],
+      "cuda_kernels": [],
+      "dependencies": [],
+      "cuda_features_used": ["half_precision"],
+      "steps": [
+        "Study ggml_cuda_op_rope_back in rope.cu (line 559+): reverse rotation for gradient backprop",
+        "Examine how forward rope is implemented in SYCL rope.cpp and mirror the structure",
+        "Add rope_back SYCL kernel(s) to existing rope.cpp supporting norm/neox modes",
+        "Handle rope_yarn frequency scaling parameters from op_params",
+        "Add ggml_sycl_op_rope_back wrapper function",
+        "Declare ggml_sycl_op_rope_back in rope.hpp",
+        "Register GGML_OP_ROPE_BACK in ggml-sycl.cpp dispatch",
+        "Build test: ./syclgen/remote_run.sh 'upload,build'",
+        "Unit test: ./syclgen/remote_run.sh unit ROPE_BACK"
+      ],
+      "test_command": "./syclgen/remote_run.sh unit ROPE_BACK",
+      "estimated_lines": 100,
+      "notes": "Reverse of forward rope: rotate by negative angle. Must handle all forward rope variants (norm, neox). Extend existing rope.cpp."
+    },
+    {
+      "id": "task_011",
+      "op": "CONV_2D",
+      "type": "kernel",
+      "priority": 4,
+      "complexity": "medium",
+      "category": "convolution",
+      "status": "pending",
+      "description": "Migrate 2D convolution kernel",
+      "source_files": [
+        "ggml/src/ggml-cuda/conv2d.cu",
+        "ggml/src/ggml-cuda/conv2d.cuh"
+      ],
+      "target_files": [
+        "ggml/src/ggml-sycl/conv2d.cpp",
+        "ggml/src/ggml-sycl/conv2d.hpp"
+      ],
+      "cuda_kernels": ["ck_016"],
+      "dependencies": [],
+      "cuda_features_used": ["half_precision"],
+      "steps": [
+        "Study conv2d_kernel in conv2d.cu (lines 73-120): WHCN layout, templated on input/kernel types",
+        "Study helper functions load_input_element and load_kernel_element for type handling",
+        "Create ggml/src/ggml-sycl/conv2d.hpp with declaration for ggml_sycl_op_conv_2d",
+        "Create ggml/src/ggml-sycl/conv2d.cpp with SYCL kernel using nd_range<3>",
+        "Handle sycl::half for mixed-precision (f16 input, f32 accumulation)",
+        "Register GGML_OP_CONV_2D in ggml-sycl.cpp dispatch",
+        "Add conv2d.cpp to ggml/src/ggml-sycl/CMakeLists.txt",
+        "Build test: ./syclgen/remote_run.sh 'upload,build'",
+        "Unit test: ./syclgen/remote_run.sh unit CONV_2D"
+      ],
+      "test_command": "./syclgen/remote_run.sh unit CONV_2D",
+      "estimated_lines": 100,
+      "notes": "Medium complexity: nested loops over kernel spatial dims with stride/padding/dilation. WHCN layout must be preserved."
+    },
+    {
+      "id": "task_012",
+      "op": "CONV_2D_DW",
+      "type": "kernel",
+      "priority": 4,
+      "complexity": "medium",
+      "category": "convolution",
+      "status": "pending",
+      "description": "Migrate depthwise 2D convolution kernel",
+      "source_files": [
+        "ggml/src/ggml-cuda/conv2d-dw.cu",
+        "ggml/src/ggml-cuda/conv2d-dw.cuh"
+      ],
+      "target_files": [
+        "ggml/src/ggml-sycl/conv2d-dw.cpp",
+        "ggml/src/ggml-sycl/conv2d-dw.hpp"
+      ],
+      "cuda_kernels": ["ck_017"],
+      "dependencies": [],
+      "cuda_features_used": ["half_precision"],
+      "steps": [
+        "Study conv2d_dw_kernel in conv2d-dw.cu (lines 82-130): supports WHCN and CWHN layouts",
+        "Study load helpers for both layout types",
+        "Create ggml/src/ggml-sycl/conv2d-dw.hpp with declaration for ggml_sycl_op_conv_2d_dw",
+        "Create ggml/src/ggml-sycl/conv2d-dw.cpp with SYCL kernel supporting both layouts",
+        "Handle sycl::half for mixed-precision",
+        "Register GGML_OP_CONV_2D_DW in ggml-sycl.cpp dispatch",
+        "Add conv2d-dw.cpp to ggml/src/ggml-sycl/CMakeLists.txt",
+        "Build test: ./syclgen/remote_run.sh 'upload,build'",
+        "Unit test: ./syclgen/remote_run.sh unit CONV_2D_DW"
+      ],
+      "test_command": "./syclgen/remote_run.sh unit CONV_2D_DW",
+      "estimated_lines": 120,
+      "notes": "Depthwise: each channel processed independently. Two layout variants (WHCN, CWHN) increase code size."
+    },
+    {
+      "id": "task_013",
+      "op": "CONV_TRANSPOSE_2D",
+      "type": "kernel",
+      "priority": 4,
+      "complexity": "medium",
+      "category": "convolution",
+      "status": "pending",
+      "description": "Migrate 2D transposed convolution kernel",
+      "source_files": [
+        "ggml/src/ggml-cuda/conv2d-transpose.cu",
+        "ggml/src/ggml-cuda/conv2d-transpose.cuh"
+      ],
+      "target_files": [
+        "ggml/src/ggml-sycl/conv2d-transpose.cpp",
+        "ggml/src/ggml-sycl/conv2d-transpose.hpp"
+      ],
+      "cuda_kernels": ["ck_018"],
+      "dependencies": [],
+      "cuda_features_used": ["half_precision"],
+      "steps": [
+        "Study conv2d_transpose_kernel in conv2d-transpose.cu (lines 6-40): uses half-precision kernel weights",
+        "Create ggml/src/ggml-sycl/conv2d-transpose.hpp with declaration for ggml_sycl_op_conv_transpose_2d",
+        "Create ggml/src/ggml-sycl/conv2d-transpose.cpp with SYCL kernel",
+        "Handle sycl::half for kernel weights (__half -> sycl::half)",
+        "Register GGML_OP_CONV_TRANSPOSE_2D in ggml-sycl.cpp dispatch",
+        "Add conv2d-transpose.cpp to ggml/src/ggml-sycl/CMakeLists.txt",
+        "Build test: ./syclgen/remote_run.sh 'upload,build'",
+        "Unit test: ./syclgen/remote_run.sh unit CONV_TRANSPOSE_2D"
+      ],
+      "test_command": "./syclgen/remote_run.sh unit CONV_TRANSPOSE_2D",
+      "estimated_lines": 80,
+      "notes": "Transposed conv: scatter-add pattern vs regular conv gather. Kernel weights are half precision."
+    },
+    {
+      "id": "task_014",
+      "op": "CROSS_ENTROPY_LOSS",
+      "type": "kernel",
+      "priority": 4,
+      "complexity": "medium",
+      "category": "training",
+      "status": "pending",
+      "description": "Migrate cross-entropy loss computation kernel",
+      "source_files": [
+        "ggml/src/ggml-cuda/cross-entropy-loss.cu",
+        "ggml/src/ggml-cuda/cross-entropy-loss.cuh"
+      ],
+      "target_files": [
+        "ggml/src/ggml-sycl/cross-entropy-loss.cpp",
+        "ggml/src/ggml-sycl/cross-entropy-loss.hpp"
+      ],
+      "cuda_kernels": ["ck_046"],
+      "dependencies": [],
+      "cuda_features_used": ["shared_memory", "warp_shuffle"],
+      "steps": [
+        "Study cross_entropy_loss_f32 in cross-entropy-loss.cu (lines 9-51): log-sum-exp with shared memory reduction",
+        "Create ggml/src/ggml-sycl/cross-entropy-loss.hpp with declarations",
+        "Create ggml/src/ggml-sycl/cross-entropy-loss.cpp with SYCL kernel",
+        "Replace __shfl_xor_sync with dpct::permute_sub_group_by_xor (from common.hpp warp_reduce_sum/max)",
+        "Replace __shared__ with sycl::local_accessor for shared memory reduction buffer",
+        "Register GGML_OP_CROSS_ENTROPY_LOSS in ggml-sycl.cpp dispatch",
+        "Add cross-entropy-loss.cpp to ggml/src/ggml-sycl/CMakeLists.txt",
+        "Build test: ./syclgen/remote_run.sh 'upload,build'",
+        "Unit test: ./syclgen/remote_run.sh unit CROSS_ENTROPY_LOSS"
+      ],
+      "test_command": "./syclgen/remote_run.sh unit CROSS_ENTROPY_LOSS",
+      "estimated_lines": 80,
+      "notes": "Uses warp_reduce_sum/max which have SYCL equivalents in common.hpp. Shared memory for block-level reduction. Log-sum-exp for numerical stability."
+    },
+    {
+      "id": "task_015",
+      "op": "CROSS_ENTROPY_LOSS_BACK",
+      "type": "kernel",
+      "priority": 4,
+      "complexity": "medium",
+      "category": "training",
+      "status": "pending",
+      "description": "Migrate backward pass for cross-entropy loss",
+      "source_files": [
+        "ggml/src/ggml-cuda/cross-entropy-loss.cu"
+      ],
+      "target_files": [
+        "ggml/src/ggml-sycl/cross-entropy-loss.cpp",
+        "ggml/src/ggml-sycl/cross-entropy-loss.hpp"
+      ],
+      "cuda_kernels": ["ck_047"],
+      "dependencies": ["task_014"],
+      "cuda_features_used": ["shared_memory", "warp_shuffle"],
+      "steps": [
+        "Study cross_entropy_loss_back_f32 in cross-entropy-loss.cu (lines 53-85): gradient of cross-entropy",
+        "Add backward kernel to cross-entropy-loss.cpp (same file as forward, created in task_014)",
+        "Reuse shared memory and warp reduction patterns from forward kernel",
+        "Add ggml_sycl_op_cross_entropy_loss_back wrapper",
+        "Declare in cross-entropy-loss.hpp",
+        "Register GGML_OP_CROSS_ENTROPY_LOSS_BACK in ggml-sycl.cpp dispatch",
+        "Build test: ./syclgen/remote_run.sh 'upload,build'",
+        "Unit test: ./syclgen/remote_run.sh unit CROSS_ENTROPY_LOSS_BACK"
+      ],
+      "test_command": "./syclgen/remote_run.sh unit CROSS_ENTROPY_LOSS_BACK",
+      "estimated_lines": 60,
+      "notes": "Same CUDA features as forward. Depends on task_014 since they share a file."
+    },
+    {
+      "id": "task_016",
+      "op": "TOP_K",
+      "type": "kernel",
+      "priority": 4,
+      "complexity": "medium",
+      "category": "misc",
+      "status": "pending",
+      "description": "Migrate top-k selection kernel",
+      "source_files": [
+        "ggml/src/ggml-cuda/top-k.cu",
+        "ggml/src/ggml-cuda/top-k.cuh"
+      ],
+      "target_files": [
+        "ggml/src/ggml-sycl/top-k.cpp",
+        "ggml/src/ggml-sycl/top-k.hpp"
+      ],
+      "cuda_kernels": [],
+      "dependencies": [],
+      "cuda_features_used": ["shared_memory", "cub_library"],
+      "steps": [
+        "Study top-k.cu: uses CUB DeviceRadixSort for efficient top-k when CUB available, fallback otherwise",
+        "Create ggml/src/ggml-sycl/top-k.hpp with declaration for ggml_sycl_op_top_k",
+        "Create ggml/src/ggml-sycl/top-k.cpp: implement using oneDPL sort or custom partial sort kernel",
+        "Alternative: use sycl::ext::oneapi::experimental::radix_sort_over_group if available, else custom bitonic sort",
+        "Register GGML_OP_TOP_K in ggml-sycl.cpp dispatch",
+        "Add top-k.cpp to ggml/src/ggml-sycl/CMakeLists.txt",
+        "Build test: ./syclgen/remote_run.sh 'upload,build'",
+        "Unit test: ./syclgen/remote_run.sh unit TOP_K"
+      ],
+      "test_command": "./syclgen/remote_run.sh unit TOP_K",
+      "estimated_lines": 100,
+      "notes": "CUB DeviceRadixSort needs replacement. Options: oneDPL, custom bitonic sort (like argsort.cu fallback which is already in SYCL). May need per-row sorting approach."
+    },
+    {
+      "id": "task_017",
+      "op": "CUMSUM",
+      "type": "kernel",
+      "priority": 4,
+      "complexity": "medium",
+      "category": "misc",
+      "status": "pending",
+      "description": "Migrate cumulative sum kernel",
+      "source_files": [
+        "ggml/src/ggml-cuda/cumsum.cu",
+        "ggml/src/ggml-cuda/cumsum.cuh"
+      ],
+      "target_files": [
+        "ggml/src/ggml-sycl/cumsum.cpp",
+        "ggml/src/ggml-sycl/cumsum.hpp"
+      ],
+      "cuda_kernels": ["ck_048", "ck_049"],
+      "dependencies": [],
+      "cuda_features_used": ["shared_memory", "cub_library"],
+      "steps": [
+        "Study cumsum.cu: CUB BlockScan (cumsum_cub_kernel) for large rows, simple serial (cumsum_kernel) for small rows",
+        "Create ggml/src/ggml-sycl/cumsum.hpp with declaration for ggml_sycl_op_cumsum",
+        "Create ggml/src/ggml-sycl/cumsum.cpp with two paths:",
+        "  - Small rows: simple serial prefix sum (single work-item per row)",
+        "  - Large rows: use sycl::joint_exclusive_scan or manual block scan with shared memory",
+        "Register GGML_OP_CUMSUM in ggml-sycl.cpp dispatch",
+        "Add cumsum.cpp to ggml/src/ggml-sycl/CMakeLists.txt",
+        "Build test: ./syclgen/remote_run.sh 'upload,build'",
+        "Unit test: ./syclgen/remote_run.sh unit CUMSUM"
+      ],
+      "test_command": "./syclgen/remote_run.sh unit CUMSUM",
+      "estimated_lines": 90,
+      "notes": "CUB BlockScan -> need SYCL equivalent. Options: sycl::joint_exclusive_scan (group algorithm), oneDPL, or manual Hillis-Steele/Blelloch scan."
+    },
+    {
+      "id": "task_018",
+      "op": "SOLVE_TRI",
+      "type": "kernel",
+      "priority": 4,
+      "complexity": "medium",
+      "category": "misc",
+      "status": "pending",
+      "description": "Migrate triangular solve kernel",
+      "source_files": [
+        "ggml/src/ggml-cuda/solve_tri.cu",
+        "ggml/src/ggml-cuda/solve_tri.cuh"
+      ],
+      "target_files": [
+        "ggml/src/ggml-sycl/solve_tri.cpp",
+        "ggml/src/ggml-sycl/solve_tri.hpp"
+      ],
+      "cuda_kernels": ["ck_100", "ck_101"],
+      "dependencies": [],
+      "cuda_features_used": ["shared_memory", "warp_shuffle"],
+      "steps": [
+        "Study solve_tri.cu: get_batch_pointers helper + solve_tri_f32_fast (warp-based) + cuBLAS cublasStrsmBatched for large sizes",
+        "Create ggml/src/ggml-sycl/solve_tri.hpp with declaration for ggml_sycl_op_solve_tri",
+        "Create ggml/src/ggml-sycl/solve_tri.cpp:",
+        "  - Implement warp-based solve using sycl::sub_group for small matrices",
+        "  - For large matrices: use oneMKL trsm_batch (analogous to cuBLAS cublasStrsmBatched)",
+        "Register GGML_OP_SOLVE_TRI in ggml-sycl.cpp dispatch",
+        "Add solve_tri.cpp to ggml/src/ggml-sycl/CMakeLists.txt",
+        "Build test: ./syclgen/remote_run.sh 'upload,build'",
+        "Unit test: ./syclgen/remote_run.sh unit SOLVE_TRI"
+      ],
+      "test_command": "./syclgen/remote_run.sh unit SOLVE_TRI",
+      "estimated_lines": 120,
+      "notes": "Dual path: custom warp kernel for small N, oneMKL trsm_batch for large N. cuBLAS -> oneMKL mapping needed."
+    },
+    {
+      "id": "task_019",
+      "op": "SSM_SCAN",
+      "type": "kernel",
+      "priority": 5,
+      "complexity": "high",
+      "category": "state_space",
+      "status": "pending",
+      "description": "Migrate Mamba-1 and Mamba-2 selective scan kernels",
+      "source_files": [
+        "ggml/src/ggml-cuda/ssm-scan.cu",
+        "ggml/src/ggml-cuda/ssm-scan.cuh"
+      ],
+      "target_files": [
+        "ggml/src/ggml-sycl/ssm_scan.cpp",
+        "ggml/src/ggml-sycl/ssm_scan.hpp"
+      ],
+      "cuda_kernels": ["ck_104", "ck_105"],
+      "dependencies": [],
+      "cuda_features_used": ["shared_memory", "warp_shuffle", "cub_library", "launch_bounds"],
+      "steps": [
+        "Study ssm-scan.cu: two kernels (Mamba-1 at line 19, Mamba-2 at line 118) using CUB BlockLoad/BlockStore",
+        "Create ggml/src/ggml-sycl/ssm_scan.hpp with declarations",
+        "Create ggml/src/ggml-sycl/ssm_scan.cpp:",
+        "  - Replace CUB BlockLoad with sycl::group_load (or manual coalesced load)",
+        "  - Replace CUB BlockStore with sycl::group_store (or manual coalesced store)",
+        "  - Use sycl::sub_group for warp-level operations",
+        "  - Use sycl::local_accessor for shared memory",
+        "Implement Mamba-1 scan: sequential scan along time with selective gating",
+        "Implement Mamba-2 scan: grouped variant with head dimension",
+        "Register GGML_OP_SSM_SCAN in ggml-sycl.cpp dispatch",
+        "Add ssm_scan.cpp to ggml/src/ggml-sycl/CMakeLists.txt",
+        "Build test: ./syclgen/remote_run.sh 'upload,build'",
+        "Unit test: ./syclgen/remote_run.sh unit SSM_SCAN"
+      ],
+      "test_command": "./syclgen/remote_run.sh unit SSM_SCAN",
+      "estimated_lines": 250,
+      "notes": "High complexity due to CUB dependency and sequential scan semantics. Two template variants (Mamba-1, Mamba-2). CUB BlockLoad/BlockStore need custom SYCL replacement. Critical for Mamba/Jamba model support."
+    },
+    {
+      "id": "task_020",
+      "op": "TOPK_MOE",
+      "type": "kernel",
+      "priority": 5,
+      "complexity": "high",
+      "category": "misc",
+      "status": "pending",
+      "description": "Migrate fused MoE top-k with softmax/sigmoid and normalization",
+      "source_files": [
+        "ggml/src/ggml-cuda/topk-moe.cu",
+        "ggml/src/ggml-cuda/topk-moe.cuh"
+      ],
+      "target_files": [
+        "ggml/src/ggml-sycl/topk-moe.cpp",
+        "ggml/src/ggml-sycl/topk-moe.hpp"
+      ],
+      "cuda_kernels": ["ck_106"],
+      "dependencies": [],
+      "cuda_features_used": ["shared_memory", "warp_shuffle", "launch_bounds"],
+      "steps": [
+        "Study topk_moe_cuda in topk-moe.cu (lines 80-200): fused softmax/sigmoid + top-k selection + normalization",
+        "Study helper functions: warp_arg_max_of_pair, shared memory usage pattern",
+        "Create ggml/src/ggml-sycl/topk-moe.hpp with declaration for ggml_sycl_op_topk_moe",
+        "Create ggml/src/ggml-sycl/topk-moe.cpp:",
+        "  - Replace warp shuffles with sycl::sub_group operations",
+        "  - Replace shared memory with sycl::local_accessor",
+        "  - Implement warp-cooperative argmax using sub_group shuffle",
+        "  - Handle softmax vs sigmoid gating modes",
+        "Register GGML_OP_TOPK_MOE in ggml-sycl.cpp dispatch",
+        "Add topk-moe.cpp to ggml/src/ggml-sycl/CMakeLists.txt",
+        "Build test: ./syclgen/remote_run.sh 'upload,build'",
+        "Unit test: ./syclgen/remote_run.sh unit TOPK_MOE"
+      ],
+      "test_command": "./syclgen/remote_run.sh unit TOPK_MOE",
+      "estimated_lines": 180,
+      "notes": "Complex fused kernel combining multiple operations. Uses 4*WARP_SIZE threads. Critical for MoE models (Mixtral, DBRX, etc.)."
+    },
+    {
+      "id": "task_021",
+      "op": "FLASH_ATTN_EXT",
+      "type": "kernel",
+      "priority": 5,
+      "complexity": "high",
+      "category": "attention",
+      "status": "pending",
+      "description": "Migrate flash attention kernels (MMA, tile, vec, WMMA variants)",
+      "source_files": [
+        "ggml/src/ggml-cuda/fattn.cu",
+        "ggml/src/ggml-cuda/fattn.cuh",
+        "ggml/src/ggml-cuda/fattn-common.cuh",
+        "ggml/src/ggml-cuda/fattn-mma-f16.cuh",
+        "ggml/src/ggml-cuda/fattn-tile.cu",
+        "ggml/src/ggml-cuda/fattn-tile.cuh",
+        "ggml/src/ggml-cuda/fattn-vec.cuh",
+        "ggml/src/ggml-cuda/fattn-wmma-f16.cu",
+        "ggml/src/ggml-cuda/fattn-wmma-f16.cuh"
+      ],
+      "target_files": [
+        "ggml/src/ggml-sycl/fattn.cpp",
+        "ggml/src/ggml-sycl/fattn.hpp",
+        "ggml/src/ggml-sycl/fattn-common.hpp",
+        "ggml/src/ggml-sycl/fattn-vec.cpp",
+        "ggml/src/ggml-sycl/fattn-tile.cpp"
+      ],
+      "cuda_kernels": ["ck_052", "ck_053", "ck_054", "ck_055", "ck_056", "ck_057", "ck_058"],
+      "dependencies": [],
+      "cuda_features_used": ["shared_memory", "warp_shuffle", "half_precision", "mma_tensor_cores", "wmma_tensor_cores", "launch_bounds", "cp_async", "cooperative_groups"],
+      "steps": [
+        "Phase 1 - Common infrastructure:",
+        "  - Create fattn-common.hpp with SYCL equivalents of helper functions",
+        "  - Migrate flash_attn_mask_to_KV_max (ck_052): simple kernel",
+        "  - Migrate flash_attn_stream_k_fixup (ck_053): reduction fixup",
+        "  - Migrate flash_attn_combine_results (ck_054): tile combination",
+        "Phase 2 - Vec kernel (simplest, highest value for single-query):",
+        "  - Migrate flash_attn_ext_vec (ck_057): vectorized attention for batch=1",
+        "  - Replace warp shuffles with sycl::sub_group operations",
+        "  - Replace shared memory with sycl::local_accessor",
+        "  - Handle 42 template instances for type combinations",
+        "Phase 3 - Tile kernel:",
+        "  - Migrate flash_attn_tile (ck_056): tiled attention without tensor cores",
+        "  - Replace shared memory tiling pattern",
+        "  - Handle 9 template instances",
+        "Phase 4 - MMA/WMMA kernels (most complex, optional for initial support):",
+        "  - Evaluate sycl::ext::oneapi::experimental::matrix for joint_matrix (XMX) support",
+        "  - Migrate flash_attn_ext_f16 MMA (ck_055): requires PTX inline asm replacement",
+        "  - Migrate flash_attn_ext_f16 WMMA (ck_058): uses nvcuda::wmma -> sycl joint_matrix",
+        "  - Replace cp.async with SYCL async copy or prefetch",
+        "Create dispatch function in fattn.cpp selecting between available implementations",
+        "Register GGML_OP_FLASH_ATTN_EXT in ggml-sycl.cpp dispatch",
+        "Add new files to ggml/src/ggml-sycl/CMakeLists.txt",
+        "Build test: ./syclgen/remote_run.sh 'upload,build'",
+        "Unit test: ./syclgen/remote_run.sh unit FLASH_ATTN_EXT"
+      ],
+      "test_command": "./syclgen/remote_run.sh unit FLASH_ATTN_EXT",
+      "estimated_lines": 1500,
+      "notes": "HIGHEST IMPACT task for inference performance. 7 kernels, 152+ template instances in CUDA. Start with vec kernel (most common in inference). MMA/WMMA kernels use NVIDIA-specific tensor core intrinsics that need Intel XMX (joint_matrix) equivalents. cp.async has no direct SYCL equivalent; use prefetch or explicit staging. This should be decomposed into sub-tasks during implementation."
+    }
+  ]
+}
