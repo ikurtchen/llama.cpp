@@ -30,16 +30,16 @@ Total migration tasks:              21
   Priority 4 (medium complexity):    9  (task_010 through task_018)
   Priority 5 (high complexity):      3  (task_019 through task_021)
 
-Tasks completed:                     1  (task_001 FILL)
+Tasks completed:                     2  (task_001 FILL, task_002 DIAG)
 Tasks in progress:                   0
-Tasks pending:                      20
+Tasks pending:                      19
 
 Estimated total new SYCL lines:   ~2950
 
 Task List (by priority)
 -----------------------
 task_001  FILL                     priority=3  COMPLETED
-task_002  DIAG                     priority=3  pending
+task_002  DIAG                     priority=3  COMPLETED
 task_003  UNARY_EXPM1              priority=3  pending
 task_004  UNARY_XIELU              priority=3  pending
 task_005  OPT_STEP_SGD             priority=3  pending
@@ -70,6 +70,17 @@ Session 1 (2026-02-09):
   - Unit tests: 4/4 PASS on Intel BMG GPU (Intel Graphics [0xe211])
   - No issues discovered
   - Next: task_002 (DIAG) — another simple kernel
+
+Session 2 (2026-02-09):
+  - Completed task_002: DIAG kernel migration
+  - Created: ggml/src/ggml-sycl/diag.hpp, ggml/src/ggml-sycl/diag.cpp
+  - Modified: ggml/src/ggml-sycl/ggml-sycl.cpp (dispatch + supports_op)
+  - Build: PASS (CMakeLists auto-globs .cpp files, no change needed)
+  - Unit tests: 3/3 PASS on Intel BMG GPU (Intel Graphics [0xe211])
+  - Issue: Initial remote test showed "not supported" due to stale build cache
+    (rsync preserves timestamps causing CMake to skip recompilation).
+    Fix: touch source files on remote after upload to force rebuild.
+  - Next: task_003 (UNARY_EXPM1) — minimal addition to element_wise.cpp
 
 Files
 -----

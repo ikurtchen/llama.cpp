@@ -53,7 +53,8 @@
       "priority": 3,
       "complexity": "low",
       "category": "misc",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-02-09T01:00:00Z",
       "description": "Migrate DIAG operation: extract or create diagonal matrix",
       "source_files": [
         "ggml/src/ggml-cuda/diag.cu",
@@ -77,7 +78,7 @@
       ],
       "test_command": "./syclgen/remote_run.sh unit DIAG",
       "estimated_lines": 50,
-      "notes": "Simple indexing kernel. Template on T (float, sycl::half). Note: different from DIAG_MASK_INF which already exists in SYCL."
+      "notes": "Completed. Created diag.hpp and diag.cpp with templated SYCL kernel supporting F32 and F16. Registered dispatch and supports_op in ggml-sycl.cpp. CMakeLists auto-globs so no change needed. All 3 unit tests pass on Intel BMG GPU."
     },
     {
       "id": "task_003",
