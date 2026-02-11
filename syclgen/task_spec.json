@@ -677,7 +677,8 @@
       "priority": 5,
       "complexity": "high",
       "category": "misc",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-02-11T16:00:00Z",
       "description": "Migrate fused MoE top-k with softmax/sigmoid and normalization",
       "source_files": [
         "ggml/src/ggml-cuda/topk-moe.cu",
@@ -706,7 +707,7 @@
       ],
       "test_command": "./syclgen/remote_run.sh unit TOPK_MOE",
       "estimated_lines": 180,
-      "notes": "Complex fused kernel combining multiple operations. Uses 4*WARP_SIZE threads. Critical for MoE models (Mixtral, DBRX, etc.)."
+      "notes": "Completed. Created topk-moe.hpp and topk-moe.cpp (390 lines) with fused MoE top-k SYCL kernel. Two components: (1) SYCL kernel topk_moe_sycl<n_experts, has_bias> — direct port from CUDA with nd_range<2> (dim0=rows_per_block=4, dim1=WARP_SIZE), dpct::permute_sub_group_by_xor for warp shuffles (both float and int), warp_reduce_max/sum from common.hpp, sycl::exp/fmax. Template switch for 11 expert counts (1,2,4,8,16,32,64,128,256,512,576). Handles softmax/sigmoid gating, bias, normalization, delayed softmax, and scale modes. (2) Graph-level fusion detection in ggml-sycl.cpp — added ggml_sycl_topk_moe_fusion() function and fusion detection block in graph_compute_impl loop, mirroring CUDA's pattern (SOFT_MAX/UNARY/ARGSORT → RESHAPE → optional ADD → ARGSORT → VIEW → GET_ROWS → optional norm/scale). Uses ggml_can_fuse_subgraph from ggml-impl.h. GGML_SYCL_DISABLE_FUSION env var to opt out. WARP_SIZE-portable: experts_per_thread=n_experts/WARP_SIZE adapts automatically (576/16=36 works since 576%16==0). [[sycl::reqd_sub_group_size(WARP_SIZE)]] on all launches. 192/192 unit tests pass on Intel BMG GPU (8 shapes × 2 norm × 2 bias × 3 gating × 2 scale)."
     },
     {
       "id": "task_021",
