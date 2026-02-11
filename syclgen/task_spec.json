@@ -601,7 +601,8 @@
       "priority": 4,
       "complexity": "medium",
       "category": "misc",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-02-11T14:00:00Z",
       "description": "Migrate triangular solve kernel",
       "source_files": [
         "ggml/src/ggml-cuda/solve_tri.cu",
@@ -627,7 +628,7 @@
       ],
       "test_command": "./syclgen/remote_run.sh unit SOLVE_TRI",
       "estimated_lines": 120,
-      "notes": "Dual path: custom warp kernel for small N, oneMKL trsm_batch for large N. cuBLAS -> oneMKL mapping needed."
+      "notes": "Completed. Created solve_tri.hpp and solve_tri.cpp with two paths: (1) Fast warp-based kernel (solve_tri_f32_fast) for n<=64, k<=32 using shared memory for A matrix and warp_reduce_sum for forward substitution; generalized CUDA's 2-half split to NUM_SECTIONS=MAX_N_FAST/WARP_SIZE sections to support Intel GPUs with WARP_SIZE=16. Template specializations for n=64 with k=32/16/14/12/10/8/6/4/2/1 plus generic <0,0> fallback. (2) oneMKL trsm_batch for large matrices (n>64 or k>32), using get_batch_pointers kernel + oneapi::math::blas::column_major::trsm_batch (right-side, upper triangular, non-transposed, non-unit diagonal). Passed sycl::uint3 fastdiv values as 3 separate uint32_t to avoid device-capture issues. Registered dispatch and supports_op (F32 only) in ggml-sycl.cpp. CMakeLists auto-globs. Initial test had 2/24 failures (n=42/k=10, n=64/k=10) due to CUDA assuming WARP_SIZE=32 for 2-half row split; fixed by generalizing to NUM_SECTIONS. 24/24 unit tests pass on Intel BMG GPU."
     },
     {
       "id": "task_019",

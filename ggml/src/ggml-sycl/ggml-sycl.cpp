@@ -63,6 +63,7 @@
 #include "ggml-sycl/cross-entropy-loss.hpp"
 #include "ggml-sycl/cumsum.hpp"
 #include "ggml-sycl/top-k.hpp"
+#include "ggml-sycl/solve_tri.hpp"
 #include "ggml.h"
 
 static bool g_sycl_loaded = false;
@@ -4114,6 +4115,9 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
         case GGML_OP_CUMSUM:
             ggml_sycl_op_cumsum(ctx, dst);
             break;
+        case GGML_OP_SOLVE_TRI:
+            ggml_sycl_op_solve_tri(ctx, dst);
+            break;
         default:
             return false;
     }
@@ -4845,6 +4849,8 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
             return op->src[0]->type == GGML_TYPE_F32
                 && op->src[0]->ne[0] * (int64_t)sizeof(int) <= (int64_t)ggml_sycl_info().devices[device].smpbo;
         case GGML_OP_CUMSUM:
+            return op->src[0]->type == GGML_TYPE_F32;
+        case GGML_OP_SOLVE_TRI:
             return op->src[0]->type == GGML_TYPE_F32;
         default:
             return false;
