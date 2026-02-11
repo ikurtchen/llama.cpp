@@ -637,7 +637,8 @@
       "priority": 5,
       "complexity": "high",
       "category": "state_space",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-02-11T15:00:00Z",
       "description": "Migrate Mamba-1 and Mamba-2 selective scan kernels",
       "source_files": [
         "ggml/src/ggml-cuda/ssm-scan.cu",
@@ -667,7 +668,7 @@
       ],
       "test_command": "./syclgen/remote_run.sh unit SSM_SCAN",
       "estimated_lines": 250,
-      "notes": "High complexity due to CUB dependency and sequential scan semantics. Two template variants (Mamba-1, Mamba-2). CUB BlockLoad/BlockStore need custom SYCL replacement. Critical for Mamba/Jamba model support."
+      "notes": "Completed. Created ssm_scan.hpp and ssm_scan.cpp (298 lines) with two kernel implementations. Mamba-1 (ssm_scan_f32): template<splitD=128, N=16>, uses non-CUB fallback path with runtime L, sycl::local_accessor for shared B/C vectors, sycl::group_barrier for sync, nd_range<3>. Mamba-2 (ssm_scan_f32_group): template<c_factor=d_state/WARP_SIZE, d_state=128|256>, warp-based with warp_reduce_sum<WARP_SIZE>() for parallel output accumulation, nd_range<2>, [[sycl::reqd_sub_group_size(WARP_SIZE)]] attribute. WARP_SIZE-portable: c_factor correctly adapts to WARP_SIZE=16 on Intel (c_factor=8 for d_state=128, c_factor=16 for d_state=256). Added bounds check for out-of-range warps from grid rounding. Registered dispatch, supports_op (matching CUDA: Mamba-2 d_state==128||256 && d_head%16==0, Mamba-1 d_state==16 && d_head==1 && n_head%128==0 && n_group==1) in ggml-sycl.cpp. CMakeLists auto-globs. 3/3 unit tests pass on Intel BMG GPU (d_state=16/128/256 configurations)."
     },
     {
       "id": "task_020",
