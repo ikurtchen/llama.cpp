@@ -252,7 +252,8 @@
       "priority": 3,
       "complexity": "low",
       "category": "training",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-02-11T05:00:00Z",
       "description": "Migrate backward pass for get_rows: scatter-accumulate gradients",
       "source_files": [
         "ggml/src/ggml-cuda/getrows.cu"
@@ -275,7 +276,7 @@
       ],
       "test_command": "./syclgen/remote_run.sh unit GET_ROWS_BACK",
       "estimated_lines": 45,
-      "notes": "Key challenge: CUDA atomicAdd -> sycl::atomic_ref<float, memory_order::relaxed, memory_scope::device, access::address_space::global_space>. Extend existing getrows.cpp."
+      "notes": "Completed. Added k_get_rows_back_float kernel and ggml_sycl_op_get_rows_back wrapper to existing getrows.cpp. Declared ggml_sycl_op_get_rows_back in getrows.hpp. Added dispatch and supports_op (F32 only) in ggml-sycl.cpp. Added SYCL_GET_ROWS_BACK_BLOCK_SIZE=256 to presets.hpp. Implementation uses gather-reduce pattern (no atomics needed — each output element summed by one thread). 3/3 unit tests pass on Intel BMG GPU."
     },
     {
       "id": "task_009",

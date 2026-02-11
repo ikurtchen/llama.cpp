@@ -168,6 +168,65 @@ static void get_rows_sycl_float(ggml_backend_sycl_context & ctx, const ggml_tens
     GGML_UNUSED(ctx);
 }
 
+static void k_get_rows_back_float(
+            const float * __restrict__ grad, const int32_t * __restrict__ rows, float * __restrict__ dst,
+            int64_t ncols, int64_t nrows_grad,
+            const sycl::nd_item<3> &item_ct1) {
+
+    const int col     = item_ct1.get_group(2) * item_ct1.get_local_range(2) + item_ct1.get_local_id(2);
+    const int dst_row = item_ct1.get_group(1) * item_ct1.get_local_range(1) + item_ct1.get_local_id(1);
+
+    if (col >= ncols) {
+        return;
+    }
+
+    float sum = 0.0f;
+
+    for (int64_t i = 0; i < nrows_grad; ++i) {
+        if (rows[i] != dst_row) {
+            continue;
+        }
+        sum += grad[i*ncols + col];
+    }
+
+    dst[dst_row*ncols + col] = sum;
+}
+
+void ggml_sycl_op_get_rows_back(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
+    const ggml_tensor * src0 = dst->src[0]; // gradients of forward pass output
+    const ggml_tensor * src1 = dst->src[1]; // src1 in forward pass (row indices)
+
+    GGML_TENSOR_BINARY_OP_LOCALS
+
+    const float   * src0_d = (const float   *) src0->data;
+    const int32_t * src1_d = (const int32_t *) src1->data;
+    float         * dst_d  = (float         *) dst->data;
+
+    queue_ptr stream = ctx.stream();
+
+    GGML_ASSERT(src0->type == GGML_TYPE_F32);
+    GGML_ASSERT(src1->type == GGML_TYPE_I32);
+    GGML_ASSERT(dst->type  == GGML_TYPE_F32);
+
+    GGML_ASSERT(ggml_is_contiguous(src0));
+    GGML_ASSERT(ggml_is_contiguous(src1));
+    GGML_ASSERT(ggml_is_contiguous(dst));
+
+    GGML_ASSERT(ne02*ne03 == 1);
+    GGML_ASSERT(ne12*ne13 == 1);
+    GGML_ASSERT(ne2*ne3 == 1);
+
+    const sycl::range<3> block_dims(1, 1, SYCL_GET_ROWS_BACK_BLOCK_SIZE);
+    const int block_num_x = (ne00 + SYCL_GET_ROWS_BACK_BLOCK_SIZE - 1) / SYCL_GET_ROWS_BACK_BLOCK_SIZE;
+    const sycl::range<3> block_nums(1, ne1, block_num_x);
+
+    stream->parallel_for(
+        sycl::nd_range<3>(block_nums * block_dims, block_dims),
+        [=](sycl::nd_item<3> item_ct1) {
+            k_get_rows_back_float(src0_d, src1_d, dst_d, ne00, ne10, item_ct1);
+        });
+}
+
 void ggml_sycl_op_get_rows(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
     GGML_ASSERT(dst->src[1]->type == GGML_TYPE_I32);
     GGML_ASSERT(dst->type == GGML_TYPE_F32);
