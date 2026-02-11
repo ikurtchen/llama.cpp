@@ -2,7 +2,7 @@ SYCL Migration Progress Tracker
 ================================
 Project: llama.cpp
 Phase: CUDA-to-SYCL kernel migration
-Last updated: 2026-02-11 (session 5)
+Last updated: 2026-02-11 (session 6)
 
 Kernel Inventory
 ----------------
@@ -30,9 +30,9 @@ Total migration tasks:              21
   Priority 4 (medium complexity):    9  (task_010 through task_018)
   Priority 5 (high complexity):      3  (task_019 through task_021)
 
-Tasks completed:                     5  (task_001 FILL, task_002 DIAG, task_003 EXPM1, task_004 XIELU, task_005 OPT_STEP_SGD)
+Tasks completed:                     6  (task_001 FILL, task_002 DIAG, task_003 EXPM1, task_004 XIELU, task_005 OPT_STEP_SGD, task_006 OPT_STEP_ADAMW)
 Tasks in progress:                   0
-Tasks pending:                      16
+Tasks pending:                      15
 
 Estimated total new SYCL lines:   ~2950
 
@@ -43,7 +43,7 @@ task_002  DIAG                     priority=3  COMPLETED
 task_003  UNARY_EXPM1              priority=3  COMPLETED
 task_004  UNARY_XIELU              priority=3  COMPLETED
 task_005  OPT_STEP_SGD             priority=3  COMPLETED
-task_006  OPT_STEP_ADAMW           priority=3  pending
+task_006  OPT_STEP_ADAMW           priority=3  COMPLETED
 task_007  SILU_BACK                priority=3  pending
 task_008  GET_ROWS_BACK            priority=3  pending
 task_009  IM2COL_3D                priority=3  pending
@@ -129,6 +129,22 @@ Session 5 (2026-02-11):
     with lr and weight_decay read from params tensor (2 floats)
   - Next: task_006 (OPT_STEP_ADAMW) — AdamW optimizer step, also element-wise but
     with multiple buffers (x, grad, m, v)
+
+Session 6 (2026-02-11):
+  - Completed task_006: OPT_STEP_ADAMW kernel migration
+  - Created: ggml/src/ggml-sycl/opt-step-adamw.hpp, ggml/src/ggml-sycl/opt-step-adamw.cpp
+  - Modified: ggml/src/ggml-sycl/ggml-sycl.cpp (dispatch + supports_op)
+  - Build: PASS (CMakeLists auto-globs .cpp files, no change needed)
+  - Unit tests: 1/1 PASS on Intel BMG GPU (Intel Graphics [0xe211])
+  - Issue: Initial test showed "not supported" due to stale build cache
+    (same rsync timestamp issue as sessions 2 and 4). Fix: used clean,upload,build
+    to force full rebuild.
+  - Implementation: F32-only AdamW update with 5 input tensors (x, grad, m, v,
+    params). 7 parameters (alpha, beta1, beta2, eps, wd, beta1h, beta2h).
+    Straightforward element-wise kernel — direct port from CUDA with
+    sqrtf → sycl::sqrt as only math function change.
+  - Next: task_007 (SILU_BACK) — backward pass for SiLU activation, two-input
+    element-wise kernel added to element_wise.cpp
 
 Files
 -----

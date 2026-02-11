@@ -185,7 +185,8 @@
       "priority": 3,
       "complexity": "low",
       "category": "optimizer",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-02-11T03:00:00Z",
       "description": "Migrate AdamW optimizer step kernel",
       "source_files": [
         "ggml/src/ggml-cuda/opt-step-adamw.cu",
@@ -209,7 +210,7 @@
       ],
       "test_command": "./syclgen/remote_run.sh unit OPT_STEP_ADAMW",
       "estimated_lines": 50,
-      "notes": "Element-wise but with multiple buffers (x, grad, m, v). No special CUDA features needed."
+      "notes": "Completed. Created opt-step-adamw.hpp and opt-step-adamw.cpp with SYCL kernel for element-wise AdamW update: m = m*beta1 + g*(1-beta1), v = v*beta2 + g*g*(1-beta2), x = x*(1-alpha*wd) - alpha*(m*beta1h)/(sqrt(v*beta2h)+eps). F32-only. 5 input tensors (x, grad, m, v, params with 7 floats). Registered dispatch and supports_op in ggml-sycl.cpp. CMakeLists auto-globs so no change needed. 1/1 unit test passes on Intel BMG GPU."
     },
     {
       "id": "task_007",
