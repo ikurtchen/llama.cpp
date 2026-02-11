@@ -119,7 +119,8 @@
       "priority": 3,
       "complexity": "low",
       "category": "unary",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-02-11T01:00:00Z",
       "description": "Migrate XiELU activation function",
       "source_files": [
         "ggml/src/ggml-cuda/unary.cu"
@@ -142,7 +143,7 @@
       ],
       "test_command": "./syclgen/remote_run.sh unit XIELU",
       "estimated_lines": 50,
-      "notes": "XiELU is a custom activation: parametric ELU variant. Needs alpha_n, alpha_p, beta, eps from op_params."
+      "notes": "Completed. Added xielu_kernel template function in ggml_sycl_detail namespace with parametric XiELU activation (alpha_n, alpha_p, beta, eps from op_params). Added ggml_sycl_op_xielu wrapper with F32/F16 dispatch. Declared in element_wise.hpp. Added dispatch and supports_op (in EXPM1/FLOOR group with F32-only check when GGML_SYCL_F16 off). Fixed CUDA implicit bool-to-float conversion to explicit ternary. 1/1 unit test passes on Intel BMG GPU."
     },
     {
       "id": "task_005",

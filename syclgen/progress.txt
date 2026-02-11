@@ -2,7 +2,7 @@ SYCL Migration Progress Tracker
 ================================
 Project: llama.cpp
 Phase: CUDA-to-SYCL kernel migration
-Last updated: 2026-02-11
+Last updated: 2026-02-11 (session 4)
 
 Kernel Inventory
 ----------------
@@ -30,9 +30,9 @@ Total migration tasks:              21
   Priority 4 (medium complexity):    9  (task_010 through task_018)
   Priority 5 (high complexity):      3  (task_019 through task_021)
 
-Tasks completed:                     3  (task_001 FILL, task_002 DIAG, task_003 EXPM1)
+Tasks completed:                     4  (task_001 FILL, task_002 DIAG, task_003 EXPM1, task_004 XIELU)
 Tasks in progress:                   0
-Tasks pending:                      18
+Tasks pending:                      17
 
 Estimated total new SYCL lines:   ~2950
 
@@ -41,7 +41,7 @@ Task List (by priority)
 task_001  FILL                     priority=3  COMPLETED
 task_002  DIAG                     priority=3  COMPLETED
 task_003  UNARY_EXPM1              priority=3  COMPLETED
-task_004  UNARY_XIELU              priority=3  pending
+task_004  UNARY_XIELU              priority=3  COMPLETED
 task_005  OPT_STEP_SGD             priority=3  pending
 task_006  OPT_STEP_ADAMW           priority=3  pending
 task_007  SILU_BACK                priority=3  pending
@@ -98,6 +98,25 @@ Session 3 (2026-02-11):
     latent bug — they claim F16 support but assert F32 when GGML_SYCL_F16 is off.
     This hasn't been caught because those ops' F16 tests aren't run in isolation.
   - Next: task_004 (UNARY_XIELU) — another unary op, but with custom parameters
+
+Session 4 (2026-02-11):
+  - Completed task_004: UNARY_XIELU kernel migration
+  - Modified: ggml/src/ggml-sycl/element_wise.cpp (added xielu_kernel template
+    function in ggml_sycl_detail namespace, ggml_sycl_op_xielu wrapper with
+    F32/F16 dispatch, ggml_sycl_xielu public function)
+  - Modified: ggml/src/ggml-sycl/element_wise.hpp (declared ggml_sycl_xielu)
+  - Modified: ggml/src/ggml-sycl/ggml-sycl.cpp (dispatch + supports_op)
+  - Build: PASS
+  - Unit tests: 1/1 PASS on Intel BMG GPU (Intel Graphics [0xe211])
+  - Issue: Initial test showed "not supported" due to stale build cache
+    (same rsync timestamp issue as session 2). Fix: used clean,upload,build
+    to force full rebuild.
+  - Implementation notes: XiELU is a parametric unary op with 4 params
+    (alpha_n, alpha_p, beta, eps) read from op_params. Cannot use the simple
+    ggml_sycl_op_unary lambda pattern — needed custom kernel like swiglu_oai.
+    Fixed CUDA implicit bool-to-float conversion to explicit ternary operator.
+    Used sycl::fmin and sycl::expm1 instead of fminf/expm1f.
+  - Next: task_005 (OPT_STEP_SGD) — simple element-wise optimizer step
 
 Files
 -----

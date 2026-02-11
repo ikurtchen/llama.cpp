@@ -3862,6 +3862,9 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
                 case GGML_UNARY_OP_EXPM1:
                     ggml_sycl_expm1(ctx, dst);
                     break;
+                case GGML_UNARY_OP_XIELU:
+                    ggml_sycl_xielu(ctx, dst);
+                    break;
                 case GGML_UNARY_OP_FLOOR:
                     ggml_sycl_floor(ctx, dst);
                     break;
@@ -4484,6 +4487,7 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
                 case GGML_UNARY_OP_ELU:
                     return true;
                 case GGML_UNARY_OP_EXPM1:
+                case GGML_UNARY_OP_XIELU:
                 case GGML_UNARY_OP_FLOOR:
                 case GGML_UNARY_OP_CEIL:
                 case GGML_UNARY_OP_ROUND:
