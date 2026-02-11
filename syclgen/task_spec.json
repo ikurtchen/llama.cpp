@@ -389,7 +389,8 @@
       "priority": 4,
       "complexity": "medium",
       "category": "convolution",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-02-11T09:00:00Z",
       "description": "Migrate depthwise 2D convolution kernel",
       "source_files": [
         "ggml/src/ggml-cuda/conv2d-dw.cu",
@@ -415,7 +416,7 @@
       ],
       "test_command": "./syclgen/remote_run.sh unit CONV_2D_DW",
       "estimated_lines": 120,
-      "notes": "Depthwise: each channel processed independently. Two layout variants (WHCN, CWHN) increase code size."
+      "notes": "Completed. Created conv2d-dw.hpp and conv2d-dw.cpp with template<bool is_cwhn> SYCL kernel supporting both WHCN and CWHN layouts. F32-only depthwise convolution (each channel processed independently, no IC inner loop). Uses if constexpr for layout selection. Struct/function names prefixed with 'dw' to avoid collisions with conv2d.cpp. Registered dispatch and supports_op in ggml-sycl.cpp. CMakeLists auto-globs so no change needed. 4/4 unit tests pass on Intel BMG GPU (both layout variants, various input sizes, stride/padding combos)."
     },
     {
       "id": "task_013",
