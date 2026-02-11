@@ -3707,6 +3707,11 @@ static void ggml_sycl_im2col(ggml_backend_sycl_context & ctx, ggml_tensor * dst)
     ggml_sycl_op_im2col(ctx, dst);
 }
 
+static void ggml_sycl_im2col_3d(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
+    scope_op_debug_print scope_dbg_print(__func__, dst, /*num_src=*/2);
+    ggml_sycl_op_im2col_3d(ctx, dst);
+}
+
 static void ggml_sycl_sum(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
     scope_op_debug_print scope_dbg_print(__func__, dst, /*num_src=*/1);
     GGML_ASSERT(ggml_is_contiguous(dst->src[0]));
@@ -4009,6 +4014,9 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             break;
         case GGML_OP_IM2COL:
             ggml_sycl_im2col(ctx, dst);
+            break;
+        case GGML_OP_IM2COL_3D:
+            ggml_sycl_im2col_3d(ctx, dst);
             break;
         case GGML_OP_POOL_2D:
             ggml_sycl_pool2d(ctx, dst);
@@ -4737,6 +4745,7 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         }
         case GGML_OP_ROPE:
         case GGML_OP_IM2COL:
+        case GGML_OP_IM2COL_3D:
             return true;
         case GGML_OP_UPSCALE:
             return op->src[0]->type == GGML_TYPE_F32 && op->op_params[0] == GGML_SCALE_MODE_NEAREST && !(op->op_params[0] & GGML_SCALE_FLAG_ANTIALIAS);

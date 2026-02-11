@@ -34,7 +34,7 @@ bash syclgen/remote_run.sh -s b60 -t upload,build --local "/localdisk/kurt/works
 
 * Run kernel unit test on server `b60`, IMPORTANT: always add `-e ZES_ENABLE_SYSMAN=1` to support to get free memory of GPU by `sycl::aspect::ext_intel_free_memory`:
 ```bash
-bash syclgen/remote_run.sh -s b60 -t unit -k CPY,ROPE -e CUDA_VISIBLE_DEVICES="0"
+bash syclgen/remote_run.sh -s b60 -t unit -k CPY,ROPE -e ZES_ENABLE_SYSMAN=1
 ```
 
 * Run integration test on server `b60`, IMPORTANT: always add `-e ZES_ENABLE_SYSMAN=1` to support to get free memory of GPU by `sycl::aspect::ext_intel_free_memory`:

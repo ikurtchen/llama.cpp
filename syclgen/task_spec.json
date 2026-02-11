@@ -285,7 +285,8 @@
       "priority": 3,
       "complexity": "low",
       "category": "convolution",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-02-11T06:00:00Z",
       "description": "Migrate 3D im2col transformation for 3D convolution",
       "source_files": [
         "ggml/src/ggml-cuda/im2col.cu"
@@ -308,7 +309,7 @@
       ],
       "test_command": "./syclgen/remote_run.sh unit IM2COL_3D",
       "estimated_lines": 60,
-      "notes": "Extends existing SYCL im2col.cpp. No special CUDA features, just nested loop with bounds checks. Float-only (no half)."
+      "notes": "Completed. Added im2col_3d_kernel template, im2col_3d_sycl_internal launcher, im2col_3d_sycl_f16/f32 wrappers, and ggml_sycl_op_im2col_3d public function to existing im2col.cpp. Declared ggml_sycl_op_im2col_3d in im2col.hpp. Added dispatch and supports_op in ggml-sycl.cpp. Direct port from CUDA with nd_range<3> mapping (dim0=N*OD*OH capped at 65535, dim1=OW, dim2=IC*KD*KH*KW blocks). Supports F16 and F32 output. 2051/2051 unit tests pass on Intel BMG GPU."
     },
     {
       "id": "task_010",
