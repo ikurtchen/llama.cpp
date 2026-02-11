@@ -54,6 +54,7 @@
 #include "ggml-sycl/quantize.hpp"
 #include "ggml-sycl/diag.hpp"
 #include "ggml-sycl/fill.hpp"
+#include "ggml-sycl/opt-step-sgd.hpp"
 #include "ggml-sycl/ssm_conv.hpp"
 #include "ggml.h"
 
@@ -4042,6 +4043,9 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
         case GGML_OP_FILL:
             ggml_sycl_op_fill(ctx, dst);
             break;
+        case GGML_OP_OPT_STEP_SGD:
+            ggml_sycl_op_opt_step_sgd(ctx, dst);
+            break;
         default:
             return false;
     }
@@ -4753,6 +4757,8 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
             return op->type == GGML_TYPE_F32 || op->type == GGML_TYPE_F16;
         case GGML_OP_FILL:
             return op->type == GGML_TYPE_F32 || op->type == GGML_TYPE_F16;
+        case GGML_OP_OPT_STEP_SGD:
+            return op->type == GGML_TYPE_F32;
         default:
             return false;
     }

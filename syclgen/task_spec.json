@@ -152,7 +152,8 @@
       "priority": 3,
       "complexity": "low",
       "category": "optimizer",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-02-11T02:00:00Z",
       "description": "Migrate SGD optimizer step kernel",
       "source_files": [
         "ggml/src/ggml-cuda/opt-step-sgd.cu",
@@ -175,7 +176,7 @@
       ],
       "test_command": "./syclgen/remote_run.sh unit OPT_STEP_SGD",
       "estimated_lines": 30,
-      "notes": "Pure element-wise: x = x - lr * gradient. No special CUDA features."
+      "notes": "Completed. Created opt-step-sgd.hpp and opt-step-sgd.cpp with SYCL kernel for element-wise SGD update (x = x * (1 - lr * wd) - lr * grad). F32-only. Registered dispatch and supports_op in ggml-sycl.cpp. CMakeLists auto-globs so no change needed. 1/1 unit test passes on Intel BMG GPU."
     },
     {
       "id": "task_006",
