@@ -87,7 +87,8 @@
       "priority": 3,
       "complexity": "low",
       "category": "unary",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-02-11T00:00:00Z",
       "description": "Migrate EXPM1 unary operation: compute exp(x)-1 with numerical stability",
       "source_files": [
         "ggml/src/ggml-cuda/unary.cu"
@@ -109,7 +110,7 @@
       ],
       "test_command": "./syclgen/remote_run.sh unit EXPM1",
       "estimated_lines": 15,
-      "notes": "Minimal addition to existing element_wise.cpp. sycl::expm1 is already available. Just add the functor and dispatch entry."
+      "notes": "Completed. Added op_expm1 functor, ggml_sycl_op_expm1 wrapper, and ggml_sycl_expm1 public function to element_wise.cpp. Declared in element_wise.hpp. Added dispatch in ggml-sycl.cpp. Placed EXPM1 in the FLOOR/CEIL/ROUND/TRUNC supports_op group (with F32-only check when GGML_SYCL_F16 is off) to avoid assertion failure on F16 inputs. 2/2 unit tests pass on Intel BMG GPU."
     },
     {
       "id": "task_004",

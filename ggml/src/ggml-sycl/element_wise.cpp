@@ -40,6 +40,11 @@ static __dpct_inline__ T op_abs(T x) {
 }
 
 template<typename T>
+static __dpct_inline__ T op_expm1(T x) {
+    return sycl::expm1(x);
+}
+
+template<typename T>
 static __dpct_inline__ T op_elu(T x) {
     return (x > static_cast<T>(0.f)) ? x : sycl::expm1(x);
 }
@@ -632,6 +637,12 @@ static inline void ggml_sycl_op_abs(ggml_backend_sycl_context & ctx, ggml_tensor
     });
 }
 
+static inline void ggml_sycl_op_expm1(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
+    ggml_sycl_detail::ggml_sycl_op_unary(ctx, dst, [](auto x) {
+        return op_expm1(x);
+    });
+}
+
 static inline void ggml_sycl_op_elu(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
     ggml_sycl_detail::ggml_sycl_op_unary(ctx, dst, [](auto x) {
         return op_elu(x);
@@ -1165,6 +1176,11 @@ void ggml_sycl_abs(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
 void ggml_sycl_elu(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
     scope_op_debug_print scope_dbg_print(__func__, dst, /*num_src=*/1);
     ggml_sycl_op_elu(ctx, dst);
+}
+
+void ggml_sycl_expm1(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
+    scope_op_debug_print scope_dbg_print(__func__, dst, /*num_src=*/1);
+    ggml_sycl_op_expm1(ctx, dst);
 }
 
 void ggml_sycl_geglu(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
