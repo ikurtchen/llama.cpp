@@ -61,6 +61,7 @@
 #include "ggml-sycl/conv2d-dw.hpp"
 #include "ggml-sycl/conv2d-transpose.hpp"
 #include "ggml-sycl/cross-entropy-loss.hpp"
+#include "ggml-sycl/cumsum.hpp"
 #include "ggml-sycl/top-k.hpp"
 #include "ggml.h"
 
@@ -4110,6 +4111,9 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
         case GGML_OP_TOP_K:
             ggml_sycl_op_top_k(ctx, dst);
             break;
+        case GGML_OP_CUMSUM:
+            ggml_sycl_op_cumsum(ctx, dst);
+            break;
         default:
             return false;
     }
@@ -4840,6 +4844,8 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_TOP_K:
             return op->src[0]->type == GGML_TYPE_F32
                 && op->src[0]->ne[0] * (int64_t)sizeof(int) <= (int64_t)ggml_sycl_info().devices[device].smpbo;
+        case GGML_OP_CUMSUM:
+            return op->src[0]->type == GGML_TYPE_F32;
         default:
             return false;
     }

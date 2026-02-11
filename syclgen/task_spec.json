@@ -565,7 +565,8 @@
       "priority": 4,
       "complexity": "medium",
       "category": "misc",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-02-11T13:00:00Z",
       "description": "Migrate cumulative sum kernel",
       "source_files": [
         "ggml/src/ggml-cuda/cumsum.cu",
@@ -591,7 +592,7 @@
       ],
       "test_command": "./syclgen/remote_run.sh unit CUMSUM",
       "estimated_lines": 90,
-      "notes": "CUB BlockScan -> need SYCL equivalent. Options: sycl::joint_exclusive_scan (group algorithm), oneDPL, or manual Hillis-Steele/Blelloch scan."
+      "notes": "Completed. Created cumsum.hpp and cumsum.cpp with SYCL kernel for cumulative sum (inclusive prefix sum). F32-only. Uses fallback kernel approach (no CUB equivalent in SYCL). Two-level scan: intra-warp prefix scan via sycl::inclusive_scan_over_group on sub-group, inter-warp communication via shared memory (local_accessor). Register blocking with num_unroll=4 elements per thread. Block carry propagation across chunks for rows longer than block_size*4. Grid: one work-group per row (ne01*ne02*ne03). Block size: min(ceil(ne00/WARP_SIZE)*WARP_SIZE, 256). Registered dispatch and supports_op (F32 only) in ggml-sycl.cpp. CMakeLists auto-globs so no change needed. 15/15 unit tests pass on Intel BMG GPU (various shapes: small 10-element, non-power-of-2, power-of-2 up to 2048, large 1D up to 375960 elements, multi-dimensional)."
     },
     {
       "id": "task_018",
