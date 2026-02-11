@@ -2,7 +2,7 @@ SYCL Migration Progress Tracker
 ================================
 Project: llama.cpp
 Phase: CUDA-to-SYCL kernel migration
-Last updated: 2026-02-11 (session 6)
+Last updated: 2026-02-11 (session 7)
 
 Kernel Inventory
 ----------------
@@ -30,9 +30,9 @@ Total migration tasks:              21
   Priority 4 (medium complexity):    9  (task_010 through task_018)
   Priority 5 (high complexity):      3  (task_019 through task_021)
 
-Tasks completed:                     6  (task_001 FILL, task_002 DIAG, task_003 EXPM1, task_004 XIELU, task_005 OPT_STEP_SGD, task_006 OPT_STEP_ADAMW)
+Tasks completed:                     7  (task_001 FILL, task_002 DIAG, task_003 EXPM1, task_004 XIELU, task_005 OPT_STEP_SGD, task_006 OPT_STEP_ADAMW, task_007 SILU_BACK)
 Tasks in progress:                   0
-Tasks pending:                      15
+Tasks pending:                      14
 
 Estimated total new SYCL lines:   ~2950
 
@@ -44,7 +44,7 @@ task_003  UNARY_EXPM1              priority=3  COMPLETED
 task_004  UNARY_XIELU              priority=3  COMPLETED
 task_005  OPT_STEP_SGD             priority=3  COMPLETED
 task_006  OPT_STEP_ADAMW           priority=3  COMPLETED
-task_007  SILU_BACK                priority=3  pending
+task_007  SILU_BACK                priority=3  COMPLETED
 task_008  GET_ROWS_BACK            priority=3  pending
 task_009  IM2COL_3D                priority=3  pending
 task_010  ROPE_BACK                priority=4  pending
@@ -145,6 +145,23 @@ Session 6 (2026-02-11):
     sqrtf → sycl::sqrt as only math function change.
   - Next: task_007 (SILU_BACK) — backward pass for SiLU activation, two-input
     element-wise kernel added to element_wise.cpp
+
+Session 7 (2026-02-11):
+  - Completed task_007: SILU_BACK kernel migration
+  - Modified: ggml/src/ggml-sycl/element_wise.cpp (added silu_back_kernel template
+    in ggml_sycl_detail namespace, ggml_sycl_op_silu_back wrapper with F32/F16
+    dispatch, ggml_sycl_silu_back public function)
+  - Modified: ggml/src/ggml-sycl/element_wise.hpp (declared ggml_sycl_silu_back)
+  - Modified: ggml/src/ggml-sycl/ggml-sycl.cpp (dispatch + supports_op for F32/F16)
+  - Build: PASS
+  - Unit tests: 1/1 PASS on Intel BMG GPU (Intel Graphics [0xe211])
+  - No issues discovered — straightforward two-input element-wise kernel migration
+  - Implementation: SiLU backward pass: grad * sigmoid(x) * (1 + x * (1 - sigmoid(x))).
+    Two input tensors (src0=grad, src1=x). Uses sycl::exp instead of expf.
+    Casts to float for computation, casts back for F16. Follows xielu pattern
+    for custom kernel with manual F16/F32 dispatch.
+  - Next: task_008 (GET_ROWS_BACK) — backward pass for get_rows, uses atomicAdd
+    → sycl::atomic_ref for scatter-accumulate pattern
 
 Files
 -----

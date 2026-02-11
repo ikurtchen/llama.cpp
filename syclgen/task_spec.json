@@ -219,7 +219,8 @@
       "priority": 3,
       "complexity": "low",
       "category": "training",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-02-11T04:00:00Z",
       "description": "Migrate backward pass for SiLU activation",
       "source_files": [
         "ggml/src/ggml-cuda/unary.cu"
@@ -242,7 +243,7 @@
       ],
       "test_command": "./syclgen/remote_run.sh unit SILU_BACK",
       "estimated_lines": 40,
-      "notes": "Two input tensors (grad, x), one output. SiLU backward: d/dx[x*sigmoid(x)] * grad. Add to existing element_wise.cpp."
+      "notes": "Completed. Added silu_back_kernel template in ggml_sycl_detail namespace with two-input (grad, x) element-wise SiLU backward pass: grad * sigmoid(x) * (1 + x * (1 - sigmoid(x))). Added ggml_sycl_op_silu_back wrapper with F32/F16 dispatch. Declared ggml_sycl_silu_back in element_wise.hpp. Added dispatch and supports_op (F32 and F16) in ggml-sycl.cpp. Uses sycl::exp instead of expf. 1/1 unit test passes on Intel BMG GPU."
     },
     {
       "id": "task_008",

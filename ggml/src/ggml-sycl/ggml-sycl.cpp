@@ -4050,6 +4050,9 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
         case GGML_OP_OPT_STEP_ADAMW:
             ggml_sycl_op_opt_step_adamw(ctx, dst);
             break;
+        case GGML_OP_SILU_BACK:
+            ggml_sycl_silu_back(ctx, dst);
+            break;
         default:
             return false;
     }
@@ -4765,6 +4768,8 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
             return op->type == GGML_TYPE_F32;
         case GGML_OP_OPT_STEP_ADAMW:
             return op->type == GGML_TYPE_F32;
+        case GGML_OP_SILU_BACK:
+            return op->type == GGML_TYPE_F32 || op->type == GGML_TYPE_F16;
         default:
             return false;
     }

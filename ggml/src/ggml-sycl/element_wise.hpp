@@ -85,6 +85,8 @@ void ggml_sycl_expm1(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
 
 void ggml_sycl_xielu(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
 
+void ggml_sycl_silu_back(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
+
 void ggml_sycl_geglu(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
 void ggml_sycl_reglu(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
 void ggml_sycl_swiglu(ggml_backend_sycl_context & ctx, ggml_tensor * dst);

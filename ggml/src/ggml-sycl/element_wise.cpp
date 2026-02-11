@@ -640,7 +640,63 @@ static void xielu_kernel(const T * x, T * dst, const int k,
     dst[i] = static_cast<T>(out);
 }
 
+template <typename T>
+static void silu_back_kernel(const T * grad, const T * x, T * dst, const int k,
+                             const sycl::nd_item<1> & item_ct1) {
+    const int i = item_ct1.get_global_id(0);
+    if (i >= k) {
+        return;
+    }
+
+    const float xf = static_cast<float>(x[i]);
+    const float gf = static_cast<float>(grad[i]);
+    const float s = 1.0f / (1.0f + sycl::exp(-xf));
+    const float result = gf * s * (1.0f + xf * (1.0f - s));
+
+    dst[i] = static_cast<T>(result);
+}
+
 } // namespace ggml_sycl_detail
+
+static void ggml_sycl_op_silu_back(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
+    const ggml_tensor * src0 = dst->src[0]; // grad
+    const ggml_tensor * src1 = dst->src[1]; // x (original forward input)
+    const void * src0_d = src0->data;
+    const void * src1_d = src1->data;
+    void * dst_d = dst->data;
+    dpct::queue_ptr stream = ctx.stream();
+
+    GGML_ASSERT(ggml_is_contiguous(src0));
+
+    GGML_ASSERT(src0->type == GGML_TYPE_F32 || src0->type == GGML_TYPE_F16);
+    GGML_ASSERT( dst->type == GGML_TYPE_F32 ||  dst->type == GGML_TYPE_F16);
+    GGML_ASSERT(src0->type == dst->type);
+
+    SYCL_CHECK(ggml_sycl_set_device(ctx.device));
+
+    const int k = ggml_nelements(src0);
+    const int num_blocks = (k + 255) / 256;
+
+    if (src0->type == GGML_TYPE_F16) {
+        const sycl::half * src0_ptr = static_cast<const sycl::half *>(src0_d);
+        const sycl::half * src1_ptr = static_cast<const sycl::half *>(src1_d);
+        sycl::half * dst_ptr = static_cast<sycl::half *>(dst_d);
+        stream->parallel_for(
+            sycl::nd_range<1>(sycl::range<1>(num_blocks * 256), sycl::range<1>(256)),
+            [=](sycl::nd_item<1> item_ct1) {
+                ggml_sycl_detail::silu_back_kernel(src0_ptr, src1_ptr, dst_ptr, k, item_ct1);
+            });
+    } else {
+        const float * src0_ptr = static_cast<const float *>(src0_d);
+        const float * src1_ptr = static_cast<const float *>(src1_d);
+        float * dst_ptr = static_cast<float *>(dst_d);
+        stream->parallel_for(
+            sycl::nd_range<1>(sycl::range<1>(num_blocks * 256), sycl::range<1>(256)),
+            [=](sycl::nd_item<1> item_ct1) {
+                ggml_sycl_detail::silu_back_kernel(src0_ptr, src1_ptr, dst_ptr, k, item_ct1);
+            });
+    }
+}
 
 static void ggml_sycl_op_xielu(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
     const ggml_tensor * src0 = dst->src[0];
@@ -1245,6 +1301,11 @@ void ggml_sycl_expm1(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
 void ggml_sycl_xielu(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
     scope_op_debug_print scope_dbg_print(__func__, dst, /*num_src=*/1);
     ggml_sycl_op_xielu(ctx, dst);
+}
+
+void ggml_sycl_silu_back(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
+    scope_op_debug_print scope_dbg_print(__func__, dst, /*num_src=*/2);
+    ggml_sycl_op_silu_back(ctx, dst);
 }
 
 void ggml_sycl_geglu(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
