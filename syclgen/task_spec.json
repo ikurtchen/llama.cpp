@@ -318,7 +318,8 @@
       "priority": 4,
       "complexity": "medium",
       "category": "training",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-02-11T07:00:00Z",
       "description": "Migrate backward pass for rotary position embedding",
       "source_files": [
         "ggml/src/ggml-cuda/rope.cu"
@@ -343,7 +344,7 @@
       ],
       "test_command": "./syclgen/remote_run.sh unit ROPE_BACK",
       "estimated_lines": 100,
-      "notes": "Reverse of forward rope: rotate by negative angle. Must handle all forward rope variants (norm, neox). Extend existing rope.cpp."
+      "notes": "Completed. Added bool forward template parameter to all rope kernel functions (rope_yarn, rope_norm, rope_neox, rope_multi, rope_vision) and their launchers. Backward pass negates sin_theta (the only mathematical difference from forward). Converted ggml_sycl_op_rope to template ggml_sycl_op_rope_impl<forward>. Added ggml_sycl_rope_back calling ggml_sycl_op_rope_impl<false>. Declared in rope.hpp. Added dispatch, supports_op (fallthrough with ROPE), and get_op_batch_size (fallthrough with ROPE) in ggml-sycl.cpp. 228/228 unit tests pass on Intel BMG GPU (modes: norm, neox, mrope, vision; types: F32, F16)."
     },
     {
       "id": "task_011",

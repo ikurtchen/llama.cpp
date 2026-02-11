@@ -4012,6 +4012,9 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
         case GGML_OP_ROPE:
             ggml_sycl_rope(ctx, dst);
             break;
+        case GGML_OP_ROPE_BACK:
+            ggml_sycl_rope_back(ctx, dst);
+            break;
         case GGML_OP_IM2COL:
             ggml_sycl_im2col(ctx, dst);
             break;
@@ -4744,6 +4747,7 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
             return max_bias == 0.0f;
         }
         case GGML_OP_ROPE:
+        case GGML_OP_ROPE_BACK:
         case GGML_OP_IM2COL:
         case GGML_OP_IM2COL_3D:
             return true;
@@ -4813,6 +4817,7 @@ static int64_t get_op_batch_size(const ggml_tensor * op) {
             return op->ne[1];
         case GGML_OP_MUL_MAT_ID:
         case GGML_OP_ROPE:
+        case GGML_OP_ROPE_BACK:
             return op->ne[2];
         default:
             return ggml_nrows(op);

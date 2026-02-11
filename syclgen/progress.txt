@@ -2,7 +2,7 @@ SYCL Migration Progress Tracker
 ================================
 Project: llama.cpp
 Phase: CUDA-to-SYCL kernel migration
-Last updated: 2026-02-11 (session 9)
+Last updated: 2026-02-11 (session 10)
 
 Kernel Inventory
 ----------------
@@ -30,9 +30,9 @@ Total migration tasks:              21
   Priority 4 (medium complexity):    9  (task_010 through task_018)
   Priority 5 (high complexity):      3  (task_019 through task_021)
 
-Tasks completed:                     9  (task_001 FILL, task_002 DIAG, task_003 EXPM1, task_004 XIELU, task_005 OPT_STEP_SGD, task_006 OPT_STEP_ADAMW, task_007 SILU_BACK, task_008 GET_ROWS_BACK, task_009 IM2COL_3D)
+Tasks completed:                    10  (task_001 FILL, task_002 DIAG, task_003 EXPM1, task_004 XIELU, task_005 OPT_STEP_SGD, task_006 OPT_STEP_ADAMW, task_007 SILU_BACK, task_008 GET_ROWS_BACK, task_009 IM2COL_3D, task_010 ROPE_BACK)
 Tasks in progress:                   0
-Tasks pending:                      12
+Tasks pending:                      11
 
 Estimated total new SYCL lines:   ~2950
 
@@ -47,7 +47,7 @@ task_006  OPT_STEP_ADAMW           priority=3  COMPLETED
 task_007  SILU_BACK                priority=3  COMPLETED
 task_008  GET_ROWS_BACK            priority=3  COMPLETED
 task_009  IM2COL_3D                priority=3  COMPLETED
-task_010  ROPE_BACK                priority=4  pending
+task_010  ROPE_BACK                priority=4  COMPLETED
 task_011  CONV_2D                  priority=4  pending
 task_012  CONV_2D_DW               priority=4  pending
 task_013  CONV_TRANSPOSE_2D        priority=4  pending
@@ -199,6 +199,28 @@ Session 9 (2026-02-11):
     in blocks. Each work-item computes one output element per (n, od, oh) combination.
     Supports both F16 and F32 output types. No special CUDA features needed.
   - Next: task_010 (ROPE_BACK) — backward pass for rotary position embedding
+
+Session 10 (2026-02-11):
+  - Completed task_010: ROPE_BACK kernel migration
+  - Modified: ggml/src/ggml-sycl/rope.cpp (added `bool forward` template parameter
+    to rope_yarn, rope_norm, rope_neox, rope_multi, rope_vision kernels and their
+    launchers. Converted ggml_sycl_op_rope to template ggml_sycl_op_rope_impl<forward>.
+    Added ggml_sycl_rope_back public function calling ggml_sycl_op_rope_impl<false>.)
+  - Modified: ggml/src/ggml-sycl/rope.hpp (declared ggml_sycl_rope_back)
+  - Modified: ggml/src/ggml-sycl/ggml-sycl.cpp (dispatch + supports_op + get_op_batch_size,
+    all as fallthroughs with GGML_OP_ROPE)
+  - Build: PASS
+  - Unit tests: 228/228 PASS on Intel BMG GPU (Intel Graphics [0xe211])
+  - Issue: Initial test showed "not supported" due to stale build cache on remote
+    (same rsync timestamp issue as sessions 2, 4, 6, and 8). Fix: rm -rf build
+    directory on remote to force clean rebuild.
+  - Implementation notes: ROPE backward pass is mathematically identical to forward
+    pass except sin_theta is negated (inverse rotation). The CUDA implementation uses
+    a single `template<bool forward>` codebase for both forward and backward. The SYCL
+    implementation now mirrors this exactly. No new kernels or files were created — only
+    the existing rope.cpp was refactored to add the forward template parameter.
+    Test coverage: all rope modes (norm, neox, mrope, vision), both F32 and F16 types.
+  - Next: task_011 (CONV_2D) — 2D convolution kernel
 
 Files
 -----
