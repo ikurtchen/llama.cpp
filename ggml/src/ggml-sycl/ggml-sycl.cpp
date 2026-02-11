@@ -61,6 +61,7 @@
 #include "ggml-sycl/conv2d-dw.hpp"
 #include "ggml-sycl/conv2d-transpose.hpp"
 #include "ggml-sycl/cross-entropy-loss.hpp"
+#include "ggml-sycl/top-k.hpp"
 #include "ggml.h"
 
 static bool g_sycl_loaded = false;
@@ -1793,9 +1794,9 @@ static int next_power_of_2(int x) {
     return n;
 }
 
-static void argsort_f32_i32_sycl(const float *x, int *dst, const int ncols,
-                                 const int nrows, ggml_sort_order order,
-                                 queue_ptr stream, int device) {
+void argsort_f32_i32_sycl(const float *x, int *dst, const int ncols,
+                          const int nrows, ggml_sort_order order,
+                          queue_ptr stream, int device) {
     // bitonic sort requires ncols to be power of 2
     const int ncols_pad = next_power_of_2(ncols);
 
@@ -4106,6 +4107,9 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
         case GGML_OP_CROSS_ENTROPY_LOSS_BACK:
             ggml_sycl_cross_entropy_loss_back(ctx, dst);
             break;
+        case GGML_OP_TOP_K:
+            ggml_sycl_op_top_k(ctx, dst);
+            break;
         default:
             return false;
     }
@@ -4833,6 +4837,9 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_CROSS_ENTROPY_LOSS:
         case GGML_OP_CROSS_ENTROPY_LOSS_BACK:
             return op->src[0]->type == GGML_TYPE_F32;
+        case GGML_OP_TOP_K:
+            return op->src[0]->type == GGML_TYPE_F32
+                && op->src[0]->ne[0] * (int64_t)sizeof(int) <= (int64_t)ggml_sycl_info().devices[device].smpbo;
         default:
             return false;
     }
