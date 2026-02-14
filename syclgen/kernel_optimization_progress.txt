@@ -5,9 +5,9 @@
 
 ## Summary
 - Total SYCL kernels to analyze: 13
-- Kernels analyzed so far: 12
-- Analysis complete: No
-- Kernels with optimization potential: 12
+- Kernels analyzed so far: 13
+- Analysis complete: Yes
+- Kernels with optimization potential: 13
 - Optimization tasks created: 0 (pending finalization)
 
 ## Kernels Analyzed
@@ -23,9 +23,15 @@
 - [x] sk_010: dmmv SYCL kernels — high potential (9 optimization opportunities)
 - [x] sk_011: getrows SYCL kernels — medium potential (6 optimization opportunities)
 - [x] sk_012: wkv SYCL kernels — medium potential (5 optimization opportunities)
-- [ ] sk_013: gla SYCL kernel — pending
+- [x] sk_013: gla SYCL kernel — low potential (4 optimization opportunities)
 
 ## Recent Activity
+[2026-02-14] Analyzed kernel gla (Gated Linear Attention) SYCL kernel (sk_013). Found 4 optimization opportunities (low potential).
+  - MEDIUM: Missing reqd_sub_group_size(16) on kernel lambda — suboptimal SIMD width on Xe2.
+  - MEDIUM: Missing #pragma unroll on hot inner j-loop — compile-time constant trip count of 16 or 32.
+  - LOW: DPCT migration artifacts — dpct::queue_ptr, u_int non-standard type.
+  - LOW: Scalar global memory loads for k/r/td/v — could use vec4 to match SLM read pattern.
+
 [2026-02-14] Analyzed kernel wkv (RWKV WKV attention) SYCL kernels (sk_012). Found 5 optimization opportunities (medium potential).
   - HIGH: SLM over-allocation by 4x — local_accessor<float> receives C/H*N*sizeof(float) (byte count) but expects element count. Wastes 3/4 of allocated SLM.
   - MEDIUM: Scalar SLM loads for float4 construction — 4 individual reads instead of 1 aligned 128-bit vector load (CUDA uses (float4&) cast).

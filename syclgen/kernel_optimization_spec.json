@@ -1884,14 +1884,123 @@
       ],
       "overall_optimization_potential": "medium",
       "estimated_current_efficiency": "55-65% — The WKV kernels are algorithmically well-structured and closely match CUDA. The SLM over-allocation bug (4x) wastes shared memory but the absolute amounts (1-2.5 KB wasted per work-group) are small relative to the 64KB Xe-core SLM budget. The scalar SLM loads (4 loads instead of 1 vector load) add unnecessary instruction pressure in the inner loop. The work-group size of 64-128 is inherently constrained by the algorithm (1 thread per head dimension) and cannot be increased. The kernel is compute-bound with high register pressure (64-128 floats for state[] per thread). The main optimization opportunities are fixing the SLM allocation bug, enabling vector SLM loads, and ensuring optimal SIMD16 selection."
+    },
+    {
+      "kernel_id": "sk_013",
+      "name": "gla (Gated Linear Attention) SYCL kernel",
+      "file": "ggml/src/ggml-sycl/gla.cpp",
+      "related_files": ["ggml/src/ggml-sycl/gla.hpp"],
+      "source_cuda_ids": ["ck_063"],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": "head_size (64 or 128, compile-time template parameter)",
+          "sub_group_size": null,
+          "global_size_expression": "nd_range<1>(B*H*head_size, head_size) — one work-group per (batch, head) pair, one thread per head dimension element",
+          "notes": "Clean 1D nd_range launch. Work-group size equals head_size which is 64 or 128 — both are good sizes for Xe2 (multiples of 16). Missing [[sycl::reqd_sub_group_size(16)]] on the kernel lambda (gla.cpp line 20). CUDA equivalent uses dim3(1,1,head_size) with 1D block."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "strided_accesses": [],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "All global memory reads (k, r, td, v at lines 35-38) use scalar float loads with coalesced access pattern — consecutive threads read consecutive elements within the head dimension. SLM reads use float4 via reinterpret_cast (lines 44-47) which is effectively vectorized for SLM but not for global memory. Output write (y at line 57) is scalar and coalesced."
+        },
+        "slm_usage": {
+          "uses_slm": true,
+          "slm_bytes": "3 * head_size * sizeof(float) = 768 bytes (head_size=64) or 1536 bytes (head_size=128)",
+          "potential_bank_conflicts": false,
+          "notes": "SLM allocation is CORRECT — uses local_accessor<float>(head_size, ...) three times (for _k, _r, _td). This is element count, not byte count (unlike the wkv kernel sk_012 which had a 4x over-allocation bug). SLM is used as a broadcast buffer: all threads cooperatively load k/r/td for the current timestep, barrier, then all threads read via float4 reinterpret_cast. Well within 64KB SLM limit."
+        },
+        "reduction_pattern": {
+          "has_reduction": false,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "No reductions. Each thread independently computes its own state[j] updates and output accumulation. The y output is accumulated per-thread across the head_size/4 inner loop iterations, then written directly to global memory."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "FP32 throughout. The state array (float state[head_size]) and all intermediate computations use FP32. Half precision would likely cause quality issues for the recurrent state accumulation. joint_matrix is not applicable — the computation pattern is element-wise state updates, not matrix multiplication."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [],
+          "notes": "No transcendental math functions. All computation is multiply-add: state[j] = state[j] * td_j + k_j * v (line 51), y_val += r_j * state[j] (line 52). These map directly to FMA instructions. No optimization opportunities for native math."
+        },
+        "loop_analysis": {
+          "hot_loops": [
+            "Timestep loop (line 28): for (int _t = 0; _t < T; _t++) — iterates over sequence length T. This is the outer recurrent loop, inherently sequential.",
+            "Inner j-loop (line 46): for (int j = 0; j < head_size/4; j++) — iterates 16 times (head_size=64) or 32 times (head_size=128). This is the HOT inner loop performing state updates and output accumulation via float4 operations."
+          ],
+          "unrolled": false,
+          "notes": "The hot inner j-loop (line 46) has a COMPILE-TIME CONSTANT trip count (head_size/4 where head_size is a template parameter) but is missing #pragma unroll. Adding unroll would allow the compiler to pipeline the FMA operations and optimize register allocation across iterations. The CUDA version also lacks #pragma unroll here."
+        },
+        "estimated_bottleneck": "memory (single-token T=1) / compute (long sequences T>>1)",
+        "anti_patterns": [
+          "Missing [[sycl::reqd_sub_group_size(16)]] on kernel lambda (line 20) — suboptimal SIMD width selection on Xe2",
+          "Missing #pragma unroll on hot inner j-loop (line 46) — compile-time constant trip count of 16 or 32",
+          "High register pressure: float state[head_size] uses 64-128 float registers per thread, likely forcing large GRF mode on Xe2 and reducing occupancy",
+          "dpct::queue_ptr migration artifact in function signature (line 6) — should use sycl::queue&",
+          "u_int non-standard type (lines 6-7) — should use unsigned int or uint32_t",
+          "Scalar global memory loads for k, r, td, v (lines 35-38) — could use vec4 loads to match the float4 SLM read pattern"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_013_001",
+          "category": "sub_group_ops",
+          "priority": "medium",
+          "description": "Add [[sycl::reqd_sub_group_size(16)]] to the kernel lambda at line 20. Without this attribute, the compiler may choose SIMD32 on Xe2, halving the number of hardware threads and reducing occupancy. Given the high register pressure from float state[head_size], occupancy is already limited — ensuring SIMD16 maximizes the number of concurrent threads.",
+          "expected_improvement": "5-15% from better occupancy and guaranteed native SIMD width.",
+          "implementation_notes": "Add [[sycl::reqd_sub_group_size(16)]] to the parallel_for lambda at line 20 of gla.cpp.",
+          "risk": "low",
+          "risk_notes": "No sub-group operations are used. Only affects SIMD width selection."
+        },
+        {
+          "id": "opt_013_002",
+          "category": "loop_unroll",
+          "priority": "medium",
+          "description": "Add #pragma unroll to the hot inner j-loop at line 46. The loop iterates head_size/4 times where head_size is a compile-time template parameter (64 or 128), giving trip counts of 16 or 32. Unrolling enables the compiler to pipeline FMA operations, reduce loop overhead, and optimize register allocation across iterations.",
+          "expected_improvement": "5-15% for long sequences where the inner loop dominates execution time.",
+          "implementation_notes": "Add #pragma unroll before the for loop at line 46. For head_size=128 (trip count 32), full unrolling may cause excessive register pressure — consider #pragma unroll 8 as a compromise.",
+          "risk": "low",
+          "risk_notes": "Compiler hint only. Cannot cause incorrect behavior. May increase register pressure for head_size=128."
+        },
+        {
+          "id": "opt_013_003",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Clean up migration artifacts: replace dpct::queue_ptr with sycl::queue& in the function signature (line 6), replace u_int with uint32_t (lines 6-7), remove any DPCT-style patterns.",
+          "expected_improvement": "No performance improvement — code quality and portability fix.",
+          "implementation_notes": "Change function signature from dpct::queue_ptr stream to sycl::queue& stream. Change u_int to uint32_t.",
+          "risk": "low",
+          "risk_notes": "Mechanical cleanup with no functional changes."
+        },
+        {
+          "id": "opt_013_004",
+          "category": "vectorization",
+          "priority": "low",
+          "description": "Use vectorized vec4 global memory loads for k, r, td, v (lines 35-38) to match the float4 SLM read pattern already used in the inner loop (lines 44-47). Currently each thread loads one scalar float from global memory per timestep per array, but the inner loop reads SLM as float4. Loading directly as float4 from global memory and storing to SLM as float4 would reduce memory transactions by 4x for the loading phase.",
+          "expected_improvement": "5-10% for the loading phase, but only significant for single-token inference (T=1) where loading dominates. For long sequences, the inner loop dominates.",
+          "implementation_notes": "Change lines 35-38 from scalar loads (_k[i] = k[...]; etc.) to vec4 loads: for threads where i % 4 == 0, load a float4 and store 4 consecutive SLM elements. Requires work-group size >= 4 (always true since head_size >= 64). Alternatively, since each thread loads exactly one element at index i, and threads are consecutive, the hardware may already coalesce these into vec4 transactions — profile first.",
+          "risk": "low",
+          "risk_notes": "The coalesced scalar loads may already achieve similar throughput to explicit vec4 loads due to hardware memory coalescing. Profile before implementing."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "65-75% — The GLA kernel is a clean 1:1 CUDA port with correct 1D nd_range, correct SLM allocation (element count, not bytes), correct barrier placement, and efficient float4 SLM access pattern. The main inefficiencies are missing reqd_sub_group_size, missing loop unrolling, and high register pressure from the per-thread state array. The algorithm is inherently sequential over timesteps (recurrent), limiting parallelism. No major anti-patterns or correctness issues."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 12,
+    "total_kernels_analyzed": 13,
     "critical_potential": 1,
     "high_potential": 5,
     "medium_potential": 6,
-    "low_potential": 0,
+    "low_potential": 1,
     "no_optimization_needed": 0,
     "top_opportunities": [
       {
@@ -2116,6 +2225,20 @@
         "kernel_name": "wkv SYCL kernels",
         "opportunity_id": "opt_012_002",
         "description": "Replace scalar SLM loads with true 128-bit vector loads for float4 construction — 5-15% inner loop speedup",
+        "priority": "medium"
+      },
+      {
+        "kernel_id": "sk_013",
+        "kernel_name": "gla (Gated Linear Attention) SYCL kernel",
+        "opportunity_id": "opt_013_001",
+        "description": "Add reqd_sub_group_size(16) to GLA kernel — 5-15% from better occupancy on Xe2",
+        "priority": "medium"
+      },
+      {
+        "kernel_id": "sk_013",
+        "kernel_name": "gla (Gated Linear Attention) SYCL kernel",
+        "opportunity_id": "opt_013_002",
+        "description": "Add #pragma unroll to hot inner j-loop — 5-15% from pipelined FMA operations",
         "priority": "medium"
       }
     ]
