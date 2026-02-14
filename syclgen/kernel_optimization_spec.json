@@ -1756,13 +1756,141 @@
       ],
       "overall_optimization_potential": "medium",
       "estimated_current_efficiency": "60-70% — Getrows is a relatively simple gather/scatter kernel. The work-group size (256) is already appropriate and matches CUDA. No SLM or complex reductions are needed. The main issues are: missing type coverage (I32, BF16 src; non-F32 dst), missing grid-stride loops for large batch dimensions, integer div/mod for batch indexing, no vectorization for float paths, and no reqd_sub_group_size. Getrows is not performance-critical compared to mmq/mmvq/dmmv — it is called infrequently for embedding lookups and similar operations."
+    },
+    {
+      "kernel_id": "sk_012",
+      "name": "wkv SYCL kernels",
+      "file": "ggml/src/ggml-sycl/wkv.cpp",
+      "source_cuda_ids": [
+        "ck_100",
+        "ck_101"
+      ],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": "C/H (head_size) — either 64 (WKV_BLOCK_SIZE) or 128 (WKV_BLOCK_SIZE*2). Algorithmically constrained: 1 thread per head dimension.",
+          "sub_group_size": null,
+          "global_size_expression": "B*H work-groups of head_size threads each (one work-group per batch*head)",
+          "notes": "Uses sycl::nd_range<3> with dims 0 and 1 always 1 — effectively 1D dispatch. Work-group size of 64-128 is small for Xe2 (optimal 256-512) but is inherent to the RWKV attention algorithm where each thread owns one row of the head_size x head_size state matrix. Missing [[sycl::reqd_sub_group_size(16)]] on all 4 kernel launch paths (lines 215, 228, 272, 285)."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "strided_accesses": [
+            "WKV6 state load (line 35): state[i] = s[... + i * head_size + tid] — stride of head_size between consecutive i values, but each thread loads different tid (coalesced across threads for fixed i)",
+            "WKV7 state load (line 125): state[i] = s[... + tid * head_size + i] — stride of 1 between consecutive i values per thread, but stride of head_size between consecutive threads for fixed i (uncoalesced across threads)"
+          ],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "Global memory accesses for k, v, r, etc. at index t are coalesced (consecutive threads access consecutive elements). State load/store patterns differ between WKV6 and WKV7 — WKV6 uses [i * head_size + tid] (coalesced for each i iteration), WKV7 uses [tid * head_size + i] (uncoalesced, each thread accesses a different cache line). Both patterns match CUDA exactly."
+        },
+        "slm_usage": {
+          "uses_slm": true,
+          "slm_bytes": "WKV6: C/H * 4 * sizeof(float) = head_size * 16 bytes (256 or 512 bytes needed). WKV7: C/H * 5 * sizeof(float) = head_size * 20 bytes (320 or 640 bytes needed). However, due to BUG, actual allocation is 4x larger (see anti_patterns).",
+          "potential_bank_conflicts": false,
+          "notes": "SLM stores 4 arrays (WKV6: _k, _r, _tf, _td) or 5 arrays (WKV7: _r, _w, _k, _a, _b) of head_size floats each. All SLM accesses are to consecutive elements within each array (no bank conflicts). SLM is loaded once per timestep and read head_size/4 times in the inner loop — good reuse ratio. CUDA uses __shared__ with implicit correct sizing; SYCL over-allocates by 4x due to sizeof(float) bug."
+        },
+        "reduction_pattern": {
+          "has_reduction": false,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "No cross-thread reduction needed. Each thread independently computes its output y = dot(r, tf*kv + state) using SLM-broadcast data. The dot product is accumulated locally within each thread (y += ...) — this is a local accumulation, not a cross-thread reduction."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "FP32 throughout matches CUDA. The state matrix accumulation across timesteps is numerically sensitive — half precision would likely degrade RWKV model quality. The head_size x head_size state matrix per thread is too large for practical half conversion. joint_matrix is not applicable since the computation is per-thread dot products, not matrix multiply."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [
+            "sycl::dot (lines 77, 150, 165) — built-in dot product on float4 vectors",
+            "scalar multiply and add — all arithmetic is multiply-accumulate"
+          ],
+          "notes": "No transcendental math functions used — the kernel is purely multiply-add arithmetic. sycl::dot on float4 should compile to efficient FMA instructions. No opportunity for native math optimization."
+        },
+        "loop_analysis": {
+          "hot_loops": [
+            "WKV6 inner loop (lines 65-87): head_size/4 iterations, computes kv product + state update + y accumulation. Has #pragma unroll.",
+            "WKV7 first inner loop (lines 147-151): head_size/4 iterations, computes sa = dot(a, state). Has #pragma unroll.",
+            "WKV7 second inner loop (lines 155-171): head_size/4 iterations, computes state update + y accumulation. Has #pragma unroll.",
+            "Outer time loop (lines 46-90, 128-174): n_seq_tokens iterations, processes each timestep sequentially. NOT unrolled (dynamic trip count)."
+          ],
+          "unrolled": true,
+          "notes": "All inner loops have #pragma unroll and iterate head_size/4 times (16 or 32 iterations). With head_size=64, unrolled inner loops have 16 iterations of float4 operations — this is a significant register pressure source (64 floats for state[] alone). The outer time loop is inherently sequential (each timestep depends on previous state) and cannot be parallelized or unrolled."
+        },
+        "estimated_bottleneck": "compute",
+        "anti_patterns": [
+          "BUG: SLM over-allocation by 4x — sycl::local_accessor<float,1>(shared_mem_size) at lines 211, 224, 268, 281 receives shared_mem_size = C/H * N * sizeof(float) (lines 204, 261), but local_accessor<float> expects element count, not byte count. The sizeof(float) multiplier causes allocation of 4x more SLM elements than needed. For head_size=64 WKV6: allocates 1024 floats (4096 bytes) instead of 256 floats (1024 bytes). Wastes SLM capacity and may reduce occupancy on Xe2 (64KB SLM per Xe-core).",
+          "Scalar SLM loads instead of vector loads — lines 67-70, 148, 156-160 construct sycl::float4 from 4 individual scalar SLM reads: sycl::float4(_k[j], _k[j+1], _k[j+2], _k[j+3]). CUDA uses (float4&)(_k[j]) which is a true 128-bit aligned vector load from shared memory. The SYCL pattern generates 4 separate 32-bit loads instead of 1 aligned 128-bit load.",
+          "Missing [[sycl::reqd_sub_group_size(16)]] on all 4 kernel launch paths (lines 215, 228, 272, 285). While the kernel does not use sub-group operations, specifying the sub-group size ensures optimal SIMD width selection on Xe2 and prevents the compiler from choosing SIMD32 which would halve occupancy.",
+          "3D nd_range when only 1D is needed — sycl::range<3>(1, 1, N) used at lines 205-206, 262-263. Dimensions 0 and 1 are always 1. DPCT artifact that adds unnecessary complexity.",
+          "DPCT artifacts: dpct::queue_ptr (lines 201, 258), item_ct1 naming convention, verbose shared_mem_acc.get_multi_ptr<sycl::access::decorated::no>().get() extraction (lines 218, 231, 275, 288)"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_012_001",
+          "category": "slm_usage",
+          "priority": "high",
+          "description": "Fix SLM over-allocation by 4x bug. sycl::local_accessor<float,1>(shared_mem_size) receives shared_mem_size = C/H * N * sizeof(float) (lines 204, 261), but local_accessor<float> takes element count, not byte count. Remove the sizeof(float) multiplier. WKV6 line 204: change 'C / H * 4 * sizeof(float)' to 'C / H * 4'. WKV7 line 261: change 'C / H * 5 * sizeof(float)' to 'C / H * 5'. Currently wastes 3/4 of the allocated SLM per work-group.",
+          "expected_improvement": "Reduces SLM usage from 4096 to 1024 bytes (WKV6, head_size=64) or 2560 to 640 bytes (WKV7, head_size=64). May improve occupancy if the over-allocated SLM was limiting work-group scheduling on the Xe-core. In practice, the amounts are small relative to the 64KB SLM budget, so the performance impact may be negligible — but this is a correctness fix regardless.",
+          "implementation_notes": "Line 204: const size_t shared_mem_size = C / H * 4; // Remove * sizeof(float). Line 261: const size_t shared_mem_size = C / H * 5; // Remove * sizeof(float). Verify that the kernel functions access shared_mem[0..head_size*4-1] (WKV6) and shared_mem[0..head_size*5-1] (WKV7) — confirmed by pointer arithmetic in kernel: _k = shared_mem, _r = _k + head_size, etc.",
+          "risk": "low",
+          "risk_notes": "The over-allocation is strictly wasteful — reducing it to the correct size cannot break anything since the kernel only accesses elements 0..head_size*N-1. The fix is removing a single sizeof(float) multiplier."
+        },
+        {
+          "id": "opt_012_002",
+          "category": "vectorization",
+          "priority": "medium",
+          "description": "Replace scalar SLM loads with true vector loads for float4 construction. Currently constructs sycl::float4(_k[j], _k[j+1], _k[j+2], _k[j+3]) from 4 individual scalar reads (lines 67-71, 148, 156-160). CUDA uses (float4&)(_k[j]) which performs a single 128-bit aligned load from shared memory. The SYCL equivalent would be to use reinterpret_cast or sycl::vec load from the SLM pointer.",
+          "expected_improvement": "5-15% improvement in inner loop throughput by reducing SLM load instructions from 4x32-bit to 1x128-bit per float4. The inner loop is compute-bound (multiply-add) but SLM load latency contributes to the critical path. With head_size=64, each timestep performs 16 iterations x multiple float4 loads — reducing load count by 4x frees instruction slots.",
+          "implementation_notes": "Replace sycl::float4(_k[j], _k[j+1], _k[j+2], _k[j+3]) with *reinterpret_cast<const sycl::float4*>(&_k[j]) or use sycl::vec<float,4> load from the SLM multi_ptr. Ensure 16-byte alignment of SLM arrays — they are aligned since each array starts at head_size offset (head_size is 64 or 128, always a multiple of 4). Apply to all float4 construction sites in both WKV6 (lines 67-71) and WKV7 (lines 148, 156-160) inner loops.",
+          "risk": "low",
+          "risk_notes": "The SLM arrays are naturally aligned to 4-float boundaries (head_size is always 64 or 128). The reinterpret_cast pattern is the standard SYCL equivalent of CUDA's (float4&) cast. No change in computed values."
+        },
+        {
+          "id": "opt_012_003",
+          "category": "sub_group_ops",
+          "priority": "medium",
+          "description": "Add [[sycl::reqd_sub_group_size(16)]] to all 4 kernel launch paths (lines 215, 228, 272, 285). While the wkv kernels do not use explicit sub-group operations, specifying the sub-group size ensures optimal SIMD16 selection on Xe2 and prevents the compiler from choosing SIMD32 which would halve occupancy for these small work-groups (64-128 threads).",
+          "expected_improvement": "5-10% throughput improvement from guaranteed SIMD16. With work-group size = 64, SIMD32 would create only 2 sub-groups (barely enough to hide latency), while SIMD16 creates 4 sub-groups (better latency hiding). For work-group size = 128, the difference is 4 vs 8 sub-groups.",
+          "implementation_notes": "Add [[sycl::reqd_sub_group_size(16)]] attribute to the lambda in each cgh.parallel_for call. Four launch sites: lines 215, 228, 272, 285. Example: cgh.parallel_for(nd_range, [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(16)]] { ... });",
+          "risk": "low",
+          "risk_notes": "No sub-group operations are used in the kernel. The attribute only affects SIMD width selection. No functional impact."
+        },
+        {
+          "id": "opt_012_004",
+          "category": "dpct_cleanup",
+          "priority": "low",
+          "description": "Simplify 3D nd_range to 1D. The kernel uses sycl::range<3>(1, 1, N) for both block and grid dims (lines 205-206, 262-263), but dimensions 0 and 1 are always 1. The kernel only accesses item_ct1.get_local_id(2) and item_ct1.get_group(2). This is a DPCT artifact that can be reduced to nd_range<1> with nd_item<1>.",
+          "expected_improvement": "Negligible runtime improvement (<2%). Code clarity and reduced DPCT artifact surface area.",
+          "implementation_notes": "Change sycl::range<3>(1, 1, C/H) to sycl::range<1>(C/H). Change sycl::range<3>(1, 1, B*H) to sycl::range<1>(B*H). Update kernel functions to accept sycl::nd_item<1> and use get_local_id(0), get_group(0). Four launch sites and two kernel function signatures to update.",
+          "risk": "low",
+          "risk_notes": "Mechanical refactoring. The dimensions being removed are always 1 — no functional change."
+        },
+        {
+          "id": "opt_012_005",
+          "category": "dpct_cleanup",
+          "priority": "low",
+          "description": "Clean up DPCT artifacts: replace dpct::queue_ptr with sycl::queue& (lines 201, 258), rename item_ct1 to item, simplify the verbose shared_mem_acc.get_multi_ptr<sycl::access::decorated::no>().get() extraction (lines 218, 231, 275, 288) to use the accessor directly or a simpler pattern.",
+          "expected_improvement": "No performance improvement. Code readability and maintenance improvement.",
+          "implementation_notes": "1. dpct::queue_ptr stream → sycl::queue& stream (or auto& stream = ctx.stream()). 2. item_ct1 → item throughout kernel functions. 3. For SLM access, can pass the accessor directly and index it, or use shared_mem_acc.get_pointer() for a simpler extraction pattern.",
+          "risk": "low",
+          "risk_notes": "Purely cosmetic changes. No functional or performance impact."
+        }
+      ],
+      "overall_optimization_potential": "medium",
+      "estimated_current_efficiency": "55-65% — The WKV kernels are algorithmically well-structured and closely match CUDA. The SLM over-allocation bug (4x) wastes shared memory but the absolute amounts (1-2.5 KB wasted per work-group) are small relative to the 64KB Xe-core SLM budget. The scalar SLM loads (4 loads instead of 1 vector load) add unnecessary instruction pressure in the inner loop. The work-group size of 64-128 is inherently constrained by the algorithm (1 thread per head dimension) and cannot be increased. The kernel is compute-bound with high register pressure (64-128 floats for state[] per thread). The main optimization opportunities are fixing the SLM allocation bug, enabling vector SLM loads, and ensuring optimal SIMD16 selection."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 11,
+    "total_kernels_analyzed": 12,
     "critical_potential": 1,
     "high_potential": 5,
-    "medium_potential": 5,
+    "medium_potential": 6,
     "low_potential": 0,
     "no_optimization_needed": 0,
     "top_opportunities": [
@@ -1974,6 +2102,20 @@
         "kernel_name": "getrows SYCL kernels",
         "opportunity_id": "opt_011_003",
         "description": "Replace integer div/mod with grid-stride loops — 5-20% speedup + correctness fix for large grids",
+        "priority": "medium"
+      },
+      {
+        "kernel_id": "sk_012",
+        "kernel_name": "wkv SYCL kernels",
+        "opportunity_id": "opt_012_001",
+        "description": "Fix SLM over-allocation by 4x — local_accessor receives byte count instead of element count",
+        "priority": "high"
+      },
+      {
+        "kernel_id": "sk_012",
+        "kernel_name": "wkv SYCL kernels",
+        "opportunity_id": "opt_012_002",
+        "description": "Replace scalar SLM loads with true 128-bit vector loads for float4 construction — 5-15% inner loop speedup",
         "priority": "medium"
       }
     ]

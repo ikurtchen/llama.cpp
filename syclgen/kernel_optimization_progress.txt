@@ -5,9 +5,9 @@
 
 ## Summary
 - Total SYCL kernels to analyze: 13
-- Kernels analyzed so far: 11
+- Kernels analyzed so far: 12
 - Analysis complete: No
-- Kernels with optimization potential: 11
+- Kernels with optimization potential: 12
 - Optimization tasks created: 0 (pending finalization)
 
 ## Kernels Analyzed
@@ -22,10 +22,17 @@
 - [x] sk_009: mmvq SYCL kernels — high potential (8 optimization opportunities)
 - [x] sk_010: dmmv SYCL kernels — high potential (9 optimization opportunities)
 - [x] sk_011: getrows SYCL kernels — medium potential (6 optimization opportunities)
-- [ ] sk_012: wkv SYCL kernels — pending
+- [x] sk_012: wkv SYCL kernels — medium potential (5 optimization opportunities)
 - [ ] sk_013: gla SYCL kernel — pending
 
 ## Recent Activity
+[2026-02-14] Analyzed kernel wkv (RWKV WKV attention) SYCL kernels (sk_012). Found 5 optimization opportunities (medium potential).
+  - HIGH: SLM over-allocation by 4x — local_accessor<float> receives C/H*N*sizeof(float) (byte count) but expects element count. Wastes 3/4 of allocated SLM.
+  - MEDIUM: Scalar SLM loads for float4 construction — 4 individual reads instead of 1 aligned 128-bit vector load (CUDA uses (float4&) cast).
+  - MEDIUM: Missing reqd_sub_group_size(16) on all 4 kernel launch paths.
+  - LOW: 3D nd_range with dims 0,1 always 1 — DPCT artifact, should be 1D.
+  - LOW: DPCT artifacts — dpct::queue_ptr, item_ct1 naming, verbose get_multi_ptr extraction.
+
 [2026-02-14] Analyzed kernel getrows (gather rows) SYCL kernels (sk_011). Found 6 optimization opportunities (medium potential).
   - MEDIUM: Missing I32 and BF16 src0 types + non-F32 dst type support — CUDA has two-level type switch covering I32, BF16, F16, F32 src and F32, I32, F16, BF16 dst.
   - MEDIUM: No reqd_sub_group_size(16) on any kernel launch — suboptimal SIMD width on Xe2.
