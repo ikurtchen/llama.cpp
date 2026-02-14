@@ -1,0 +1,33 @@
+# SyclGen Kernel Optimization Progress
+# Project: llama.cpp
+# Target Hardware: Intel Arc Pro B60 (Xe2, Battlemage)
+# Created: 2026-02-14
+
+## Summary
+- Total SYCL kernels to analyze: 13
+- Kernels analyzed so far: 1
+- Analysis complete: No
+- Kernels with optimization potential: 1
+- Optimization tasks created: 0 (pending finalization)
+
+## Kernels Analyzed
+- [x] sk_001: softmax SYCL kernels — high potential (6 optimization opportunities)
+- [ ] sk_002: rope SYCL kernels — pending
+- [ ] sk_003: norm SYCL kernels — pending
+- [ ] sk_004: element_wise SYCL kernels — pending
+- [ ] sk_005: convert SYCL kernels — pending
+- [ ] sk_006: binbcast SYCL kernels — pending
+- [ ] sk_007: cpy SYCL kernels — pending
+- [ ] sk_008: mmq SYCL kernels — pending
+- [ ] sk_009: mmvq SYCL kernels — pending
+- [ ] sk_010: dmmv SYCL kernels — pending
+- [ ] sk_011: getrows SYCL kernels — pending
+- [ ] sk_012: wkv SYCL kernels — pending
+- [ ] sk_013: gla SYCL kernel — pending
+
+## Recent Activity
+[2026-02-14] Analyzed kernel softmax SYCL kernels (sk_001). Found 6 optimization opportunities (high potential).
+  - CRITICAL: Missing [[sycl::reqd_sub_group_size(WARP_SIZE)]] on 2 kernel launch paths — correctness risk
+  - HIGH: Manual SLM block reduction with 5 barriers can be replaced with sycl::reduce_over_group
+  - MEDIUM: No vectorized memory access (scalar float only) — 20-40% memory throughput improvement possible
+  - MEDIUM: soft_max_back_f32 work-group size too small (only 16 on Intel)

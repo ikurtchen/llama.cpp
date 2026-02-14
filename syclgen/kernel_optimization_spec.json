@@ -1,0 +1,180 @@
+{
+  "version": "1.0",
+  "created": "2026-02-14T00:00:00Z",
+  "target_hardware": {
+    "name": "Intel Arc Pro B60",
+    "architecture": "Xe2 (Battlemage)",
+    "xe_cores": 20,
+    "xve_per_core": 8,
+    "simd_width": 16,
+    "slm_per_xe_core_kb": 64,
+    "memory_bandwidth_gbs": 456,
+    "fp32_tflops": 12.28,
+    "max_work_group_size": 1024,
+    "preferred_work_group_sizes": [256, 512],
+    "preferred_sub_group_size": 16
+  },
+  "kernels": [
+    {
+      "kernel_id": "sk_001",
+      "name": "softmax SYCL kernels",
+      "file": "ggml/src/ggml-sycl/softmax.cpp",
+      "source_cuda_ids": ["ck_097", "ck_098", "ck_099"],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": "dynamic: doubles from WARP_SIZE (16) until >= ncols or max_block_size; template specializations at 32/64/128/256/512/1024",
+          "sub_group_size": 16,
+          "global_size_expression": "nrows * block_size (one work-group per row)",
+          "notes": "soft_max_back_f32 uses a fixed work-group of WARP_SIZE (16 on Intel), which is very small. Missing [[sycl::reqd_sub_group_size(WARP_SIZE)]] on fallback forward path (line 293) and backward kernel (line 316) — correctness risk."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "strided_accesses": [],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "All memory accesses are scalar float. Consecutive threads access consecutive elements (coalesced). No sycl::vec usage for data loads/stores despite vec_aligned_load helper existing in common.hpp."
+        },
+        "slm_usage": {
+          "uses_slm": true,
+          "slm_bytes": "(GGML_PAD(ncols, WARP_SIZE) + max(nwarps, WARP_SIZE)) * sizeof(float) for shared path; WARP_SIZE * sizeof(float) for non-shared path",
+          "potential_bank_conflicts": true,
+          "notes": "Inter-warp SLM reduction buffer has potential bank conflicts when nreduce > 1 (stride-16 accesses on 16-bank SLM). SLM allocation is larger than CUDA equivalent due to different reduction algorithm requiring nwarps elements vs WARP_SIZE."
+        },
+        "reduction_pattern": {
+          "has_reduction": true,
+          "uses_sub_group_reduce": true,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": true,
+          "uses_atomic": false,
+          "notes": "Two-level reduction: sub-group shuffle (warp_reduce_max/sum) + manual SLM-based inter-warp reduction. Uses 5 barriers (2 for MAX, 3 for SUM) vs CUDA's 2 barriers total (1 per block_reduce call). Does NOT use sycl::reduce_over_group or sycl::joint_reduce. The manual SLM reduction is inlined rather than using a reusable block_reduce utility."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "FP32 throughout is appropriate for softmax numerical stability. Mask input supports both float and sycl::half via template."
+        },
+        "math_functions": {
+          "uses_native_math": true,
+          "functions": ["sycl::native::exp (line 131, 159)", "sycl::max", "standard division for 1.0f/tmp (line 161)"],
+          "notes": "Good: already uses sycl::native::exp. Minor: could use sycl::native::recip for 1/sum but precision impact may be undesirable."
+        },
+        "loop_analysis": {
+          "hot_loops": [
+            "Column loop (lines 92-103): iterates ncols/block_size times for max computation",
+            "Column loop (lines 124-134): iterates ncols/block_size times for exp + sum",
+            "Column loop (lines 164-172): iterates ncols/block_size times for normalization",
+            "nreduce loop (lines 141-143, 153-155): up to 4 iterations for SLM reduction zeroing/accumulation"
+          ],
+          "unrolled": true,
+          "notes": "Main column loops have #pragma unroll which works when ncols_template != 0 (compile-time constant). Fallback path (ncols_template == 0) cannot unroll. nreduce loops are NOT unrolled."
+        },
+        "estimated_bottleneck": "memory",
+        "anti_patterns": [
+          "DPCT artifact: uses sycl::ext::oneapi::this_work_item::get_nd_item<3>() instead of lambda parameter (lines 52, 180)",
+          "DPCT artifact: uses dpct::dim3 instead of sycl::range (lines 272-273, 312-313)",
+          "3D nd_range for logically 1D/2D kernel (unnecessary complexity from DPCT migration)",
+          "Manual inlined block reduction instead of reusable utility — more barriers than CUDA equivalent",
+          "Missing soft_max_f32_parallelize_cols cooperative kernel for large ncols (> 8192)",
+          "Missing [[sycl::reqd_sub_group_size(WARP_SIZE)]] on two kernel launch paths — correctness risk",
+          "soft_max_back_f32 work-group size is only WARP_SIZE (16 on Intel) — poor occupancy"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_001_001",
+          "category": "sub_group_ops",
+          "priority": "high",
+          "description": "Add missing [[sycl::reqd_sub_group_size(WARP_SIZE)]] attribute on the fallback forward kernel launch (line 293) and backward kernel launch (line 316). Both paths call warp_reduce_max/warp_reduce_sum which rely on sub-group shuffle with assumed width WARP_SIZE. Without the attribute, the runtime may choose a different sub-group size, causing incorrect reductions.",
+          "expected_improvement": "Correctness fix — prevents potential wrong results on hardware where runtime chooses sub-group size != WARP_SIZE",
+          "implementation_notes": "Add [[sycl::reqd_sub_group_size(WARP_SIZE)]] to the lambda in both parallel_for calls at lines 293 and 316 of softmax.cpp",
+          "risk": "low",
+          "risk_notes": "Low risk — this is adding a constraint that the kernel already implicitly requires"
+        },
+        {
+          "id": "opt_001_002",
+          "category": "reduction",
+          "priority": "high",
+          "description": "Replace manual two-level SLM block reduction (5 barriers) with sycl::reduce_over_group for both MAX and SUM reductions. The current implementation manually inlines a warp-shuffle + SLM inter-warp reduction pattern ported from CUDA, using 5 barriers (2 for MAX, 3 for SUM). sycl::reduce_over_group(item.get_group(), val, op) performs the entire work-group reduction in a single call with optimal barrier usage.",
+          "expected_improvement": "10-20% speedup from reduced barrier overhead (5 barriers → 0-2 internal barriers managed by runtime) and potentially better reduction tree. Also simplifies code significantly.",
+          "implementation_notes": "Replace lines 105-120 (MAX) with: max_val = sycl::reduce_over_group(item.get_group(), max_val, sycl::maximum<float>()). Replace lines 136-157 (SUM) with: tmp = sycl::reduce_over_group(item.get_group(), tmp, sycl::plus<float>()). Remove the buf_iw SLM allocation for the inter-warp buffer (only keep vals if use_shared). This eliminates the nreduce logic entirely. Ref: optimization_guide.md section 3.4.",
+          "risk": "medium",
+          "risk_notes": "Need to verify sycl::reduce_over_group works correctly with all block sizes used (32-1024). Some older oneAPI compiler versions may have bugs with large work-group reductions. Need to verify numerical equivalence with current implementation."
+        },
+        {
+          "id": "opt_001_003",
+          "category": "vectorization",
+          "priority": "medium",
+          "description": "Add vectorized memory access (sycl::vec<float, 4>) to the three column loops in soft_max_f32. Currently all loads and stores are scalar float, processing 1 element per thread per iteration. Using vec4 loads would reduce memory transactions by 4x for aligned data.",
+          "expected_improvement": "20-40% improvement in memory throughput for memory-bound softmax. Softmax is bandwidth-limited (compute intensity ~3-5 ops/byte, well below the 27 ops/byte threshold), so better memory utilization directly translates to speedup.",
+          "implementation_notes": "For the column loops (lines 92-103, 124-134, 164-172), process 4 elements per iteration using sycl::vec<float, 4> loads. Handle tail elements (ncols % 4 != 0) with scalar fallback. The vec_aligned_load helper in common.hpp line 520 can be used. Need to ensure alignment of x, mask, and dst pointers. For the shared-memory path, vals buffer is already float-aligned since it's SLM. Ref: optimization_guide.md section 2.2.",
+          "risk": "medium",
+          "risk_notes": "Need to handle non-aligned and non-multiple-of-4 ncols correctly. The template specialization for ncols=32,64,128,256,512,1024,2048,4096 are all multiples of 4, so vectorization is safe for those paths. The fallback path needs careful tail handling."
+        },
+        {
+          "id": "opt_001_004",
+          "category": "work_group_size",
+          "priority": "medium",
+          "description": "Increase soft_max_back_f32 work-group size from WARP_SIZE (16 on Intel) to at least 128 or 256. The current single-warp work-group provides very poor occupancy on Intel Xe2 (only 1 hardware thread per EU). With a larger work-group, multiple warps can cooperate on a single row, improving latency hiding and bandwidth utilization.",
+          "expected_improvement": "30-50% improvement for backward pass. Larger work-groups better hide memory latency through more concurrent threads per Xe-core. Currently each work-group occupies only 1/8 of an EU's thread capacity.",
+          "implementation_notes": "Change block_dims from (WARP_SIZE, 1, 1) to (256, 1, 1) at line 312. Modify the kernel to use multi-warp reduction: each thread accumulates its partial sum, then use sycl::reduce_over_group instead of single-warp warp_reduce_sum. The column loop stride changes from WARP_SIZE to block_size. Also need to add [[sycl::reqd_sub_group_size(WARP_SIZE)]] attribute.",
+          "risk": "low",
+          "risk_notes": "Standard pattern change. The forward kernel already uses larger work-groups successfully. Need to verify backward pass numerical accuracy is maintained."
+        },
+        {
+          "id": "opt_001_005",
+          "category": "slm_tuning",
+          "priority": "low",
+          "description": "Reduce SLM allocation for inter-warp communication buffer. Current allocation is max(nwarps, WARP_SIZE) floats, which is 256 bytes for 1024-thread work-groups on Intel (nwarps=64). If reduction is replaced with sycl::reduce_over_group (opt_001_002), this buffer is eliminated entirely. Otherwise, restructure the reduction to use only WARP_SIZE elements like the CUDA block_reduce pattern.",
+          "expected_improvement": "5-10% from reduced SLM pressure allowing more work-groups per Xe-core (higher occupancy). The freed SLM can be used for more vals caching.",
+          "implementation_notes": "If opt_001_002 is implemented, this is automatically resolved. Otherwise, restructure the SUM reduction to match CUDA's block_reduce pattern: each lane reads shared[lane_id] for lane_id < nwarps, with sentinel 0 for lane_id >= nwarps. This requires only WARP_SIZE elements and 1 barrier per reduction.",
+          "risk": "low",
+          "risk_notes": "Low risk if done carefully. The CUDA version already proves this pattern works correctly."
+        },
+        {
+          "id": "opt_001_006",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Clean up DPCT migration artifacts: replace this_work_item::get_nd_item<3>() with lambda parameter, replace dpct::dim3 with sycl::range, simplify 3D nd_range to 1D where possible. This improves code maintainability and removes dependency on non-standard SYCL extensions.",
+          "expected_improvement": "No direct performance improvement, but enables better compiler optimization by making data flow explicit and removes runtime overhead of extension function calls.",
+          "implementation_notes": "1. Pass nd_item<3> as function parameter instead of calling this_work_item::get_nd_item<3>() (lines 52, 180). 2. Replace dpct::dim3 with sycl::range<3> (lines 272-273, 312-313). 3. Consider converting to nd_range<1> for the backward kernel which is logically 1D.",
+          "risk": "low",
+          "risk_notes": "Purely mechanical refactoring with no algorithmic changes."
+        }
+      ],
+      "overall_optimization_potential": "high",
+      "estimated_current_efficiency": "40-50% — softmax is memory-bound and the current implementation wastes bandwidth through scalar accesses and has excessive barrier overhead from the manual block reduction pattern. The missing sub-group size attributes are a correctness concern."
+    }
+  ],
+  "summary": {
+    "total_kernels_analyzed": 1,
+    "high_potential": 1,
+    "medium_potential": 0,
+    "low_potential": 0,
+    "no_optimization_needed": 0,
+    "top_opportunities": [
+      {
+        "kernel_id": "sk_001",
+        "kernel_name": "softmax SYCL kernels",
+        "opportunity_id": "opt_001_001",
+        "description": "Fix missing reqd_sub_group_size attribute — correctness issue",
+        "priority": "high"
+      },
+      {
+        "kernel_id": "sk_001",
+        "kernel_name": "softmax SYCL kernels",
+        "opportunity_id": "opt_001_002",
+        "description": "Replace manual SLM block reduction with sycl::reduce_over_group — 10-20% speedup",
+        "priority": "high"
+      },
+      {
+        "kernel_id": "sk_001",
+        "kernel_name": "softmax SYCL kernels",
+        "opportunity_id": "opt_001_003",
+        "description": "Add vec4 vectorized memory access — 20-40% memory throughput improvement",
+        "priority": "medium"
+      }
+    ]
+  }
+}
