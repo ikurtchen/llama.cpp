@@ -5,16 +5,16 @@
 
 ## Summary
 - Total SYCL kernels to analyze: 13
-- Kernels analyzed so far: 3
+- Kernels analyzed so far: 4
 - Analysis complete: No
-- Kernels with optimization potential: 3
+- Kernels with optimization potential: 4
 - Optimization tasks created: 0 (pending finalization)
 
 ## Kernels Analyzed
 - [x] sk_001: softmax SYCL kernels — high potential (6 optimization opportunities)
 - [x] sk_002: rope SYCL kernels — medium potential (5 optimization opportunities)
 - [x] sk_003: norm SYCL kernels — high potential (9 optimization opportunities)
-- [ ] sk_004: element_wise SYCL kernels — pending
+- [x] sk_004: element_wise SYCL kernels — medium potential (8 optimization opportunities)
 - [ ] sk_005: convert SYCL kernels — pending
 - [ ] sk_006: binbcast SYCL kernels — pending
 - [ ] sk_007: cpy SYCL kernels — pending
@@ -26,6 +26,13 @@
 - [ ] sk_013: gla SYCL kernel — pending
 
 ## Recent Activity
+[2026-02-14] Analyzed kernel element_wise SYCL kernels (sk_004). Found 8 optimization opportunities (medium potential).
+  - MEDIUM: All ops use scalar loads — vec4 vectorization would improve memory throughput 20-40%
+  - MEDIUM: Inconsistent native math — silu/sigmoid use native::exp but gelu/exp/sin/cos/log use standard versions
+  - LOW: 5 separate GLU kernels duplicate index math — should consolidate to template
+  - LOW: swiglu_oai uses 3D nd_range (DPCT artifact), dpct_inline cleanup, generic stride overhead
+  - LOW: Feature gaps — acc_f32 3D only, upscale missing bilinear/bicubic modes
+
 [2026-02-14] Analyzed kernel norm SYCL kernels (sk_003). Found 9 optimization opportunities (high potential).
   - HIGH: group_norm uses global barrier instead of local_space — performance bug
   - HIGH: Three inconsistent reduction patterns — should use sycl::reduce_over_group

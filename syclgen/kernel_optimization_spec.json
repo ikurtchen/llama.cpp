@@ -429,12 +429,159 @@
       ],
       "overall_optimization_potential": "high",
       "estimated_current_efficiency": "35-45% — Norm kernels are memory-bound but waste bandwidth through scalar accesses (no vectorization), have inconsistent and suboptimal reduction patterns (3 different styles, one using global barriers), use unnecessarily small work-groups for the small path (16 vs CUDA's 256), and are missing the critical fused rms_norm_multiply kernel that eliminates a full memory pass in transformer inference."
+    },
+    {
+      "kernel_id": "sk_004",
+      "name": "element_wise SYCL kernels",
+      "file": "ggml/src/ggml-sycl/element_wise.cpp",
+      "source_cuda_ids": ["ck_109", "ck_110", "ck_111", "ck_112", "ck_113"],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": 256,
+          "sub_group_size": null,
+          "global_size_expression": "ceil_div(n, 256) * 256 for contiguous ops; product of dimensions for generic stride path; swiglu_oai uses 3D nd_range",
+          "notes": "All element-wise kernels use SYCL_ELEMENT_WISE_BLOCK_SIZE=256 with nd_range<1>, except swiglu_oai which uses nd_range<3> (DPCT artifact). No [[sycl::reqd_sub_group_size]] specified on any kernel. ~25 unary ops, 5 fused GLU ops, plus acc_f32, arange, upscale, clamp, xielu, silu_back."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "strided_accesses": ["generic stride path: per-element 4D address decomposition (i0/i1/i2/i3 + byte offset multiply)"],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "All ops use scalar loads/stores — one element per work-item. Consecutive threads access consecutive elements for the contiguous fast path (coalesced). The generic stride path (unary_op_generic_kernel) performs expensive 4D address decomposition per element. No sycl::vec usage anywhere despite all ops being trivially vectorizable."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes": 0,
+          "potential_bank_conflicts": false,
+          "notes": "No SLM needed — all ops are purely element-wise with no data sharing."
+        },
+        "reduction_pattern": {
+          "has_reduction": false,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "No reductions — purely element-wise operations."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "All computation is FP32. Input/output types handled through casting. FP32 is appropriate for transcendental functions (gelu, silu, sigmoid, etc.) where half-precision could cause quality issues."
+        },
+        "math_functions": {
+          "uses_native_math": "partial",
+          "functions": ["sycl::native::exp (silu, sigmoid)", "sycl::tanh (gelu, hardswish)", "sycl::exp (exp op, elu, geglu, softplus)", "sycl::log (log op, softplus)", "sycl::sin/sycl::cos (sin/cos ops)", "sycl::sqrt (sqrt op)", "sycl::erf (gelu_erf, geglu_erf)"],
+          "notes": "Inconsistent native math usage: silu and sigmoid correctly use sycl::native::exp, but gelu uses standard sycl::tanh, exp op uses standard sycl::exp, sin/cos use standard versions, log uses standard version. All should use sycl::native:: variants where precision allows. CUDA equivalents use __expf, tanhf, etc. which are fast-math by default."
+        },
+        "loop_analysis": {
+          "hot_loops": [],
+          "unrolled": false,
+          "notes": "No loops within kernels — each work-item processes exactly one element. The outer dispatch loop is the nd_range grid."
+        },
+        "estimated_bottleneck": "memory",
+        "anti_patterns": [
+          "All element-wise ops use scalar loads/stores — should use vec4 for 2-4x memory throughput improvement",
+          "Inconsistent native math: silu/sigmoid use native::exp but gelu/exp/sin/cos/log do not use native equivalents",
+          "Five separate GLU kernel bodies duplicate index math — CUDA uses a single template kernel with function pointer parameter",
+          "swiglu_oai uses 3D nd_range (DPCT artifact) while all other element_wise kernels use nd_range<1>",
+          "__dpct_inline__ artifacts should use standard inline or nothing",
+          "Generic stride path (unary_op_generic_kernel) performs expensive 4D address decomposition per element without fast-path detection for contiguous case",
+          "acc_f32 only supports 3D tensors (asserts dst->ne[3] == 1) while CUDA supports 4D",
+          "Missing upscale modes: SYCL only has nearest-neighbor, CUDA also has bilinear and bicubic"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_004_001",
+          "category": "vectorization",
+          "priority": "medium",
+          "description": "Add vectorized loads/stores (sycl::vec<float, 4>) to all contiguous-path element-wise kernels. Currently all ~25 unary ops, 5 GLU ops, and other element-wise kernels process one scalar float per work-item. For memory-bound element-wise ops, vec4 loads can improve memory throughput by 2-4x by reducing memory transactions. Element-wise ops are the simplest case for vectorization since there are no inter-element dependencies.",
+          "expected_improvement": "20-40% throughput improvement for memory-bound element-wise ops (most of them). Compute-heavy ops (gelu, silu, sigmoid) will see less improvement since they are closer to compute-bound.",
+          "implementation_notes": "Create a vectorized wrapper that loads 4 elements, applies the unary op to each, and stores 4 elements. The contiguous dispatch path (ggml_sycl_op_unary) can check alignment and n%4==0 to use vec4 path. Each work-item processes 4 elements instead of 1, reducing grid size by 4x. Handle tail elements with scalar fallback. Apply to both unary ops and GLU ops. Ref: optimization_guide.md section 2.2.",
+          "risk": "low",
+          "risk_notes": "Element-wise ops have no inter-element dependencies, making vectorization safe. Need to handle non-aligned and non-multiple-of-4 element counts with scalar fallback."
+        },
+        {
+          "id": "opt_004_002",
+          "category": "math_functions",
+          "priority": "medium",
+          "description": "Use sycl::native:: variants consistently for all transcendental functions in element-wise ops. Currently silu and sigmoid correctly use sycl::native::exp, but many other ops use standard versions: gelu uses sycl::tanh (should be native::tanh or native::exp-based), exp op uses sycl::exp (should be native::exp), sin/cos use sycl::sin/sycl::cos (should be native::sin/native::cos), log uses sycl::log (should be native::log), sqrt uses sycl::sqrt (should be native::sqrt). On Xe2, native math functions are 2-4x faster than standard precision versions.",
+          "expected_improvement": "10-30% speedup for compute-bound ops (gelu, sigmoid, tanh, exp, log, sin, cos). For memory-bound ops the improvement is smaller since compute is not the bottleneck. The gelu kernel (2x exp + tanh + multiply) benefits most from native math.",
+          "implementation_notes": "Replace in each kernel: sycl::tanh → sycl::native::exp-based tanh or direct native (if available), sycl::exp → sycl::native::exp, sycl::sin → sycl::native::sin, sycl::cos → sycl::native::cos, sycl::log → sycl::native::log, sycl::sqrt → sycl::native::sqrt. For gelu, the tanh can be rewritten as: t = native::exp(2*x); result = t/(t+1) (sigmoid-based form) which uses only native::exp. Ref: optimization_guide.md section 3.2.",
+          "risk": "low",
+          "risk_notes": "Native math provides ~1 ULP accuracy which is sufficient for activation functions in LLM inference. silu/sigmoid already use native::exp successfully, confirming the precision is acceptable."
+        },
+        {
+          "id": "opt_004_003",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Consolidate the 5 separate GLU kernel bodies (gated_op_fused_geglu, gated_op_fused_reglu, gated_op_fused_swiglu, gated_op_fused_geglu_erf, gated_op_fused_geglu_quick) into a single template kernel with a function pointer or constexpr-if parameter, matching CUDA's unified unary_gated_op_kernel<op> pattern. The 5 kernels duplicate the same index computation logic (i0, i1, row, col, x_offset, g_offset) and only differ in the activation function applied.",
+          "expected_improvement": "No performance improvement — code quality and maintainability fix. Reduces ~150 lines of duplicated kernel code to ~40 lines. Makes it easier to add new GLU variants.",
+          "implementation_notes": "Create template: template<typename ActivationOp> void gated_op_fused_kernel(nd_item<1>, ..., ActivationOp op) with the common index math, then instantiate with lambda or functor for each activation (gelu, relu, silu, gelu_erf, gelu_quick). Update dispatch to use the template.",
+          "risk": "low",
+          "risk_notes": "Mechanical refactoring. All 5 kernels already have identical control flow and only differ in one line (the activation function call)."
+        },
+        {
+          "id": "opt_004_004",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Convert swiglu_oai from 3D nd_range to 1D nd_range, matching all other element_wise kernels. The 3D nd_range is a DPCT migration artifact — the kernel is logically 1D (one element per thread). This simplifies thread index computation and removes unnecessary dimensions.",
+          "expected_improvement": "Negligible performance improvement (<2%). Primary benefit is code consistency and maintainability.",
+          "implementation_notes": "Change nd_range<3> to nd_range<1>. Update thread index computation from 3D decomposition to simple get_global_id(0). Grid size = ceil_div(total_elements, 256) * 256.",
+          "risk": "low",
+          "risk_notes": "Mechanical refactoring. The kernel is logically 1D with no dimensional dependencies."
+        },
+        {
+          "id": "opt_004_005",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Clean up __dpct_inline__ artifacts throughout element_wise.cpp. Replace with standard C++ inline keyword or remove entirely (the compiler inlines small functions automatically). This is a DPCT migration artifact that reduces code portability.",
+          "expected_improvement": "No performance improvement — code quality fix for portability and readability.",
+          "implementation_notes": "Replace all instances of __dpct_inline__ with inline or remove the annotation entirely. The functions are small enough that the compiler will inline them regardless.",
+          "risk": "low",
+          "risk_notes": "Mechanical cleanup with no functional changes."
+        },
+        {
+          "id": "opt_004_006",
+          "category": "vectorization",
+          "priority": "low",
+          "description": "Add contiguous fast-path detection for the generic stride kernel (unary_op_generic_kernel). The generic path performs expensive 4D address decomposition (i0/i1/i2/i3 + byte offset multiply) per element. For contiguous tensors, this decomposition is unnecessary — a simple linear index suffices. Detecting contiguity at dispatch time and routing to the fast path avoids this overhead.",
+          "expected_improvement": "5-15% for ops that go through the generic path with contiguous tensors. The address decomposition adds ~10 ALU ops per element (4 divisions + 4 modulos + 4 multiplies + additions) which is significant for simple ops like relu or neg.",
+          "implementation_notes": "At dispatch time (in ggml_sycl_op_unary or equivalent), check if src and dst have contiguous strides (ne[i] * nb[i] == nb[i+1] for all i). If contiguous, use the existing fast path. If non-contiguous, use the generic path. This check is already partially done for some ops but not consistently applied.",
+          "risk": "low",
+          "risk_notes": "Adding a dispatch-time check has no risk. The fast path already exists and is proven correct."
+        },
+        {
+          "id": "opt_004_007",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Feature gap: acc_f32 only supports 3D tensors (asserts dst->ne[3] == 1) while CUDA supports 4D with ne13/s13 parameters. This limits the operations that can run on the SYCL backend.",
+          "expected_improvement": "No performance improvement — feature completeness fix.",
+          "implementation_notes": "Add ne13 and s13 parameters to the acc_f32_sycl kernel. Remove the assert(dst->ne[3] == 1) check and add an outer loop or grid dimension for the 4th dimension.",
+          "risk": "low",
+          "risk_notes": "Straightforward extension of existing 3D logic to 4D."
+        },
+        {
+          "id": "opt_004_008",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Feature gap: upscale kernel only implements nearest-neighbor interpolation. CUDA supports bilinear (with and without antialiasing) and bicubic modes. This limits model compatibility for vision and image processing workloads.",
+          "expected_improvement": "No performance improvement — feature completeness fix for vision model support.",
+          "implementation_notes": "Implement bilinear and bicubic interpolation modes in the upscale kernel, matching CUDA's implementation. The dispatch should select the mode based on the op parameters.",
+          "risk": "medium",
+          "risk_notes": "Bilinear and bicubic are more complex algorithms requiring multi-element reads with interpolation weights. Need careful testing against CUDA reference output."
+        }
+      ],
+      "overall_optimization_potential": "medium",
+      "estimated_current_efficiency": "60-70% — Element-wise kernels are simple and already reasonably well-implemented. The main performance wins come from vectorized loads (2-4x memory throughput for bandwidth-bound ops) and consistent native math usage (2-4x faster transcendentals for compute-bound ops like gelu/silu). Code quality improvements (GLU dedup, DPCT cleanup) are beneficial but don't affect performance significantly."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 3,
+    "total_kernels_analyzed": 4,
     "high_potential": 2,
-    "medium_potential": 1,
+    "medium_potential": 2,
     "low_potential": 0,
     "no_optimization_needed": 0,
     "top_opportunities": [
@@ -506,6 +653,20 @@
         "kernel_name": "norm SYCL kernels",
         "opportunity_id": "opt_003_004",
         "description": "Add vec4 vectorized memory access to norm kernels — 20-40% memory throughput improvement",
+        "priority": "medium"
+      },
+      {
+        "kernel_id": "sk_004",
+        "kernel_name": "element_wise SYCL kernels",
+        "opportunity_id": "opt_004_001",
+        "description": "Add vec4 vectorized loads/stores to all element-wise ops — 20-40% memory throughput improvement",
+        "priority": "medium"
+      },
+      {
+        "kernel_id": "sk_004",
+        "kernel_name": "element_wise SYCL kernels",
+        "opportunity_id": "opt_004_002",
+        "description": "Use native math consistently for all transcendentals — 10-30% speedup for compute-bound ops",
         "priority": "medium"
       }
     ]
