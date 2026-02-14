@@ -34,12 +34,12 @@ declare -A SERVER_CONTAINERS
 # Format: SERVER_NAME=IP:USER:PASSWORD:SSH_KEY:WORKDIR
 SERVER_IPS=(
     ["h20"]="h20"
-    ["b60"]="172.16.114.168"
+    ["b60"]="10.239.129.239"
 )
 
 SERVER_PORTS=(
     ["h20"]="22"
-    ["b60"]="2232"
+    ["b60"]="2332"
 )
 
 SERVER_USERS=(
@@ -63,7 +63,7 @@ SERVER_SSH_KEYS=(
 # Can be overridden by --workdir argument
 SERVER_WORKDIRS=(
     ["h20"]="/ssd/kurt/llama.cpp"
-    ["b60"]="/intel/kurt/llama.cpp"
+    ["b60"]="/host/root/kurt/llama.cpp"
 )
 
 SERVER_CONTAINERS=(
@@ -109,10 +109,10 @@ ACCURACY_COMMANDS=(
     ["b60"]="echo \"not implemented\""
 )
 
-# Benchmark commands
+# Kernel benchmark commands
 BENCHMARK_COMMANDS=(
-    ["h20"]="echo \"not implemented\""
-    ["b60"]="echo \"not implemented\""
+    ["h20"]="./build/bin/test-backend-ops perf -b CUDA0"
+    ["b60"]="source /opt/intel/oneapi/setvars.sh && ./build/bin/test-backend-ops perf -b SYCL0"
 )
 
 # Profile commands
@@ -558,12 +558,21 @@ task_benchmark() {
     local container="$3"
     local custom_cmd="$4"
     local env_vars="$5"
+    local kernels="$6"
 
     local cmd="${custom_cmd:-${BENCHMARK_COMMANDS[$server]}}"
+
+    # Append kernel filter: -o accepts comma-separated names natively
+    if [[ -n "$kernels" ]]; then
+        cmd="$cmd -o $kernels"
+        print_info "Filtering kernels: $kernels"
+    fi
+
     local log_file=$(generate_log_filename "benchmark" "$server")
 
     print_info "Running benchmark on $server"
     print_info "Working directory: $workdir"
+    print_info "Command: $cmd"
 
     local full_cmd="cd $workdir && $env_vars $cmd"
 
@@ -810,7 +819,7 @@ main() {
                 task_accuracy "$SERVER" "$WORKDIR" "$CONTAINER" "$CUSTOM_COMMAND" "$ENV_VARS"
                 ;;
             benchmark)
-                task_benchmark "$SERVER" "$WORKDIR" "$CONTAINER" "$CUSTOM_COMMAND" "$ENV_VARS"
+                task_benchmark "$SERVER" "$WORKDIR" "$CONTAINER" "$CUSTOM_COMMAND" "$ENV_VARS" "$KERNEL_NAMES"
                 ;;
             profile)
                 task_profile "$SERVER" "$WORKDIR" "$CONTAINER" "$CUSTOM_COMMAND" "$ENV_VARS"

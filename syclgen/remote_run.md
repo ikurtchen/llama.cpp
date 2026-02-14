@@ -29,6 +29,11 @@ bash syclgen/remote_run.sh -s h20 -t upload,build --local "/localdisk/kurt/works
 bash syclgen/remote_run.sh -s h20 -t unit -k CPY,ROPE -e CUDA_VISIBLE_DEVICES="0"
 ```
 
+* Run kernel benchmark on Nvidia GPU server `h20`:
+```bash
+bash syclgen/remote_run.sh -s h20 -t benchmark -k CPY,ROPE -e CUDA_VISIBLE_DEVICES="0"
+```
+
 * Run integration test on Nvidia GPU server `h20`:
 ```bash
 bash syclgen/remote_run.sh -s h20 -t run -e CUDA_VISIBLE_DEVICES="0"
@@ -42,6 +47,11 @@ bash syclgen/remote_run.sh -s b60 -t upload,build --local "/localdisk/kurt/works
 * Run kernel unit test on Intel GPU server `b60`: 
 ```bash
 bash syclgen/remote_run.sh -s b60 -t unit -k CPY,ROPE -e ZES_ENABLE_SYSMAN=1
+```
+
+* Run kernel benchmark on Intel GPU server `b60`: 
+```bash
+bash syclgen/remote_run.sh -s b60 -t benchmark -k CPY,ROPE -e ZES_ENABLE_SYSMAN=1
 ```
 
 * Run integration test on Intel GPU server `b60`:
