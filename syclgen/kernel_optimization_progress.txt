@@ -5,9 +5,9 @@
 
 ## Summary
 - Total SYCL kernels to analyze: 13
-- Kernels analyzed so far: 6
+- Kernels analyzed so far: 7
 - Analysis complete: No
-- Kernels with optimization potential: 6
+- Kernels with optimization potential: 7
 - Optimization tasks created: 0 (pending finalization)
 
 ## Kernels Analyzed
@@ -17,7 +17,7 @@
 - [x] sk_004: element_wise SYCL kernels — medium potential (8 optimization opportunities)
 - [x] sk_005: convert SYCL kernels — medium potential (7 optimization opportunities)
 - [x] sk_006: binbcast SYCL kernels — medium potential (6 optimization opportunities)
-- [ ] sk_007: cpy SYCL kernels — pending
+- [x] sk_007: cpy SYCL kernels — high potential (8 optimization opportunities)
 - [ ] sk_008: mmq SYCL kernels — pending
 - [ ] sk_009: mmvq SYCL kernels — pending
 - [ ] sk_010: dmmv SYCL kernels — pending
@@ -26,6 +26,13 @@
 - [ ] sk_013: gla SYCL kernel — pending
 
 ## Recent Activity
+[2026-02-14] Analyzed kernel cpy (copy) SYCL kernels (sk_007). Found 8 optimization opportunities (high potential).
+  - CRITICAL: Quantized copy kernels launch with work-group size 1 — 15/16 SIMD lanes wasted on Xe2
+  - HIGH: Scalar copy work-group size is only 32 (SYCL_CPY_BLOCK_SIZE) — should be 256+
+  - HIGH: No contiguous fast-path — always performs 12 integer div/mul for 4D index decomposition
+  - MEDIUM: No vectorized loads/stores, no #pragma unroll, no reqd_sub_group_size(16)
+  - LOW: DPCT artifacts, int32 indices (overflow risk), missing BF16 support
+
 [2026-02-14] Analyzed kernel binbcast (binary broadcast) SYCL kernels (sk_006). Found 6 optimization opportunities (medium potential).
   - HIGH: Uses plain % and / for broadcast indices — CUDA uses fastdiv/fastmodulo (10x cheaper on GPU)
   - MEDIUM: Missing fused multi-source op support — CUDA fuses up to 8 adds into single kernel

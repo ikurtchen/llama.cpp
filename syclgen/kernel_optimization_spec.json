@@ -11,7 +11,10 @@
     "memory_bandwidth_gbs": 456,
     "fp32_tflops": 12.28,
     "max_work_group_size": 1024,
-    "preferred_work_group_sizes": [256, 512],
+    "preferred_work_group_sizes": [
+      256,
+      512
+    ],
     "preferred_sub_group_size": 16
   },
   "kernels": [
@@ -19,14 +22,18 @@
       "kernel_id": "sk_001",
       "name": "softmax SYCL kernels",
       "file": "ggml/src/ggml-sycl/softmax.cpp",
-      "source_cuda_ids": ["ck_097", "ck_098", "ck_099"],
+      "source_cuda_ids": [
+        "ck_097",
+        "ck_098",
+        "ck_099"
+      ],
       "current_analysis": {
         "launch_config": {
           "uses_nd_range": true,
           "work_group_size": "dynamic: doubles from WARP_SIZE (16) until >= ncols or max_block_size; template specializations at 32/64/128/256/512/1024",
           "sub_group_size": 16,
           "global_size_expression": "nrows * block_size (one work-group per row)",
-          "notes": "soft_max_back_f32 uses a fixed work-group of WARP_SIZE (16 on Intel), which is very small. Missing [[sycl::reqd_sub_group_size(WARP_SIZE)]] on fallback forward path (line 293) and backward kernel (line 316) — correctness risk."
+          "notes": "soft_max_back_f32 uses a fixed work-group of WARP_SIZE (16 on Intel), which is very small. Missing [[sycl::reqd_sub_group_size(WARP_SIZE)]] on fallback forward path (line 293) and backward kernel (line 316) \u2014 correctness risk."
         },
         "memory_patterns": {
           "coalesced_accesses": true,
@@ -57,7 +64,11 @@
         },
         "math_functions": {
           "uses_native_math": true,
-          "functions": ["sycl::native::exp (line 131, 159)", "sycl::max", "standard division for 1.0f/tmp (line 161)"],
+          "functions": [
+            "sycl::native::exp (line 131, 159)",
+            "sycl::max",
+            "standard division for 1.0f/tmp (line 161)"
+          ],
           "notes": "Good: already uses sycl::native::exp. Minor: could use sycl::native::recip for 1/sum but precision impact may be undesirable."
         },
         "loop_analysis": {
@@ -75,10 +86,10 @@
           "DPCT artifact: uses sycl::ext::oneapi::this_work_item::get_nd_item<3>() instead of lambda parameter (lines 52, 180)",
           "DPCT artifact: uses dpct::dim3 instead of sycl::range (lines 272-273, 312-313)",
           "3D nd_range for logically 1D/2D kernel (unnecessary complexity from DPCT migration)",
-          "Manual inlined block reduction instead of reusable utility — more barriers than CUDA equivalent",
+          "Manual inlined block reduction instead of reusable utility \u2014 more barriers than CUDA equivalent",
           "Missing soft_max_f32_parallelize_cols cooperative kernel for large ncols (> 8192)",
-          "Missing [[sycl::reqd_sub_group_size(WARP_SIZE)]] on two kernel launch paths — correctness risk",
-          "soft_max_back_f32 work-group size is only WARP_SIZE (16 on Intel) — poor occupancy"
+          "Missing [[sycl::reqd_sub_group_size(WARP_SIZE)]] on two kernel launch paths \u2014 correctness risk",
+          "soft_max_back_f32 work-group size is only WARP_SIZE (16 on Intel) \u2014 poor occupancy"
         ]
       },
       "optimization_opportunities": [
@@ -87,17 +98,17 @@
           "category": "sub_group_ops",
           "priority": "high",
           "description": "Add missing [[sycl::reqd_sub_group_size(WARP_SIZE)]] attribute on the fallback forward kernel launch (line 293) and backward kernel launch (line 316). Both paths call warp_reduce_max/warp_reduce_sum which rely on sub-group shuffle with assumed width WARP_SIZE. Without the attribute, the runtime may choose a different sub-group size, causing incorrect reductions.",
-          "expected_improvement": "Correctness fix — prevents potential wrong results on hardware where runtime chooses sub-group size != WARP_SIZE",
+          "expected_improvement": "Correctness fix \u2014 prevents potential wrong results on hardware where runtime chooses sub-group size != WARP_SIZE",
           "implementation_notes": "Add [[sycl::reqd_sub_group_size(WARP_SIZE)]] to the lambda in both parallel_for calls at lines 293 and 316 of softmax.cpp",
           "risk": "low",
-          "risk_notes": "Low risk — this is adding a constraint that the kernel already implicitly requires"
+          "risk_notes": "Low risk \u2014 this is adding a constraint that the kernel already implicitly requires"
         },
         {
           "id": "opt_001_002",
           "category": "reduction",
           "priority": "high",
           "description": "Replace manual two-level SLM block reduction (5 barriers) with sycl::reduce_over_group for both MAX and SUM reductions. The current implementation manually inlines a warp-shuffle + SLM inter-warp reduction pattern ported from CUDA, using 5 barriers (2 for MAX, 3 for SUM). sycl::reduce_over_group(item.get_group(), val, op) performs the entire work-group reduction in a single call with optimal barrier usage.",
-          "expected_improvement": "10-20% speedup from reduced barrier overhead (5 barriers → 0-2 internal barriers managed by runtime) and potentially better reduction tree. Also simplifies code significantly.",
+          "expected_improvement": "10-20% speedup from reduced barrier overhead (5 barriers \u2192 0-2 internal barriers managed by runtime) and potentially better reduction tree. Also simplifies code significantly.",
           "implementation_notes": "Replace lines 105-120 (MAX) with: max_val = sycl::reduce_over_group(item.get_group(), max_val, sycl::maximum<float>()). Replace lines 136-157 (SUM) with: tmp = sycl::reduce_over_group(item.get_group(), tmp, sycl::plus<float>()). Remove the buf_iw SLM allocation for the inter-warp buffer (only keep vals if use_shared). This eliminates the nreduce logic entirely. Ref: optimization_guide.md section 3.4.",
           "risk": "medium",
           "risk_notes": "Need to verify sycl::reduce_over_group works correctly with all block sizes used (32-1024). Some older oneAPI compiler versions may have bugs with large work-group reductions. Need to verify numerical equivalence with current implementation."
@@ -144,27 +155,40 @@
         }
       ],
       "overall_optimization_potential": "high",
-      "estimated_current_efficiency": "40-50% — softmax is memory-bound and the current implementation wastes bandwidth through scalar accesses and has excessive barrier overhead from the manual block reduction pattern. The missing sub-group size attributes are a correctness concern."
+      "estimated_current_efficiency": "40-50% \u2014 softmax is memory-bound and the current implementation wastes bandwidth through scalar accesses and has excessive barrier overhead from the manual block reduction pattern. The missing sub-group size attributes are a correctness concern."
     },
     {
       "kernel_id": "sk_002",
       "name": "rope SYCL kernels",
       "file": "ggml/src/ggml-sycl/rope.cpp",
-      "source_cuda_ids": ["ck_089", "ck_090", "ck_091", "ck_092"],
+      "source_cuda_ids": [
+        "ck_089",
+        "ck_090",
+        "ck_091",
+        "ck_092"
+      ],
       "current_analysis": {
         "launch_config": {
           "uses_nd_range": true,
-          "work_group_size": [256, 1, 1],
+          "work_group_size": [
+            256,
+            1,
+            1
+          ],
           "sub_group_size": null,
-          "global_size_expression": "ceil_div(ne0, 2*256) work-groups × nr rows; each thread handles one (x0, x1) rotation pair",
+          "global_size_expression": "ceil_div(ne0, 2*256) work-groups \u00d7 nr rows; each thread handles one (x0, x1) rotation pair",
           "notes": "All 4 kernels (rope_norm, rope_neox, rope_multi, rope_vision) use 3D nd_range with SYCL_ROPE_BLOCK_SIZE=256 in dimension 1 only, dimensions 0 and 2 are (1, nr). Missing [[sycl::reqd_sub_group_size(16)]] on all 8 kernel launch paths (lines 251, 261, 283, 288, 314, 319, 349, 354). Without this attribute, the compiler may choose sub-group size 32 instead of the native SIMD16 for Xe2."
         },
         "memory_patterns": {
           "coalesced_accesses": true,
-          "strided_accesses": ["rope_neox: reads x[i2+0] and x[i2+n_dims/2] — strided by n_dims/2 (inherent to NeoX half-rotate algorithm)", "rope_multi: same n_dims/2 stride pattern", "rope_vision: reads x[ix+0] and x[ix+n_dims] — strided by n_dims"],
+          "strided_accesses": [
+            "rope_neox: reads x[i2+0] and x[i2+n_dims/2] \u2014 strided by n_dims/2 (inherent to NeoX half-rotate algorithm)",
+            "rope_multi: same n_dims/2 stride pattern",
+            "rope_vision: reads x[ix+0] and x[ix+n_dims] \u2014 strided by n_dims"
+          ],
           "vectorized_loads": true,
           "vector_width": 2,
-          "notes": "Within the primary dimension (local_id(1)), adjacent threads access adjacent pairs of elements (i0 = 2*thread_id), so coalesced within a sub-group. sycl::vec<T,2> is used for the passthrough path (lines 61, 101, 140) when i0 >= n_dims, but the HOT rotation computation path uses scalar loads/stores only (lines 74-78, 114-118, 179-184, 223-228). The strided access patterns in neox/multi/vision are algorithmic — they read two halves of the rotation domain that are n_dims/2 apart."
+          "notes": "Within the primary dimension (local_id(1)), adjacent threads access adjacent pairs of elements (i0 = 2*thread_id), so coalesced within a sub-group. sycl::vec<T,2> is used for the passthrough path (lines 61, 101, 140) when i0 >= n_dims, but the HOT rotation computation path uses scalar loads/stores only (lines 74-78, 114-118, 179-184, 223-228). The strided access patterns in neox/multi/vision are algorithmic \u2014 they read two halves of the rotation domain that are n_dims/2 apart."
         },
         "slm_usage": {
           "uses_slm": false,
@@ -178,17 +202,23 @@
           "uses_work_group_reduce": false,
           "uses_slm_manual_reduce": false,
           "uses_atomic": false,
-          "notes": "No reductions needed — each thread independently computes one rotation pair."
+          "notes": "No reductions needed \u2014 each thread independently computes one rotation pair."
         },
         "data_types": {
           "compute_type": "float",
           "could_use_half": false,
           "could_use_joint_matrix": false,
-          "notes": "All computation is FP32 regardless of input type T. This is appropriate — RoPE involves sin/cos which need FP32 precision. Input is implicitly cast from T to float for computation, results cast back to T for output. Template supports both float and sycl::half inputs."
+          "notes": "All computation is FP32 regardless of input type T. This is appropriate \u2014 RoPE involves sin/cos which need FP32 precision. Input is implicitly cast from T to float for computation, results cast back to T for output. Template supports both float and sycl::half inputs."
         },
         "math_functions": {
           "uses_native_math": false,
-          "functions": ["sycl::cos (line 34)", "sycl::sin (line 35)", "sycl::pow (lines 65, 105, 152-172, 212, 216)", "sycl::log (line 32)", "sycl::max/sycl::min (lines 14-15)"],
+          "functions": [
+            "sycl::cos (line 34)",
+            "sycl::sin (line 35)",
+            "sycl::pow (lines 65, 105, 152-172, 212, 216)",
+            "sycl::log (line 32)",
+            "sycl::max/sycl::min (lines 14-15)"
+          ],
           "notes": "All math functions use standard (full-precision) SYCL versions, NOT sycl::native variants. sycl::pow is called on every thread in the hot path and is the most expensive operation. On Xe2, native::cos and native::sin are ~2-4x faster than standard versions. sycl::pow(base, exp) can be replaced with sycl::native::exp2(sycl::native::log2(base) * exp) for significant speedup. The CUDA version uses cosf/sinf/powf which are already the fast-math equivalents."
         },
         "loop_analysis": {
@@ -198,11 +228,11 @@
         },
         "estimated_bottleneck": "compute",
         "anti_patterns": [
-          "Missing [[sycl::reqd_sub_group_size(16)]] on all 8 kernel launch paths — suboptimal SIMD width selection on Xe2",
-          "3D nd_range with dimension 0 always 1 — DPCT artifact, should be 2D (lines 237-239, 274-276, 302-305, 337-340)",
+          "Missing [[sycl::reqd_sub_group_size(16)]] on all 8 kernel launch paths \u2014 suboptimal SIMD width selection on Xe2",
+          "3D nd_range with dimension 0 always 1 \u2014 DPCT artifact, should be 2D (lines 237-239, 274-276, 302-305, 337-340)",
           "Manual thread indexing (local_range*group+local_id) instead of get_global_id() at lines 46, 52, 86, 92, 128, 132, 196, 200",
-          "Unconditional dpct::has_capability_or_fail(fp16) check in rope_norm_sycl and rope_neox_sycl even when T=float (lines 243, 280) — wastes time on device capability query per launch. rope_multi_sycl and rope_vision_sycl correctly guard with if constexpr",
-          "Uses standard sycl::cos/sin/pow instead of sycl::native equivalents — significant compute waste on Xe2 for these throughput-bound trig operations",
+          "Unconditional dpct::has_capability_or_fail(fp16) check in rope_norm_sycl and rope_neox_sycl even when T=float (lines 243, 280) \u2014 wastes time on device capability query per launch. rope_multi_sycl and rope_vision_sycl correctly guard with if constexpr",
+          "Uses standard sycl::cos/sin/pow instead of sycl::native equivalents \u2014 significant compute waste on Xe2 for these throughput-bound trig operations",
           "DPCT migration comments still present (lines 246-250, 256-259)"
         ]
       },
@@ -223,7 +253,7 @@
           "priority": "high",
           "description": "Replace sycl::pow(theta_scale, i0/2.0f) with sycl::native::exp2(sycl::native::log2(theta_scale) * (i0/2.0f)) in all four kernel variants. sycl::pow is an expensive multi-cycle operation. The exp2/log2 decomposition is mathematically equivalent and maps to faster hardware instructions on Xe2. The log2(theta_scale) term is constant per-kernel-invocation and could be precomputed on the host, reducing it to a single native::exp2 call per thread.",
           "expected_improvement": "10-20% overall kernel speedup. sycl::pow is one of the most expensive operations per thread, called at lines 65, 105, 152-172 (8 branches in rope_multi), 212, 216.",
-          "implementation_notes": "1. Precompute log2_theta_scale = log2f(theta_scale) on the host side in the launcher functions (rope_norm_sycl etc.) and pass as kernel argument. 2. In each kernel, replace sycl::pow(theta_scale, (float)i0/2) with sycl::native::exp2(log2_theta_scale * (float)i0 * 0.5f). For rope_multi, the theta_scale power is used in all 8 sector branches — precomputing log2_theta_scale eliminates redundant work. Ref: optimization_guide.md section 3.2.",
+          "implementation_notes": "1. Precompute log2_theta_scale = log2f(theta_scale) on the host side in the launcher functions (rope_norm_sycl etc.) and pass as kernel argument. 2. In each kernel, replace sycl::pow(theta_scale, (float)i0/2) with sycl::native::exp2(log2_theta_scale * (float)i0 * 0.5f). For rope_multi, the theta_scale power is used in all 8 sector branches \u2014 precomputing log2_theta_scale eliminates redundant work. Ref: optimization_guide.md section 3.2.",
           "risk": "low",
           "risk_notes": "Mathematically equivalent transformation. The precomputed log2 value is exact for power-of-2 theta_scales (common case). For non-power-of-2 values, the error is within 1-2 ULP which is negligible for position embeddings."
         },
@@ -241,7 +271,7 @@
           "id": "opt_002_004",
           "category": "work_group_size",
           "priority": "low",
-          "description": "Simplify 3D nd_range to 2D nd_range. All kernels use sycl::nd_range<3> with dimension 0 always being 1 (a DPCT migration artifact from CUDA dim3). Converting to nd_range<2> removes the trivial dimension, slightly reduces launch overhead, and makes the code clearer. Dimension mapping: current dim 1 (block columns) → new dim 0, current dim 2 (rows) → new dim 1.",
+          "description": "Simplify 3D nd_range to 2D nd_range. All kernels use sycl::nd_range<3> with dimension 0 always being 1 (a DPCT migration artifact from CUDA dim3). Converting to nd_range<2> removes the trivial dimension, slightly reduces launch overhead, and makes the code clearer. Dimension mapping: current dim 1 (block columns) \u2192 new dim 0, current dim 2 (rows) \u2192 new dim 1.",
           "expected_improvement": "Negligible performance improvement (<2%). Primary benefit is code clarity and maintainability.",
           "implementation_notes": "1. Change nd_range<3>({1, num_blocks, nr}, {1, 256, 1}) to nd_range<2>({num_blocks, nr}, {256, 1}) at lines 239, 276, 305, 340. 2. Update kernel functions to accept nd_item<2> instead of nd_item<3>. 3. Update thread index computation: i0 = 2 * item.get_global_id(0), row = item.get_global_id(1).",
           "risk": "low",
@@ -251,7 +281,7 @@
           "id": "opt_002_005",
           "category": "work_group_size",
           "priority": "low",
-          "description": "Clean up DPCT artifacts: (1) Replace manual thread indexing (local_range*group+local_id) with get_global_id() at 8 locations, (2) Remove unconditional dpct::has_capability_or_fail(fp16) checks in rope_norm_sycl and rope_neox_sycl (lines 243, 280) — guard with if constexpr like rope_multi/vision already do, (3) Remove DPCT migration comments (lines 246-250, 256-259).",
+          "description": "Clean up DPCT artifacts: (1) Replace manual thread indexing (local_range*group+local_id) with get_global_id() at 8 locations, (2) Remove unconditional dpct::has_capability_or_fail(fp16) checks in rope_norm_sycl and rope_neox_sycl (lines 243, 280) \u2014 guard with if constexpr like rope_multi/vision already do, (3) Remove DPCT migration comments (lines 246-250, 256-259).",
           "expected_improvement": "Minor: removes per-launch device capability queries (~microseconds). get_global_id() may enable compiler optimizations vs manual index arithmetic.",
           "implementation_notes": "1. Lines 46,52,86,92,128,132,196,200: replace item_ct1.get_local_range(N)*item_ct1.get_group(N)+item_ct1.get_local_id(N) with item_ct1.get_global_id(N). 2. Lines 243,280: wrap with if constexpr (std::is_same_v<T, sycl::half>) like lines 309-311 and 344-346 already do. 3. Delete DPCT comment blocks.",
           "risk": "low",
@@ -259,33 +289,41 @@
         }
       ],
       "overall_optimization_potential": "medium",
-      "estimated_current_efficiency": "55-65% — RoPE is compute-bound (sin/cos/pow operations dominate) and uses standard precision math functions where native versions would be significantly faster on Xe2. The work-group size (256) and coalesced access patterns are reasonable. No SLM or reductions needed. Main gains come from switching to native math functions."
+      "estimated_current_efficiency": "55-65% \u2014 RoPE is compute-bound (sin/cos/pow operations dominate) and uses standard precision math functions where native versions would be significantly faster on Xe2. The work-group size (256) and coalesced access patterns are reasonable. No SLM or reductions needed. Main gains come from switching to native math functions."
     },
     {
       "kernel_id": "sk_003",
       "name": "norm SYCL kernels",
       "file": "ggml/src/ggml-sycl/norm.cpp",
-      "source_cuda_ids": ["ck_074", "ck_075", "ck_076", "ck_077", "ck_078"],
+      "source_cuda_ids": [
+        "ck_074",
+        "ck_075",
+        "ck_076",
+        "ck_077",
+        "ck_078"
+      ],
       "current_analysis": {
         "launch_config": {
           "uses_nd_range": true,
           "work_group_size": "dynamic: WARP_SIZE (16) for ncols < 1024, device max_work_group_size for ncols >= 1024; rms_norm_back caps at 256",
           "sub_group_size": 16,
           "global_size_expression": "(nsamples, nchannels, nrows) for norm/rms_norm; (1, 1, num_groups) for group_norm; (1, 1, N) for rms_norm_back and l2_norm",
-          "notes": "All 5 kernels use 3D nd_range. All have [[sycl::reqd_sub_group_size(WARP_SIZE)]] — good. Critical issue: rms_norm_f32 uses only WARP_SIZE (16) threads for ncols < 1024, while CUDA uses 256 threads — significant throughput loss for mid-range column counts (32-1023). group_norm uses 3D nd_range but only dimension 2 is meaningful."
+          "notes": "All 5 kernels use 3D nd_range. All have [[sycl::reqd_sub_group_size(WARP_SIZE)]] \u2014 good. Critical issue: rms_norm_f32 uses only WARP_SIZE (16) threads for ncols < 1024, while CUDA uses 256 threads \u2014 significant throughput loss for mid-range column counts (32-1023). group_norm uses 3D nd_range but only dimension 2 is meaningful."
         },
         "memory_patterns": {
           "coalesced_accesses": true,
-          "strided_accesses": ["group_norm_f32: three separate passes over the same data (mean, variance, scale) — 3x memory traffic"],
+          "strided_accesses": [
+            "group_norm_f32: three separate passes over the same data (mean, variance, scale) \u2014 3x memory traffic"
+          ],
           "vectorized_loads": false,
           "vector_width": null,
-          "notes": "All kernels use scalar float reads/writes. Consecutive threads access consecutive elements (coalesced via col = tid; col < ncols; col += block_size). norm_f32/rms_norm use calculate_offset<3> for strided source support. l2_norm_f32 uses explicit row*ncols multiply per access instead of pointer offset — extra ALU overhead. No sycl::vec usage anywhere."
+          "notes": "All kernels use scalar float reads/writes. Consecutive threads access consecutive elements (coalesced via col = tid; col < ncols; col += block_size). norm_f32/rms_norm use calculate_offset<3> for strided source support. l2_norm_f32 uses explicit row*ncols multiply per access instead of pointer offset \u2014 extra ALU overhead. No sycl::vec usage anywhere."
         },
         "slm_usage": {
           "uses_slm": true,
           "slm_bytes": "norm_f32: up to 64 * sizeof(float2) = 512 bytes; group_norm: up to 64 * sizeof(float) = 256 bytes; rms_norm: up to 64 * sizeof(float) = 256 bytes; rms_norm_back: 2 * 16 * sizeof(float2) = 256 bytes; l2_norm: up to 64 * sizeof(float) = 256 bytes",
           "potential_bank_conflicts": false,
-          "notes": "SLM usage is minimal and well within the 64 KB per Xe-core limit. No bank conflicts detected — writes are one per sub-group, reads are coalesced within sub-group."
+          "notes": "SLM usage is minimal and well within the 64 KB per Xe-core limit. No bank conflicts detected \u2014 writes are one per sub-group, reads are coalesced within sub-group."
         },
         "reduction_pattern": {
           "has_reduction": true,
@@ -293,24 +331,27 @@
           "uses_work_group_reduce": false,
           "uses_slm_manual_reduce": true,
           "uses_atomic": false,
-          "notes": "Three DIFFERENT reduction implementations across five kernels: (1) norm_f32/rms_norm_f32 use clean sub-group API (sub_group.get_group_linear_id()) with ceil_div nreduce and local_space barrier. (2) group_norm_f32/l2_norm_f32 use old DPCT-migrated pattern with manual warp_id/lane_id, integer division nreduce (not ceil_div — potential bug), and group_norm uses GLOBAL barrier instead of local_space barrier. (3) rms_norm_back_f32 uses cleanest pattern with sub-group API + sycl::group_broadcast. None use sycl::reduce_over_group."
+          "notes": "Three DIFFERENT reduction implementations across five kernels: (1) norm_f32/rms_norm_f32 use clean sub-group API (sub_group.get_group_linear_id()) with ceil_div nreduce and local_space barrier. (2) group_norm_f32/l2_norm_f32 use old DPCT-migrated pattern with manual warp_id/lane_id, integer division nreduce (not ceil_div \u2014 potential bug), and group_norm uses GLOBAL barrier instead of local_space barrier. (3) rms_norm_back_f32 uses cleanest pattern with sub-group API + sycl::group_broadcast. None use sycl::reduce_over_group."
         },
         "data_types": {
           "compute_type": "float",
           "could_use_half": false,
           "could_use_joint_matrix": false,
-          "notes": "FP32 throughout is appropriate for normalization numerical stability. norm_f32 uses sycl::float2 for combined mean+variance accumulation — register-efficient. rms_norm_back_f32 uses compensated (Kahan) summation for improved numerical accuracy (unless GGML_SYCL_RMS_BACK_FAST is defined)."
+          "notes": "FP32 throughout is appropriate for normalization numerical stability. norm_f32 uses sycl::float2 for combined mean+variance accumulation \u2014 register-efficient. rms_norm_back_f32 uses compensated (Kahan) summation for improved numerical accuracy (unless GGML_SYCL_RMS_BACK_FAST is defined)."
         },
         "math_functions": {
           "uses_native_math": false,
-          "functions": ["sycl::rsqrt (norm_f32 line 54, rms_norm_f32 line 198, rms_norm_back line 622, l2_norm line 242)", "sycl::max (l2_norm line 242)"],
+          "functions": [
+            "sycl::rsqrt (norm_f32 line 54, rms_norm_f32 line 198, rms_norm_back line 622, l2_norm line 242)",
+            "sycl::max (l2_norm line 242)"
+          ],
           "notes": "All kernels use standard sycl::rsqrt, not sycl::native::rsqrt. On Xe2, native::rsqrt is ~2x faster. CUDA uses rsqrtf() which maps to a fast hardware intrinsic. The rsqrt is called once per work-group (only thread 0 or broadcast result), so the absolute impact is small but switching to native is trivial."
         },
         "loop_analysis": {
           "hot_loops": [
             "norm_f32: accumulation loop (lines 27-31) iterates ncols/block_size times",
             "norm_f32: write-back loop (lines 56-58) iterates ncols/block_size times",
-            "group_norm_f32: THREE passes — mean (lines 76-78), variance (lines 109-113), scale (lines 143-145)",
+            "group_norm_f32: THREE passes \u2014 mean (lines 76-78), variance (lines 109-113), scale (lines 143-145)",
             "rms_norm_f32: accumulation (lines 172-175), write-back (lines 200-202)",
             "rms_norm_back_f32: accumulation (lines 547-564), write-back (lines 628-630)",
             "l2_norm_f32: accumulation (lines 214-217), write-back (lines 244-246)"
@@ -320,17 +361,17 @@
         },
         "estimated_bottleneck": "memory",
         "anti_patterns": [
-          "group_norm_f32 uses GLOBAL barrier (item_ct1.barrier()) at lines 97, 132 instead of local_space barrier — unnecessary global memory fence overhead",
+          "group_norm_f32 uses GLOBAL barrier (item_ct1.barrier()) at lines 97, 132 instead of local_space barrier \u2014 unnecessary global memory fence overhead",
           "group_norm_f32 has DPCT artifact comments at lines 88-96, 122-131 (DPCT1118, DPCT1065)",
           "l2_norm_f32 has DPCT artifact comment at lines 228-231 (DPCT1118:3)",
           "Dispatch functions have stale DPCT comments at lines 269-273, 309-313, 355-358, 395-398 (DPCT1049)",
-          "Three different reduction styles across five kernels — inconsistent code, harder to maintain and optimize",
-          "group_norm_f32 uses nwarps/WARP_SIZE (integer division) instead of ceil_div — inconsistent with norm_f32/rms_norm which use ceil_div",
-          "l2_norm_f32 uses explicit row*ncols multiply per access instead of pointer offset — based on outdated CUDA version",
+          "Three different reduction styles across five kernels \u2014 inconsistent code, harder to maintain and optimize",
+          "group_norm_f32 uses nwarps/WARP_SIZE (integer division) instead of ceil_div \u2014 inconsistent with norm_f32/rms_norm which use ceil_div",
+          "l2_norm_f32 uses explicit row*ncols multiply per access instead of pointer offset \u2014 based on outdated CUDA version",
           "l2_norm_f32 is out-of-date with current CUDA: missing stride support for non-contiguous tensors",
-          "rms_norm_f32 uses only WARP_SIZE (16) threads for ncols < 1024 while CUDA uses 256 — poor occupancy",
-          "Missing CUDA fused rms_norm_multiply and rms_norm_multiply_add kernels — significant feature gap",
-          "group_norm_f32 may not handle batched input correctly — dispatches num_groups vs CUDA's num_groups * ne[3]",
+          "rms_norm_f32 uses only WARP_SIZE (16) threads for ncols < 1024 while CUDA uses 256 \u2014 poor occupancy",
+          "Missing CUDA fused rms_norm_multiply and rms_norm_multiply_add kernels \u2014 significant feature gap",
+          "group_norm_f32 may not handle batched input correctly \u2014 dispatches num_groups vs CUDA's num_groups * ne[3]",
           "rms_norm_back_f32 is an inline 100+ line lambda instead of a separate function",
           "Runtime block_size parameter prevents compiler loop unrolling across all kernels"
         ]
@@ -340,7 +381,7 @@
           "id": "opt_003_001",
           "category": "reduction",
           "priority": "high",
-          "description": "Fix group_norm_f32 global barrier to use local_space fence. Lines 97 and 132 use item_ct1.barrier() which includes an unnecessary global memory fence. Since the barrier only synchronizes SLM access, it should use item_ct1.barrier(sycl::access::fence_space::local_space). This is both a performance fix and a correctness alignment — the other kernels (norm_f32, rms_norm_f32, l2_norm_f32) already correctly use local_space barriers.",
+          "description": "Fix group_norm_f32 global barrier to use local_space fence. Lines 97 and 132 use item_ct1.barrier() which includes an unnecessary global memory fence. Since the barrier only synchronizes SLM access, it should use item_ct1.barrier(sycl::access::fence_space::local_space). This is both a performance fix and a correctness alignment \u2014 the other kernels (norm_f32, rms_norm_f32, l2_norm_f32) already correctly use local_space barriers.",
           "expected_improvement": "5-15% speedup for group_norm_f32. Global barriers stall the memory pipeline until all global memory writes are visible, which is unnecessary when only SLM synchronization is needed. The impact is proportional to how often the barrier is hit (2x per kernel invocation).",
           "implementation_notes": "At lines 97 and 132 of norm.cpp, change: item_ct1.barrier() to item_ct1.barrier(sycl::access::fence_space::local_space). This is a one-line change per occurrence. Ref: optimization_guide.md section 6.2 (avoid unnecessary synchronization).",
           "risk": "low",
@@ -360,9 +401,9 @@
           "id": "opt_003_003",
           "category": "work_group_size",
           "priority": "high",
-          "description": "Increase rms_norm_f32 work-group size for ncols < 1024 from WARP_SIZE (16) to 256 threads. CUDA uses 256 threads for this path (norm.cu line 302-303). The current SYCL implementation uses only 16 threads per work-group, which provides terrible occupancy on Xe2 — only 1 hardware thread per XVE (1/8 capacity). For typical LLM dimensions like 768, 1024, 2048, this path may be hit or the boundary case matters. RMS normalization is one of the most frequently called kernels in transformer inference (applied before every attention and FFN layer).",
+          "description": "Increase rms_norm_f32 work-group size for ncols < 1024 from WARP_SIZE (16) to 256 threads. CUDA uses 256 threads for this path (norm.cu line 302-303). The current SYCL implementation uses only 16 threads per work-group, which provides terrible occupancy on Xe2 \u2014 only 1 hardware thread per XVE (1/8 capacity). For typical LLM dimensions like 768, 1024, 2048, this path may be hit or the boundary case matters. RMS normalization is one of the most frequently called kernels in transformer inference (applied before every attention and FFN layer).",
           "expected_improvement": "2-4x throughput improvement for the small path (ncols < 1024). The larger work-group allows 16x more threads to cooperate on each row, dramatically improving memory bandwidth utilization for this memory-bound kernel. Even for the large path, ensuring the work-group size is reasonable (256-512 rather than device max 1024) may improve occupancy.",
-          "implementation_notes": "At line 340 of norm.cpp, change the small-path work-group size from (1, 1, WARP_SIZE) to (1, 1, 256). The kernel code already handles arbitrary block_size via the col += block_size stride loop, so no kernel changes are needed — only the dispatch. However, the SLM allocation must now be provided (currently nullptr for the small path). Add local_accessor<float, 1> of size 256/WARP_SIZE = 16 floats. Apply the same fix to norm_f32 (line 255) and l2_norm_f32 (line 377) which also use WARP_SIZE for the small path.",
+          "implementation_notes": "At line 340 of norm.cpp, change the small-path work-group size from (1, 1, WARP_SIZE) to (1, 1, 256). The kernel code already handles arbitrary block_size via the col += block_size stride loop, so no kernel changes are needed \u2014 only the dispatch. However, the SLM allocation must now be provided (currently nullptr for the small path). Add local_accessor<float, 1> of size 256/WARP_SIZE = 16 floats. Apply the same fix to norm_f32 (line 255) and l2_norm_f32 (line 377) which also use WARP_SIZE for the small path.",
           "risk": "low",
           "risk_notes": "The kernel is already parameterized by runtime block_size and handles multi-warp reduction via SLM. The only risk is ensuring the SLM allocation is provided for the small path, which is a mechanical change."
         },
@@ -381,7 +422,7 @@
           "category": "math_functions",
           "priority": "medium",
           "description": "Replace sycl::rsqrt with sycl::native::rsqrt in all norm kernels (lines 54, 142, 198, 242, 622). While rsqrt is called only once per row (not per element), switching to native is trivial and removes any potential for the compiler to emit a slower standard-precision sequence. CUDA's rsqrtf() maps to hardware intrinsic automatically.",
-          "expected_improvement": "1-3% — negligible per-call since rsqrt is called once per row, but free to implement and eliminates a minor inefficiency.",
+          "expected_improvement": "1-3% \u2014 negligible per-call since rsqrt is called once per row, but free to implement and eliminates a minor inefficiency.",
           "implementation_notes": "Replace sycl::rsqrt(x) with sycl::native::rsqrt(x) at 5 locations in norm.cpp. For l2_norm, also verify sycl::max usage is appropriate (sycl::max is already optimal). Ref: optimization_guide.md section 3.2.",
           "risk": "low",
           "risk_notes": "native::rsqrt provides ~1 ULP accuracy which is more than sufficient for normalization. The result is used as a scaling factor, not for further computation chains."
@@ -421,20 +462,26 @@
           "category": "work_group_size",
           "priority": "low",
           "description": "Fix potential batch dimension bug in group_norm_f32 dispatch. SYCL dispatches num_groups work-groups (norm.cpp line 453), while CUDA dispatches num_groups * ne[3] work-groups (norm.cu line 449) to account for the batch dimension. If batched group normalization is used, the SYCL version may produce incorrect results.",
-          "expected_improvement": "Correctness fix — no performance change for single-batch inference. Enables correct multi-batch group normalization if needed.",
+          "expected_improvement": "Correctness fix \u2014 no performance change for single-batch inference. Enables correct multi-batch group normalization if needed.",
           "implementation_notes": "In ggml_sycl_op_group_norm (around line 453), change the number of work-groups from num_groups to num_groups * src0->ne[3]. Pass the additional batch dimension info to the kernel.",
           "risk": "low",
           "risk_notes": "Simple dispatch fix. The kernel itself handles arbitrary group sizes, so only the grid size needs adjustment."
         }
       ],
       "overall_optimization_potential": "high",
-      "estimated_current_efficiency": "35-45% — Norm kernels are memory-bound but waste bandwidth through scalar accesses (no vectorization), have inconsistent and suboptimal reduction patterns (3 different styles, one using global barriers), use unnecessarily small work-groups for the small path (16 vs CUDA's 256), and are missing the critical fused rms_norm_multiply kernel that eliminates a full memory pass in transformer inference."
+      "estimated_current_efficiency": "35-45% \u2014 Norm kernels are memory-bound but waste bandwidth through scalar accesses (no vectorization), have inconsistent and suboptimal reduction patterns (3 different styles, one using global barriers), use unnecessarily small work-groups for the small path (16 vs CUDA's 256), and are missing the critical fused rms_norm_multiply kernel that eliminates a full memory pass in transformer inference."
     },
     {
       "kernel_id": "sk_004",
       "name": "element_wise SYCL kernels",
       "file": "ggml/src/ggml-sycl/element_wise.cpp",
-      "source_cuda_ids": ["ck_109", "ck_110", "ck_111", "ck_112", "ck_113"],
+      "source_cuda_ids": [
+        "ck_109",
+        "ck_110",
+        "ck_111",
+        "ck_112",
+        "ck_113"
+      ],
       "current_analysis": {
         "launch_config": {
           "uses_nd_range": true,
@@ -445,16 +492,18 @@
         },
         "memory_patterns": {
           "coalesced_accesses": true,
-          "strided_accesses": ["generic stride path: per-element 4D address decomposition (i0/i1/i2/i3 + byte offset multiply)"],
+          "strided_accesses": [
+            "generic stride path: per-element 4D address decomposition (i0/i1/i2/i3 + byte offset multiply)"
+          ],
           "vectorized_loads": false,
           "vector_width": null,
-          "notes": "All ops use scalar loads/stores — one element per work-item. Consecutive threads access consecutive elements for the contiguous fast path (coalesced). The generic stride path (unary_op_generic_kernel) performs expensive 4D address decomposition per element. No sycl::vec usage anywhere despite all ops being trivially vectorizable."
+          "notes": "All ops use scalar loads/stores \u2014 one element per work-item. Consecutive threads access consecutive elements for the contiguous fast path (coalesced). The generic stride path (unary_op_generic_kernel) performs expensive 4D address decomposition per element. No sycl::vec usage anywhere despite all ops being trivially vectorizable."
         },
         "slm_usage": {
           "uses_slm": false,
           "slm_bytes": 0,
           "potential_bank_conflicts": false,
-          "notes": "No SLM needed — all ops are purely element-wise with no data sharing."
+          "notes": "No SLM needed \u2014 all ops are purely element-wise with no data sharing."
         },
         "reduction_pattern": {
           "has_reduction": false,
@@ -462,7 +511,7 @@
           "uses_work_group_reduce": false,
           "uses_slm_manual_reduce": false,
           "uses_atomic": false,
-          "notes": "No reductions — purely element-wise operations."
+          "notes": "No reductions \u2014 purely element-wise operations."
         },
         "data_types": {
           "compute_type": "float",
@@ -472,19 +521,27 @@
         },
         "math_functions": {
           "uses_native_math": "partial",
-          "functions": ["sycl::native::exp (silu, sigmoid)", "sycl::tanh (gelu, hardswish)", "sycl::exp (exp op, elu, geglu, softplus)", "sycl::log (log op, softplus)", "sycl::sin/sycl::cos (sin/cos ops)", "sycl::sqrt (sqrt op)", "sycl::erf (gelu_erf, geglu_erf)"],
+          "functions": [
+            "sycl::native::exp (silu, sigmoid)",
+            "sycl::tanh (gelu, hardswish)",
+            "sycl::exp (exp op, elu, geglu, softplus)",
+            "sycl::log (log op, softplus)",
+            "sycl::sin/sycl::cos (sin/cos ops)",
+            "sycl::sqrt (sqrt op)",
+            "sycl::erf (gelu_erf, geglu_erf)"
+          ],
           "notes": "Inconsistent native math usage: silu and sigmoid correctly use sycl::native::exp, but gelu uses standard sycl::tanh, exp op uses standard sycl::exp, sin/cos use standard versions, log uses standard version. All should use sycl::native:: variants where precision allows. CUDA equivalents use __expf, tanhf, etc. which are fast-math by default."
         },
         "loop_analysis": {
           "hot_loops": [],
           "unrolled": false,
-          "notes": "No loops within kernels — each work-item processes exactly one element. The outer dispatch loop is the nd_range grid."
+          "notes": "No loops within kernels \u2014 each work-item processes exactly one element. The outer dispatch loop is the nd_range grid."
         },
         "estimated_bottleneck": "memory",
         "anti_patterns": [
-          "All element-wise ops use scalar loads/stores — should use vec4 for 2-4x memory throughput improvement",
+          "All element-wise ops use scalar loads/stores \u2014 should use vec4 for 2-4x memory throughput improvement",
           "Inconsistent native math: silu/sigmoid use native::exp but gelu/exp/sin/cos/log do not use native equivalents",
-          "Five separate GLU kernel bodies duplicate index math — CUDA uses a single template kernel with function pointer parameter",
+          "Five separate GLU kernel bodies duplicate index math \u2014 CUDA uses a single template kernel with function pointer parameter",
           "swiglu_oai uses 3D nd_range (DPCT artifact) while all other element_wise kernels use nd_range<1>",
           "__dpct_inline__ artifacts should use standard inline or nothing",
           "Generic stride path (unary_op_generic_kernel) performs expensive 4D address decomposition per element without fast-path detection for contiguous case",
@@ -509,7 +566,7 @@
           "priority": "medium",
           "description": "Use sycl::native:: variants consistently for all transcendental functions in element-wise ops. Currently silu and sigmoid correctly use sycl::native::exp, but many other ops use standard versions: gelu uses sycl::tanh (should be native::tanh or native::exp-based), exp op uses sycl::exp (should be native::exp), sin/cos use sycl::sin/sycl::cos (should be native::sin/native::cos), log uses sycl::log (should be native::log), sqrt uses sycl::sqrt (should be native::sqrt). On Xe2, native math functions are 2-4x faster than standard precision versions.",
           "expected_improvement": "10-30% speedup for compute-bound ops (gelu, sigmoid, tanh, exp, log, sin, cos). For memory-bound ops the improvement is smaller since compute is not the bottleneck. The gelu kernel (2x exp + tanh + multiply) benefits most from native math.",
-          "implementation_notes": "Replace in each kernel: sycl::tanh → sycl::native::exp-based tanh or direct native (if available), sycl::exp → sycl::native::exp, sycl::sin → sycl::native::sin, sycl::cos → sycl::native::cos, sycl::log → sycl::native::log, sycl::sqrt → sycl::native::sqrt. For gelu, the tanh can be rewritten as: t = native::exp(2*x); result = t/(t+1) (sigmoid-based form) which uses only native::exp. Ref: optimization_guide.md section 3.2.",
+          "implementation_notes": "Replace in each kernel: sycl::tanh \u2192 sycl::native::exp-based tanh or direct native (if available), sycl::exp \u2192 sycl::native::exp, sycl::sin \u2192 sycl::native::sin, sycl::cos \u2192 sycl::native::cos, sycl::log \u2192 sycl::native::log, sycl::sqrt \u2192 sycl::native::sqrt. For gelu, the tanh can be rewritten as: t = native::exp(2*x); result = t/(t+1) (sigmoid-based form) which uses only native::exp. Ref: optimization_guide.md section 3.2.",
           "risk": "low",
           "risk_notes": "Native math provides ~1 ULP accuracy which is sufficient for activation functions in LLM inference. silu/sigmoid already use native::exp successfully, confirming the precision is acceptable."
         },
@@ -518,7 +575,7 @@
           "category": "work_group_size",
           "priority": "low",
           "description": "Consolidate the 5 separate GLU kernel bodies (gated_op_fused_geglu, gated_op_fused_reglu, gated_op_fused_swiglu, gated_op_fused_geglu_erf, gated_op_fused_geglu_quick) into a single template kernel with a function pointer or constexpr-if parameter, matching CUDA's unified unary_gated_op_kernel<op> pattern. The 5 kernels duplicate the same index computation logic (i0, i1, row, col, x_offset, g_offset) and only differ in the activation function applied.",
-          "expected_improvement": "No performance improvement — code quality and maintainability fix. Reduces ~150 lines of duplicated kernel code to ~40 lines. Makes it easier to add new GLU variants.",
+          "expected_improvement": "No performance improvement \u2014 code quality and maintainability fix. Reduces ~150 lines of duplicated kernel code to ~40 lines. Makes it easier to add new GLU variants.",
           "implementation_notes": "Create template: template<typename ActivationOp> void gated_op_fused_kernel(nd_item<1>, ..., ActivationOp op) with the common index math, then instantiate with lambda or functor for each activation (gelu, relu, silu, gelu_erf, gelu_quick). Update dispatch to use the template.",
           "risk": "low",
           "risk_notes": "Mechanical refactoring. All 5 kernels already have identical control flow and only differ in one line (the activation function call)."
@@ -527,7 +584,7 @@
           "id": "opt_004_004",
           "category": "work_group_size",
           "priority": "low",
-          "description": "Convert swiglu_oai from 3D nd_range to 1D nd_range, matching all other element_wise kernels. The 3D nd_range is a DPCT migration artifact — the kernel is logically 1D (one element per thread). This simplifies thread index computation and removes unnecessary dimensions.",
+          "description": "Convert swiglu_oai from 3D nd_range to 1D nd_range, matching all other element_wise kernels. The 3D nd_range is a DPCT migration artifact \u2014 the kernel is logically 1D (one element per thread). This simplifies thread index computation and removes unnecessary dimensions.",
           "expected_improvement": "Negligible performance improvement (<2%). Primary benefit is code consistency and maintainability.",
           "implementation_notes": "Change nd_range<3> to nd_range<1>. Update thread index computation from 3D decomposition to simple get_global_id(0). Grid size = ceil_div(total_elements, 256) * 256.",
           "risk": "low",
@@ -538,7 +595,7 @@
           "category": "work_group_size",
           "priority": "low",
           "description": "Clean up __dpct_inline__ artifacts throughout element_wise.cpp. Replace with standard C++ inline keyword or remove entirely (the compiler inlines small functions automatically). This is a DPCT migration artifact that reduces code portability.",
-          "expected_improvement": "No performance improvement — code quality fix for portability and readability.",
+          "expected_improvement": "No performance improvement \u2014 code quality fix for portability and readability.",
           "implementation_notes": "Replace all instances of __dpct_inline__ with inline or remove the annotation entirely. The functions are small enough that the compiler will inline them regardless.",
           "risk": "low",
           "risk_notes": "Mechanical cleanup with no functional changes."
@@ -547,7 +604,7 @@
           "id": "opt_004_006",
           "category": "vectorization",
           "priority": "low",
-          "description": "Add contiguous fast-path detection for the generic stride kernel (unary_op_generic_kernel). The generic path performs expensive 4D address decomposition (i0/i1/i2/i3 + byte offset multiply) per element. For contiguous tensors, this decomposition is unnecessary — a simple linear index suffices. Detecting contiguity at dispatch time and routing to the fast path avoids this overhead.",
+          "description": "Add contiguous fast-path detection for the generic stride kernel (unary_op_generic_kernel). The generic path performs expensive 4D address decomposition (i0/i1/i2/i3 + byte offset multiply) per element. For contiguous tensors, this decomposition is unnecessary \u2014 a simple linear index suffices. Detecting contiguity at dispatch time and routing to the fast path avoids this overhead.",
           "expected_improvement": "5-15% for ops that go through the generic path with contiguous tensors. The address decomposition adds ~10 ALU ops per element (4 divisions + 4 modulos + 4 multiplies + additions) which is significant for simple ops like relu or neg.",
           "implementation_notes": "At dispatch time (in ggml_sycl_op_unary or equivalent), check if src and dst have contiguous strides (ne[i] * nb[i] == nb[i+1] for all i). If contiguous, use the existing fast path. If non-contiguous, use the generic path. This check is already partially done for some ops but not consistently applied.",
           "risk": "low",
@@ -558,7 +615,7 @@
           "category": "work_group_size",
           "priority": "low",
           "description": "Feature gap: acc_f32 only supports 3D tensors (asserts dst->ne[3] == 1) while CUDA supports 4D with ne13/s13 parameters. This limits the operations that can run on the SYCL backend.",
-          "expected_improvement": "No performance improvement — feature completeness fix.",
+          "expected_improvement": "No performance improvement \u2014 feature completeness fix.",
           "implementation_notes": "Add ne13 and s13 parameters to the acc_f32_sycl kernel. Remove the assert(dst->ne[3] == 1) check and add an outer loop or grid dimension for the 4th dimension.",
           "risk": "low",
           "risk_notes": "Straightforward extension of existing 3D logic to 4D."
@@ -568,21 +625,25 @@
           "category": "work_group_size",
           "priority": "low",
           "description": "Feature gap: upscale kernel only implements nearest-neighbor interpolation. CUDA supports bilinear (with and without antialiasing) and bicubic modes. This limits model compatibility for vision and image processing workloads.",
-          "expected_improvement": "No performance improvement — feature completeness fix for vision model support.",
+          "expected_improvement": "No performance improvement \u2014 feature completeness fix for vision model support.",
           "implementation_notes": "Implement bilinear and bicubic interpolation modes in the upscale kernel, matching CUDA's implementation. The dispatch should select the mode based on the op parameters.",
           "risk": "medium",
           "risk_notes": "Bilinear and bicubic are more complex algorithms requiring multi-element reads with interpolation weights. Need careful testing against CUDA reference output."
         }
       ],
       "overall_optimization_potential": "medium",
-      "estimated_current_efficiency": "60-70% — Element-wise kernels are simple and already reasonably well-implemented. The main performance wins come from vectorized loads (2-4x memory throughput for bandwidth-bound ops) and consistent native math usage (2-4x faster transcendentals for compute-bound ops like gelu/silu). Code quality improvements (GLU dedup, DPCT cleanup) are beneficial but don't affect performance significantly."
+      "estimated_current_efficiency": "60-70% \u2014 Element-wise kernels are simple and already reasonably well-implemented. The main performance wins come from vectorized loads (2-4x memory throughput for bandwidth-bound ops) and consistent native math usage (2-4x faster transcendentals for compute-bound ops like gelu/silu). Code quality improvements (GLU dedup, DPCT cleanup) are beneficial but don't affect performance significantly."
     },
     {
       "kernel_id": "sk_005",
       "name": "convert (dequantize) SYCL kernels",
       "file": "ggml/src/ggml-sycl/convert.cpp",
-      "related_files": ["ggml/src/ggml-sycl/dequantize.hpp"],
-      "source_cuda_ids": ["ck_015"],
+      "related_files": [
+        "ggml/src/ggml-sycl/dequantize.hpp"
+      ],
+      "source_cuda_ids": [
+        "ck_015"
+      ],
       "current_analysis": {
         "launch_config": {
           "uses_nd_range": true,
@@ -593,7 +654,9 @@
         },
         "memory_patterns": {
           "coalesced_accesses": true,
-          "strided_accesses": ["Generic dequantize_block writes to y[iybs + iqs] and y[iybs + iqs + y_offset] with y_offset=qk/2 for qr>1 — strided writes for interleaved quant formats"],
+          "strided_accesses": [
+            "Generic dequantize_block writes to y[iybs + iqs] and y[iybs + iqs + y_offset] with y_offset=qk/2 for qr>1 \u2014 strided writes for interleaved quant formats"
+          ],
           "vectorized_loads": false,
           "vector_width": null,
           "notes": "All dequantize kernels process 2 output elements per thread (via dfloat2/float2). Reads from quantized blocks are coalesced within sub-groups (consecutive threads read consecutive quant indices). Writes are coalesced for qr==1 types but strided by qk/2 for qr>1 types. The reorder variants (q4_0_reorder, q4_K_reorder, q6_K_reorder) use separated d/qs memory layout for better access patterns. No sycl::vec loads used anywhere."
@@ -602,7 +665,7 @@
           "uses_slm": true,
           "slm_bytes": "Q4_K and Q4_K_reorder: 12 bytes (scale_local_acc for scale unpacking)",
           "potential_bank_conflicts": false,
-          "notes": "Only Q4_K variants use SLM (12 bytes for scale buffer). All other dequantize kernels are SLM-free. The CUDA version accesses scales directly from device memory (no shared memory) — the SYCL version added SLM for better locality on Intel GPUs."
+          "notes": "Only Q4_K variants use SLM (12 bytes for scale buffer). All other dequantize kernels are SLM-free. The CUDA version accesses scales directly from device memory (no shared memory) \u2014 the SYCL version added SLM for better locality on Intel GPUs."
         },
         "reduction_pattern": {
           "has_reduction": false,
@@ -610,39 +673,39 @@
           "uses_work_group_reduce": false,
           "uses_slm_manual_reduce": false,
           "uses_atomic": false,
-          "notes": "No reductions — each thread independently dequantizes a fixed subset of elements from one quantization block."
+          "notes": "No reductions \u2014 each thread independently dequantizes a fixed subset of elements from one quantization block."
         },
         "data_types": {
           "compute_type": "float (or sycl::half when GGML_SYCL_F16 defined)",
           "could_use_half": true,
           "could_use_joint_matrix": false,
-          "notes": "The dequantize kernels use dfloat2 which is sycl::half2 when GGML_SYCL_F16 is defined, otherwise sycl::float2. When targeting fp16 output, computing in half avoids fp32→fp16 conversion overhead. CUDA has a heavily optimized Q8_0→FP16 kernel using half2 arithmetic and shared memory (dequantize_block_q8_0_f16) that SYCL lacks entirely."
+          "notes": "The dequantize kernels use dfloat2 which is sycl::half2 when GGML_SYCL_F16 is defined, otherwise sycl::float2. When targeting fp16 output, computing in half avoids fp32\u2192fp16 conversion overhead. CUDA has a heavily optimized Q8_0\u2192FP16 kernel using half2 arithmetic and shared memory (dequantize_block_q8_0_f16) that SYCL lacks entirely."
         },
         "math_functions": {
           "uses_native_math": false,
           "functions": [],
-          "notes": "Dequantize kernels use no transcendental math — only integer bit manipulation, multiplies, and adds. No optimization opportunities for native math."
+          "notes": "Dequantize kernels use no transcendental math \u2014 only integer bit manipulation, multiplies, and adds. No optimization opportunities for native math."
         },
         "loop_analysis": {
           "hot_loops": [
-            "convert_unary_nc: loop over i00 with stride work_group_size * num_groups (line 503) — handles large ne00 that exceeds max SYCL global range",
-            "Specialized Q4_0/Q4_1 kernels: implicit loops (each thread handles 8 quantization blocks × 32 elements)"
+            "convert_unary_nc: loop over i00 with stride work_group_size * num_groups (line 503) \u2014 handles large ne00 that exceeds max SYCL global range",
+            "Specialized Q4_0/Q4_1 kernels: implicit loops (each thread handles 8 quantization blocks \u00d7 32 elements)"
           ],
           "unrolled": true,
           "notes": "convert_unary_nc has #pragma unroll on its loop. Specialized kernels have compile-time-known iteration counts enabling auto-unrolling. Generic dequantize_block has no loops (2 elements per thread, one-shot)."
         },
         "estimated_bottleneck": "memory",
         "anti_patterns": [
-          "Generic dequantize_block is contiguous-only (flat k parameter) — CUDA's generic version supports non-contiguous tensors natively via stride parameters (ne00/ne01/ne02/s01/s02/s03)",
-          "All non-reorder kernels use nd_range<3> with dimensions 0,1 = 1 — DPCT artifact, should use nd_range<1>",
-          "Missing optimized Q8_0→FP16 kernel — CUDA has dequantize_block_q8_0_f16 with shared memory and half2 arithmetic for 2-3x speedup",
-          "dpct::has_capability_or_fail(fp16) called unconditionally on every launch — wastes time on capability query per kernel dispatch",
+          "Generic dequantize_block is contiguous-only (flat k parameter) \u2014 CUDA's generic version supports non-contiguous tensors natively via stride parameters (ne00/ne01/ne02/s01/s02/s03)",
+          "All non-reorder kernels use nd_range<3> with dimensions 0,1 = 1 \u2014 DPCT artifact, should use nd_range<1>",
+          "Missing optimized Q8_0\u2192FP16 kernel \u2014 CUDA has dequantize_block_q8_0_f16 with shared memory and half2 arithmetic for 2-3x speedup",
+          "dpct::has_capability_or_fail(fp16) called unconditionally on every launch \u2014 wastes time on capability query per kernel dispatch",
           "__dpct_inline__ artifacts in dequantize.hpp kernel functions",
           "Non-contiguous (NC) support gap: SYCL only has fp16 NC output via convert_unary_nc_sycl for F32/BF16 input; CUDA has NC variants for all basic quant types (Q4_0, Q4_1, Q5_0, Q5_1, Q8_0) and all output types (fp16, fp32, bf16)",
           "Missing to_bf16_sycl_t typedef and to_fp32_nc_sycl_t, to_bf16_nc_sycl_t dispatch functions",
-          "Generic dequantize_block processes only 2 elements per thread — could process more to amortize thread launch overhead",
-          "convert_unary_nc_sycl has global range downsample workaround (downsample_sycl_global_range) adding complexity — SYCL limitation for large tensor dimensions",
-          "Missing [[sycl::reqd_sub_group_size]] on all kernels except q4_0_reorder — may cause suboptimal SIMD width on Xe2"
+          "Generic dequantize_block processes only 2 elements per thread \u2014 could process more to amortize thread launch overhead",
+          "convert_unary_nc_sycl has global range downsample workaround (downsample_sycl_global_range) adding complexity \u2014 SYCL limitation for large tensor dimensions",
+          "Missing [[sycl::reqd_sub_group_size]] on all kernels except q4_0_reorder \u2014 may cause suboptimal SIMD width on Xe2"
         ]
       },
       "optimization_opportunities": [
@@ -650,9 +713,9 @@
           "id": "opt_005_001",
           "category": "work_group_size",
           "priority": "high",
-          "description": "Implement optimized Q8_0→FP16 dequantize kernel matching CUDA's dequantize_block_q8_0_f16. CUDA has a heavily optimized kernel that uses shared memory to load entire Q8_0 blocks, then dequantizes using half2 arithmetic with 2048-element alignment. The SYCL version uses the generic scalar dequantize_block path which processes only 2 elements per thread. Q8_0 is the most common intermediate quantization format used during inference (activations are often Q8_0 quantized for GEMM).",
-          "expected_improvement": "2-3x speedup for Q8_0→FP16 dequantization. The CUDA optimized kernel uses shared memory for coalesced reads, half2 vectorized arithmetic, and processes 2048 elements per block vs the generic kernel's 512 elements per block (256 threads × 2 elements).",
-          "implementation_notes": "Port CUDA's dequantize_block_q8_0_f16 to SYCL: (1) Allocate SLM buffer of size (CUDA_Q8_0_NE_ALIGN/sizeof(int) + WARP_SIZE) × sizeof(int). (2) Cooperatively load Q8_0 blocks into SLM using coalesced reads. (3) Barrier. (4) Each thread reads d (scale) and qs (quantized values) from SLM, dequantizes using sycl::half2 multiply. (5) Use [[sycl::reqd_sub_group_size(WARP_SIZE)]]. Need to handle tail blocks with need_check template parameter. Register the optimized kernel in ggml_get_to_fp16_sycl for GGML_TYPE_Q8_0.",
+          "description": "Implement optimized Q8_0\u2192FP16 dequantize kernel matching CUDA's dequantize_block_q8_0_f16. CUDA has a heavily optimized kernel that uses shared memory to load entire Q8_0 blocks, then dequantizes using half2 arithmetic with 2048-element alignment. The SYCL version uses the generic scalar dequantize_block path which processes only 2 elements per thread. Q8_0 is the most common intermediate quantization format used during inference (activations are often Q8_0 quantized for GEMM).",
+          "expected_improvement": "2-3x speedup for Q8_0\u2192FP16 dequantization. The CUDA optimized kernel uses shared memory for coalesced reads, half2 vectorized arithmetic, and processes 2048 elements per block vs the generic kernel's 512 elements per block (256 threads \u00d7 2 elements).",
+          "implementation_notes": "Port CUDA's dequantize_block_q8_0_f16 to SYCL: (1) Allocate SLM buffer of size (CUDA_Q8_0_NE_ALIGN/sizeof(int) + WARP_SIZE) \u00d7 sizeof(int). (2) Cooperatively load Q8_0 blocks into SLM using coalesced reads. (3) Barrier. (4) Each thread reads d (scale) and qs (quantized values) from SLM, dequantizes using sycl::half2 multiply. (5) Use [[sycl::reqd_sub_group_size(WARP_SIZE)]]. Need to handle tail blocks with need_check template parameter. Register the optimized kernel in ggml_get_to_fp16_sycl for GGML_TYPE_Q8_0.",
           "risk": "medium",
           "risk_notes": "Shared memory staging pattern is well-understood. The half2 arithmetic requires SYCL fp16 support which is already used elsewhere. Need alignment handling for non-2048-aligned element counts."
         },
@@ -670,8 +733,8 @@
           "id": "opt_005_003",
           "category": "vectorization",
           "priority": "medium",
-          "description": "Support non-contiguous (NC) dequantization for quantized types in SYCL. CUDA's generic dequantize_block natively supports NC tensors via stride parameters (ne00/ne01/ne02/s01/s02/s03) and 3D grid indexing. SYCL's generic dequantize_block only supports contiguous tensors (flat k parameter). SYCL's NC support is limited to convert_unary_nc_sycl which only handles F32/BF16→FP16 conversion. This means quantized tensor reshaping or non-contiguous views must materialize contiguous copies before dequantization on SYCL.",
-          "expected_improvement": "Eliminates extra copy operations for non-contiguous quantized tensors — up to 2x speedup for those paths by avoiding the contiguity materialization step. Also enables new dispatch paths (get_to_fp32_nc_sycl, get_to_bf16_nc_sycl) matching CUDA's API surface.",
+          "description": "Support non-contiguous (NC) dequantization for quantized types in SYCL. CUDA's generic dequantize_block natively supports NC tensors via stride parameters (ne00/ne01/ne02/s01/s02/s03) and 3D grid indexing. SYCL's generic dequantize_block only supports contiguous tensors (flat k parameter). SYCL's NC support is limited to convert_unary_nc_sycl which only handles F32/BF16\u2192FP16 conversion. This means quantized tensor reshaping or non-contiguous views must materialize contiguous copies before dequantization on SYCL.",
+          "expected_improvement": "Eliminates extra copy operations for non-contiguous quantized tensors \u2014 up to 2x speedup for those paths by avoiding the contiguity materialization step. Also enables new dispatch paths (get_to_fp32_nc_sycl, get_to_bf16_nc_sycl) matching CUDA's API surface.",
           "implementation_notes": "Modify dequantize_block to accept ne00/ne01/ne02/s01/s02/s03 stride parameters matching CUDA's version. Use 3D nd_range for the NC path: grid = (ceil_div(ne00, 2*block_size), ne01, ne02*ne03). Compute source offset as i03*s03 + i02*s02 + i01*s01 + i00/qk. Compute dest offset as ((i03*ne02 + i02)*ne01 + i01)*ne00 + iybs + iqs. Add dispatch functions get_to_fp32_nc_sycl, get_to_bf16_nc_sycl, and extend get_to_fp16_nc_sycl to support quantized input types.",
           "risk": "medium",
           "risk_notes": "Multi-dimensional indexing must be carefully mapped. The CUDA version is proven correct and can serve as reference. Need to handle the downsample_sycl_global_range workaround for large tensor dimensions."
@@ -681,7 +744,7 @@
           "category": "work_group_size",
           "priority": "low",
           "description": "Remove unconditional dpct::has_capability_or_fail(fp16) checks from all dequantize launch functions. These capability queries are called on every kernel dispatch, adding microseconds of overhead per launch. The fp16 capability should be checked once at device initialization, not per-dispatch. Most dequantize kernels don't even require fp16 capability (they output float).",
-          "expected_improvement": "Reduces per-dispatch latency by ~1-5 microseconds. For batched inference with many small dequantize calls, this adds up. More importantly, this is incorrect for float output — the fp16 check is a DPCT artifact that doesn't apply to fp32 dequantization.",
+          "expected_improvement": "Reduces per-dispatch latency by ~1-5 microseconds. For batched inference with many small dequantize calls, this adds up. More importantly, this is incorrect for float output \u2014 the fp16 check is a DPCT artifact that doesn't apply to fp32 dequantization.",
           "implementation_notes": "Remove all dpct::has_capability_or_fail blocks from convert.cpp. If fp16 validation is needed, do it once in the SYCL device initialization path (ggml-sycl.cpp). Alternatively, guard with if constexpr (std::is_same_v<dst_t, sycl::half>) to only check when actually outputting fp16.",
           "risk": "low",
           "risk_notes": "Removing a debug check. The capability is already validated at device selection time. No functional impact."
@@ -701,7 +764,7 @@
           "category": "work_group_size",
           "priority": "low",
           "description": "Clean up __dpct_inline__ artifacts in dequantize.hpp. Replace all instances with standard C++ inline keyword or remove entirely. These are DPCT migration artifacts that reduce code portability.",
-          "expected_improvement": "No performance impact — code quality fix for portability and readability.",
+          "expected_improvement": "No performance impact \u2014 code quality fix for portability and readability.",
           "implementation_notes": "Replace all __dpct_inline__ with inline in dequantize.hpp. The functions are small enough that the compiler will inline them regardless of the attribute.",
           "risk": "low",
           "risk_notes": "Mechanical cleanup with no functional changes."
@@ -711,34 +774,43 @@
           "category": "work_group_size",
           "priority": "low",
           "description": "Add BF16 output support as a first-class type. CUDA has a dedicated to_bf16_cuda_t typedef and to_bf16_nc_cuda_t dispatch functions. SYCL conditionally supports BF16 via #ifdef GGML_SYCL_HAS_BF16 but lacks a dedicated typedef and nc dispatch. This limits BF16 model support on Intel GPUs which natively support BF16.",
-          "expected_improvement": "Feature completeness — no performance impact for existing paths. Enables BF16 model inference pipelines on SYCL.",
+          "expected_improvement": "Feature completeness \u2014 no performance impact for existing paths. Enables BF16 model inference pipelines on SYCL.",
           "implementation_notes": "Add to_bf16_sycl_t typedef in convert.hpp. Add ggml_get_to_bf16_sycl dispatch function in convert.cpp. Add get_to_bf16_nc_sycl for non-contiguous BF16 output. Ensure GGML_SYCL_HAS_BF16 guard is applied consistently.",
           "risk": "low",
           "risk_notes": "Straightforward type extension. BF16 support is already partially implemented."
         }
       ],
       "overall_optimization_potential": "medium",
-      "estimated_current_efficiency": "55-65% — Dequantize kernels are memory-bound and reasonably well-implemented for most quant types. The main gap is the missing optimized Q8_0→FP16 kernel (CUDA has a 2-3x faster variant). Missing sub-group size attributes hurt occupancy. NC support gap forces extra copies for non-contiguous quantized tensors. The reorder variants (q4_0, q4_K, q6_K) are SYCL-specific optimizations that are ahead of CUDA."
+      "estimated_current_efficiency": "55-65% \u2014 Dequantize kernels are memory-bound and reasonably well-implemented for most quant types. The main gap is the missing optimized Q8_0\u2192FP16 kernel (CUDA has a 2-3x faster variant). Missing sub-group size attributes hurt occupancy. NC support gap forces extra copies for non-contiguous quantized tensors. The reorder variants (q4_0, q4_K, q6_K) are SYCL-specific optimizations that are ahead of CUDA."
     },
     {
       "kernel_id": "sk_006",
       "name": "binbcast (binary broadcast) SYCL kernels",
       "file": "ggml/src/ggml-sycl/binbcast.cpp",
-      "source_cuda_ids": ["ck_001", "ck_002", "ck_003", "ck_004", "ck_005"],
+      "source_cuda_ids": [
+        "ck_001",
+        "ck_002",
+        "ck_003",
+        "ck_004",
+        "ck_005"
+      ],
       "current_analysis": {
         "launch_config": {
           "uses_nd_range": true,
           "work_group_size": 128,
           "sub_group_size": null,
           "global_size_expression": "3D adaptive: block_dims = (min(ne2*ne3, cap), min(ne1, cap), min(hne0, 128)) where cap fills to 128; fallback 1D: ceil_div(ne0*ne1*ne2*ne3, 128) when z-dim exceeds 65535",
-          "notes": "Two kernel variants: k_bin_bcast (3D grid) and k_bin_bcast_unravel (1D fallback). Block size is 128 matching CUDA. The 3D grid packs dimensions 2 and 3 into the z-axis using integer division (ne2*ne3 packed). The dimension 0 uses hne0 = max(ne0/2, 1) which halves the grid in dimension 0. Missing [[sycl::reqd_sub_group_size]] on both kernel launch paths. Fallback condition only checks z-dim > 65535, while CUDA checks both y AND z — potential bug for large ne1."
+          "notes": "Two kernel variants: k_bin_bcast (3D grid) and k_bin_bcast_unravel (1D fallback). Block size is 128 matching CUDA. The 3D grid packs dimensions 2 and 3 into the z-axis using integer division (ne2*ne3 packed). The dimension 0 uses hne0 = max(ne0/2, 1) which halves the grid in dimension 0. Missing [[sycl::reqd_sub_group_size]] on both kernel launch paths. Fallback condition only checks z-dim > 65535, while CUDA checks both y AND z \u2014 potential bug for large ne1."
         },
         "memory_patterns": {
           "coalesced_accesses": true,
-          "strided_accesses": ["src1 broadcast: i10 = i0 % ne10 causes non-contiguous access when ne10 < ne0", "src0/src1 stride-based addressing via s01/s02/s03 and s11/s12/s13"],
+          "strided_accesses": [
+            "src1 broadcast: i10 = i0 % ne10 causes non-contiguous access when ne10 < ne0",
+            "src0/src1 stride-based addressing via s01/s02/s03 and s11/s12/s13"
+          ],
           "vectorized_loads": false,
           "vector_width": null,
-          "notes": "Innermost loop iterates over dimension 0 with stride equal to total threads in dimension 0. Consecutive threads access consecutive elements in src0 and dst (coalesced). src1 access is coalesced only when ne10 >= ne0 (no broadcast in dim 0); otherwise the modulo causes irregular access. All loads/stores are scalar — no sycl::vec usage."
+          "notes": "Innermost loop iterates over dimension 0 with stride equal to total threads in dimension 0. Consecutive threads access consecutive elements in src0 and dst (coalesced). src1 access is coalesced only when ne10 >= ne0 (no broadcast in dim 0); otherwise the modulo causes irregular access. All loads/stores are scalar \u2014 no sycl::vec usage."
         },
         "slm_usage": {
           "uses_slm": false,
@@ -752,7 +824,7 @@
           "uses_work_group_reduce": false,
           "uses_slm_manual_reduce": false,
           "uses_atomic": false,
-          "notes": "No reductions — each thread computes one or more output elements independently."
+          "notes": "No reductions \u2014 each thread computes one or more output elements independently."
         },
         "data_types": {
           "compute_type": "float",
@@ -763,26 +835,26 @@
         "math_functions": {
           "uses_native_math": false,
           "functions": [],
-          "notes": "No transcendental math — only add, sub, mul, div operations. div uses standard float division. No optimization opportunities for native math."
+          "notes": "No transcendental math \u2014 only add, sub, mul, div operations. div uses standard float division. No optimization opportunities for native math."
         },
         "loop_analysis": {
           "hot_loops": [
-            "k_bin_bcast inner loop (line 44-48): iterates ne0/(block_dims[2]*block_nums[2]) times — handles multiple elements per thread in dimension 0",
+            "k_bin_bcast inner loop (line 44-48): iterates ne0/(block_dims[2]*block_nums[2]) times \u2014 handles multiple elements per thread in dimension 0",
             "Dimension collapse loop (lines 127-139): host-side, iterates up to 3 times to collapse non-broadcast dimensions"
           ],
           "unrolled": false,
-          "notes": "The inner loop in k_bin_bcast cannot be unrolled since ne0 is runtime. The loop body is simple (one load from each src + one op + one store). k_bin_bcast_unravel has no loop — one element per thread."
+          "notes": "The inner loop in k_bin_bcast cannot be unrolled since ne0 is runtime. The loop body is simple (one load from each src + one op + one store). k_bin_bcast_unravel has no loop \u2014 one element per thread."
         },
         "estimated_bottleneck": "memory",
         "anti_patterns": [
-          "Uses plain integer % and / for broadcast index computation (i1%ne11, i2%ne12, i3%ne13, i0%ne10, i/(ne2*ne1*ne0) in unravel) — CUDA uses fastdiv/fastmodulo with multiply-high (2-3 cycles vs 20-30 cycles for integer division on GPU)",
+          "Uses plain integer % and / for broadcast index computation (i1%ne11, i2%ne12, i3%ne13, i0%ne10, i/(ne2*ne1*ne0) in unravel) \u2014 CUDA uses fastdiv/fastmodulo with multiply-high (2-3 cycles vs 20-30 cycles for integer division on GPU)",
           "DPCT artifact: dpct::has_capability_or_fail(fp16) called on every launch",
           "DPCT artifact: stale DPCT1049 comment at lines 240-245",
           "Missing [[sycl::reqd_sub_group_size]] on both launch paths",
-          "Fallback condition only checks block_nums[0] > 65535 — CUDA checks both y AND z grid limits; missing y check is a potential correctness bug for large ne1",
-          "Missing fused multi-source op support — CUDA's variadic template fuses up to 8 add operations into a single kernel launch, eliminating redundant memory traffic",
-          "Missing repeat_back kernel — CUDA has k_repeat_back for the inverse of repeat",
-          "s00 is GGML_UNUSED instead of GGML_ASSERT(s00 == 1) — CUDA asserts this for safety"
+          "Fallback condition only checks block_nums[0] > 65535 \u2014 CUDA checks both y AND z grid limits; missing y check is a potential correctness bug for large ne1",
+          "Missing fused multi-source op support \u2014 CUDA's variadic template fuses up to 8 add operations into a single kernel launch, eliminating redundant memory traffic",
+          "Missing repeat_back kernel \u2014 CUDA has k_repeat_back for the inverse of repeat",
+          "s00 is GGML_UNUSED instead of GGML_ASSERT(s00 == 1) \u2014 CUDA asserts this for safety"
         ]
       },
       "optimization_opportunities": [
@@ -791,7 +863,7 @@
           "category": "math_functions",
           "priority": "high",
           "description": "Replace plain integer % and / with fast division/modulo for broadcast index computation. CUDA uses fastdiv/fastmodulo which precomputes magic numbers and uses multiply-high + shift (2-3 cycles) instead of hardware integer division (20-30 cycles on GPU). In binbcast, every thread executes 3-4 modulo operations (i1%ne11, i2%ne12, i3%ne13, i0%ne10) and the unravel kernel adds 3-4 integer divisions (i/(ne2*ne1*ne0) etc.). This is the single largest performance gap vs CUDA for this kernel.",
-          "expected_improvement": "15-40% speedup depending on tensor dimensions. For small-element broadcast ops (where compute per element is minimal: add/sub = 1 FLOP), the division overhead dominates. The unravel kernel (1D fallback) is worst affected — 7+ divisions per thread vs 0 with fastdiv.",
+          "expected_improvement": "15-40% speedup depending on tensor dimensions. For small-element broadcast ops (where compute per element is minimal: add/sub = 1 FLOP), the division overhead dominates. The unravel kernel (1D fallback) is worst affected \u2014 7+ divisions per thread vs 0 with fastdiv.",
           "implementation_notes": "Implement a SYCL fastdiv utility matching CUDA's: precompute (mp, L, divisor) triple on host for each ne value, pass as kernel parameters. Replace % with fastmodulo and / with fastdiv in both k_bin_bcast and k_bin_bcast_unravel. The host-side init_fastdiv_values() computes: L = ceil(log2(d)), mp = 2^(32+L)/d + 1. The device-side fastdiv uses __umulhi(n, mp) >> L. On SYCL/Intel, use sycl::mul_hi for the multiply-high operation.",
           "risk": "medium",
           "risk_notes": "The fastdiv algorithm requires careful handling of edge cases (divisor = 1, power of 2 divisors). CUDA's implementation is proven correct. Need to verify sycl::mul_hi behavior matches __umulhi for unsigned 32-bit multiply-high."
@@ -811,7 +883,7 @@
           "category": "work_group_size",
           "priority": "medium",
           "description": "Fix the fallback condition to check both y and z grid dimension limits, matching CUDA. Currently SYCL only checks block_nums[0] > 65535 (z-dimension equivalent) but not block_nums[1] (y-dimension). CUDA checks both: block_nums.z > 65535 || block_nums.y > 65535. If ne1 is very large (>65535 * block_dims[1]), the SYCL kernel could fail or produce incorrect results.",
-          "expected_improvement": "Correctness fix — prevents potential failures with large ne1 dimensions.",
+          "expected_improvement": "Correctness fix \u2014 prevents potential failures with large ne1 dimensions.",
           "implementation_notes": "Change the condition at line 221 from: if (block_nums[0] > 65535) to: if (block_nums[0] > 65535 || block_nums[1] > 65535). This ensures the 1D fallback kernel is used whenever any grid dimension exceeds SYCL limits.",
           "risk": "low",
           "risk_notes": "Simple conditional change. The unravel fallback kernel already handles arbitrary dimensions correctly."
@@ -831,7 +903,7 @@
           "category": "work_group_size",
           "priority": "low",
           "description": "Implement repeat_back kernel. CUDA has k_repeat_back for the inverse of repeat (summing elements that were repeated back to the original size using atomicAdd). SYCL binbcast does not have this, which may cause fallback to CPU or incorrect behavior for backward pass of repeat operations.",
-          "expected_improvement": "Feature completeness — enables SYCL backward pass for repeat operations without CPU fallback.",
+          "expected_improvement": "Feature completeness \u2014 enables SYCL backward pass for repeat operations without CPU fallback.",
           "implementation_notes": "Port CUDA's k_repeat_back kernel: for each output element, use atomicAdd to accumulate contributions from all repeated input elements. Use sycl::atomic_ref<float, ...> for the atomic operation. The kernel iterates over repeat dimensions and accumulates.",
           "risk": "medium",
           "risk_notes": "Atomic operations on float require sycl::atomic_ref with memory_order::relaxed. Need to verify Intel GPU support for float atomics. The atomic approach may have contention for small output tensors."
@@ -848,12 +920,189 @@
         }
       ],
       "overall_optimization_potential": "medium",
-      "estimated_current_efficiency": "50-60% — Binary broadcast kernels are memory-bound but waste significant cycles on expensive integer division for broadcast index computation (CUDA uses fastdiv for 10x cheaper division). Missing fused multi-source support leaves significant throughput on the table for common add chains. The dimension collapse optimization and 3D grid mapping are well-implemented, matching CUDA. Missing repeat_back is a feature gap."
+      "estimated_current_efficiency": "50-60% \u2014 Binary broadcast kernels are memory-bound but waste significant cycles on expensive integer division for broadcast index computation (CUDA uses fastdiv for 10x cheaper division). Missing fused multi-source support leaves significant throughput on the table for common add chains. The dimension collapse optimization and 3D grid mapping are well-implemented, matching CUDA. Missing repeat_back is a feature gap."
+    },
+    {
+      "kernel_id": "sk_007",
+      "name": "cpy SYCL kernels",
+      "file": "ggml/src/ggml-sycl/cpy.cpp",
+      "source_cuda_ids": [
+        "ck_041",
+        "ck_042",
+        "ck_043",
+        "ck_044",
+        "ck_045"
+      ],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": "32 for scalar copy kernels (SYCL_CPY_BLOCK_SIZE); 1 for quantized f32->q and q->f32 kernels; 32 for q->q same-type copy kernels",
+          "sub_group_size": null,
+          "global_size_expression": "ceil_div(ne, SYCL_CPY_BLOCK_SIZE) for scalar; ne/qk for f32->q; ne for q->f32; ceil_div(ne, SYCL_CPY_BLOCK_SIZE) for q->q",
+          "notes": "CRITICAL: Quantized f32->q and q->f32 kernels launch with work-group size 1 \u2014 each quantization block processed by single work-item. Catastrophically bad on Xe2 where 15/16 SIMD lanes are idle. CUDA also uses block size 1 for these but NVIDIA warp scheduling partially compensates. Scalar copy work-group of 32 is also too small (CUDA uses 64). All kernels use 3D nd_range with first 2 dims = 1 (DPCT artifact). No [[sycl::reqd_sub_group_size]] on any kernel."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "strided_accesses": [
+            "Non-contiguous tensor paths: byte offsets nb00-nb03 and nb10-nb13 can produce strided access per element",
+            "Quantized single-thread kernels: 32 sequential scalar loads by one thread \u2014 no sub-group cooperation for coalescing"
+          ],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "All loads/stores are scalar \u2014 one element per work-item. sycl::vec<float,1> used at line 22 only for f32->f16 conversion, not for vectorized memory access. Contiguous tensor copies (the common case) have coalesced access in scalar kernels (adjacent threads access adjacent elements). Quantized kernels have no coalescing \u2014 single thread reads 32 floats sequentially. Missing contiguous fast-path: dispatch always uses full 4D index decomposition (12 integer divisions/multiplies per element) even when both tensors are contiguous."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes": 0,
+          "potential_bank_conflicts": false,
+          "notes": "No SLM usage in any cpy kernel. CUDA version has 32x33 float shared memory tile for transposed copy (cpy_scalar_transpose, cpy.cu line 59) \u2014 this optimization is entirely missing in the SYCL version."
+        },
+        "reduction_pattern": {
+          "has_reduction": true,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "Quantization helpers (cpy.hpp) contain serial reductions within single work-items: amax/vmax loops of 32 elements (cpy_blck_f32_q8_0 line 34, cpy_blck_f32_q4_0 line 58, cpy_blck_f32_q5_0 line 122, cpy_blck_f32_q5_1 line 157, cpy_blck_f32_iq4_nl line 191). These could use sub-group reduction if the work-group size were > 1 with cooperative processing."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "FP32 compute throughout. For copy operations this is appropriate since the operation is just type conversion. Quantization math (amax, scaling) benefits from FP32 precision."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [
+            "sycl::fmax (cpy.hpp:36)",
+            "sycl::fabs (cpy.hpp:36,60,61,124,125,193,194)",
+            "sycl::round (cpy.hpp:47)",
+            "sycl::min/sycl::max (cpy.hpp:93-94)",
+            "1.0f/d reciprocal (cpy.hpp:40,67,98,131,164,200)"
+          ],
+          "notes": "Standard precision math throughout. The 1.0f/d reciprocal (computed once per quantization block) could use sycl::native::recip for marginal speedup, but the impact is minimal since it's computed only once per 32 elements. sycl::round is acceptable as-is."
+        },
+        "loop_analysis": {
+          "hot_loops": [
+            "cpy_blck_f32_q8_0: amax loop (cpy.hpp:34, 32 iters) + quantize loop (cpy.hpp:44, 32 iters)",
+            "cpy_blck_f32_q4_0: amax loop (cpy.hpp:58, 32 iters) + pack loop (cpy.hpp:71, 16 iters)",
+            "cpy_blck_f32_q4_1: min/max loop (cpy.hpp:90, 32 iters) + pack loop (cpy.hpp:103, 16 iters)",
+            "cpy_blck_f32_q5_0: amax loop (cpy.hpp:122, 32 iters) + pack loop (cpy.hpp:136, 16 iters)",
+            "cpy_blck_f32_q5_1: min/max loop (cpy.hpp:157, 31 iters) + pack loop (cpy.hpp:170, 16 iters)",
+            "cpy_blck_f32_iq4_nl: amax loop (cpy.hpp:191, 32 iters) + index search + accumulate loop (cpy.hpp:203, 16 iters)",
+            "cpy_blck_q8_0_f32: dequant loop (cpy.cpp:94, 16 iters)",
+            "cpy_blck_q_f32: dequant loop (cpy.cpp:107, qk/2 iters)"
+          ],
+          "unrolled": false,
+          "notes": "No #pragma unroll on any loop in cpy.hpp or cpy.cpp. CUDA's cpy.cu has #pragma unroll on dequant loops (lines 97, 110). All loop trip counts are compile-time constants (QK8_0=32, QK4_0=32, etc.) making them ideal candidates for unrolling."
+        },
+        "estimated_bottleneck": "memory",
+        "anti_patterns": [
+          "CRITICAL: Work-group size of 1 for all quantized copy kernels (cpy.cpp lines 256,268,281,293,307,319,333,345,359,371,385) \u2014 16x SIMD underutilization",
+          "Work-group size of 32 (SYCL_CPY_BLOCK_SIZE, presets.hpp:35) for scalar copies \u2014 should be 256+ for Xe2",
+          "3D nd_range<3> for logically 1D work on ALL kernel launches (DPCT artifact)",
+          "Manual thread indexing (item_ct1.get_local_range(2)*item_ct1.get_group(2)+item_ct1.get_local_id(2)) instead of get_global_id() (lines 58, 121, 148, 175)",
+          "dpct::has_capability_or_fail() on every launch (lines 202, 220, 238, 398) \u2014 unnecessary runtime overhead",
+          "__dpct_inline__ instead of standard inline (cpy.hpp:9)",
+          "dpct::min() instead of std::min() (cpy.hpp:75,107,140)",
+          "item_ct1 naming convention (DPCT artifact) throughout",
+          "Missing contiguous fast-path for mixed-type copies: always performs 12 integer div/mul for 4D index decomposition even when tensors are contiguous (cpy.cpp lines 66-76)",
+          "Missing transposed copy kernel with SLM tiling (CUDA has cpy_scalar_transpose with shared memory)",
+          "int32 indices instead of int64 \u2014 potential overflow for large tensors (lines 54-76)",
+          "No #pragma unroll on any quantization loop (cpy.hpp) or dequantization loop (cpy.cpp:94,107)",
+          "No [[sycl::reqd_sub_group_size(16)]] on any kernel",
+          "Missing BF16 copy support (CUDA has f32->bf16, bf16->f32, bf16->f16, etc.)"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_007_001",
+          "category": "work_group_size",
+          "priority": "high",
+          "description": "Increase quantized copy kernel work-group size from 1 to at least 16 (one sub-group). Currently each f32->q and q->f32 kernel launches with work-group size 1 (cpy.cpp lines 256, 268, 281, 293, 307, 319, 333, 345, 359, 371, 385). On Xe2, this wastes 15/16 of each SIMD lane since the native SIMD width is 16. Even without restructuring the algorithm, launching with work-group size 16 allows the hardware to pack 16 independent quantization blocks into one SIMD thread, achieving full lane utilization. The kernel code already uses per-thread indexing (each thread processes one block independently), so increasing the work-group size from 1 to 16/32/64 is a trivial dispatch change.",
+          "expected_improvement": "4-8x throughput improvement for quantized copy operations. Currently 15/16 SIMD lanes are wasted. Proper work-group sizing fills all lanes and enables better latency hiding through concurrent work-groups.",
+          "implementation_notes": "Change from sycl::nd_range<3>((1,1,num_blocks), (1,1,1)) to sycl::nd_range<1>(ceil_div(num_blocks,256)*256, 256) for all f32->q and q->f32 dispatches. Each work-item still processes one quantization block independently \u2014 no algorithm change needed. The kernel already has an early-return guard (i >= ne). For q->f32 kernels, note that num_blocks = ne (number of elements), not ne/qk, so the grid may need adjustment.",
+          "risk": "low",
+          "risk_notes": "No algorithm change \u2014 only dispatch configuration. Each work-item is fully independent. The early-return guard (if i >= ne) already handles excess threads."
+        },
+        {
+          "id": "opt_007_002",
+          "category": "work_group_size",
+          "priority": "high",
+          "description": "Increase SYCL_CPY_BLOCK_SIZE from 32 to 256. The scalar copy kernels (f32->f32, f32->f16, f16->f32, f16->f16, i16->i16, i32->i32) use a work-group size of 32 (presets.hpp line 35). On Xe2, this is only 2 sub-groups of 16, severely limiting occupancy and latency hiding. CUDA uses 64 which is already small. The Intel GPU Optimization Guide recommends 256 or 512 for best performance. Since each work-item processes one element independently, increasing to 256 is a trivial change with no algorithm impact.",
+          "expected_improvement": "30-50% throughput improvement for scalar copy operations. Larger work-groups improve memory latency hiding through more concurrent threads per Xe-core. The current 32-thread work-group uses only 1/4 of the occupancy potential of a 128-thread work-group.",
+          "implementation_notes": "Change SYCL_CPY_BLOCK_SIZE from 32 to 256 in presets.hpp line 35. Also change the q_q same-type copy kernels (lines 452-510) which also use SYCL_CPY_BLOCK_SIZE. Verify no other kernels depend on this constant. Alternatively, define a separate CPY_BLOCK_SIZE_SCALAR constant to avoid affecting other users of SYCL_CPY_BLOCK_SIZE.",
+          "risk": "low",
+          "risk_notes": "No algorithm change. Check if SYCL_CPY_BLOCK_SIZE is used by other kernels \u2014 if so, create a separate constant for copy kernels."
+        },
+        {
+          "id": "opt_007_003",
+          "category": "memory_coalescing",
+          "priority": "high",
+          "description": "Add contiguous fast-path for mixed-type scalar copies. Currently, all scalar copy kernels (f32->f32, f32->f16, f16->f32, etc.) unconditionally perform 4D index decomposition with 12 integer divisions/multiplies per element (cpy.cpp lines 66-76). For contiguous tensors \u2014 the most common case \u2014 this index math is entirely redundant since element i maps directly to byte offset i*sizeof(element). CUDA has a separate cpy_scalar_contiguous kernel (cpy.cu line 172) for this case. The dispatch at line 525 only uses memcpy for same-type contiguous copies, falling through to the expensive strided path for mixed-type contiguous copies like f32->f16.",
+          "expected_improvement": "40-60% throughput improvement for contiguous mixed-type copies (e.g., f32->f16 contiguous). The 4D index decomposition dominates execution time for this memory-bound operation \u2014 each element requires 12 integer divisions that could be replaced with a single address offset. This is the most impactful optimization for copy kernels.",
+          "implementation_notes": "1. Add a contiguous fast-path kernel like CUDA's cpy_scalar_contiguous: template<cpy_kernel_t cpy_1> static void cpy_contiguous(const char * cx, char * cdst, const int ne, const int nb_src, const int nb_dst, nd_item<1> item). 2. In each dispatch function, detect contiguous case (ggml_is_contiguous()) and call the fast-path. 3. Alternatively, modify ggml_sycl_cpy at line 525 to detect contiguous + different types and dispatch to the fast kernel. The fast kernel: int i = item.get_global_id(0); if (i >= ne) return; cpy_1(cx + i*nb_src, cdst + i*nb_dst);",
+          "risk": "low",
+          "risk_notes": "CUDA already implements this pattern (cpy_scalar_contiguous). The contiguity check is already available via ggml_is_contiguous(). The fast-path is a strict simplification of the general path."
+        },
+        {
+          "id": "opt_007_004",
+          "category": "vectorization",
+          "priority": "medium",
+          "description": "Add vectorized loads/stores (sycl::vec<float, 4>) to the contiguous scalar copy kernels. Currently each work-item reads and writes exactly 1 element. For f32->f32 copy, using vec4 reduces memory transactions by 4x. For f32->f16, each work-item can load vec4<float> and store vec4<half> in a single transaction. Copy kernels are purely memory-bound (0 compute ops per byte), so maximizing memory throughput is critical.",
+          "expected_improvement": "20-40% throughput improvement for contiguous copy operations. Combined with the contiguous fast-path (opt_007_003), this can achieve near-peak memory bandwidth for simple copies.",
+          "implementation_notes": "For the contiguous fast-path (requires opt_007_003 first), create a vec4 variant: each work-item processes 4 elements using sycl::vec<T,4> loads and stores. For f32->f16, load vec4<float>, convert to vec4<half> using vec.convert<>(), store vec4<half>. Grid size reduces by 4x. Handle tail elements (ne % 4 != 0) with scalar fallback. For non-contiguous paths, vectorization is not applicable due to non-uniform byte offsets. Ref: optimization_guide.md section 2.2.",
+          "risk": "low",
+          "risk_notes": "Requires contiguous fast-path (opt_007_003) as a prerequisite. Vectorization only applies to contiguous case where alignment is guaranteed. Tail handling is straightforward."
+        },
+        {
+          "id": "opt_007_005",
+          "category": "loop_unroll",
+          "priority": "medium",
+          "description": "Add #pragma unroll to all quantization and dequantization inner loops. All loops in cpy.hpp (amax, quantize, pack) and cpy.cpp (dequant) have compile-time constant trip counts (QK8_0=32, QK4_0=32, etc.) but lack unroll pragmas. CUDA's cpy.cu has #pragma unroll on dequant loops (lines 97, 110). On Intel GPUs, #pragma unroll reduces loop overhead and enables register allocation across iterations, improving IPC for these short tight loops.",
+          "expected_improvement": "10-20% speedup for quantized copy operations. The effect is more pronounced when combined with work-group size increase (opt_007_001) since more threads means higher total throughput where the per-thread loop efficiency matters.",
+          "implementation_notes": "Add #pragma unroll before each loop in cpy.hpp: line 34 (amax q8_0), line 44 (quantize q8_0), line 58 (amax q4_0), line 71 (pack q4_0), line 90 (min/max q4_1), line 103 (pack q4_1), line 122 (amax q5_0), line 136 (pack q5_0), line 157 (min/max q5_1), line 170 (pack q5_1), line 191 (amax iq4_nl), line 203 (search+pack iq4_nl). In cpy.cpp: line 94 (dequant q8_0), line 107 (dequant generic). Total: 14 pragma insertions.",
+          "risk": "low",
+          "risk_notes": "All loop trip counts are compile-time constants. #pragma unroll is a compiler hint that cannot cause incorrect behavior. At worst, the compiler ignores it."
+        },
+        {
+          "id": "opt_007_006",
+          "category": "sub_group_ops",
+          "priority": "medium",
+          "description": "Add [[sycl::reqd_sub_group_size(16)]] to all kernel launches. No cpy kernel specifies the required sub-group size. On Xe2, the compiler should be directed to use SIMD16 (the native width) to ensure optimal lane utilization and prevent the compiler from choosing SIMD32 which would halve occupancy. This is especially important when combined with work-group size increases (opt_007_001, opt_007_002).",
+          "expected_improvement": "5-15% improvement from guaranteed optimal SIMD width selection. Without this attribute, the compiler may choose SIMD32 which reduces hardware thread count by 2x.",
+          "implementation_notes": "Add [[sycl::reqd_sub_group_size(16)]] to each parallel_for lambda in cpy.cpp. There are approximately 22 kernel launches: 6 scalar type copies (lines 204-445), 11 quantized conversions (lines 256-390), 5 same-type quantized copies (lines 448-510). Ref: optimization_guide.md section 1.2.",
+          "risk": "low",
+          "risk_notes": "No sub-group operations are used in copy kernels, so this only affects the compiler's SIMD width selection. No functional impact."
+        },
+        {
+          "id": "opt_007_007",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Clean up DPCT migration artifacts: (1) Convert all nd_range<3> to nd_range<1> since work is logically 1D. (2) Replace manual thread indexing with get_global_id(0). (3) Remove dpct::has_capability_or_fail() calls (lines 202, 220, 238, 398). (4) Replace dpct::min() with std::min() in cpy.hpp (lines 75, 107, 140). (5) Replace __dpct_inline__ with standard inline (cpy.hpp line 9). (6) Rename item_ct1 to item throughout.",
+          "expected_improvement": "Minor: removes per-launch device capability queries (~microseconds). get_global_id() may enable minor compiler optimizations vs manual index arithmetic. Primary benefit is code clarity and maintainability.",
+          "implementation_notes": "Mechanical refactoring across ~22 kernel launches in cpy.cpp and helper functions in cpy.hpp. The dpct::has_capability_or_fail removal is the most impactful \u2014 it's called 4 times per f16-related kernel launch and does a synchronous device query.",
+          "risk": "low",
+          "risk_notes": "Purely mechanical refactoring with no algorithmic changes."
+        },
+        {
+          "id": "opt_007_008",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Upgrade int32 indices to int64 for large tensor support. All index computations (lines 54-76, 117-141, 144-168, 170-194) use int32 which overflows for tensors with more than ~2 billion elements. CUDA's cpy.cu uses int64_t throughout. Modern LLMs with long context windows can have tensors exceeding this limit.",
+          "expected_improvement": "Correctness fix for large tensors. No performance impact for typical sizes. May have minor performance impact on Xe2 due to wider integer operations, but correctness is paramount.",
+          "implementation_notes": "Change all int parameters (ne, ne00, ne01, ne02, nb00-nb13, etc.) to int64_t in cpy_f32_f16, cpy_f32_q, cpy_q_f32, cpy_q_q kernel templates and all dispatch functions. Also update the product computations (ne00*ne01*ne02) which are the first to overflow. This is a mechanical change affecting function signatures throughout cpy.cpp.",
+          "risk": "medium",
+          "risk_notes": "int64 arithmetic is slightly slower than int32 on GPUs. The main risk is ensuring all callers pass int64 consistently and that the SYCL backend tensor metadata is properly cast."
+        }
+      ],
+      "overall_optimization_potential": "high",
+      "estimated_current_efficiency": "20-30% \u2014 Copy kernels are severely underperforming due to catastrophically small work-group sizes (1 for quantized, 32 for scalar), missing contiguous fast-path (needless 12 integer div/mul per element), no vectorized loads, and numerous DPCT migration artifacts. The quantized copy path in particular is ~16x slower than necessary due to single-work-item SIMD underutilization."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 6,
-    "high_potential": 2,
+    "total_kernels_analyzed": 7,
+    "high_potential": 3,
     "medium_potential": 4,
     "low_potential": 0,
     "no_optimization_needed": 0,
@@ -862,113 +1111,127 @@
         "kernel_id": "sk_001",
         "kernel_name": "softmax SYCL kernels",
         "opportunity_id": "opt_001_001",
-        "description": "Fix missing reqd_sub_group_size attribute — correctness issue",
+        "description": "Fix missing reqd_sub_group_size attribute \u2014 correctness issue",
         "priority": "high"
       },
       {
         "kernel_id": "sk_001",
         "kernel_name": "softmax SYCL kernels",
         "opportunity_id": "opt_001_002",
-        "description": "Replace manual SLM block reduction with sycl::reduce_over_group — 10-20% speedup",
+        "description": "Replace manual SLM block reduction with sycl::reduce_over_group \u2014 10-20% speedup",
         "priority": "high"
       },
       {
         "kernel_id": "sk_002",
         "kernel_name": "rope SYCL kernels",
         "opportunity_id": "opt_002_001",
-        "description": "Use native sin/cos for RoPE — 15-30% speedup from faster trig on Xe2",
+        "description": "Use native sin/cos for RoPE \u2014 15-30% speedup from faster trig on Xe2",
         "priority": "high"
       },
       {
         "kernel_id": "sk_002",
         "kernel_name": "rope SYCL kernels",
         "opportunity_id": "opt_002_002",
-        "description": "Replace sycl::pow with native::exp2(native::log2()*...) — 10-20% speedup",
+        "description": "Replace sycl::pow with native::exp2(native::log2()*...) \u2014 10-20% speedup",
         "priority": "high"
       },
       {
         "kernel_id": "sk_003",
         "kernel_name": "norm SYCL kernels",
         "opportunity_id": "opt_003_001",
-        "description": "Fix group_norm global barrier to local_space — 5-15% speedup + correctness alignment",
+        "description": "Fix group_norm global barrier to local_space \u2014 5-15% speedup + correctness alignment",
         "priority": "high"
       },
       {
         "kernel_id": "sk_003",
         "kernel_name": "norm SYCL kernels",
         "opportunity_id": "opt_003_002",
-        "description": "Unify reduction to sycl::reduce_over_group — 10-20% speedup, eliminates 100+ lines of duplicated code",
+        "description": "Unify reduction to sycl::reduce_over_group \u2014 10-20% speedup, eliminates 100+ lines of duplicated code",
         "priority": "high"
       },
       {
         "kernel_id": "sk_003",
         "kernel_name": "norm SYCL kernels",
         "opportunity_id": "opt_003_003",
-        "description": "Increase rms_norm small-path work-group from 16 to 256 — 2-4x throughput for ncols < 1024",
+        "description": "Increase rms_norm small-path work-group from 16 to 256 \u2014 2-4x throughput for ncols < 1024",
         "priority": "high"
       },
       {
         "kernel_id": "sk_003",
         "kernel_name": "norm SYCL kernels",
         "opportunity_id": "opt_003_006",
-        "description": "Implement fused rms_norm_multiply kernel — 30-50% throughput improvement by eliminating a memory pass",
+        "description": "Implement fused rms_norm_multiply kernel \u2014 30-50% throughput improvement by eliminating a memory pass",
         "priority": "medium"
       },
       {
         "kernel_id": "sk_001",
         "kernel_name": "softmax SYCL kernels",
         "opportunity_id": "opt_001_003",
-        "description": "Add vec4 vectorized memory access — 20-40% memory throughput improvement",
+        "description": "Add vec4 vectorized memory access \u2014 20-40% memory throughput improvement",
         "priority": "medium"
       },
       {
         "kernel_id": "sk_003",
         "kernel_name": "norm SYCL kernels",
         "opportunity_id": "opt_003_004",
-        "description": "Add vec4 vectorized memory access to norm kernels — 20-40% memory throughput improvement",
+        "description": "Add vec4 vectorized memory access to norm kernels \u2014 20-40% memory throughput improvement",
         "priority": "medium"
       },
       {
         "kernel_id": "sk_004",
         "kernel_name": "element_wise SYCL kernels",
         "opportunity_id": "opt_004_001",
-        "description": "Add vec4 vectorized loads/stores to all element-wise ops — 20-40% memory throughput improvement",
+        "description": "Add vec4 vectorized loads/stores to all element-wise ops \u2014 20-40% memory throughput improvement",
         "priority": "medium"
       },
       {
         "kernel_id": "sk_004",
         "kernel_name": "element_wise SYCL kernels",
         "opportunity_id": "opt_004_002",
-        "description": "Use native math consistently for all transcendentals — 10-30% speedup for compute-bound ops",
+        "description": "Use native math consistently for all transcendentals \u2014 10-30% speedup for compute-bound ops",
         "priority": "medium"
       },
       {
         "kernel_id": "sk_005",
         "kernel_name": "convert (dequantize) SYCL kernels",
         "opportunity_id": "opt_005_001",
-        "description": "Implement optimized Q8_0→FP16 kernel with SLM and half2 — 2-3x speedup for Q8_0 dequant",
+        "description": "Implement optimized Q8_0\u2192FP16 kernel with SLM and half2 \u2014 2-3x speedup for Q8_0 dequant",
         "priority": "high"
       },
       {
         "kernel_id": "sk_005",
         "kernel_name": "convert (dequantize) SYCL kernels",
         "opportunity_id": "opt_005_002",
-        "description": "Add reqd_sub_group_size to all dequantize kernels — 5-15% occupancy improvement",
+        "description": "Add reqd_sub_group_size to all dequantize kernels \u2014 5-15% occupancy improvement",
         "priority": "medium"
       },
       {
         "kernel_id": "sk_006",
         "kernel_name": "binbcast SYCL kernels",
         "opportunity_id": "opt_006_001",
-        "description": "Replace plain integer % and / with fastdiv/fastmodulo — 15-40% speedup from avoiding expensive GPU integer division",
+        "description": "Replace plain integer % and / with fastdiv/fastmodulo \u2014 15-40% speedup from avoiding expensive GPU integer division",
         "priority": "high"
       },
       {
         "kernel_id": "sk_006",
         "kernel_name": "binbcast SYCL kernels",
         "opportunity_id": "opt_006_003",
-        "description": "Fix fallback condition to check both y and z grid limits — correctness fix",
+        "description": "Fix fallback condition to check both y and z grid limits \u2014 correctness fix",
         "priority": "medium"
+      },
+      {
+        "kernel_id": "sk_007",
+        "kernel_name": "cpy SYCL kernels",
+        "opportunity_id": "opt_007_001",
+        "description": "Increase quantized copy work-group size from 1 to 256 \u2014 4-8x throughput from proper SIMD utilization",
+        "priority": "high"
+      },
+      {
+        "kernel_id": "sk_007",
+        "kernel_name": "cpy SYCL kernels",
+        "opportunity_id": "opt_007_003",
+        "description": "Add contiguous fast-path for mixed-type copies \u2014 40-60% speedup by eliminating needless 4D index decomposition",
+        "priority": "high"
       }
     ]
   }
