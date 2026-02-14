@@ -1624,13 +1624,145 @@
           "risk_notes": "Cosmetic changes except for has_capability_or_fail removal which has a tiny runtime benefit."
         }
       ]
+    },
+    {
+      "kernel_id": "sk_011",
+      "name": "getrows SYCL kernels",
+      "file": "ggml/src/ggml-sycl/getrows.cpp",
+      "source_cuda_ids": [
+        "ck_058"
+      ],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": 256,
+          "sub_group_size": null,
+          "global_size_expression": "k_get_rows: nd_range<3>((ne11*ne12, block_num_y, SYCL_GET_ROWS_BLOCK_SIZE), (1,1,SYCL_GET_ROWS_BLOCK_SIZE)) where block_num_y = ceil_div(ne00, 2*256). k_get_rows_float: same structure. k_get_rows_back_float: nd_range<3>((1,ne1,block_num_x*SYCL_GET_ROWS_BACK_BLOCK_SIZE), (1,1,SYCL_GET_ROWS_BACK_BLOCK_SIZE)).",
+          "notes": "SYCL_GET_ROWS_BLOCK_SIZE=256 matches CUDA_GET_ROWS_BLOCK_SIZE=256 — appropriate for Xe2. All 3 kernels use 3D nd_range. The dim 0 of k_get_rows_back_float is always 1 (minor DPCT artifact — could be nd_range<2>). No [[sycl::reqd_sub_group_size]] on any kernel launch. CRITICAL difference: CUDA clamps grid dimensions with MIN(..., UINT16_MAX) and uses grid-stride loops to iterate when the work exceeds the grid size. SYCL does NOT clamp — it launches potentially enormous grids (ne11*ne12 can be very large for batched/multi-head operations). For small dimensions both are equivalent; for large ones, SYCL may hit implementation limits or waste resources."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "strided_accesses": [],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "Adjacent threads access adjacent elements within a row (coalesced). k_get_rows_float copies src0 to dst as float — purely contiguous read/write within each row. k_get_rows with quantized types dequantizes from packed format to float — coalesced within sub-group for both source (quantized blocks) and destination (float array). No sycl::vec usage for data loads or stores."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes": 0,
+          "potential_bank_conflicts": false,
+          "notes": "No SLM needed — each thread independently processes one or two elements from the selected row. No inter-thread data sharing."
+        },
+        "reduction_pattern": {
+          "has_reduction": false,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "No reductions in forward kernels (k_get_rows, k_get_rows_float). The backward kernel (k_get_rows_back_float) has a serial loop over nrows_grad, accumulating gradients for each output element — this is a serial reduction within each thread, not a parallel reduction. Both SYCL and CUDA have the same serial approach."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "All output is float (float *dst_dd hardcoded throughout). The CUDA version supports multiple dst types via a two-level template switch: dst_type → src0_type. SYCL only supports F32 output. Input types: SYCL supports F16, F32, Q4_0, Q4_1, Q5_0, Q5_1, Q8_0. Missing: I32 and BF16 source types that CUDA supports."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [],
+          "notes": "No transcendental math — only dequantization (integer bit manipulation + multiply-add) and simple float copy. No optimization opportunities for native math."
+        },
+        "loop_analysis": {
+          "hot_loops": [
+            "k_get_rows_back_float serial accumulation loop (line 73): for (r = 0; r < nrows_grad; ++r) — iterates nrows_grad times, accumulating gradients. This is O(nrows_grad) per output element, which is inherently inefficient but correct."
+          ],
+          "unrolled": false,
+          "notes": "No hot loops in forward kernels — each thread processes exactly one (i00, i10, i11, i12) tuple with a simple bounds check. The backward kernel has the nrows_grad serial loop which cannot be unrolled (runtime trip count). No #pragma unroll used anywhere."
+        },
+        "estimated_bottleneck": "memory",
+        "anti_patterns": [
+          "Missing grid-stride loops (CRITICAL functional difference): CUDA k_get_rows uses two grid-stride loops (z-dim for ne11*ne12, y-dim for block_num_y) with MIN(..., UINT16_MAX) clamping. SYCL launches the full grid without clamping — ne11*ne12 can be very large for batched/multi-head operations, potentially exceeding SYCL implementation limits or wasting resources on enormous grids. Same issue for k_get_rows_float.",
+          "Missing src0 types (feature gap): CUDA supports I32 and BF16 source types in addition to F16, F32, Q4_0-Q8_0. SYCL is missing I32 and BF16.",
+          "Missing dst types (feature gap): CUDA supports dst types F32, I32, F16, BF16 via two-level type switch. SYCL only supports dst type F32 (hardcoded float *dst_dd throughout).",
+          "DPCT artifact: dpct::has_capability_or_fail(fp16) called unconditionally in get_rows_sycl_float (line 156) even when src0_t=float — unnecessary fp16 check. Inconsistent: get_rows_sycl (quantized path) does NOT have this check.",
+          "Integer division/modulo for batch indexing: SYCL computes i11 = global_id(0) / ne12, i12 = global_id(0) % ne12 — expensive integer division on GPU (same fastdiv issue as binbcast sk_006). CUDA avoids this by receiving ne11 as a parameter and using the 3D grid indices directly (though it has a TODO for fastdiv).",
+          "k_get_rows_back_float uses nd_range<3> with dim 0 = 1 — minor DPCT artifact, could be nd_range<2>.",
+          "No [[sycl::reqd_sub_group_size(16)]] on any kernel launch — suboptimal SIMD width selection on Xe2.",
+          "No vectorized loads/stores — k_get_rows_float copies contiguous float data without using sycl::vec.",
+          "Missing __restrict__ qualifiers — CUDA uses __restrict__ on all pointer parameters for better compiler optimization. SYCL versions omit them."
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_011_001",
+          "category": "feature_gap",
+          "priority": "medium",
+          "description": "Add missing I32 and BF16 src0 type support + non-F32 dst type support to match CUDA's type coverage. CUDA supports src0 types I32, BF16 (in addition to F16, F32, Q4_0-Q8_0) and dst types F32, I32, F16, BF16 via a two-level template switch (ggml_cuda_get_rows_switch_src0_type). SYCL is missing I32 and BF16 source types and only supports F32 destination. This limits model compatibility — I32 is used for embedding indices, BF16 for BF16 models.",
+          "expected_improvement": "Feature completeness — enables getrows for I32/BF16 models on SYCL. No performance change for existing types.",
+          "implementation_notes": "1. Add I32 source type: trivial — just cast int32_t to dst_t. No dequantization needed. 2. Add BF16 source type: cast sycl::ext::oneapi::bfloat16 to dst_t. 3. Template the dst pointer type: change float *dst_dd to dst_t *dst_dd throughout k_get_rows, k_get_rows_float, and their dispatchers. 4. Add the two-level type switch in ggml_sycl_op_get_rows matching CUDA's pattern. 5. Guard BF16 with #ifdef GGML_SYCL_HAS_BF16.",
+          "risk": "low",
+          "risk_notes": "I32 and BF16 are simple type conversions. The template change for dst type is mechanical. CUDA implementation serves as reference."
+        },
+        {
+          "id": "opt_011_002",
+          "category": "sub_group_ops",
+          "priority": "medium",
+          "description": "Add [[sycl::reqd_sub_group_size(16)]] to all kernel launches for optimal SIMD width on Xe2. Currently none of the getrows kernel launches specify the required sub-group size. Without this attribute, the compiler may choose SIMD32 on Xe2, halving occupancy for these memory-bound gather/scatter kernels.",
+          "expected_improvement": "5-15% throughput improvement from guaranteed SIMD16 selection, improving occupancy and memory latency hiding.",
+          "implementation_notes": "Add [[sycl::reqd_sub_group_size(16)]] to the lambda in each parallel_for call in get_rows_sycl (line 121), get_rows_sycl_float (line 159), and get_rows_back_sycl_float (line ~183). Three launch sites total.",
+          "risk": "low",
+          "risk_notes": "No sub-group operations are used. Only affects SIMD width selection. No functional impact."
+        },
+        {
+          "id": "opt_011_003",
+          "category": "math_functions",
+          "priority": "medium",
+          "description": "Replace integer % and / for i11/i12 computation with grid-stride loops matching CUDA's pattern. SYCL computes i11 = global_id(0) / ne12 and i12 = global_id(0) % ne12 — expensive integer division on GPU (20-30 cycles per operation). CUDA avoids this by using the 3D grid z-index directly with grid-stride loops and MIN(..., UINT16_MAX) clamping. Adopting CUDA's approach both avoids expensive division AND handles large ne11*ne12 gracefully by clamping the grid and iterating.",
+          "expected_improvement": "5-20% speedup for cases with moderate ne11*ne12 (common in multi-head attention). Saves 40-60 cycles of integer division per thread. Also fixes the potential correctness issue with unclamped grid dimensions for very large ne11*ne12.",
+          "implementation_notes": "1. Clamp grid z-dimension: MIN(ne11*ne12, 65535) as in CUDA. 2. Add grid-stride loop: for (int z = blockIdx.z; z < ne11*ne12; z += gridDim.z) { i11 = z / ne12; i12 = z % ne12; ... }. 3. Similarly clamp grid y-dimension: MIN(block_num_y, 65535) and add grid-stride loop for i00. 4. Pass ne11 as kernel parameter (CUDA does this). 5. Note: the integer division inside the loop still exists in CUDA (with a TODO fastdiv comment) — but the loop only executes 1 iteration for small cases and spreads work evenly for large cases. For a full solution, precompute fastdiv magic numbers for ne12 on the host.",
+          "risk": "low",
+          "risk_notes": "The grid-stride loop pattern is well-established in CUDA and matches the existing CUDA implementation. The grid clamping is a strict improvement for correctness."
+        },
+        {
+          "id": "opt_011_004",
+          "category": "vectorization",
+          "priority": "low",
+          "description": "Add vectorized loads/stores for k_get_rows_float. The float-to-float gather path copies contiguous rows using scalar loads and stores. For aligned contiguous data, sycl::vec<float,4> loads/stores would reduce memory transactions by 4x. The quantized path (k_get_rows) processes 2 elements per thread via dequantize functions which is already somewhat efficient.",
+          "expected_improvement": "10-20% throughput improvement for float/f16 getrows operations. The quantized path benefits less since dequantization is already the bottleneck, not memory access granularity.",
+          "implementation_notes": "For k_get_rows_float: process 4 elements per thread using sycl::vec<float,4> loads from src and stores to dst. Adjust grid size by 4x. Handle tail elements (ne00 % 4 != 0) with scalar fallback. For k_get_rows (quantized): the dequantize functions already output 2 elements per thread, and vectorization would require deeper changes to the dequantize pattern.",
+          "risk": "low",
+          "risk_notes": "Float path vectorization is straightforward for contiguous rows. Need to verify alignment of src0 row pointers (row starts are computed from src0 base + row_index * stride, which should be aligned for float tensors)."
+        },
+        {
+          "id": "opt_011_005",
+          "category": "dpct_cleanup",
+          "priority": "low",
+          "description": "Remove unnecessary dpct::has_capability_or_fail(fp16) check from get_rows_sycl_float (line 156). This check is called unconditionally even when src0_t=float, which doesn't require fp16 capability. The quantized path (get_rows_sycl) does not have this check — the inconsistency suggests this is a DPCT migration artifact. Should be guarded with if constexpr or removed entirely.",
+          "expected_improvement": "Negligible runtime improvement (removes a per-launch device query). Code quality fix for consistency.",
+          "implementation_notes": "Either remove the dpct::has_capability_or_fail block entirely (capability already checked at device init) or guard with: if constexpr (std::is_same_v<src0_t, sycl::half>) { dpct::has_capability_or_fail(...); }. The latter matches the pattern used in rope_multi_sycl and rope_vision_sycl.",
+          "risk": "low",
+          "risk_notes": "Removing a debug capability check. No functional impact."
+        },
+        {
+          "id": "opt_011_006",
+          "category": "dpct_cleanup",
+          "priority": "low",
+          "description": "Convert k_get_rows_back_float from nd_range<3> to nd_range<2>. The backward kernel uses nd_range<3> with dimension 0 always 1 (block_nums = (1, ne1, block_num_x)). Since dim 0 is trivial, this is a minor DPCT artifact that can be simplified to nd_range<2>.",
+          "expected_improvement": "Negligible performance improvement (<2%). Code clarity and consistency.",
+          "implementation_notes": "Change nd_range<3>((1, ne1, block_num_x*256), (1, 1, 256)) to nd_range<2>((ne1, block_num_x*256), (1, 256)). Update kernel to accept nd_item<2> and adjust index computation.",
+          "risk": "low",
+          "risk_notes": "Mechanical refactoring with no algorithmic change."
+        }
+      ],
+      "overall_optimization_potential": "medium",
+      "estimated_current_efficiency": "60-70% — Getrows is a relatively simple gather/scatter kernel. The work-group size (256) is already appropriate and matches CUDA. No SLM or complex reductions are needed. The main issues are: missing type coverage (I32, BF16 src; non-F32 dst), missing grid-stride loops for large batch dimensions, integer div/mod for batch indexing, no vectorization for float paths, and no reqd_sub_group_size. Getrows is not performance-critical compared to mmq/mmvq/dmmv — it is called infrequently for embedding lookups and similar operations."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 10,
+    "total_kernels_analyzed": 11,
     "critical_potential": 1,
     "high_potential": 5,
-    "medium_potential": 4,
+    "medium_potential": 5,
     "low_potential": 0,
     "no_optimization_needed": 0,
     "top_opportunities": [
@@ -1829,6 +1961,20 @@
         "opportunity_id": "opt_010_004",
         "description": "Fix off-by-one boundary check in K-quant kernels — potential out-of-bounds write",
         "priority": "high"
+      },
+      {
+        "kernel_id": "sk_011",
+        "kernel_name": "getrows SYCL kernels",
+        "opportunity_id": "opt_011_001",
+        "description": "Add missing I32/BF16 src0 types + non-F32 dst types to match CUDA type coverage",
+        "priority": "medium"
+      },
+      {
+        "kernel_id": "sk_011",
+        "kernel_name": "getrows SYCL kernels",
+        "opportunity_id": "opt_011_003",
+        "description": "Replace integer div/mod with grid-stride loops — 5-20% speedup + correctness fix for large grids",
+        "priority": "medium"
       }
     ]
   }
