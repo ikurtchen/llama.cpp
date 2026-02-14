@@ -1281,11 +1281,175 @@
       ],
       "overall_optimization_potential": "critical",
       "estimated_current_efficiency": "15-25% \u2014 The MMQ kernel is the most performance-critical kernel in LLM inference (dominating token generation time), yet the SYCL version is severely underperforming: no XMX/tensor core compute (using dp4a at ~1/4 theoretical peak INT8 throughput), hardcoded NVIDIA tile sizes, no stream-K for small batches, suboptimal Y data loading, missing IQ quant types, tile size mismatch bug between dispatch and kernel, and pervasive DPCT artifacts. The missing XMX path alone represents a 3-5x potential improvement."
+    },
+    {
+      "kernel_id": "sk_009",
+      "name": "mmvq (quantized matrix-vector multiply) SYCL kernels",
+      "file": "ggml/src/ggml-sycl/mmvq.cpp",
+      "source_cuda_ids": [
+        "ck_073"
+      ],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": "Non-reorder path: WARP_SIZE (16 on Intel) in dimension 2, GGML_SYCL_MMV_Y (1) in dimension 1 — total work-group size = 16. Reorder path: num_subgroups*WARP_SIZE (16*16=256) in dimension 2, GGML_SYCL_MMV_Y (1) in dimension 1 — total work-group size = 256.",
+          "sub_group_size": 16,
+          "global_size_expression": "Non-reorder: nd_range<3>((1,1,block_num_y) * (1,GGML_SYCL_MMV_Y,WARP_SIZE)) where block_num_y = ceil(nrows/GGML_SYCL_MMV_Y). Reorder: nd_range<3>((1,GGML_SYCL_MMV_Y,block_num_y*WARP_SIZE), (1,GGML_SYCL_MMV_Y,num_subgroups*WARP_SIZE)). One sub-group per row.",
+          "notes": "CRITICAL: Non-reorder path has an effective work-group size of only 16 (1 sub-group). This is catastrophically small for Xe2 — only 1 hardware thread per XVE, minimal latency hiding. CUDA uses 4 warps (nwarps=4, 128 threads total for ncols_dst<=4) to process multiple rows per block and performs inter-warp SLM reduction. The reorder path is much better at 256 threads (16 sub-groups). All non-reorder launches correctly have [[sycl::reqd_sub_group_size(WARP_SIZE)]]. 3D nd_range with dim 0 always 1 (DPCT artifact)."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "strided_accesses": [],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "Adjacent lanes within a sub-group access adjacent quantized blocks along the K dimension — this is coalesced for row-major weight layout. Y data (block_q8_1) is accessed via pointer arithmetic with sequential offsets — coalesced. No sycl::vec usage for loading quantized data. The reorder path uses a custom reordered block layout (get_block_offset, get_d_offset) designed for better memory access patterns on Intel GPUs. Non-reorder path casts vx to block_q_t* with AOS layout, which may cause non-coalesced access for scale/quantized data interleaving in K-quant types."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes": 0,
+          "potential_bank_conflicts": false,
+          "notes": "No SLM usage in any SYCL mmvq kernel. CUDA uses __shared__ tmp_shared[nwarps-1][ncols_dst][rows_per_block][warp_size] for inter-warp partial sum reduction. The SYCL version avoids SLM by using only 1 sub-group per row, but this trades off occupancy for simplicity. The reorder path uses sycl::reduce_over_group which is SLM-free (sub-group shuffle only)."
+        },
+        "reduction_pattern": {
+          "has_reduction": true,
+          "uses_sub_group_reduce": true,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "TWO inconsistent reduction patterns: (1) Reorder path (mul_mat_vec_q_reorder, line 52) correctly uses sycl::reduce_over_group(sub_group, partial_sum, plus<>()) — clean, modern SYCL. (2) Non-reorder path (mul_mat_vec_q + all 9 IQ variants, lines 93-96) uses manual dpct::permute_sub_group_by_xor shuffle reduction — a DPCT migration artifact. The manual reduction is functionally correct but generates more instructions and is harder to maintain. The reorder path is the model for how all kernels should be written."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "FP32 accumulation throughout, which is appropriate for dot product precision. Y data uses block_q8_1 (int8 quantized with half2 scale/min). X data varies by quant type. joint_matrix is not applicable to matvec (it's for matmul tiles)."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [
+            "vec_dot_q*_q8_1 (type-specific dot product functions from vecdotq.hpp)",
+            "reorder_vec_dot_q_sycl (reorder-path dot product from vecdotq.hpp)",
+            "dpct::permute_sub_group_by_xor (sub-group shuffle for reduction)",
+            "sycl::reduce_over_group (reorder path only)"
+          ],
+          "notes": "No transcendental math — purely integer arithmetic (dp4a, bitwise ops, shifts) in the vec_dot functions. The computational core is in vecdotq.hpp which is shared with mmq. The reorder path uses separate vecdotq functions optimized for the reordered memory layout."
+        },
+        "loop_analysis": {
+          "hot_loops": [
+            "Non-reorder outer loop (line 79): for (i = lid/(qi/vdr); i < blocks_per_row; i += blocks_per_warp) — iterates blocks_per_row/blocks_per_warp times",
+            "Non-reorder inner loop (line 84): for (elem = 0; elem < qi/vdr; elem += WARP_SIZE) — typically 0 or 1 iterations since qi/vdr is often <= WARP_SIZE",
+            "Reorder outer loop (line 33): for (i = lid/block_elements_per_subgroup; i < blocks_per_row; i += blocks_per_subgroup) — iterates blocks_per_row/blocks_per_subgroup times",
+            "Reorder inner loop (line 44): #pragma unroll for (elem = 0; elem < block_elements_per_subgroup; elem += WARP_SIZE) — compile-time constant, properly unrolled",
+            "Dispatch loop (line 1062): for (i = 0; i < src1_ncols; i++) — iterates over output columns sequentially on the HOST — one kernel launch per column"
+          ],
+          "unrolled": true,
+          "notes": "The reorder path correctly uses #pragma unroll on its inner loop (line 43). Non-reorder path inner loops lack #pragma unroll but have small trip counts (often 1). The CRITICAL issue is the HOST-side dispatch loop (line 1062) launching one kernel per output column — CUDA processes up to 8 columns per kernel launch using ncols_dst template parameter with shared memory reduction."
+        },
+        "estimated_bottleneck": "memory",
+        "anti_patterns": [
+          "CRITICAL: Host-side column loop (line 1062) launches one kernel per output column — CUDA batches up to 8 columns per launch via ncols_dst template parameter with inter-warp SLM reduction. For batch_size=4, this means 4 separate kernel launches vs CUDA's 1, adding 4x kernel launch overhead and 4x redundant weight reads from global memory",
+          "HIGH: Non-reorder work-group size is only WARP_SIZE (16) — only 1 sub-group per work-group. CUDA uses nwarps=4 (128 threads) for ncols_dst<=4, with SLM-based inter-warp reduction. The tiny work-group means only 1 hardware thread per XVE, providing minimal memory latency hiding. Increasing to 4 sub-groups (64 threads) with sub-group cooperative reduction would improve throughput 2-3x",
+          "HIGH: 11 nearly identical kernel functions — mul_mat_vec_q (generic) + 9 IQ-specific variants (iq2_xxs, iq2_xs, iq2_s, iq3_xxs, iq3_s, iq1_s, iq1_m, iq4_nl, iq4_xs). Each is 40-50 lines of duplicated boilerplate differing only in the vec_dot function called and extra parameters (lookup tables). CUDA unifies ALL quant types into a single kernel using constexpr dispatch. This duplication makes maintenance/optimization very expensive (changes must be replicated 11 times)",
+          "HIGH: 20 nearly identical dispatch functions — one per quant type (mul_mat_vec_q4_0_q8_1_sycl through mul_mat_vec_iq4_xs_q8_1_sycl) + 3 reorder variants. Each is 15-25 lines of identical boilerplate. CUDA has a single mul_mat_vec_q_switch_type dispatcher. This is 400+ lines of pure duplication",
+          "MEDIUM: No GLU/bias fusion — CUDA fuses gate matmul + bias addition + GLU activation (swiglu, geglu, etc.) into the mmvq kernel via the has_fusion template parameter. The SYCL version requires separate kernel launches for gate matmul, bias add, and GLU activation — 3 extra kernel launches and 3 extra global memory round-trips per token generation step for fused models",
+          "MEDIUM: No multi-channel/sample batching — CUDA handles channel_ratio and sample_ratio in a single 3D grid launch using fastdiv for efficient integer division. SYCL dispatches per-column and lacks the stride/channel/sample infrastructure entirely, limiting multi-GPU and batched MoE support",
+          "MEDIUM: IQ kernels use manual dpct shuffle reduction (dpct::permute_sub_group_by_xor) while the reorder kernel uses sycl::reduce_over_group — inconsistent and the dpct path generates worse code",
+          "MEDIUM: Missing rows_per_block optimization — CUDA processes 2 rows per block (rows_per_cuda_block=2) for ncols_dst >= 2, doubling row throughput. SYCL GGML_SYCL_MMV_Y=1 processes only 1 row per work-group, even though the Y dimension of the nd_range is used for rows",
+          "LOW: 3D nd_range<3> with first dim always 1 on all 20+ launch sites (DPCT artifact)",
+          "LOW: dpct::permute_sub_group_by_xor instead of sycl::sub_group::shuffle_xor (DPCT compatibility wrapper)",
+          "LOW: Reorder path GGML_ASSERT(block_num_y % num_subgroups == 0) (lines 542, 767, 811) — will fail if nrows is not a multiple of num_subgroups*GGML_SYCL_MMV_Y (16), causing crashes for models with unusual hidden dimensions"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_009_001",
+          "category": "work_group_size",
+          "priority": "high",
+          "description": "Implement multi-column batching matching CUDA's ncols_dst template parameter. Currently the host dispatch function (ggml_sycl_op_mul_mat_vec_q, line 1062) loops over src1_ncols and launches a separate kernel per column. CUDA batches up to 8 columns per kernel launch using a compile-time ncols_dst parameter, with each warp computing dot products for all ncols_dst columns simultaneously using register-level accumulation (float tmp[ncols_dst][rows_per_block]) and a single SLM-based inter-warp reduction at the end. This eliminates redundant weight reads — the same quantized weight block is dotted with ncols_dst different Y vectors in a single load.",
+          "expected_improvement": "2-4x throughput for small batch sizes (2-8 tokens). For batch_size=4, reduces kernel launches from 4 to 1, eliminates 3 redundant weight reads from global memory (the dominant cost for this memory-bound kernel), and reduces dispatch overhead. Weight matrix memory traffic drops from batch_size * matrix_bytes to 1 * matrix_bytes.",
+          "implementation_notes": "1. Template mul_mat_vec_q on ncols_dst (1-8). 2. Each sub-group accumulates float tmp[ncols_dst] — multiple dot products per weight load. 3. Inner loop: for each kbx, load the weight block once, then dot with ncols_dst Y vectors: for (j=0; j<ncols_dst; j++) tmp[j] += vec_dot(x_block, y[j*stride+kby], iqs). 4. Replace host-side for loop with a switch on src1_ncols dispatching to the correct template instantiation. 5. For ncols_dst >= 2, use nwarps=2 (32 threads) with SLM inter-warp reduction matching CUDA's pattern: __shared__ tmp_shared[nwarps-1][ncols_dst][warp_size]. 6. Apply to both generic and IQ kernel variants.",
+          "risk": "medium",
+          "risk_notes": "Moderate complexity — requires SLM allocation for inter-warp reduction and careful stride management for Y vector offsets. CUDA's implementation is well-tested and can serve as reference. Register pressure increases with ncols_dst but is manageable (8 floats per thread for ncols_dst=8)."
+        },
+        {
+          "id": "opt_009_002",
+          "category": "work_group_size",
+          "priority": "high",
+          "description": "Increase non-reorder work-group size from WARP_SIZE (16) to at least 64 (4 sub-groups) with inter-sub-group cooperative reduction. Currently each non-reorder kernel launch has a work-group of only 16 threads (1 sub-group). On Xe2, this uses only 1 of 8 possible hardware threads per XVE, providing minimal memory latency hiding. CUDA uses nwarps=4 (128 threads) for batch_size <= 4 and nwarps=2 for batch_size 5-8. Increasing to 4 sub-groups (64 threads on Xe2's SIMD16) would allow 4 hardware threads to cooperate on each row, splitting the K-dimension work and reducing per-row latency.",
+          "expected_improvement": "2-3x throughput for the non-reorder path. More hardware threads per work-group improves memory latency hiding (the #1 performance factor for this memory-bound kernel). Combined with multi-column batching, this could yield 4-8x total improvement.",
+          "implementation_notes": "1. Change block_dims from (1, GGML_SYCL_MMV_Y, WARP_SIZE) to (1, GGML_SYCL_MMV_Y, nwarps*WARP_SIZE) where nwarps = 4 for ncols_dst<=4, 2 for ncols_dst 5-8. 2. Each sub-group computes a partial sum over blocks_per_row / nwarps blocks. 3. After the K-loop, write non-leader sub-group partial sums to SLM: float slm[nwarps-1][WARP_SIZE]. 4. Barrier. 5. Leader sub-group reads and accumulates partial sums, then reduces within sub-group. 6. Only thread 0 writes dst[row]. This exactly matches CUDA's multi-warp reduction pattern.",
+          "risk": "low",
+          "risk_notes": "Well-established pattern — matches CUDA's nwarps approach. SLM usage is minimal (< 256 bytes per work-group for nwarps=4). The reorder path already achieves this with 16 sub-groups."
+        },
+        {
+          "id": "opt_009_003",
+          "category": "work_group_size",
+          "priority": "high",
+          "description": "Consolidate 11 nearly identical kernel functions into a single unified template. The generic mul_mat_vec_q and 9 IQ-specific variants (iq2_xxs, iq2_xs, iq2_s, iq3_xxs, iq3_s, iq1_s, iq1_m, iq4_nl, iq4_xs) are each 40-50 lines with identical structure, differing only in the vec_dot function called and extra parameters (lookup table pointers). CUDA unifies everything into a single template using constexpr get_vec_dot_q_cuda(type) dispatch. Similarly, the 20+ dispatch functions are boilerplate copies. This duplication means any optimization (multi-column, multi-warp, etc.) must be replicated 11+20=31 times.",
+          "expected_improvement": "No direct performance improvement — code quality and maintainability. Reduces ~900 lines of kernels + ~500 lines of dispatchers to ~100+50 lines. Makes all other optimizations (multi-column, multi-warp, fusion) far cheaper to implement since they only need to be done once.",
+          "implementation_notes": "1. Create a single template kernel: template<ggml_type type> mul_mat_vec_q_unified(...). 2. Use constexpr switch/if to select vec_dot function, qk, qi, vdr, and any lookup table pointers at compile time. Define a traits struct per quant type following CUDA's pattern. 3. For IQ types that need extra parameters (grid tables, sign tables), pass them as template-selected constexpr pointers. 4. Create a single dispatch function: template<ggml_type type> mul_mat_vec_q_sycl_dispatch(vx, vy, dst, ncols, nrows, stream) that handles all quant types. 5. The dispatch switch in ggml_sycl_op_mul_mat_vec_q (line 1066) remains but each case calls the single template instead of a per-type function.",
+          "risk": "low",
+          "risk_notes": "Pure refactoring. The kernel logic for each quant type is identical — the only variations are in the vec_dot function signature (some pass extra lookup table params). These can be handled with template specialization or constexpr if."
+        },
+        {
+          "id": "opt_009_004",
+          "category": "compute_path",
+          "priority": "medium",
+          "description": "Add GLU fusion support matching CUDA's has_fusion template parameter. CUDA fuses gate matrix multiplication + bias addition + GLU activation (swiglu, geglu, swiglu_oai) into the mmvq kernel. For each row, the kernel simultaneously computes dot(weight, y) and dot(gate, y), applies bias, then applies the GLU activation — all in a single kernel launch with shared Y data. Without fusion, SYCL requires 3+ separate kernel launches (gate mmvq + bias add + GLU), each reading/writing the full output tensor.",
+          "expected_improvement": "30-50% throughput improvement for models using GLU activations (LLaMA, Mistral, Qwen, and most modern LLMs). Eliminates 2+ kernel launches and 4+ extra global memory passes (2 reads + 2 writes for bias and GLU).",
+          "implementation_notes": "1. Add a has_fusion template parameter to mul_mat_vec_q. 2. When has_fusion=true, accept additional parameters: gate pointer, x_bias pointer, gate_bias pointer, glu_op enum. 3. In the K-loop, compute tmp_gate[j] += vec_dot(vgate, y, ...) alongside tmp[j] += vec_dot(vx, y, ...). 4. After reduction, apply: result = tmp + x_bias; gate_val = tmp_gate + gate_bias; result = glu_op(result, gate_val). 5. The gate weight matrix has the same quantization type and layout as the main weight — reuses the same vec_dot functions. 6. Add ggml_cuda_mm_fusion_args equivalent struct for SYCL dispatch. Requires integration with the SYCL backend op dispatch in ggml-sycl.cpp.",
+          "risk": "medium",
+          "risk_notes": "Requires changes to both the kernel and the dispatch layer (ggml-sycl.cpp must detect fusible patterns and pass fusion parameters). Register pressure doubles (accumulating both x and gate results). The CUDA implementation is well-documented and can serve as reference."
+        },
+        {
+          "id": "opt_009_005",
+          "category": "sub_group_ops",
+          "priority": "medium",
+          "description": "Replace manual dpct::permute_sub_group_by_xor shuffle reduction with sycl::reduce_over_group in all non-reorder kernels. The reorder path (mul_mat_vec_q_reorder, line 52) already correctly uses sycl::reduce_over_group(sub_group, partial_sum, plus<>()). But the generic mul_mat_vec_q (lines 93-96) and all 9 IQ variants use a manual 4-step XOR shuffle loop — a DPCT migration artifact that generates suboptimal code. The inconsistency between the two paths means the codebase has two different reduction implementations for the same operation.",
+          "expected_improvement": "5-10% throughput from better code generation. sycl::reduce_over_group gives the compiler full visibility into the reduction pattern, enabling optimal instruction selection (potentially using hardware-native reduction when available). Also eliminates the DPCT dependency on dpct::permute_sub_group_by_xor.",
+          "implementation_notes": "Replace lines 93-96 (and equivalent in all 9 IQ variants) from: #pragma unroll for (int mask = WARP_SIZE/2; mask > 0; mask >>= 1) { tmp += dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), tmp, mask); } if (item_ct1.get_local_id(2) == 0) { dst[row] = tmp; } TO: auto sum = sycl::reduce_over_group(item_ct1.get_sub_group(), tmp, std::plus<>()); if (item_ct1.get_sub_group().leader()) { dst[row] = sum; }",
+          "risk": "low",
+          "risk_notes": "The reorder path already proves sycl::reduce_over_group works correctly for this exact use case. Strictly equivalent functional change."
+        },
+        {
+          "id": "opt_009_006",
+          "category": "work_group_size",
+          "priority": "medium",
+          "description": "Increase GGML_SYCL_MMV_Y from 1 to 2 to process 2 rows per work-group. CUDA uses rows_per_cuda_block=2 for ncols_dst >= 2, amortizing thread setup and reduction overhead across 2 rows. The SYCL work-group Y dimension (GGML_SYCL_MMV_Y) controls how many rows are processed — currently fixed at 1. With GGML_SYCL_MMV_Y=2, each work-group processes 2 adjacent rows, halving the number of work-groups launched (reducing kernel dispatch grid overhead) and improving data locality for weight matrix reads.",
+          "expected_improvement": "10-20% throughput from better row amortization. Each sub-group still processes one row independently, but 2 rows share the same work-group, improving scheduling efficiency and reducing grid overhead. The benefit is larger for small nrows (where grid efficiency matters most).",
+          "implementation_notes": "1. Change GGML_SYCL_MMV_Y from 1 to 2 in presets.hpp (line 61). 2. Verify that block_num_y = ceil(nrows / GGML_SYCL_MMV_Y) correctly handles odd nrows. 3. The kernel already indexes via item.get_local_id(1) for the Y dimension — with GGML_SYCL_MMV_Y=2, two rows are processed per work-group. 4. The early-return guard (if row >= nrows) handles the last work-group when nrows is odd. 5. Note: this effectively doubles the work-group size from 16 to 32 (or 256 to 512 for reorder), which may affect occupancy — benchmark to verify.",
+          "risk": "low",
+          "risk_notes": "The kernel already supports GGML_SYCL_MMV_Y > 1 by design (the row index computation uses local_range(1) and local_id(1)). The only risk is occupancy reduction from doubling work-group size, which should be tested."
+        },
+        {
+          "id": "opt_009_007",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Fix reorder path assertion that block_num_y must be divisible by num_subgroups. Lines 542, 767, and 811 have GGML_ASSERT(block_num_y % num_subgroups == 0) where num_subgroups=16. This means the reorder path crashes if ceil(nrows / GGML_SYCL_MMV_Y) is not divisible by 16. For models with nrows not a multiple of 16 (or 32 with MMV_Y=2), the reorder path cannot be used. CUDA's equivalent code has no such restriction — it simply uses an early-return guard.",
+          "expected_improvement": "Correctness fix — enables the reorder path (which is 2-3x faster than non-reorder) for all model dimensions.",
+          "implementation_notes": "1. Remove the GGML_ASSERT(block_num_y % num_subgroups == 0). 2. Change global_size calculation from block_num_y * WARP_SIZE to ceil_div(block_num_y, num_subgroups) * num_subgroups * WARP_SIZE (pad the grid up to a multiple of the work-group size). 3. The kernel already has if (row >= nrows) return guard (line 20), so excess work-items safely exit. 4. This is the same approach used by the non-reorder path and by CUDA.",
+          "risk": "low",
+          "risk_notes": "The kernel already handles excess rows via early return. Padding the grid is standard practice."
+        },
+        {
+          "id": "opt_009_008",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Clean up DPCT artifacts: convert 3D nd_range to 2D (dim 0 is always 1), replace dpct::permute_sub_group_by_xor with sycl::sub_group shuffle (covered by opt_009_005), replace item_ct1 naming with item, replace get_local_id(2)/get_group(2) with get_local_id(0)/get_group(0) after ndim reduction.",
+          "expected_improvement": "No performance impact — code quality. Simplifies 20+ kernel launches and 10+ kernel functions.",
+          "implementation_notes": "Mechanical search-and-replace across mmvq.cpp. The 3D -> 2D conversion changes nd_range<3>((1,Y,X), (1,Y,X)) to nd_range<2>((Y,X), (Y,X)) and nd_item<3> to nd_item<2>.",
+          "risk": "low",
+          "risk_notes": "Purely mechanical refactoring. No algorithmic changes."
+        }
+      ],
+      "overall_optimization_potential": "high",
+      "estimated_current_efficiency": "25-35% — The mmvq kernel is the most performance-critical kernel for single-token generation (autoregressive decode), yet the SYCL version has several major gaps vs CUDA: (1) one kernel launch per output column instead of batching up to 8, causing redundant weight reads; (2) work-group size of only 16 threads for the non-reorder path (CUDA uses 128), providing minimal memory latency hiding; (3) no GLU fusion, requiring 3+ extra kernel launches for GLU models; (4) massive code duplication across 31 functions making optimization expensive. The reorder path (available for Q4_0, Q4_K, Q6_K) is much better designed — 256 threads, sycl::reduce_over_group, proper unrolling — but only covers 3 of 20 quant types. The non-reorder path serving the other 17 quant types is severely underperforming."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 7,
-    "high_potential": 3,
+    "total_kernels_analyzed": 9,
+    "critical_potential": 1,
+    "high_potential": 4,
     "medium_potential": 4,
     "low_potential": 0,
     "no_optimization_needed": 0,
@@ -1414,6 +1578,55 @@
         "kernel_name": "cpy SYCL kernels",
         "opportunity_id": "opt_007_003",
         "description": "Add contiguous fast-path for mixed-type copies \u2014 40-60% speedup by eliminating needless 4D index decomposition",
+        "priority": "high"
+      },
+      {
+        "kernel_id": "sk_008",
+        "kernel_name": "mmq SYCL kernels",
+        "opportunity_id": "opt_008_001",
+        "description": "Implement Intel XMX compute path using SYCL joint_matrix \u2014 3-5x throughput improvement for quantized matmul",
+        "priority": "critical"
+      },
+      {
+        "kernel_id": "sk_008",
+        "kernel_name": "mmq SYCL kernels",
+        "opportunity_id": "opt_008_002",
+        "description": "Fix tile size mismatch bug between dispatch and kernel \u2014 correctness/performance fix",
+        "priority": "high"
+      },
+      {
+        "kernel_id": "sk_008",
+        "kernel_name": "mmq SYCL kernels",
+        "opportunity_id": "opt_008_003",
+        "description": "Tune tile sizes for Intel Xe2 architecture \u2014 15-40% improvement from proper SLM/SIMD/register sizing",
+        "priority": "high"
+      },
+      {
+        "kernel_id": "sk_008",
+        "kernel_name": "mmq SYCL kernels",
+        "opportunity_id": "opt_008_004",
+        "description": "Add stream-K work distribution \u2014 15-40% improvement for small-batch/large-K problems",
+        "priority": "high"
+      },
+      {
+        "kernel_id": "sk_009",
+        "kernel_name": "mmvq SYCL kernels",
+        "opportunity_id": "opt_009_001",
+        "description": "Implement multi-column batching \u2014 up to 4x reduction in kernel launches and redundant weight reads",
+        "priority": "high"
+      },
+      {
+        "kernel_id": "sk_009",
+        "kernel_name": "mmvq SYCL kernels",
+        "opportunity_id": "opt_009_002",
+        "description": "Increase non-reorder work-group size from 16 to 64+ \u2014 2-3x throughput from better memory latency hiding",
+        "priority": "high"
+      },
+      {
+        "kernel_id": "sk_009",
+        "kernel_name": "mmvq SYCL kernels",
+        "opportunity_id": "opt_009_003",
+        "description": "Consolidate 31 duplicated functions into unified template \u2014 maintenance/optimization cost reduction",
         "priority": "high"
       }
     ]

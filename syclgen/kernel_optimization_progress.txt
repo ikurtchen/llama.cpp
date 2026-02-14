@@ -5,9 +5,9 @@
 
 ## Summary
 - Total SYCL kernels to analyze: 13
-- Kernels analyzed so far: 8
+- Kernels analyzed so far: 9
 - Analysis complete: No
-- Kernels with optimization potential: 8
+- Kernels with optimization potential: 9
 - Optimization tasks created: 0 (pending finalization)
 
 ## Kernels Analyzed
@@ -19,13 +19,22 @@
 - [x] sk_006: binbcast SYCL kernels — medium potential (6 optimization opportunities)
 - [x] sk_007: cpy SYCL kernels — high potential (8 optimization opportunities)
 - [x] sk_008: mmq SYCL kernels — critical potential (9 optimization opportunities)
-- [ ] sk_009: mmvq SYCL kernels — pending
+- [x] sk_009: mmvq SYCL kernels — high potential (8 optimization opportunities)
 - [ ] sk_010: dmmv SYCL kernels — pending
 - [ ] sk_011: getrows SYCL kernels — pending
 - [ ] sk_012: wkv SYCL kernels — pending
 - [ ] sk_013: gla SYCL kernel — pending
 
 ## Recent Activity
+[2026-02-14] Analyzed kernel mmvq (quantized matrix-vector multiply) SYCL kernels (sk_009). Found 8 optimization opportunities (high potential).
+  - HIGH: One kernel launch per output column — CUDA batches up to 8, causing 4x redundant weight reads
+  - HIGH: Non-reorder work-group size only 16 (CUDA uses 128) — minimal memory latency hiding
+  - HIGH: 31 duplicated functions (11 kernels + 20 dispatchers) — should be unified template
+  - MEDIUM: No GLU/bias fusion — CUDA fuses gate matmul + bias + activation into single kernel
+  - MEDIUM: Inconsistent reduction patterns — reorder uses reduce_over_group, non-reorder uses dpct shuffle
+  - MEDIUM: GGML_SYCL_MMV_Y=1 vs CUDA rows_per_block=2 — half the row throughput
+  - LOW: DPCT artifacts, reorder path assertion crash risk for unusual model dimensions
+
 [2026-02-14] Analyzed kernel mmq (quantized matrix multiply) SYCL kernels (sk_008). Found 9 optimization opportunities (critical potential).
   - CRITICAL: No XMX/tensor core compute path — SYCL_USE_XMX only changes tile sizes, not computation. joint_matrix completely unused. 3-5x potential.
   - HIGH: Tile size mismatch bug — dispatch selects sizes by compute_capability but kernels hardcoded to AMPERE constants
