@@ -576,12 +576,155 @@
       ],
       "overall_optimization_potential": "medium",
       "estimated_current_efficiency": "60-70% — Element-wise kernels are simple and already reasonably well-implemented. The main performance wins come from vectorized loads (2-4x memory throughput for bandwidth-bound ops) and consistent native math usage (2-4x faster transcendentals for compute-bound ops like gelu/silu). Code quality improvements (GLU dedup, DPCT cleanup) are beneficial but don't affect performance significantly."
+    },
+    {
+      "kernel_id": "sk_005",
+      "name": "convert (dequantize) SYCL kernels",
+      "file": "ggml/src/ggml-sycl/convert.cpp",
+      "related_files": ["ggml/src/ggml-sycl/dequantize.hpp"],
+      "source_cuda_ids": ["ck_015"],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": "256 for generic dequantize_block and convert_unary; 32 for Q4_0/Q4_1/Q4_K/IQ*/MXFP4 specialized kernels; 64 for Q2_K/Q3_K/Q5_K/Q6_K; WARP_SIZE for q4_0_reorder",
+          "sub_group_size": "Only q4_0_reorder specifies [[sycl::reqd_sub_group_size(WARP_SIZE)]]; all others have no sub-group size attribute",
+          "global_size_expression": "Generic: ceil_div(k, 2*256) work-groups; K-quant/IQ: k/QK_K work-groups; convert_unary_nc: 3D grid (ne02*ne03, ne01, ceil_div(ne00, 256))",
+          "notes": "All kernels use nd_range<3> with dimensions 0 and 1 set to 1 (except convert_unary_nc which uses all 3 dimensions). Small work-group sizes (32) for specialized quant kernels are dictated by the per-block element count (QK_K=256, 32 threads handle 256/32=8 elements each). The generic dequantize_block uses SYCL_DEQUANTIZE_BLOCK_SIZE=256 matching CUDA's CUDA_DEQUANTIZE_BLOCK_SIZE=256."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "strided_accesses": ["Generic dequantize_block writes to y[iybs + iqs] and y[iybs + iqs + y_offset] with y_offset=qk/2 for qr>1 — strided writes for interleaved quant formats"],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "All dequantize kernels process 2 output elements per thread (via dfloat2/float2). Reads from quantized blocks are coalesced within sub-groups (consecutive threads read consecutive quant indices). Writes are coalesced for qr==1 types but strided by qk/2 for qr>1 types. The reorder variants (q4_0_reorder, q4_K_reorder, q6_K_reorder) use separated d/qs memory layout for better access patterns. No sycl::vec loads used anywhere."
+        },
+        "slm_usage": {
+          "uses_slm": true,
+          "slm_bytes": "Q4_K and Q4_K_reorder: 12 bytes (scale_local_acc for scale unpacking)",
+          "potential_bank_conflicts": false,
+          "notes": "Only Q4_K variants use SLM (12 bytes for scale buffer). All other dequantize kernels are SLM-free. The CUDA version accesses scales directly from device memory (no shared memory) — the SYCL version added SLM for better locality on Intel GPUs."
+        },
+        "reduction_pattern": {
+          "has_reduction": false,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "No reductions — each thread independently dequantizes a fixed subset of elements from one quantization block."
+        },
+        "data_types": {
+          "compute_type": "float (or sycl::half when GGML_SYCL_F16 defined)",
+          "could_use_half": true,
+          "could_use_joint_matrix": false,
+          "notes": "The dequantize kernels use dfloat2 which is sycl::half2 when GGML_SYCL_F16 is defined, otherwise sycl::float2. When targeting fp16 output, computing in half avoids fp32→fp16 conversion overhead. CUDA has a heavily optimized Q8_0→FP16 kernel using half2 arithmetic and shared memory (dequantize_block_q8_0_f16) that SYCL lacks entirely."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [],
+          "notes": "Dequantize kernels use no transcendental math — only integer bit manipulation, multiplies, and adds. No optimization opportunities for native math."
+        },
+        "loop_analysis": {
+          "hot_loops": [
+            "convert_unary_nc: loop over i00 with stride work_group_size * num_groups (line 503) — handles large ne00 that exceeds max SYCL global range",
+            "Specialized Q4_0/Q4_1 kernels: implicit loops (each thread handles 8 quantization blocks × 32 elements)"
+          ],
+          "unrolled": true,
+          "notes": "convert_unary_nc has #pragma unroll on its loop. Specialized kernels have compile-time-known iteration counts enabling auto-unrolling. Generic dequantize_block has no loops (2 elements per thread, one-shot)."
+        },
+        "estimated_bottleneck": "memory",
+        "anti_patterns": [
+          "Generic dequantize_block is contiguous-only (flat k parameter) — CUDA's generic version supports non-contiguous tensors natively via stride parameters (ne00/ne01/ne02/s01/s02/s03)",
+          "All non-reorder kernels use nd_range<3> with dimensions 0,1 = 1 — DPCT artifact, should use nd_range<1>",
+          "Missing optimized Q8_0→FP16 kernel — CUDA has dequantize_block_q8_0_f16 with shared memory and half2 arithmetic for 2-3x speedup",
+          "dpct::has_capability_or_fail(fp16) called unconditionally on every launch — wastes time on capability query per kernel dispatch",
+          "__dpct_inline__ artifacts in dequantize.hpp kernel functions",
+          "Non-contiguous (NC) support gap: SYCL only has fp16 NC output via convert_unary_nc_sycl for F32/BF16 input; CUDA has NC variants for all basic quant types (Q4_0, Q4_1, Q5_0, Q5_1, Q8_0) and all output types (fp16, fp32, bf16)",
+          "Missing to_bf16_sycl_t typedef and to_fp32_nc_sycl_t, to_bf16_nc_sycl_t dispatch functions",
+          "Generic dequantize_block processes only 2 elements per thread — could process more to amortize thread launch overhead",
+          "convert_unary_nc_sycl has global range downsample workaround (downsample_sycl_global_range) adding complexity — SYCL limitation for large tensor dimensions",
+          "Missing [[sycl::reqd_sub_group_size]] on all kernels except q4_0_reorder — may cause suboptimal SIMD width on Xe2"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_005_001",
+          "category": "work_group_size",
+          "priority": "high",
+          "description": "Implement optimized Q8_0→FP16 dequantize kernel matching CUDA's dequantize_block_q8_0_f16. CUDA has a heavily optimized kernel that uses shared memory to load entire Q8_0 blocks, then dequantizes using half2 arithmetic with 2048-element alignment. The SYCL version uses the generic scalar dequantize_block path which processes only 2 elements per thread. Q8_0 is the most common intermediate quantization format used during inference (activations are often Q8_0 quantized for GEMM).",
+          "expected_improvement": "2-3x speedup for Q8_0→FP16 dequantization. The CUDA optimized kernel uses shared memory for coalesced reads, half2 vectorized arithmetic, and processes 2048 elements per block vs the generic kernel's 512 elements per block (256 threads × 2 elements).",
+          "implementation_notes": "Port CUDA's dequantize_block_q8_0_f16 to SYCL: (1) Allocate SLM buffer of size (CUDA_Q8_0_NE_ALIGN/sizeof(int) + WARP_SIZE) × sizeof(int). (2) Cooperatively load Q8_0 blocks into SLM using coalesced reads. (3) Barrier. (4) Each thread reads d (scale) and qs (quantized values) from SLM, dequantizes using sycl::half2 multiply. (5) Use [[sycl::reqd_sub_group_size(WARP_SIZE)]]. Need to handle tail blocks with need_check template parameter. Register the optimized kernel in ggml_get_to_fp16_sycl for GGML_TYPE_Q8_0.",
+          "risk": "medium",
+          "risk_notes": "Shared memory staging pattern is well-understood. The half2 arithmetic requires SYCL fp16 support which is already used elsewhere. Need alignment handling for non-2048-aligned element counts."
+        },
+        {
+          "id": "opt_005_002",
+          "category": "sub_group_ops",
+          "priority": "medium",
+          "description": "Add [[sycl::reqd_sub_group_size(WARP_SIZE)]] to all dequantize kernel launch paths. Currently only q4_0_reorder has this attribute (line 148). All other kernels (~20 launch sites) lack it, which may cause the compiler to select SIMD32 instead of SIMD16 on Xe2, halving occupancy. The dequantize kernels don't use sub-group operations explicitly, but specifying the native SIMD width ensures optimal register allocation and occupancy.",
+          "expected_improvement": "5-15% throughput improvement from better occupancy. Without the attribute, Xe2 may use SIMD32 (2 elements per hardware thread) instead of SIMD16, reducing the number of hardware threads per XVE and worsening latency hiding for these memory-bound kernels.",
+          "implementation_notes": "Add [[sycl::reqd_sub_group_size(WARP_SIZE)]] to the lambda in every parallel_for call in convert.cpp. There are approximately 20 launch sites. This is a mechanical change with no algorithmic impact.",
+          "risk": "low",
+          "risk_notes": "No sub-group operations are used, so this only affects SIMD width selection. No functional impact. Already proven working on q4_0_reorder."
+        },
+        {
+          "id": "opt_005_003",
+          "category": "vectorization",
+          "priority": "medium",
+          "description": "Support non-contiguous (NC) dequantization for quantized types in SYCL. CUDA's generic dequantize_block natively supports NC tensors via stride parameters (ne00/ne01/ne02/s01/s02/s03) and 3D grid indexing. SYCL's generic dequantize_block only supports contiguous tensors (flat k parameter). SYCL's NC support is limited to convert_unary_nc_sycl which only handles F32/BF16→FP16 conversion. This means quantized tensor reshaping or non-contiguous views must materialize contiguous copies before dequantization on SYCL.",
+          "expected_improvement": "Eliminates extra copy operations for non-contiguous quantized tensors — up to 2x speedup for those paths by avoiding the contiguity materialization step. Also enables new dispatch paths (get_to_fp32_nc_sycl, get_to_bf16_nc_sycl) matching CUDA's API surface.",
+          "implementation_notes": "Modify dequantize_block to accept ne00/ne01/ne02/s01/s02/s03 stride parameters matching CUDA's version. Use 3D nd_range for the NC path: grid = (ceil_div(ne00, 2*block_size), ne01, ne02*ne03). Compute source offset as i03*s03 + i02*s02 + i01*s01 + i00/qk. Compute dest offset as ((i03*ne02 + i02)*ne01 + i01)*ne00 + iybs + iqs. Add dispatch functions get_to_fp32_nc_sycl, get_to_bf16_nc_sycl, and extend get_to_fp16_nc_sycl to support quantized input types.",
+          "risk": "medium",
+          "risk_notes": "Multi-dimensional indexing must be carefully mapped. The CUDA version is proven correct and can serve as reference. Need to handle the downsample_sycl_global_range workaround for large tensor dimensions."
+        },
+        {
+          "id": "opt_005_004",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Remove unconditional dpct::has_capability_or_fail(fp16) checks from all dequantize launch functions. These capability queries are called on every kernel dispatch, adding microseconds of overhead per launch. The fp16 capability should be checked once at device initialization, not per-dispatch. Most dequantize kernels don't even require fp16 capability (they output float).",
+          "expected_improvement": "Reduces per-dispatch latency by ~1-5 microseconds. For batched inference with many small dequantize calls, this adds up. More importantly, this is incorrect for float output — the fp16 check is a DPCT artifact that doesn't apply to fp32 dequantization.",
+          "implementation_notes": "Remove all dpct::has_capability_or_fail blocks from convert.cpp. If fp16 validation is needed, do it once in the SYCL device initialization path (ggml-sycl.cpp). Alternatively, guard with if constexpr (std::is_same_v<dst_t, sycl::half>) to only check when actually outputting fp16.",
+          "risk": "low",
+          "risk_notes": "Removing a debug check. The capability is already validated at device selection time. No functional impact."
+        },
+        {
+          "id": "opt_005_005",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Convert all 1D-like dequantize kernel launches from nd_range<3> to nd_range<1>. All specialized kernels (Q2_K through MXFP4 and generic dequantize_block) use nd_range<3>(range<3>(1,1,N), range<3>(1,1,WG)) which is a DPCT migration artifact. The kernels only use dimension 2 for thread indexing. Converting to nd_range<1> simplifies the code and removes trivial dimensions.",
+          "expected_improvement": "Negligible performance impact (<2%). Code clarity and maintainability improvement. Also enables using nd_item<1> which simplifies thread index computation.",
+          "implementation_notes": "Change nd_range<3>(range<3>(1,1,N*WG), range<3>(1,1,WG)) to nd_range<1>(N*WG, WG) for all ~20 launch sites. Update kernel functions to accept nd_item<1> instead of nd_item<3>. Change item.get_local_id(2) to item.get_local_id(0) etc.",
+          "risk": "low",
+          "risk_notes": "Mechanical refactoring. Keep convert_unary_nc as nd_range<3> since it genuinely uses 3 dimensions."
+        },
+        {
+          "id": "opt_005_006",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Clean up __dpct_inline__ artifacts in dequantize.hpp. Replace all instances with standard C++ inline keyword or remove entirely. These are DPCT migration artifacts that reduce code portability.",
+          "expected_improvement": "No performance impact — code quality fix for portability and readability.",
+          "implementation_notes": "Replace all __dpct_inline__ with inline in dequantize.hpp. The functions are small enough that the compiler will inline them regardless of the attribute.",
+          "risk": "low",
+          "risk_notes": "Mechanical cleanup with no functional changes."
+        },
+        {
+          "id": "opt_005_007",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Add BF16 output support as a first-class type. CUDA has a dedicated to_bf16_cuda_t typedef and to_bf16_nc_cuda_t dispatch functions. SYCL conditionally supports BF16 via #ifdef GGML_SYCL_HAS_BF16 but lacks a dedicated typedef and nc dispatch. This limits BF16 model support on Intel GPUs which natively support BF16.",
+          "expected_improvement": "Feature completeness — no performance impact for existing paths. Enables BF16 model inference pipelines on SYCL.",
+          "implementation_notes": "Add to_bf16_sycl_t typedef in convert.hpp. Add ggml_get_to_bf16_sycl dispatch function in convert.cpp. Add get_to_bf16_nc_sycl for non-contiguous BF16 output. Ensure GGML_SYCL_HAS_BF16 guard is applied consistently.",
+          "risk": "low",
+          "risk_notes": "Straightforward type extension. BF16 support is already partially implemented."
+        }
+      ],
+      "overall_optimization_potential": "medium",
+      "estimated_current_efficiency": "55-65% — Dequantize kernels are memory-bound and reasonably well-implemented for most quant types. The main gap is the missing optimized Q8_0→FP16 kernel (CUDA has a 2-3x faster variant). Missing sub-group size attributes hurt occupancy. NC support gap forces extra copies for non-contiguous quantized tensors. The reorder variants (q4_0, q4_K, q6_K) are SYCL-specific optimizations that are ahead of CUDA."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 4,
+    "total_kernels_analyzed": 5,
     "high_potential": 2,
-    "medium_potential": 2,
+    "medium_potential": 3,
     "low_potential": 0,
     "no_optimization_needed": 0,
     "top_opportunities": [
@@ -667,6 +810,20 @@
         "kernel_name": "element_wise SYCL kernels",
         "opportunity_id": "opt_004_002",
         "description": "Use native math consistently for all transcendentals — 10-30% speedup for compute-bound ops",
+        "priority": "medium"
+      },
+      {
+        "kernel_id": "sk_005",
+        "kernel_name": "convert (dequantize) SYCL kernels",
+        "opportunity_id": "opt_005_001",
+        "description": "Implement optimized Q8_0→FP16 kernel with SLM and half2 — 2-3x speedup for Q8_0 dequant",
+        "priority": "high"
+      },
+      {
+        "kernel_id": "sk_005",
+        "kernel_name": "convert (dequantize) SYCL kernels",
+        "opportunity_id": "opt_005_002",
+        "description": "Add reqd_sub_group_size to all dequantize kernels — 5-15% occupancy improvement",
         "priority": "medium"
       }
     ]

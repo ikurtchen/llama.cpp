@@ -5,9 +5,9 @@
 
 ## Summary
 - Total SYCL kernels to analyze: 13
-- Kernels analyzed so far: 4
+- Kernels analyzed so far: 5
 - Analysis complete: No
-- Kernels with optimization potential: 4
+- Kernels with optimization potential: 5
 - Optimization tasks created: 0 (pending finalization)
 
 ## Kernels Analyzed
@@ -15,7 +15,7 @@
 - [x] sk_002: rope SYCL kernels — medium potential (5 optimization opportunities)
 - [x] sk_003: norm SYCL kernels — high potential (9 optimization opportunities)
 - [x] sk_004: element_wise SYCL kernels — medium potential (8 optimization opportunities)
-- [ ] sk_005: convert SYCL kernels — pending
+- [x] sk_005: convert SYCL kernels — medium potential (7 optimization opportunities)
 - [ ] sk_006: binbcast SYCL kernels — pending
 - [ ] sk_007: cpy SYCL kernels — pending
 - [ ] sk_008: mmq SYCL kernels — pending
@@ -26,6 +26,12 @@
 - [ ] sk_013: gla SYCL kernel — pending
 
 ## Recent Activity
+[2026-02-14] Analyzed kernel convert (dequantize) SYCL kernels (sk_005). Found 7 optimization opportunities (medium potential).
+  - HIGH: Missing optimized Q8_0→FP16 kernel — CUDA has dequantize_block_q8_0_f16 with SLM+half2 for 2-3x speedup
+  - MEDIUM: Missing reqd_sub_group_size on all kernels except q4_0_reorder — 5-15% occupancy loss
+  - MEDIUM: Non-contiguous (NC) dequantize gap — SYCL only supports F32/BF16→FP16 NC, CUDA supports all basic quant types
+  - LOW: DPCT artifacts (nd_range<3>, has_capability_or_fail, __dpct_inline__), missing BF16 first-class support
+
 [2026-02-14] Analyzed kernel element_wise SYCL kernels (sk_004). Found 8 optimization opportunities (medium potential).
   - MEDIUM: All ops use scalar loads — vec4 vectorization would improve memory throughput 20-40%
   - MEDIUM: Inconsistent native math — silu/sigmoid use native::exp but gelu/exp/sin/cos/log use standard versions
