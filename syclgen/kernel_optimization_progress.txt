@@ -5,14 +5,14 @@
 
 ## Summary
 - Total SYCL kernels to analyze: 13
-- Kernels analyzed so far: 1
+- Kernels analyzed so far: 2
 - Analysis complete: No
-- Kernels with optimization potential: 1
+- Kernels with optimization potential: 2
 - Optimization tasks created: 0 (pending finalization)
 
 ## Kernels Analyzed
 - [x] sk_001: softmax SYCL kernels — high potential (6 optimization opportunities)
-- [ ] sk_002: rope SYCL kernels — pending
+- [x] sk_002: rope SYCL kernels — medium potential (5 optimization opportunities)
 - [ ] sk_003: norm SYCL kernels — pending
 - [ ] sk_004: element_wise SYCL kernels — pending
 - [ ] sk_005: convert SYCL kernels — pending
@@ -26,6 +26,13 @@
 - [ ] sk_013: gla SYCL kernel — pending
 
 ## Recent Activity
+[2026-02-14] Analyzed kernel rope SYCL kernels (sk_002). Found 5 optimization opportunities (medium potential).
+  - HIGH: Use sycl::native::cos/sin instead of standard versions — 15-30% speedup on Xe2
+  - HIGH: Replace sycl::pow with native::exp2(log2()*...) — 10-20% speedup
+  - MEDIUM: Add [[sycl::reqd_sub_group_size(16)]] to all 8 launch paths — 5-15% occupancy improvement
+  - LOW: Simplify 3D nd_range to 2D (DPCT artifact cleanup)
+  - LOW: Clean up manual thread indexing, remove DPCT artifacts
+
 [2026-02-14] Analyzed kernel softmax SYCL kernels (sk_001). Found 6 optimization opportunities (high potential).
   - CRITICAL: Missing [[sycl::reqd_sub_group_size(WARP_SIZE)]] on 2 kernel launch paths — correctness risk
   - HIGH: Manual SLM block reduction with 5 barriers can be replaced with sycl::reduce_over_group

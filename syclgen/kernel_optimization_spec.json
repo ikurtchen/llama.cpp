@@ -145,12 +145,127 @@
       ],
       "overall_optimization_potential": "high",
       "estimated_current_efficiency": "40-50% — softmax is memory-bound and the current implementation wastes bandwidth through scalar accesses and has excessive barrier overhead from the manual block reduction pattern. The missing sub-group size attributes are a correctness concern."
+    },
+    {
+      "kernel_id": "sk_002",
+      "name": "rope SYCL kernels",
+      "file": "ggml/src/ggml-sycl/rope.cpp",
+      "source_cuda_ids": ["ck_089", "ck_090", "ck_091", "ck_092"],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": [256, 1, 1],
+          "sub_group_size": null,
+          "global_size_expression": "ceil_div(ne0, 2*256) work-groups × nr rows; each thread handles one (x0, x1) rotation pair",
+          "notes": "All 4 kernels (rope_norm, rope_neox, rope_multi, rope_vision) use 3D nd_range with SYCL_ROPE_BLOCK_SIZE=256 in dimension 1 only, dimensions 0 and 2 are (1, nr). Missing [[sycl::reqd_sub_group_size(16)]] on all 8 kernel launch paths (lines 251, 261, 283, 288, 314, 319, 349, 354). Without this attribute, the compiler may choose sub-group size 32 instead of the native SIMD16 for Xe2."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "strided_accesses": ["rope_neox: reads x[i2+0] and x[i2+n_dims/2] — strided by n_dims/2 (inherent to NeoX half-rotate algorithm)", "rope_multi: same n_dims/2 stride pattern", "rope_vision: reads x[ix+0] and x[ix+n_dims] — strided by n_dims"],
+          "vectorized_loads": true,
+          "vector_width": 2,
+          "notes": "Within the primary dimension (local_id(1)), adjacent threads access adjacent pairs of elements (i0 = 2*thread_id), so coalesced within a sub-group. sycl::vec<T,2> is used for the passthrough path (lines 61, 101, 140) when i0 >= n_dims, but the HOT rotation computation path uses scalar loads/stores only (lines 74-78, 114-118, 179-184, 223-228). The strided access patterns in neox/multi/vision are algorithmic — they read two halves of the rotation domain that are n_dims/2 apart."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes": 0,
+          "potential_bank_conflicts": false,
+          "notes": "No SLM usage. RoPE is purely element-wise with no data sharing between threads. This is correct."
+        },
+        "reduction_pattern": {
+          "has_reduction": false,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "No reductions needed — each thread independently computes one rotation pair."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "All computation is FP32 regardless of input type T. This is appropriate — RoPE involves sin/cos which need FP32 precision. Input is implicitly cast from T to float for computation, results cast back to T for output. Template supports both float and sycl::half inputs."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": ["sycl::cos (line 34)", "sycl::sin (line 35)", "sycl::pow (lines 65, 105, 152-172, 212, 216)", "sycl::log (line 32)", "sycl::max/sycl::min (lines 14-15)"],
+          "notes": "All math functions use standard (full-precision) SYCL versions, NOT sycl::native variants. sycl::pow is called on every thread in the hot path and is the most expensive operation. On Xe2, native::cos and native::sin are ~2-4x faster than standard versions. sycl::pow(base, exp) can be replaced with sycl::native::exp2(sycl::native::log2(base) * exp) for significant speedup. The CUDA version uses cosf/sinf/powf which are already the fast-math equivalents."
+        },
+        "loop_analysis": {
+          "hot_loops": [],
+          "unrolled": false,
+          "notes": "No loops in any kernel. Each thread computes exactly one (x0, x1) rotation pair and returns. rope_multi has an 8-way branch (lines 150-173) for sector-based theta computation, but this is not a loop. No unrolling opportunities."
+        },
+        "estimated_bottleneck": "compute",
+        "anti_patterns": [
+          "Missing [[sycl::reqd_sub_group_size(16)]] on all 8 kernel launch paths — suboptimal SIMD width selection on Xe2",
+          "3D nd_range with dimension 0 always 1 — DPCT artifact, should be 2D (lines 237-239, 274-276, 302-305, 337-340)",
+          "Manual thread indexing (local_range*group+local_id) instead of get_global_id() at lines 46, 52, 86, 92, 128, 132, 196, 200",
+          "Unconditional dpct::has_capability_or_fail(fp16) check in rope_norm_sycl and rope_neox_sycl even when T=float (lines 243, 280) — wastes time on device capability query per launch. rope_multi_sycl and rope_vision_sycl correctly guard with if constexpr",
+          "Uses standard sycl::cos/sin/pow instead of sycl::native equivalents — significant compute waste on Xe2 for these throughput-bound trig operations",
+          "DPCT migration comments still present (lines 246-250, 256-259)"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_002_001",
+          "category": "math_functions",
+          "priority": "high",
+          "description": "Replace sycl::cos and sycl::sin with sycl::native::cos and sycl::native::sin in the rope_yarn function (lines 34-35). These are called for every rotation pair in every RoPE variant. On Xe2, native trig functions are ~2-4x faster than standard precision versions. RoPE precision requirements (position encoding) are well within the accuracy of Intel's native sin/cos implementation (~1 ULP). The CUDA version uses cosf/sinf which are already the reduced-precision equivalents.",
+          "expected_improvement": "15-30% overall kernel speedup. RoPE is compute-bound (sin/cos/pow dominate), and the trig calls are the primary bottleneck. Native versions reduce trig cost by 2-4x.",
+          "implementation_notes": "In rope_yarn() at lines 34-35 of rope.cpp, change: cos_theta = sycl::native::cos(theta); sin_theta = sycl::native::sin(theta); Alternatively, use sycl::sincos() or native::sincos() if available for a single fused call. Ref: optimization_guide.md section 3.2.",
+          "risk": "low",
+          "risk_notes": "Intel native sin/cos on Xe2 provides ~1 ULP accuracy which is sufficient for position embeddings. The CUDA version already uses equivalent fast-math functions."
+        },
+        {
+          "id": "opt_002_002",
+          "category": "math_functions",
+          "priority": "high",
+          "description": "Replace sycl::pow(theta_scale, i0/2.0f) with sycl::native::exp2(sycl::native::log2(theta_scale) * (i0/2.0f)) in all four kernel variants. sycl::pow is an expensive multi-cycle operation. The exp2/log2 decomposition is mathematically equivalent and maps to faster hardware instructions on Xe2. The log2(theta_scale) term is constant per-kernel-invocation and could be precomputed on the host, reducing it to a single native::exp2 call per thread.",
+          "expected_improvement": "10-20% overall kernel speedup. sycl::pow is one of the most expensive operations per thread, called at lines 65, 105, 152-172 (8 branches in rope_multi), 212, 216.",
+          "implementation_notes": "1. Precompute log2_theta_scale = log2f(theta_scale) on the host side in the launcher functions (rope_norm_sycl etc.) and pass as kernel argument. 2. In each kernel, replace sycl::pow(theta_scale, (float)i0/2) with sycl::native::exp2(log2_theta_scale * (float)i0 * 0.5f). For rope_multi, the theta_scale power is used in all 8 sector branches — precomputing log2_theta_scale eliminates redundant work. Ref: optimization_guide.md section 3.2.",
+          "risk": "low",
+          "risk_notes": "Mathematically equivalent transformation. The precomputed log2 value is exact for power-of-2 theta_scales (common case). For non-power-of-2 values, the error is within 1-2 ULP which is negligible for position embeddings."
+        },
+        {
+          "id": "opt_002_003",
+          "category": "sub_group_ops",
+          "priority": "medium",
+          "description": "Add [[sycl::reqd_sub_group_size(16)]] attribute to all 8 kernel launch lambdas (lines 251, 261, 283, 288, 314, 319, 349, 354). While not a correctness issue for RoPE (no sub-group operations are used), specifying SIMD16 ensures the compiler generates native-width code for Xe2 rather than potentially selecting SIMD32 which would reduce occupancy by 2x (fewer hardware threads per XVE).",
+          "expected_improvement": "5-15% improvement from better occupancy. Without the attribute, the compiler may choose SIMD32 (32 work-items per thread), which halves the number of hardware threads that fit per XVE on Xe2, reducing latency hiding.",
+          "implementation_notes": "Add [[sycl::reqd_sub_group_size(16)]] to each parallel_for lambda. Example: stream->parallel_for(nd_range<3>(...), [=](nd_item<3> item) [[sycl::reqd_sub_group_size(16)]] { ... }); Apply to all 8 parallel_for calls across rope_norm_sycl (2 calls), rope_neox_sycl (2), rope_multi_sycl (2), rope_vision_sycl (2). Ref: optimization_guide.md section 1.2.",
+          "risk": "low",
+          "risk_notes": "No sub-group operations are used, so this only affects occupancy and register allocation. No functional impact."
+        },
+        {
+          "id": "opt_002_004",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Simplify 3D nd_range to 2D nd_range. All kernels use sycl::nd_range<3> with dimension 0 always being 1 (a DPCT migration artifact from CUDA dim3). Converting to nd_range<2> removes the trivial dimension, slightly reduces launch overhead, and makes the code clearer. Dimension mapping: current dim 1 (block columns) → new dim 0, current dim 2 (rows) → new dim 1.",
+          "expected_improvement": "Negligible performance improvement (<2%). Primary benefit is code clarity and maintainability.",
+          "implementation_notes": "1. Change nd_range<3>({1, num_blocks, nr}, {1, 256, 1}) to nd_range<2>({num_blocks, nr}, {256, 1}) at lines 239, 276, 305, 340. 2. Update kernel functions to accept nd_item<2> instead of nd_item<3>. 3. Update thread index computation: i0 = 2 * item.get_global_id(0), row = item.get_global_id(1).",
+          "risk": "low",
+          "risk_notes": "Purely mechanical refactoring. Well-defined mapping from 3D to 2D dimensions."
+        },
+        {
+          "id": "opt_002_005",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Clean up DPCT artifacts: (1) Replace manual thread indexing (local_range*group+local_id) with get_global_id() at 8 locations, (2) Remove unconditional dpct::has_capability_or_fail(fp16) checks in rope_norm_sycl and rope_neox_sycl (lines 243, 280) — guard with if constexpr like rope_multi/vision already do, (3) Remove DPCT migration comments (lines 246-250, 256-259).",
+          "expected_improvement": "Minor: removes per-launch device capability queries (~microseconds). get_global_id() may enable compiler optimizations vs manual index arithmetic.",
+          "implementation_notes": "1. Lines 46,52,86,92,128,132,196,200: replace item_ct1.get_local_range(N)*item_ct1.get_group(N)+item_ct1.get_local_id(N) with item_ct1.get_global_id(N). 2. Lines 243,280: wrap with if constexpr (std::is_same_v<T, sycl::half>) like lines 309-311 and 344-346 already do. 3. Delete DPCT comment blocks.",
+          "risk": "low",
+          "risk_notes": "Mechanical cleanup with no algorithmic changes."
+        }
+      ],
+      "overall_optimization_potential": "medium",
+      "estimated_current_efficiency": "55-65% — RoPE is compute-bound (sin/cos/pow operations dominate) and uses standard precision math functions where native versions would be significantly faster on Xe2. The work-group size (256) and coalesced access patterns are reasonable. No SLM or reductions needed. Main gains come from switching to native math functions."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 1,
+    "total_kernels_analyzed": 2,
     "high_potential": 1,
-    "medium_potential": 0,
+    "medium_potential": 1,
     "low_potential": 0,
     "no_optimization_needed": 0,
     "top_opportunities": [
@@ -166,6 +281,20 @@
         "kernel_name": "softmax SYCL kernels",
         "opportunity_id": "opt_001_002",
         "description": "Replace manual SLM block reduction with sycl::reduce_over_group — 10-20% speedup",
+        "priority": "high"
+      },
+      {
+        "kernel_id": "sk_002",
+        "kernel_name": "rope SYCL kernels",
+        "opportunity_id": "opt_002_001",
+        "description": "Use native sin/cos for RoPE — 15-30% speedup from faster trig on Xe2",
+        "priority": "high"
+      },
+      {
+        "kernel_id": "sk_002",
+        "kernel_name": "rope SYCL kernels",
+        "opportunity_id": "opt_002_002",
+        "description": "Replace sycl::pow with native::exp2(native::log2()*...) — 10-20% speedup",
         "priority": "high"
       },
       {
