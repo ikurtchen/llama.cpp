@@ -5,9 +5,9 @@
 
 ## Summary
 - Total SYCL kernels to analyze: 13
-- Kernels analyzed so far: 5
+- Kernels analyzed so far: 6
 - Analysis complete: No
-- Kernels with optimization potential: 5
+- Kernels with optimization potential: 6
 - Optimization tasks created: 0 (pending finalization)
 
 ## Kernels Analyzed
@@ -16,7 +16,7 @@
 - [x] sk_003: norm SYCL kernels — high potential (9 optimization opportunities)
 - [x] sk_004: element_wise SYCL kernels — medium potential (8 optimization opportunities)
 - [x] sk_005: convert SYCL kernels — medium potential (7 optimization opportunities)
-- [ ] sk_006: binbcast SYCL kernels — pending
+- [x] sk_006: binbcast SYCL kernels — medium potential (6 optimization opportunities)
 - [ ] sk_007: cpy SYCL kernels — pending
 - [ ] sk_008: mmq SYCL kernels — pending
 - [ ] sk_009: mmvq SYCL kernels — pending
@@ -26,6 +26,12 @@
 - [ ] sk_013: gla SYCL kernel — pending
 
 ## Recent Activity
+[2026-02-14] Analyzed kernel binbcast (binary broadcast) SYCL kernels (sk_006). Found 6 optimization opportunities (medium potential).
+  - HIGH: Uses plain % and / for broadcast indices — CUDA uses fastdiv/fastmodulo (10x cheaper on GPU)
+  - MEDIUM: Missing fused multi-source op support — CUDA fuses up to 8 adds into single kernel
+  - MEDIUM: Fallback condition only checks z-dim limit, missing y-dim check — potential correctness bug
+  - LOW: Missing repeat_back kernel, DPCT artifacts, missing reqd_sub_group_size
+
 [2026-02-14] Analyzed kernel convert (dequantize) SYCL kernels (sk_005). Found 7 optimization opportunities (medium potential).
   - HIGH: Missing optimized Q8_0→FP16 kernel — CUDA has dequantize_block_q8_0_f16 with SLM+half2 for 2-3x speedup
   - MEDIUM: Missing reqd_sub_group_size on all kernels except q4_0_reorder — 5-15% occupancy loss

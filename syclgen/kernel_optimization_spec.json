@@ -719,12 +719,142 @@
       ],
       "overall_optimization_potential": "medium",
       "estimated_current_efficiency": "55-65% — Dequantize kernels are memory-bound and reasonably well-implemented for most quant types. The main gap is the missing optimized Q8_0→FP16 kernel (CUDA has a 2-3x faster variant). Missing sub-group size attributes hurt occupancy. NC support gap forces extra copies for non-contiguous quantized tensors. The reorder variants (q4_0, q4_K, q6_K) are SYCL-specific optimizations that are ahead of CUDA."
+    },
+    {
+      "kernel_id": "sk_006",
+      "name": "binbcast (binary broadcast) SYCL kernels",
+      "file": "ggml/src/ggml-sycl/binbcast.cpp",
+      "source_cuda_ids": ["ck_001", "ck_002", "ck_003", "ck_004", "ck_005"],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": 128,
+          "sub_group_size": null,
+          "global_size_expression": "3D adaptive: block_dims = (min(ne2*ne3, cap), min(ne1, cap), min(hne0, 128)) where cap fills to 128; fallback 1D: ceil_div(ne0*ne1*ne2*ne3, 128) when z-dim exceeds 65535",
+          "notes": "Two kernel variants: k_bin_bcast (3D grid) and k_bin_bcast_unravel (1D fallback). Block size is 128 matching CUDA. The 3D grid packs dimensions 2 and 3 into the z-axis using integer division (ne2*ne3 packed). The dimension 0 uses hne0 = max(ne0/2, 1) which halves the grid in dimension 0. Missing [[sycl::reqd_sub_group_size]] on both kernel launch paths. Fallback condition only checks z-dim > 65535, while CUDA checks both y AND z — potential bug for large ne1."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "strided_accesses": ["src1 broadcast: i10 = i0 % ne10 causes non-contiguous access when ne10 < ne0", "src0/src1 stride-based addressing via s01/s02/s03 and s11/s12/s13"],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "Innermost loop iterates over dimension 0 with stride equal to total threads in dimension 0. Consecutive threads access consecutive elements in src0 and dst (coalesced). src1 access is coalesced only when ne10 >= ne0 (no broadcast in dim 0); otherwise the modulo causes irregular access. All loads/stores are scalar — no sycl::vec usage."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes": 0,
+          "potential_bank_conflicts": false,
+          "notes": "No SLM used. Pure element-wise operations with no inter-thread data sharing."
+        },
+        "reduction_pattern": {
+          "has_reduction": false,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "No reductions — each thread computes one or more output elements independently."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "All binary ops compute in float regardless of input/output types. Supports 6 type combinations: f32/f32/f32, f16/f16/f16, f16/f32/f16, i32/i32/i32, i16/i16/i16. SYCL has i32 and i16 support that CUDA lacks. CUDA additionally supports f16/f32/f32 which SYCL does not."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [],
+          "notes": "No transcendental math — only add, sub, mul, div operations. div uses standard float division. No optimization opportunities for native math."
+        },
+        "loop_analysis": {
+          "hot_loops": [
+            "k_bin_bcast inner loop (line 44-48): iterates ne0/(block_dims[2]*block_nums[2]) times — handles multiple elements per thread in dimension 0",
+            "Dimension collapse loop (lines 127-139): host-side, iterates up to 3 times to collapse non-broadcast dimensions"
+          ],
+          "unrolled": false,
+          "notes": "The inner loop in k_bin_bcast cannot be unrolled since ne0 is runtime. The loop body is simple (one load from each src + one op + one store). k_bin_bcast_unravel has no loop — one element per thread."
+        },
+        "estimated_bottleneck": "memory",
+        "anti_patterns": [
+          "Uses plain integer % and / for broadcast index computation (i1%ne11, i2%ne12, i3%ne13, i0%ne10, i/(ne2*ne1*ne0) in unravel) — CUDA uses fastdiv/fastmodulo with multiply-high (2-3 cycles vs 20-30 cycles for integer division on GPU)",
+          "DPCT artifact: dpct::has_capability_or_fail(fp16) called on every launch",
+          "DPCT artifact: stale DPCT1049 comment at lines 240-245",
+          "Missing [[sycl::reqd_sub_group_size]] on both launch paths",
+          "Fallback condition only checks block_nums[0] > 65535 — CUDA checks both y AND z grid limits; missing y check is a potential correctness bug for large ne1",
+          "Missing fused multi-source op support — CUDA's variadic template fuses up to 8 add operations into a single kernel launch, eliminating redundant memory traffic",
+          "Missing repeat_back kernel — CUDA has k_repeat_back for the inverse of repeat",
+          "s00 is GGML_UNUSED instead of GGML_ASSERT(s00 == 1) — CUDA asserts this for safety"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_006_001",
+          "category": "math_functions",
+          "priority": "high",
+          "description": "Replace plain integer % and / with fast division/modulo for broadcast index computation. CUDA uses fastdiv/fastmodulo which precomputes magic numbers and uses multiply-high + shift (2-3 cycles) instead of hardware integer division (20-30 cycles on GPU). In binbcast, every thread executes 3-4 modulo operations (i1%ne11, i2%ne12, i3%ne13, i0%ne10) and the unravel kernel adds 3-4 integer divisions (i/(ne2*ne1*ne0) etc.). This is the single largest performance gap vs CUDA for this kernel.",
+          "expected_improvement": "15-40% speedup depending on tensor dimensions. For small-element broadcast ops (where compute per element is minimal: add/sub = 1 FLOP), the division overhead dominates. The unravel kernel (1D fallback) is worst affected — 7+ divisions per thread vs 0 with fastdiv.",
+          "implementation_notes": "Implement a SYCL fastdiv utility matching CUDA's: precompute (mp, L, divisor) triple on host for each ne value, pass as kernel parameters. Replace % with fastmodulo and / with fastdiv in both k_bin_bcast and k_bin_bcast_unravel. The host-side init_fastdiv_values() computes: L = ceil(log2(d)), mp = 2^(32+L)/d + 1. The device-side fastdiv uses __umulhi(n, mp) >> L. On SYCL/Intel, use sycl::mul_hi for the multiply-high operation.",
+          "risk": "medium",
+          "risk_notes": "The fastdiv algorithm requires careful handling of edge cases (divisor = 1, power of 2 divisors). CUDA's implementation is proven correct. Need to verify sycl::mul_hi behavior matches __umulhi for unsigned 32-bit multiply-high."
+        },
+        {
+          "id": "opt_006_002",
+          "category": "work_group_size",
+          "priority": "medium",
+          "description": "Implement fused multi-source binary broadcast operations matching CUDA's ggml_cuda_op_fused_add. CUDA uses variadic templates (src1_ptrs...) with C++17 fold expressions to fuse up to 8 add operations into a single kernel launch. This eliminates N-1 kernel launches and N-1 redundant reads/writes of the destination tensor for N fused operations. In transformer inference, multiple bias additions or residual connections can be fused.",
+          "expected_improvement": "30-50% throughput improvement for fusible add chains. For a chain of N adds, reduces memory traffic from 3N passes (read src0 + read src1 + write dst per add) to N+2 passes (read src0 + N src1 reads + 1 write). Also eliminates N-1 kernel launch overheads.",
+          "implementation_notes": "Add variadic template parameter pack src1_ptrs to k_bin_bcast and bin_bcast_sycl. Use C++17 fold expression: result = (..., (result = bin_op(result, (float)src1s[i_src1 + i10]))). Add ggml_sycl_op_fused_add dispatch function that detects fusible add chains in the op graph and batches them. Requires modifications to ggml-sycl.cpp dispatch logic to detect fusible patterns.",
+          "risk": "high",
+          "risk_notes": "Requires op graph analysis to detect fusible patterns. The variadic template approach requires careful handling of different tensor shapes and broadcast patterns across fused operations. Need to ensure all fused sources have compatible broadcast dimensions."
+        },
+        {
+          "id": "opt_006_003",
+          "category": "work_group_size",
+          "priority": "medium",
+          "description": "Fix the fallback condition to check both y and z grid dimension limits, matching CUDA. Currently SYCL only checks block_nums[0] > 65535 (z-dimension equivalent) but not block_nums[1] (y-dimension). CUDA checks both: block_nums.z > 65535 || block_nums.y > 65535. If ne1 is very large (>65535 * block_dims[1]), the SYCL kernel could fail or produce incorrect results.",
+          "expected_improvement": "Correctness fix — prevents potential failures with large ne1 dimensions.",
+          "implementation_notes": "Change the condition at line 221 from: if (block_nums[0] > 65535) to: if (block_nums[0] > 65535 || block_nums[1] > 65535). This ensures the 1D fallback kernel is used whenever any grid dimension exceeds SYCL limits.",
+          "risk": "low",
+          "risk_notes": "Simple conditional change. The unravel fallback kernel already handles arbitrary dimensions correctly."
+        },
+        {
+          "id": "opt_006_004",
+          "category": "sub_group_ops",
+          "priority": "low",
+          "description": "Add [[sycl::reqd_sub_group_size(16)]] to both kernel launch paths (k_bin_bcast and k_bin_bcast_unravel). Without this attribute, the compiler may choose SIMD32 on Xe2, halving occupancy for these memory-bound kernels.",
+          "expected_improvement": "5-10% from better occupancy and latency hiding.",
+          "implementation_notes": "Add the attribute to both parallel_for lambdas at lines 232 and 251.",
+          "risk": "low",
+          "risk_notes": "No sub-group operations are used. Only affects SIMD width selection."
+        },
+        {
+          "id": "opt_006_005",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Implement repeat_back kernel. CUDA has k_repeat_back for the inverse of repeat (summing elements that were repeated back to the original size using atomicAdd). SYCL binbcast does not have this, which may cause fallback to CPU or incorrect behavior for backward pass of repeat operations.",
+          "expected_improvement": "Feature completeness — enables SYCL backward pass for repeat operations without CPU fallback.",
+          "implementation_notes": "Port CUDA's k_repeat_back kernel: for each output element, use atomicAdd to accumulate contributions from all repeated input elements. Use sycl::atomic_ref<float, ...> for the atomic operation. The kernel iterates over repeat dimensions and accumulates.",
+          "risk": "medium",
+          "risk_notes": "Atomic operations on float require sycl::atomic_ref with memory_order::relaxed. Need to verify Intel GPU support for float atomics. The atomic approach may have contention for small output tensors."
+        },
+        {
+          "id": "opt_006_006",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Clean up DPCT artifacts: remove dpct::has_capability_or_fail(fp16) check, delete stale DPCT1049 comment, replace __dpct_inline__ on op functions in binbcast.hpp. Also add GGML_ASSERT(s00 == 1) to match CUDA's safety check instead of GGML_UNUSED(s00).",
+          "expected_improvement": "Minor: removes per-dispatch capability query overhead. Code quality improvement.",
+          "implementation_notes": "Remove dpct::has_capability_or_fail blocks (lines 225-226, 246-247). Delete DPCT comment (lines 240-245). Replace __dpct_inline__ with inline in binbcast.hpp. Change GGML_UNUSED(s00) to GGML_ASSERT(s00 == 1).",
+          "risk": "low",
+          "risk_notes": "Mechanical cleanup. The s00 assert adds a safety check that CUDA already has."
+        }
+      ],
+      "overall_optimization_potential": "medium",
+      "estimated_current_efficiency": "50-60% — Binary broadcast kernels are memory-bound but waste significant cycles on expensive integer division for broadcast index computation (CUDA uses fastdiv for 10x cheaper division). Missing fused multi-source support leaves significant throughput on the table for common add chains. The dimension collapse optimization and 3D grid mapping are well-implemented, matching CUDA. Missing repeat_back is a feature gap."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 5,
+    "total_kernels_analyzed": 6,
     "high_potential": 2,
-    "medium_potential": 3,
+    "medium_potential": 4,
     "low_potential": 0,
     "no_optimization_needed": 0,
     "top_opportunities": [
@@ -824,6 +954,20 @@
         "kernel_name": "convert (dequantize) SYCL kernels",
         "opportunity_id": "opt_005_002",
         "description": "Add reqd_sub_group_size to all dequantize kernels — 5-15% occupancy improvement",
+        "priority": "medium"
+      },
+      {
+        "kernel_id": "sk_006",
+        "kernel_name": "binbcast SYCL kernels",
+        "opportunity_id": "opt_006_001",
+        "description": "Replace plain integer % and / with fastdiv/fastmodulo — 15-40% speedup from avoiding expensive GPU integer division",
+        "priority": "high"
+      },
+      {
+        "kernel_id": "sk_006",
+        "kernel_name": "binbcast SYCL kernels",
+        "opportunity_id": "opt_006_003",
+        "description": "Fix fallback condition to check both y and z grid limits — correctness fix",
         "priority": "medium"
       }
     ]
