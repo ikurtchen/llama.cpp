@@ -5,15 +5,15 @@
 
 ## Summary
 - Total SYCL kernels to analyze: 13
-- Kernels analyzed so far: 2
+- Kernels analyzed so far: 3
 - Analysis complete: No
-- Kernels with optimization potential: 2
+- Kernels with optimization potential: 3
 - Optimization tasks created: 0 (pending finalization)
 
 ## Kernels Analyzed
 - [x] sk_001: softmax SYCL kernels — high potential (6 optimization opportunities)
 - [x] sk_002: rope SYCL kernels — medium potential (5 optimization opportunities)
-- [ ] sk_003: norm SYCL kernels — pending
+- [x] sk_003: norm SYCL kernels — high potential (9 optimization opportunities)
 - [ ] sk_004: element_wise SYCL kernels — pending
 - [ ] sk_005: convert SYCL kernels — pending
 - [ ] sk_006: binbcast SYCL kernels — pending
@@ -26,6 +26,15 @@
 - [ ] sk_013: gla SYCL kernel — pending
 
 ## Recent Activity
+[2026-02-14] Analyzed kernel norm SYCL kernels (sk_003). Found 9 optimization opportunities (high potential).
+  - HIGH: group_norm uses global barrier instead of local_space — performance bug
+  - HIGH: Three inconsistent reduction patterns — should use sycl::reduce_over_group
+  - HIGH: rms_norm uses only 16 threads for ncols<1024 — 2-4x throughput loss vs CUDA
+  - MEDIUM: No vectorized loads (scalar only) — memory throughput improvement possible
+  - MEDIUM: Missing fused rms_norm_multiply kernel (CUDA has it, eliminates a full memory pass)
+  - MEDIUM: Standard sycl::rsqrt instead of native
+  - LOW: DPCT artifact cleanup, l2_norm out-of-date with CUDA, group_norm batch dimension bug
+
 [2026-02-14] Analyzed kernel rope SYCL kernels (sk_002). Found 5 optimization opportunities (medium potential).
   - HIGH: Use sycl::native::cos/sin instead of standard versions — 15-30% speedup on Xe2
   - HIGH: Replace sycl::pow with native::exp2(log2()*...) — 10-20% speedup

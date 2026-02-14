@@ -260,11 +260,180 @@
       ],
       "overall_optimization_potential": "medium",
       "estimated_current_efficiency": "55-65% — RoPE is compute-bound (sin/cos/pow operations dominate) and uses standard precision math functions where native versions would be significantly faster on Xe2. The work-group size (256) and coalesced access patterns are reasonable. No SLM or reductions needed. Main gains come from switching to native math functions."
+    },
+    {
+      "kernel_id": "sk_003",
+      "name": "norm SYCL kernels",
+      "file": "ggml/src/ggml-sycl/norm.cpp",
+      "source_cuda_ids": ["ck_074", "ck_075", "ck_076", "ck_077", "ck_078"],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": "dynamic: WARP_SIZE (16) for ncols < 1024, device max_work_group_size for ncols >= 1024; rms_norm_back caps at 256",
+          "sub_group_size": 16,
+          "global_size_expression": "(nsamples, nchannels, nrows) for norm/rms_norm; (1, 1, num_groups) for group_norm; (1, 1, N) for rms_norm_back and l2_norm",
+          "notes": "All 5 kernels use 3D nd_range. All have [[sycl::reqd_sub_group_size(WARP_SIZE)]] — good. Critical issue: rms_norm_f32 uses only WARP_SIZE (16) threads for ncols < 1024, while CUDA uses 256 threads — significant throughput loss for mid-range column counts (32-1023). group_norm uses 3D nd_range but only dimension 2 is meaningful."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "strided_accesses": ["group_norm_f32: three separate passes over the same data (mean, variance, scale) — 3x memory traffic"],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "All kernels use scalar float reads/writes. Consecutive threads access consecutive elements (coalesced via col = tid; col < ncols; col += block_size). norm_f32/rms_norm use calculate_offset<3> for strided source support. l2_norm_f32 uses explicit row*ncols multiply per access instead of pointer offset — extra ALU overhead. No sycl::vec usage anywhere."
+        },
+        "slm_usage": {
+          "uses_slm": true,
+          "slm_bytes": "norm_f32: up to 64 * sizeof(float2) = 512 bytes; group_norm: up to 64 * sizeof(float) = 256 bytes; rms_norm: up to 64 * sizeof(float) = 256 bytes; rms_norm_back: 2 * 16 * sizeof(float2) = 256 bytes; l2_norm: up to 64 * sizeof(float) = 256 bytes",
+          "potential_bank_conflicts": false,
+          "notes": "SLM usage is minimal and well within the 64 KB per Xe-core limit. No bank conflicts detected — writes are one per sub-group, reads are coalesced within sub-group."
+        },
+        "reduction_pattern": {
+          "has_reduction": true,
+          "uses_sub_group_reduce": true,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": true,
+          "uses_atomic": false,
+          "notes": "Three DIFFERENT reduction implementations across five kernels: (1) norm_f32/rms_norm_f32 use clean sub-group API (sub_group.get_group_linear_id()) with ceil_div nreduce and local_space barrier. (2) group_norm_f32/l2_norm_f32 use old DPCT-migrated pattern with manual warp_id/lane_id, integer division nreduce (not ceil_div — potential bug), and group_norm uses GLOBAL barrier instead of local_space barrier. (3) rms_norm_back_f32 uses cleanest pattern with sub-group API + sycl::group_broadcast. None use sycl::reduce_over_group."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "FP32 throughout is appropriate for normalization numerical stability. norm_f32 uses sycl::float2 for combined mean+variance accumulation — register-efficient. rms_norm_back_f32 uses compensated (Kahan) summation for improved numerical accuracy (unless GGML_SYCL_RMS_BACK_FAST is defined)."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": ["sycl::rsqrt (norm_f32 line 54, rms_norm_f32 line 198, rms_norm_back line 622, l2_norm line 242)", "sycl::max (l2_norm line 242)"],
+          "notes": "All kernels use standard sycl::rsqrt, not sycl::native::rsqrt. On Xe2, native::rsqrt is ~2x faster. CUDA uses rsqrtf() which maps to a fast hardware intrinsic. The rsqrt is called once per work-group (only thread 0 or broadcast result), so the absolute impact is small but switching to native is trivial."
+        },
+        "loop_analysis": {
+          "hot_loops": [
+            "norm_f32: accumulation loop (lines 27-31) iterates ncols/block_size times",
+            "norm_f32: write-back loop (lines 56-58) iterates ncols/block_size times",
+            "group_norm_f32: THREE passes — mean (lines 76-78), variance (lines 109-113), scale (lines 143-145)",
+            "rms_norm_f32: accumulation (lines 172-175), write-back (lines 200-202)",
+            "rms_norm_back_f32: accumulation (lines 547-564), write-back (lines 628-630)",
+            "l2_norm_f32: accumulation (lines 214-217), write-back (lines 244-246)"
+          ],
+          "unrolled": false,
+          "notes": "No #pragma unroll on any hot inner loop in any kernel. CUDA uses compile-time template block_size which enables automatic unrolling. SYCL uses runtime block_size parameter which prevents compiler unrolling."
+        },
+        "estimated_bottleneck": "memory",
+        "anti_patterns": [
+          "group_norm_f32 uses GLOBAL barrier (item_ct1.barrier()) at lines 97, 132 instead of local_space barrier — unnecessary global memory fence overhead",
+          "group_norm_f32 has DPCT artifact comments at lines 88-96, 122-131 (DPCT1118, DPCT1065)",
+          "l2_norm_f32 has DPCT artifact comment at lines 228-231 (DPCT1118:3)",
+          "Dispatch functions have stale DPCT comments at lines 269-273, 309-313, 355-358, 395-398 (DPCT1049)",
+          "Three different reduction styles across five kernels — inconsistent code, harder to maintain and optimize",
+          "group_norm_f32 uses nwarps/WARP_SIZE (integer division) instead of ceil_div — inconsistent with norm_f32/rms_norm which use ceil_div",
+          "l2_norm_f32 uses explicit row*ncols multiply per access instead of pointer offset — based on outdated CUDA version",
+          "l2_norm_f32 is out-of-date with current CUDA: missing stride support for non-contiguous tensors",
+          "rms_norm_f32 uses only WARP_SIZE (16) threads for ncols < 1024 while CUDA uses 256 — poor occupancy",
+          "Missing CUDA fused rms_norm_multiply and rms_norm_multiply_add kernels — significant feature gap",
+          "group_norm_f32 may not handle batched input correctly — dispatches num_groups vs CUDA's num_groups * ne[3]",
+          "rms_norm_back_f32 is an inline 100+ line lambda instead of a separate function",
+          "Runtime block_size parameter prevents compiler loop unrolling across all kernels"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_003_001",
+          "category": "reduction",
+          "priority": "high",
+          "description": "Fix group_norm_f32 global barrier to use local_space fence. Lines 97 and 132 use item_ct1.barrier() which includes an unnecessary global memory fence. Since the barrier only synchronizes SLM access, it should use item_ct1.barrier(sycl::access::fence_space::local_space). This is both a performance fix and a correctness alignment — the other kernels (norm_f32, rms_norm_f32, l2_norm_f32) already correctly use local_space barriers.",
+          "expected_improvement": "5-15% speedup for group_norm_f32. Global barriers stall the memory pipeline until all global memory writes are visible, which is unnecessary when only SLM synchronization is needed. The impact is proportional to how often the barrier is hit (2x per kernel invocation).",
+          "implementation_notes": "At lines 97 and 132 of norm.cpp, change: item_ct1.barrier() to item_ct1.barrier(sycl::access::fence_space::local_space). This is a one-line change per occurrence. Ref: optimization_guide.md section 6.2 (avoid unnecessary synchronization).",
+          "risk": "low",
+          "risk_notes": "The SLM writes at lines 87 and 121 are the only writes being synchronized. No global memory writes occur between SLM write and barrier. Other kernels in the same file already use local_space correctly."
+        },
+        {
+          "id": "opt_003_002",
+          "category": "reduction",
+          "priority": "high",
+          "description": "Unify all five kernels to use sycl::reduce_over_group instead of manual SLM-based cross-warp reduction. Currently three different reduction patterns are used, with group_norm and l2_norm using an older DPCT-migrated style that is less efficient. sycl::reduce_over_group(item.get_group(), val, op) handles the entire work-group reduction optimally with minimal barriers. This eliminates 20+ lines of manual reduction code per kernel and removes the nreduce calculation (and its ceil_div vs integer division inconsistency).",
+          "expected_improvement": "10-20% speedup across all norm kernels from reduced barrier overhead and optimal reduction tree. Also eliminates ~100 lines of duplicated reduction code and the inconsistency between ceil_div and integer division nreduce calculations.",
+          "implementation_notes": "For each kernel: (1) Remove SLM local_accessor for inter-warp communication. (2) Replace warp_reduce_sum + SLM store + barrier + SLM read loop + warp_reduce_sum with single call: result = sycl::reduce_over_group(item.get_group(), partial, sycl::plus<float>()). For norm_f32 which reduces float2, do two separate reduce_over_group calls (one for mean, one for variance) or pack into float and reduce separately. For rms_norm_back_f32 which already uses the cleanest pattern, the change is still beneficial for consistency. Ref: optimization_guide.md section 3.4.",
+          "risk": "medium",
+          "risk_notes": "Need to verify reduce_over_group works correctly with all work-group sizes (16 to 1024). The small work-group path (WARP_SIZE=16) should work since reduce_over_group handles single-sub-group reductions. For group_norm which does two reductions, need to ensure both can use reduce_over_group independently. Test with representative models (LLaMA, GPT) to verify numerical equivalence."
+        },
+        {
+          "id": "opt_003_003",
+          "category": "work_group_size",
+          "priority": "high",
+          "description": "Increase rms_norm_f32 work-group size for ncols < 1024 from WARP_SIZE (16) to 256 threads. CUDA uses 256 threads for this path (norm.cu line 302-303). The current SYCL implementation uses only 16 threads per work-group, which provides terrible occupancy on Xe2 — only 1 hardware thread per XVE (1/8 capacity). For typical LLM dimensions like 768, 1024, 2048, this path may be hit or the boundary case matters. RMS normalization is one of the most frequently called kernels in transformer inference (applied before every attention and FFN layer).",
+          "expected_improvement": "2-4x throughput improvement for the small path (ncols < 1024). The larger work-group allows 16x more threads to cooperate on each row, dramatically improving memory bandwidth utilization for this memory-bound kernel. Even for the large path, ensuring the work-group size is reasonable (256-512 rather than device max 1024) may improve occupancy.",
+          "implementation_notes": "At line 340 of norm.cpp, change the small-path work-group size from (1, 1, WARP_SIZE) to (1, 1, 256). The kernel code already handles arbitrary block_size via the col += block_size stride loop, so no kernel changes are needed — only the dispatch. However, the SLM allocation must now be provided (currently nullptr for the small path). Add local_accessor<float, 1> of size 256/WARP_SIZE = 16 floats. Apply the same fix to norm_f32 (line 255) and l2_norm_f32 (line 377) which also use WARP_SIZE for the small path.",
+          "risk": "low",
+          "risk_notes": "The kernel is already parameterized by runtime block_size and handles multi-warp reduction via SLM. The only risk is ensuring the SLM allocation is provided for the small path, which is a mechanical change."
+        },
+        {
+          "id": "opt_003_004",
+          "category": "vectorization",
+          "priority": "medium",
+          "description": "Add vectorized memory access (sycl::vec<float, 4>) to the accumulation and write-back loops in all norm kernels. Currently all loads and stores are scalar float, processing 1 element per thread per iteration. Normalization kernels are memory-bound (compute intensity ~2-4 ops/byte for rms_norm, well below the 27 ops/byte threshold), so maximizing memory throughput is critical.",
+          "expected_improvement": "20-40% throughput improvement for memory-bound norm kernels. Vector loads reduce memory transactions by 4x for aligned data. For typical LLM hidden dimensions (4096, 8192) which are multiples of 4, this is safe and effective.",
+          "implementation_notes": "For each hot loop (e.g., rms_norm_f32 lines 172-175), change from: float xi = x[col]; tmp += xi * xi; col += block_size; to: sycl::vec<float, 4> xv = *reinterpret_cast<const sycl::vec<float, 4>*>(&x[col*4]); tmp += xv[0]*xv[0] + xv[1]*xv[1] + xv[2]*xv[2] + xv[3]*xv[3]; Handle tail elements (ncols % 4 != 0) with scalar fallback. Apply to all accumulation and write-back loops. Ref: optimization_guide.md section 2.2.",
+          "risk": "medium",
+          "risk_notes": "Requires ncols to be a multiple of 4 for the vectorized path (fallback needed otherwise). Most LLM dimensions are multiples of 64+, so this is safe in practice. Need to ensure pointer alignment for reinterpret_cast."
+        },
+        {
+          "id": "opt_003_005",
+          "category": "math_functions",
+          "priority": "medium",
+          "description": "Replace sycl::rsqrt with sycl::native::rsqrt in all norm kernels (lines 54, 142, 198, 242, 622). While rsqrt is called only once per row (not per element), switching to native is trivial and removes any potential for the compiler to emit a slower standard-precision sequence. CUDA's rsqrtf() maps to hardware intrinsic automatically.",
+          "expected_improvement": "1-3% — negligible per-call since rsqrt is called once per row, but free to implement and eliminates a minor inefficiency.",
+          "implementation_notes": "Replace sycl::rsqrt(x) with sycl::native::rsqrt(x) at 5 locations in norm.cpp. For l2_norm, also verify sycl::max usage is appropriate (sycl::max is already optimal). Ref: optimization_guide.md section 3.2.",
+          "risk": "low",
+          "risk_notes": "native::rsqrt provides ~1 ULP accuracy which is more than sufficient for normalization. The result is used as a scaling factor, not for further computation chains."
+        },
+        {
+          "id": "opt_003_006",
+          "category": "work_group_size",
+          "priority": "medium",
+          "description": "Implement missing fused rms_norm_multiply and rms_norm_multiply_add kernels. CUDA has template variants rms_norm_f32<block_size, do_multiply=true> and rms_norm_f32<block_size, do_multiply=true, do_add=true> that fuse RMS normalization with element-wise multiply (and optionally add) in a single kernel pass. This avoids a separate element-wise kernel launch and halves memory traffic for the fused operation. In transformer inference, RMS norm is almost always followed by a scale multiply, making this fusion highly impactful.",
+          "expected_improvement": "30-50% throughput improvement for the fused path. Eliminates one kernel launch + one full pass over the output data. For a 4096-element row, this saves 4096*4 = 16KB of memory traffic per row. With thousands of rows per inference step, this adds up significantly.",
+          "implementation_notes": "Add template parameters do_multiply and do_add to rms_norm_f32 kernel. When do_multiply is true, read an additional input pointer (scale) and multiply during the write-back loop: dst[col] = x[col] * inv_r * scale[col % scale_stride]. When do_add is true, also add a bias. Implement dispatch functions ggml_sycl_op_rms_norm_fused and ggml_sycl_op_rms_norm_fused_add. May need fastmodulo equivalent for broadcasting the scale across batch dimensions. CUDA uses fastmodulo from common.cuh for this.",
+          "risk": "high",
+          "risk_notes": "New feature implementation. Requires understanding the fastmodulo broadcasting pattern from CUDA. Needs new dispatch logic in the SYCL backend (ggml-sycl.cpp). May require changes to the op graph to detect and use the fused kernel."
+        },
+        {
+          "id": "opt_003_007",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Clean up DPCT migration artifacts across all norm kernels: (1) Remove stale DPCT comments at lines 88-96, 122-131, 228-231, 269-273, 309-313, 355-358, 395-398. (2) Unify reduction style: convert group_norm and l2_norm from manual warp_id/lane_id pattern to sub-group API (matching norm_f32 and rms_norm patterns). (3) Fix nreduce inconsistency: use ceil_div consistently. (4) Simplify group_norm and l2_norm 3D nd_range to 1D where only dimension 2 is used.",
+          "expected_improvement": "Minor direct performance improvement. Primary benefit is code maintainability, consistency, and enabling further optimizations. The ceil_div fix may prevent edge-case bugs with non-standard work-group sizes.",
+          "implementation_notes": "1. Delete DPCT comment blocks (7 locations). 2. In group_norm_f32 and l2_norm_f32, replace warp_id = tid / WARP_SIZE; lane_id = tid % WARP_SIZE with auto sg = item_ct1.get_sub_group(); auto sg_id = sg.get_group_linear_id(); auto wi_in_sg = sg.get_local_linear_id(). 3. Change nwarps / WARP_SIZE to ceil_div(nwarps, WARP_SIZE) in group_norm (line 68) and l2_norm (line 233). 4. Convert nd_range<3>((1,1,N),(1,1,WG)) to nd_range<1>(N,WG) for l2_norm and group_norm.",
+          "risk": "low",
+          "risk_notes": "Mechanical refactoring. The sub-group API pattern is proven working in norm_f32 and rms_norm_f32. The ceil_div change makes the code safer but shouldn't affect typical work-group sizes."
+        },
+        {
+          "id": "opt_003_008",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Update l2_norm_f32 to match current CUDA implementation with stride support. The SYCL version is based on an older CUDA version that uses contiguous row*ncols addressing. Current CUDA (norm.cu lines 239-271) supports full 3D strided layout via stride_row, stride_channel, stride_sample parameters. The SYCL dispatch (ggml_sycl_op_l2_norm, lines 636-654) does not compute or pass stride information.",
+          "expected_improvement": "Correctness fix for non-contiguous tensors + minor ALU savings from removing row*ncols multiply. Not a performance-critical optimization since l2_norm is less frequently used than rms_norm.",
+          "implementation_notes": "1. Update l2_norm_f32 kernel to accept stride parameters and use calculate_offset<3> for source addressing (matching norm_f32 pattern). 2. Update ggml_sycl_op_l2_norm dispatch to compute and pass stride information from the tensor metadata. 3. Update grid dimensions from (1,1,nrows) to (nsamples, nchannels, nrows_per_channel) matching CUDA's (nrows, nchannels, nsamples) grid.",
+          "risk": "medium",
+          "risk_notes": "Requires careful mapping of tensor dimension ordering between CUDA and SYCL. The calculate_offset utility is already proven in norm_f32 and rms_norm_f32."
+        },
+        {
+          "id": "opt_003_009",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Fix potential batch dimension bug in group_norm_f32 dispatch. SYCL dispatches num_groups work-groups (norm.cpp line 453), while CUDA dispatches num_groups * ne[3] work-groups (norm.cu line 449) to account for the batch dimension. If batched group normalization is used, the SYCL version may produce incorrect results.",
+          "expected_improvement": "Correctness fix — no performance change for single-batch inference. Enables correct multi-batch group normalization if needed.",
+          "implementation_notes": "In ggml_sycl_op_group_norm (around line 453), change the number of work-groups from num_groups to num_groups * src0->ne[3]. Pass the additional batch dimension info to the kernel.",
+          "risk": "low",
+          "risk_notes": "Simple dispatch fix. The kernel itself handles arbitrary group sizes, so only the grid size needs adjustment."
+        }
+      ],
+      "overall_optimization_potential": "high",
+      "estimated_current_efficiency": "35-45% — Norm kernels are memory-bound but waste bandwidth through scalar accesses (no vectorization), have inconsistent and suboptimal reduction patterns (3 different styles, one using global barriers), use unnecessarily small work-groups for the small path (16 vs CUDA's 256), and are missing the critical fused rms_norm_multiply kernel that eliminates a full memory pass in transformer inference."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 2,
-    "high_potential": 1,
+    "total_kernels_analyzed": 3,
+    "high_potential": 2,
     "medium_potential": 1,
     "low_potential": 0,
     "no_optimization_needed": 0,
@@ -298,10 +467,45 @@
         "priority": "high"
       },
       {
+        "kernel_id": "sk_003",
+        "kernel_name": "norm SYCL kernels",
+        "opportunity_id": "opt_003_001",
+        "description": "Fix group_norm global barrier to local_space — 5-15% speedup + correctness alignment",
+        "priority": "high"
+      },
+      {
+        "kernel_id": "sk_003",
+        "kernel_name": "norm SYCL kernels",
+        "opportunity_id": "opt_003_002",
+        "description": "Unify reduction to sycl::reduce_over_group — 10-20% speedup, eliminates 100+ lines of duplicated code",
+        "priority": "high"
+      },
+      {
+        "kernel_id": "sk_003",
+        "kernel_name": "norm SYCL kernels",
+        "opportunity_id": "opt_003_003",
+        "description": "Increase rms_norm small-path work-group from 16 to 256 — 2-4x throughput for ncols < 1024",
+        "priority": "high"
+      },
+      {
+        "kernel_id": "sk_003",
+        "kernel_name": "norm SYCL kernels",
+        "opportunity_id": "opt_003_006",
+        "description": "Implement fused rms_norm_multiply kernel — 30-50% throughput improvement by eliminating a memory pass",
+        "priority": "medium"
+      },
+      {
         "kernel_id": "sk_001",
         "kernel_name": "softmax SYCL kernels",
         "opportunity_id": "opt_001_003",
         "description": "Add vec4 vectorized memory access — 20-40% memory throughput improvement",
+        "priority": "medium"
+      },
+      {
+        "kernel_id": "sk_003",
+        "kernel_name": "norm SYCL kernels",
+        "opportunity_id": "opt_003_004",
+        "description": "Add vec4 vectorized memory access to norm kernels — 20-40% memory throughput improvement",
         "priority": "medium"
       }
     ]
