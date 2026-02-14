@@ -1098,6 +1098,189 @@
       ],
       "overall_optimization_potential": "high",
       "estimated_current_efficiency": "20-30% \u2014 Copy kernels are severely underperforming due to catastrophically small work-group sizes (1 for quantized, 32 for scalar), missing contiguous fast-path (needless 12 integer div/mul per element), no vectorized loads, and numerous DPCT migration artifacts. The quantized copy path in particular is ~16x slower than necessary due to single-work-item SIMD underutilization."
+    },
+    {
+      "kernel_id": "sk_008",
+      "name": "mmq SYCL kernels",
+      "file": "ggml/src/ggml-sycl/mmq.cpp",
+      "source_cuda_ids": [
+        "ck_070",
+        "ck_071"
+      ],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": "nwarps * WARP_SIZE (varies by compute capability: AMPERE path uses 4*32=128 for XMX, 4*32=128 for non-XMX; RDNA2 uses 8*32=256; RDNA1 uses 8*32=256; PASCAL uses 8*32=256). The XMX path tile sizes are tiny: mmq_x=4, mmq_y=32 \u2014 designed for small batch sizes with tensor cores, but no actual XMX/tensor core compute is used.",
+          "sub_group_size": null,
+          "global_size_expression": "nd_range<3>((1, block_num_y, block_num_x) * (1, nwarps, WARP_SIZE)) where block_num_x = ceil(nrows_x/mmq_y), block_num_y = ceil(ncols_y/mmq_x)",
+          "notes": "The dispatch selects tile sizes based on compute_capability (VER_GEN13/GEN12/GEN9/4VEC) but the kernel itself is hardcoded to use AMPERE constants \u2014 the per-quant-type kernel functions like mul_mat_q4_0 always use MMQ_X_Q4_0_AMPERE, MMQ_Y_Q4_0_AMPERE, NWARPS_Q4_0_AMPERE regardless of runtime selection. This means the host dispatches with one tile size but the kernel uses a different one \u2014 a serious bug if the cc >= VER_GEN12 or >= VER_GEN13 paths are taken. The 3D nd_range has first dim always 1 (DPCT artifact). No [[sycl::reqd_sub_group_size]] on any kernel."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "strided_accesses": [
+            "X tile loading: each warp loads mmq_y/nwarps rows \u00d7 WARP_SIZE columns \u2014 coalesced across the K dimension",
+            "Y tile loading: non-optimal \u2014 reads block_q8_1 structs from global memory per iteration instead of using a reformatted layout like CUDA's block_q8_1_mmq"
+          ],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "All loads are 32-bit scalar (get_int_from_uint8, get_int_from_int8). CUDA's MMA path uses __ldmatrix for 128-bit vectorized shared\u2192register loads. The Y loading pattern reads from global memory on every K sub-iteration (qr times), while CUDA pre-formats Y data into block_q8_1_mmq tiles for conflict-free shared memory access."
+        },
+        "slm_usage": {
+          "uses_slm": true,
+          "slm_bytes": "Varies by quant type and tile size. For Q4_0 non-XMX (mmq_x=64, mmq_y=128): tile_x_qs = 128*(32+1)*4 = 16896B, tile_x_d = 128*(32/8+128/8)*4 = varies, tile_y_qs = 64*32*4 = 8192B, tile_y_ds = 64*32/8*4 = 1024B. Total ~26-30KB per work-group. For XMX (mmq_x=4, mmq_y=32): much smaller ~2-3KB.",
+          "potential_bank_conflicts": true,
+          "notes": "SLM tiling uses +1 padding per row (stride = WARP_SIZE+1 or 2*WARP_SIZE+1) for bank conflict avoidance on 32-bit accesses \u2014 matches CUDA's dp4a path. However, this padding was designed for NVIDIA's 32-bank scheme; Intel Xe2 has different SLM banking (16 banks of 4 bytes each) so the padding may not be optimal. No double-buffering of Y tiles. Global barrier (item_ct1.barrier()) used between load and compute phases \u2014 should use barrier(access::fence_space::local_space) since only SLM is accessed."
+        },
+        "reduction_pattern": {
+          "has_reduction": false,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "No explicit reduction \u2014 the output is a direct accumulation per (row, col) element with each thread computing its own partial sum across the K dimension. The K-dimension is iterated in the outer loop (ib0 loop) with barrier synchronization between tiles."
+        },
+        "data_types": {
+          "compute_type": "float (accumulation in FP32, quantized weights as int via dp4a)",
+          "could_use_half": false,
+          "could_use_joint_matrix": true,
+          "notes": "The CUDA version has a full MMA (tensor core) path using int8 tensor core operations (mma.sync.aligned.m16n8k32.row.col.s32.s8.s8.s32) for Turing+ and AMD MFMA for CDNA. Intel Xe2's XMX (Matrix Extension) supports int8 via SYCL joint_matrix, but the SYCL version has NO XMX path despite #define SYCL_USE_XMX existing \u2014 the define only changes tile sizes, not the compute method. This is the single largest performance gap."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [
+            "dpct::dp4a (used in all vec_dot_*_impl functions for int8 dot product)",
+            "dpct::vectorized_binary<sycl::char4> with dpct::sub_sat() (q5_0, q3_K, q6_K dequant)",
+            "sycl::half2::convert<float>() (scale conversion in vec_dot implementations)",
+            "dpct::min (bounds checking in load_tiles and mul_mat_q)"
+          ],
+          "notes": "dpct::dp4a maps to Intel's dp4a instruction which is efficient on Xe2. However, dpct::vectorized_binary<sycl::char4>(a, b, dpct::sub_sat()) is a DPCT compatibility function that may not compile to optimal byte-level SIMD \u2014 should use Intel-native byte operations or sycl::vec<int8_t,4> arithmetic."
+        },
+        "loop_analysis": {
+          "hot_loops": [
+            "mul_mat_q outer K loop: for (ib0 = 0; ib0 < blocks_per_row_x; ib0 += blocks_per_warp) \u2014 iterates blocks_per_row_x/blocks_per_warp times (line 1228)",
+            "mul_mat_q inner qr loop: for (ir = 0; ir < qr; ++ir) \u2014 iterates qr times (2-8 depending on quant type) (line 1236)",
+            "mul_mat_q innermost K loop: for (k = ir*WARP_SIZE/qr; k < (ir+1)*WARP_SIZE/qr; k += vdr) \u2014 compute-bound inner loop (line 1290)",
+            "vec_dot output accumulation: 2 nested loops over mmq_y/WARP_SIZE \u00d7 mmq_x/nwarps (lines 1292-1300)",
+            "load_tiles per-quant-type loops: 2-4 #pragma unroll loops per quant type for loading qs, dm, qh, sc"
+          ],
+          "unrolled": true,
+          "notes": "Good use of #pragma unroll on most hot loops. The comment at line 1289 explicitly notes that unrolling the outer K loop causes too much register pressure. The load_tiles functions have proper #pragma unroll on their tile-loading loops. However, the inner K loop (line 1290) is NOT unrolled and has a variable trip count (WARP_SIZE/qr/vdr) which is always a compile-time constant but not annotated."
+        },
+        "estimated_bottleneck": "compute",
+        "anti_patterns": [
+          "CRITICAL: No XMX/tensor core compute path \u2014 SYCL_USE_XMX define only affects tile sizes, not computation. CUDA has full MMA path for Turing+/CDNA. Intel Xe2 XMX supports int8 joint_matrix but it is completely unused.",
+          "CRITICAL: Kernel hardcoded to AMPERE tile sizes \u2014 all 10 per-quant kernel functions (mul_mat_q4_0 through mul_mat_q6_K) always use *_AMPERE defines (e.g., MMQ_X_Q4_0_AMPERE, line 1369-1371), ignoring the runtime-selected mmq_x/mmq_y/nwarps from the dispatch function. This is a correctness/performance bug.",
+          "HIGH: No stream-K partitioning \u2014 CUDA has full stream-K (arxiv 2301.03598) for better SM utilization on small-batch/large-K problems. SYCL uses only conventional 2D tiling.",
+          "HIGH: Missing 8 IQ quant types \u2014 CUDA supports IQ2_XXS, IQ2_XS, IQ2_S, IQ3_XXS, IQ3_S, IQ1_S, IQ4_NL, IQ4_XS. SYCL only has Q4_0/Q4_1/Q5_0/Q5_1/Q8_0/Q2_K/Q3_K/Q4_K/Q5_K/Q6_K.",
+          "HIGH: No MXFP4 support \u2014 CUDA has native FP4 MMA on Blackwell.",
+          "MEDIUM: Y data read directly from block_q8_1 in global memory \u2014 CUDA pre-reformats into block_q8_1_mmq with transposed/padded layout for conflict-free SLM access.",
+          "MEDIUM: SLM bank conflict padding designed for NVIDIA (32 banks \u00d7 4B) \u2014 Intel Xe2 has 16 banks \u00d7 4B, so +1 padding may not be optimal.",
+          "MEDIUM: Global barrier (item_ct1.barrier()) used instead of barrier(access::fence_space::local_space) \u2014 DPCT artifact, wastes cycles flushing global memory (lines 1287, 1312).",
+          "MEDIUM: No [[sycl::reqd_sub_group_size(16)]] on any kernel \u2014 compiler may choose SIMD32 reducing occupancy.",
+          "LOW: dpct::has_capability_or_fail() called per launch \u2014 unnecessary runtime overhead (lines 1818, 1853, etc.).",
+          "LOW: dpct::min() instead of sycl::min() or std::min() \u2014 DPCT compatibility layer overhead.",
+          "LOW: __dpct_inline__ instead of standard inline keyword.",
+          "LOW: item_ct1 naming convention (DPCT artifact) throughout ~3000 lines.",
+          "LOW: 3D nd_range<3> with first dim=1 for logically 2D work (DPCT artifact).",
+          "LOW: Massive code duplication \u2014 10 ggml_mul_mat_*_q8_1_sycl functions are nearly identical (~100 lines each) differing only in quant type and SLM allocation sizes. Should be a single templated function.",
+          "LOW: No MoE (Mixture of Experts) support \u2014 CUDA has ids_dst/expert_bounds for efficient expert routing.",
+          "LOW: No dynamic mmq_x selection \u2014 CUDA dynamically picks mmq_x (8-128 in steps of 8) to minimize tiles while fitting in shared memory."
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_008_001",
+          "category": "compute_path",
+          "priority": "critical",
+          "description": "Implement Intel XMX (Matrix Extension) compute path using SYCL joint_matrix. The SYCL version uses only dp4a (scalar int8 dot products) despite Intel Xe2 having full XMX hardware support for int8 matrix multiplication. CUDA implements MMA tensor core paths for Turing+ (mma.sync.aligned.m16n8k32.row.col.s32.s8.s8.s32) and AMD CDNA (MFMA). Intel Xe2 supports sycl::ext::oneapi::experimental::joint_matrix with int8 types. The XMX path would perform 8\u00d716 int8 matrix multiplies per cycle vs 4 int8 dp4a operations, yielding ~4x theoretical throughput increase for the compute-bound inner loop.",
+          "expected_improvement": "3-5x throughput for compute-bound quantized matmul (the most performance-critical operation in LLM inference). XMX provides 8x peak INT8 throughput vs ALU dp4a. Real-world improvement depends on data loading efficiency and SLM utilization.",
+          "implementation_notes": "1. Define joint_matrix tile types matching Xe2 capabilities: A(m=8,k=32,int8_t), B(k=32,n=16,int8_t), C(m=8,n=16,int32_t). 2. Create new MMA-optimized SLM layout with padding for 128-bit conflict-free access (similar to CUDA's MMQ_MMA_TILE_X_K pattern). 3. Implement load_tiles_mma variant that dequantizes to int8 during SLM loading. 4. Replace the innermost vec_dot loop (line 1290) with joint_matrix::mad() calls. 5. Create new mmq_write_back_mma for the accumulator-to-global writeback. This is a large undertaking (~1000+ lines) but follows the same architectural pattern as CUDA's MMA path.",
+          "risk": "high",
+          "risk_notes": "Major architectural change. joint_matrix API is still maturing in Intel's DPC++ compiler. Requires careful SLM layout design and extensive testing across all 10 quant types. The existing dp4a path should be preserved as fallback."
+        },
+        {
+          "id": "opt_008_002",
+          "category": "work_group_size",
+          "priority": "high",
+          "description": "Fix the tile size mismatch bug between dispatch and kernel. The host dispatch functions (ggml_mul_mat_q*_q8_1_sycl) select tile sizes based on compute_capability (VER_GEN13/GEN12/GEN9/VER_4VEC) and compute grid dimensions from them (lines 1785-1807). But the kernel functions (mul_mat_q4_0 etc.) are hardcoded to use *_AMPERE tile sizes (lines 1369-1371). When cc >= VER_GEN12, the dispatch uses RDNA1 tile sizes for the grid but the kernel uses AMPERE tile sizes \u2014 which will compute incorrect output tiles or cause out-of-bounds SLM access since SLM is allocated based on dispatch sizes but kernel accesses with AMPERE sizes.",
+          "expected_improvement": "Correctness fix. May also improve performance if non-AMPERE tile sizes are better tuned for the hardware. For Intel Arc Pro B60, the compute capability maps to VER_GEN9 so the current AMPERE path is likely taken consistently, meaning this is probably not hit in practice on this specific GPU \u2014 but it's a latent bug for newer hardware.",
+          "implementation_notes": "1. Make the per-quant kernel functions (mul_mat_q4_0 etc.) use template parameters or runtime parameters for mmq_x, mmq_y, nwarps instead of hardcoded AMPERE constants. 2. Alternatively, define a single set of tile sizes for Intel GPUs (currently the RDNA/PASCAL defines are dead code from the DPCT migration of AMD/NVIDIA constants). 3. Remove the cc-based dispatch entirely and use a single Intel-optimized tile size set. The cleanest fix: template the kernel on mmq_x, mmq_y, nwarps and instantiate for the Intel-optimal values.",
+          "risk": "medium",
+          "risk_notes": "Touching tile size logic requires careful verification that SLM allocations match kernel access patterns. Currently the kernel hardcodes AMPERE values and the host allocates SLM based on runtime-selected values \u2014 if these don't match, SLM overflows cause silent corruption."
+        },
+        {
+          "id": "opt_008_003",
+          "category": "work_group_size",
+          "priority": "high",
+          "description": "Tune tile sizes for Intel Xe2 architecture. The current AMPERE tile sizes (e.g., mmq_x=4, mmq_y=32, nwarps=4 for XMX path; mmq_x=64, mmq_y=128, nwarps=4 for non-XMX) were copied from NVIDIA Ampere GPU tuning. Intel Xe2 has different SLM size (64KB vs 48KB on Ampere), different register file, different SIMD width (16 vs 32), and different memory subsystem. The XMX tile sizes (4\u00d732) are especially problematic \u2014 they were designed for NVIDIA tensor cores with warp_size=32, but Intel XMX has different granularity. Optimal tile sizes for Xe2 dp4a path should be determined through benchmarking.",
+          "expected_improvement": "20-50% throughput improvement from properly tuned tile sizes. The current 4\u00d732 XMX tile sizes produce very small work per work-group (128 output elements) which doesn't amortize SLM loading overhead. For dp4a, 64\u00d764 or 128\u00d764 with 8 sub-groups may be better on Xe2.",
+          "implementation_notes": "1. Create a new set of Intel Xe2-specific tile size defines (MMQ_X_Q4_0_XE2, etc.). 2. For dp4a path: start with mmq_x=64, mmq_y=64, nwarps=8 (matching 128*16=2048 SIMD lanes on 20 Xe-cores). 3. For XMX path: use joint_matrix granularity (m=8, n=16, k=32) to determine mmq_x/mmq_y \u2014 e.g., mmq_x=64 (4 XMX tiles wide), mmq_y=64 (8 XMX tiles tall). 4. Benchmark across all 10 quant types with representative model shapes. 5. The nwarps should be ceil(mmq_y/WARP_SIZE) = ceil(mmq_y/16) for SIMD16.",
+          "risk": "low",
+          "risk_notes": "Only changes dispatch constants \u2014 no algorithmic change. Requires benchmarking to find optimal values."
+        },
+        {
+          "id": "opt_008_004",
+          "category": "memory_coalescing",
+          "priority": "high",
+          "description": "Add stream-K work distribution. CUDA implements stream-K partitioning (arxiv 2301.03598) for better EU utilization on small-batch/large-K problems. Stream-K maps a 1D index over all tiles \u00d7 K-blocks, allowing each work-group to process a contiguous range \u2014 potentially splitting a tile's K-reduction across work-groups with a fixup pass. This eliminates the 'tile quantization' problem where some EUs sit idle when the grid doesn't divide evenly across compute units.",
+          "expected_improvement": "15-40% throughput improvement for small batch sizes (1-8 tokens) where conventional tiling severely underutilizes the 20 Xe-cores. For example, with mmq_y=128 and a 4096-row weight matrix, only 32 tiles exist in the X dimension \u2014 barely enough to keep 20 Xe-cores busy. Stream-K would distribute the K-dimension work more evenly.",
+          "implementation_notes": "1. Implement the stream-K kernel variant: map a 1D index kbc over all (tile_x, tile_y, k_block) combinations. 2. Each work-group processes floor(total_kbc / n_groups) or ceil() blocks contiguously. 3. When a work-group's range spans two tiles, it writes partial results to a fixup buffer. 4. Launch a second kernel (mul_mat_q_stream_k_fixup) to sum partial results. 5. Fall back to conventional tiling when ntiles > n_xe_cores * 2 (stream-K overhead not worth it). Reference: CUDA mmq.cuh lines 3459-3750.",
+          "risk": "medium",
+          "risk_notes": "Adds a second kernel launch and requires a temporary fixup buffer. The fixup kernel is simple (element-wise addition). Main risk is getting the tile boundary conditions correct."
+        },
+        {
+          "id": "opt_008_005",
+          "category": "memory_coalescing",
+          "priority": "medium",
+          "description": "Optimize Y data loading with pre-formatted block_q8_1_mmq layout. CUDA pre-reformats Y (query/activation) data into a custom block_q8_1_mmq struct with transposed, padded layout optimized for conflict-free SLM access. The SYCL version reads Y data directly from standard block_q8_1 structs in global memory on every K sub-iteration, causing redundant global memory traffic and suboptimal SLM access patterns.",
+          "expected_improvement": "10-25% throughput improvement from reduced global memory traffic and conflict-free SLM access for Y data. Currently each qr sub-iteration re-reads Y data from global memory; with pre-formatting, the entire Y tile can be loaded once and reused.",
+          "implementation_notes": "1. Define a SYCL equivalent of block_q8_1_mmq with 128 int8 values + 16 bytes scales per tile block. 2. Create a reformatting kernel or host-side preparation step. 3. Modify the mul_mat_q inner loop to load Y from the reformatted buffer. 4. Adjust tile_y_qs and tile_y_ds SLM layouts to match the new format.",
+          "risk": "medium",
+          "risk_notes": "Requires changes to the Y data pipeline outside mmq.cpp. The reformatting has a cost that must be amortized across multiple matmul calls."
+        },
+        {
+          "id": "opt_008_006",
+          "category": "sub_group_ops",
+          "priority": "medium",
+          "description": "Add [[sycl::reqd_sub_group_size(16)]] to all kernel launches and replace global barriers with local barriers. All 20 kernel launches (10 quant types \u00d7 2 need_check variants) lack the sub-group size attribute. On Xe2, the compiler may choose SIMD32 which halves the number of hardware threads and reduces occupancy. Additionally, all 2 barriers per K-iteration (lines 1287, 1312) use the default global fence instead of access::fence_space::local_space \u2014 wasteful since only SLM is accessed between barriers.",
+          "expected_improvement": "5-15% throughput improvement from guaranteed SIMD16 selection and reduced barrier cost. The barrier improvement is especially significant since it's called 2\u00d7qr times per K-tile (up to 16 times for Q5_K).",
+          "implementation_notes": "1. Add [[sycl::reqd_sub_group_size(16)]] to each cgh.parallel_for lambda. 2. Replace item_ct1.barrier() with item_ct1.barrier(sycl::access::fence_space::local_space) at lines 1287 and 1312. 3. Note: WARP_SIZE is currently 32 (presets.hpp:19) but Xe2 native SIMD is 16. The kernel logic uses WARP_SIZE=32 as the tile K dimension and for SLM addressing \u2014 this is independent of the actual SIMD width and should continue to work with reqd_sub_group_size(16), where 2 sub-groups form one logical 'warp'.",
+          "risk": "low",
+          "risk_notes": "reqd_sub_group_size(16) is a compiler hint. barrier(local_space) is a strict subset of the default barrier. Both are safe changes."
+        },
+        {
+          "id": "opt_008_007",
+          "category": "work_group_size",
+          "priority": "medium",
+          "description": "Eliminate massive code duplication by templating the dispatch functions. The 10 ggml_mul_mat_*_q8_1_sycl functions (lines 1773-2960) are nearly identical ~100-line functions differing only in quant type, SLM tile variable names, and SLM allocation sizes. This can be reduced to a single templated dispatch function, improving maintainability and reducing binary size.",
+          "expected_improvement": "No runtime improvement \u2014 pure code quality. Reduces ~1200 lines to ~120 lines. Makes future changes (tile size tuning, XMX path, stream-K) much easier to implement since they only need to be added once.",
+          "implementation_notes": "1. Create a template function template<typename block_q_t, int qk, int qr, int qi, bool need_sum, auto alloc_fn, auto load_fn, int vdr, auto dot_fn> ggml_mul_mat_q_sycl(). 2. Compute SLM sizes from template parameters using a traits struct similar to CUDA's mmq_type_traits. 3. Replace all 10 functions with instantiations of the template.",
+          "risk": "low",
+          "risk_notes": "Pure refactoring \u2014 no algorithmic change. Must verify SLM allocation sizes match the original per-quant calculations."
+        },
+        {
+          "id": "opt_008_008",
+          "category": "memory_coalescing",
+          "priority": "low",
+          "description": "Add support for missing IQ quant types. CUDA supports 8 additional IQ (importance quantization) types: IQ2_XXS, IQ2_XS, IQ2_S, IQ3_XXS, IQ3_S, IQ1_S, IQ4_NL, IQ4_XS. These are used by highly compressed models (2-3 bit quantization) and are increasingly popular. The SYCL mmq kernel only supports 10 basic quant types.",
+          "expected_improvement": "Feature completeness \u2014 enables running IQ-quantized models on Intel GPUs via the MMQ path. Performance impact depends on model usage patterns. IQ types are increasingly common for edge deployment.",
+          "implementation_notes": "1. Implement allocate_tiles_iq*, load_tiles_iq*, vec_dot_iq*_q8_1_mul_mat for each IQ type following the pattern of existing quant types. 2. Add dispatch cases in ggml_sycl_op_mul_mat_q (line 2987). 3. Reference: CUDA mmq.cuh mmq_type_traits specializations for IQ types. 4. This is substantial work (~200 lines per IQ type) but follows established patterns.",
+          "risk": "medium",
+          "risk_notes": "IQ types have complex dequantization (lookup tables, variable block sizes). Must match CUDA implementations exactly for numerical correctness."
+        },
+        {
+          "id": "opt_008_009",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Clean up DPCT migration artifacts. Remove dpct::has_capability_or_fail() calls (10+ occurrences), replace __dpct_inline__ with inline, replace dpct::min() with sycl::min() or std::min(), rename item_ct1 to item, convert nd_range<3> to nd_range<2> (since first dim is always 1), remove DPCT warning comments (20+ occurrences of DPCT1049, DPCT1065, DPCT1110, DPCT1118).",
+          "expected_improvement": "Minor runtime improvement from removing dpct::has_capability_or_fail() per-launch overhead. Primary benefit is code clarity \u2014 the file has ~50 DPCT comments cluttering 3000 lines.",
+          "implementation_notes": "Mechanical search-and-replace across the entire file. The dpct::has_capability_or_fail removal is the most impactful \u2014 it does a synchronous device query per kernel launch.",
+          "risk": "low",
+          "risk_notes": "Purely mechanical refactoring."
+        }
+      ],
+      "overall_optimization_potential": "critical",
+      "estimated_current_efficiency": "15-25% \u2014 The MMQ kernel is the most performance-critical kernel in LLM inference (dominating token generation time), yet the SYCL version is severely underperforming: no XMX/tensor core compute (using dp4a at ~1/4 theoretical peak INT8 throughput), hardcoded NVIDIA tile sizes, no stream-K for small batches, suboptimal Y data loading, missing IQ quant types, tile size mismatch bug between dispatch and kernel, and pervasive DPCT artifacts. The missing XMX path alone represents a 3-5x potential improvement."
     }
   ],
   "summary": {

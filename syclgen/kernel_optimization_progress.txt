@@ -5,9 +5,9 @@
 
 ## Summary
 - Total SYCL kernels to analyze: 13
-- Kernels analyzed so far: 7
+- Kernels analyzed so far: 8
 - Analysis complete: No
-- Kernels with optimization potential: 7
+- Kernels with optimization potential: 8
 - Optimization tasks created: 0 (pending finalization)
 
 ## Kernels Analyzed
@@ -18,7 +18,7 @@
 - [x] sk_005: convert SYCL kernels — medium potential (7 optimization opportunities)
 - [x] sk_006: binbcast SYCL kernels — medium potential (6 optimization opportunities)
 - [x] sk_007: cpy SYCL kernels — high potential (8 optimization opportunities)
-- [ ] sk_008: mmq SYCL kernels — pending
+- [x] sk_008: mmq SYCL kernels — critical potential (9 optimization opportunities)
 - [ ] sk_009: mmvq SYCL kernels — pending
 - [ ] sk_010: dmmv SYCL kernels — pending
 - [ ] sk_011: getrows SYCL kernels — pending
@@ -26,6 +26,16 @@
 - [ ] sk_013: gla SYCL kernel — pending
 
 ## Recent Activity
+[2026-02-14] Analyzed kernel mmq (quantized matrix multiply) SYCL kernels (sk_008). Found 9 optimization opportunities (critical potential).
+  - CRITICAL: No XMX/tensor core compute path — SYCL_USE_XMX only changes tile sizes, not computation. joint_matrix completely unused. 3-5x potential.
+  - HIGH: Tile size mismatch bug — dispatch selects sizes by compute_capability but kernels hardcoded to AMPERE constants
+  - HIGH: Tile sizes tuned for NVIDIA Ampere, not Intel Xe2 (different SLM, SIMD width, register file)
+  - HIGH: No stream-K partitioning for better EU utilization on small batches (15-40% improvement)
+  - MEDIUM: Y data loaded from global memory every K sub-iteration instead of pre-reformatted layout
+  - MEDIUM: No reqd_sub_group_size(16), global barriers instead of local barriers
+  - MEDIUM: 10 nearly identical dispatch functions should be one template
+  - LOW: Missing 8 IQ quant types + MXFP4, pervasive DPCT artifacts
+
 [2026-02-14] Analyzed kernel cpy (copy) SYCL kernels (sk_007). Found 8 optimization opportunities (high potential).
   - CRITICAL: Quantized copy kernels launch with work-group size 1 — 15/16 SIMD lanes wasted on Xe2
   - HIGH: Scalar copy work-group size is only 32 (SYCL_CPY_BLOCK_SIZE) — should be 256+
