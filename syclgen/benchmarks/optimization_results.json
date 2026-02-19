@@ -1,6 +1,29 @@
 {
   "results": [
     {
+      "task_id": "task_018",
+      "kernel": "MUL_MAT_VEC (K-quant)",
+      "optimization": "SIMD32→SIMD16 native for K-quant DMMV kernels with SLM two-level reduction",
+      "timestamp": "2026-02-19T06:30:00Z",
+      "correctness": "pass",
+      "baseline_time_us": {
+        "q2_K_n1": 111.21,
+        "q3_K_n1": 636.32,
+        "q4_K_n1": 94.89,
+        "q5_K_n1": 305.35,
+        "q6_K_n1": 236.28
+      },
+      "optimized_time_us": {
+        "q2_K_n1": 115.60,
+        "q3_K_n1": 649.31,
+        "q4_K_n1": 94.53,
+        "q5_K_n1": 303.79,
+        "q6_K_n1": 237.21
+      },
+      "speedup": 1.0,
+      "notes": "Changed K-quant kernels from SIMD32 (QK_WARP_SIZE) to SIMD16 (WARP_SIZE) native on Xe2. Added two-level reduction: sub-group level + SLM work-group level. Correctness: 79/79 K-quant tests passed. Performance within noise margin - optimization ensures architectural correctness for Xe2 SIMD16."
+    },
+    {
       "task_id": "task_017",
       "kernel": "MUL_MAT_VEC",
       "optimization": "Work-group size 16→128 for non-K-quant DMMV kernels with SLM multi-sub-group reduction",

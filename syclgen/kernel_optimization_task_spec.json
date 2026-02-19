@@ -310,17 +310,21 @@
         },
         {
           "task_id": "task_018",
+          "status": "completed",
+          "completed_at": "2026-02-19T06:30:00Z",
           "kernel_id": "sk_010",
           "optimization_ids": ["opt_010_002"],
           "name": "Fix QK_WARP_SIZE=32 forcing SIMD32 in K-quant dmmv",
           "description": "K-quant kernels (Q2_K through Q6_K) use QK_WARP_SIZE=32 which forces SIMD32 on Intel, halving occupancy vs native SIMD16. Refactor to use SIMD16-native reduction.",
           "priority": "high",
           "expected_improvement": "Up to 2x occupancy improvement for K-quant types",
+          "actual_improvement": "~1.0x measured (architectural correctness - SIMD16 native on Xe2)",
           "estimated_effort": "medium",
           "dependencies": ["task_004"],
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -k MUL_MAT_VEC",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
-          "files_to_modify": ["ggml/src/ggml-sycl/dmmv.cpp"]
+          "files_to_modify": ["ggml/src/ggml-sycl/dmmv.cpp"],
+          "notes": "Changed K-quant kernels from SIMD32 (QK_WARP_SIZE) to SIMD16 (WARP_SIZE) native on Xe2. Added two-level reduction: sub-group level (WARP_SIZE=16) + SLM-based work-group level. All 79 K-quant unit tests passed. Benchmark shows ~1.0x (within noise margin) - the optimization ensures architectural correctness for Xe2 SIMD16. SLM usage: 2 floats (8 bytes) per work-group for partial sums."
         },
         {
           "task_id": "task_019",

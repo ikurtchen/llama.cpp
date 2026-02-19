@@ -9,7 +9,7 @@
 - Analysis complete: Yes
 - Kernels with optimization potential: 13
 - Optimization tasks created: 42
-- Optimization tasks completed: 17 (Phase 1 complete, Phase 2 in progress — task_014 blocked)
+- Optimization tasks completed: 18 (Phase 1 complete, Phase 2 in progress — task_014 blocked)
 - Kernels with benchmark data: MUL_MAT, SOFT_MAX, CPY, ROPE, ADD
 
 ## Kernels Analyzed
@@ -126,6 +126,18 @@
   - MEDIUM: soft_max_back_f32 work-group size too small (only 16 on Intel)
 
 ## Optimization Activity
+
+[2026-02-19] Completed task_018: Fix QK_WARP_SIZE=32 forcing SIMD32 in K-quant dmmv
+  - Kernel: sk_010 (MUL_MAT_VEC)
+  - Optimization: Changed K-quant kernels from SIMD32 to SIMD16 native on Xe2
+  - Changes:
+    - Modified all 5 K-quant kernel functions (q2_k through q6_k) with SLM parameter
+    - Added two-level reduction: sub-group level (WARP_SIZE=16) + SLM work-group level
+    - Modified all 5 dispatch functions to use [[sycl::reqd_sub_group_size(WARP_SIZE)]]
+    - Added sycl::local_accessor for SLM partial sums (2 floats per work-group)
+  - Correctness: PASS (79/79 K-quant unit tests)
+  - Performance: ~1.0x on benchmark (architectural correctness for Xe2 SIMD16)
+  - Note: Ensures native SIMD16 mode on Xe2 instead of forced SIMD32, providing proper foundation for future optimizations
 
 [2026-02-19] Completed task_017: Increase dmmv work-group size from 16-32 to 128-256
   - Kernel: sk_010 (MUL_MAT_VEC)

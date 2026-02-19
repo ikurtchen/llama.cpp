@@ -291,6 +291,22 @@ static void convert_mul_mat_vec_f16_sycl(const void *vx, const dfloat *y,
     }
 }
 
+// ============================================================================
+// Optimization: task_018 - Use SIMD16 sub-groups for K-quant DMMV kernels
+// Target: Intel Arc Pro B60 (Xe2 architecture, SIMD16 native width)
+// 
+// Original: QK_WARP_SIZE=32 forcing SIMD32, halving occupancy on Xe2
+// Optimized: Use WARP_SIZE=16 sub-groups with two-level reduction
+//
+// Key changes:
+// 1. Changed reqd_sub_group_size from QK_WARP_SIZE (32) to WARP_SIZE (16)
+// 2. Added two-level reduction: sub-group level + SLM work-group level
+// 3. Each sub-group leader writes partial result to SLM
+// 4. First sub-group performs final reduction across all sub-groups
+//
+// Expected improvement: 2x occupancy on Intel Xe2 due to native SIMD16 usage
+// ============================================================================
+
 /*
 DPCT1110:4: The total declared local variable size in device function
 dequantize_mul_mat_vec_q2_k exceeds 128 bytes and may cause high register
@@ -302,13 +318,18 @@ static void dequantize_mul_mat_vec_q2_k(const void *__restrict__ vx,
                                         const float *__restrict__ yy,
                                         float *__restrict__ dst,
                                         const int ncols, int nrows,
-                                        const sycl::nd_item<3> &item_ct1) {
+                                        const sycl::nd_item<3> &item_ct1,
+                                        float * __restrict__ slm_partial) {
 
     static_assert(16%K_QUANTS_PER_ITERATION == 0, "16 must be divisible by K_QUANTS_PER_ITERATION");
 
     const int row = item_ct1.get_group(2) * item_ct1.get_local_range(1) +
                     item_ct1.get_local_id(1);
     if (row >= nrows) return;
+
+    const int tid = item_ct1.get_local_id(2);
+    const int sg_id = tid / WARP_SIZE;
+    const int tid_in_sg = tid % WARP_SIZE;
 
     const int num_blocks_per_row = ncols / QK_K;
     const int ib0 = row*num_blocks_per_row;
@@ -318,15 +339,15 @@ static void dequantize_mul_mat_vec_q2_k(const void *__restrict__ vx,
     float tmp = 0; // partial sum for thread in warp
 
 #if QK_K == 256
-    const int tid =
-        item_ct1.get_local_id(2) / K_QUANTS_PER_ITERATION; // 0...31 or 0...15
+    const int tid_k =
+        tid / K_QUANTS_PER_ITERATION; // 0...31 or 0...15
     const int ix =
-        item_ct1.get_local_id(2) % K_QUANTS_PER_ITERATION; // 0 or 0,1
+        tid % K_QUANTS_PER_ITERATION; // 0 or 0,1
 
     const int step = 16/K_QUANTS_PER_ITERATION;
 
-    const int im = tid/step;                             // 0 or 1. 0 computes 0..., 1 computes 128...
-    const int in = tid - step*im;                        // 0...15 or 0...7
+    const int im = tid_k/step;                             // 0 or 1. 0 computes 0..., 1 computes 128...
+    const int in = tid_k - step*im;                        // 0...15 or 0...7
 
     const int l0 = K_QUANTS_PER_ITERATION*in;            // 0...15 or 0...14 in steps of 2
     const int q_offset = 32*im + l0;
@@ -369,11 +390,11 @@ static void dequantize_mul_mat_vec_q2_k(const void *__restrict__ vx,
 
     }
 #else
-    const int tid = item_ct1.get_local_id(2) /
+    const int tid_k = tid /
                     (2 * K_QUANTS_PER_ITERATION); // 0...15 or 0...7
-    const int ix = item_ct1.get_local_id(2) %
+    const int ix = tid %
                    (2 * K_QUANTS_PER_ITERATION); // 0....1 or 0...3
-    const int offset = tid * K_QUANTS_PER_ITERATION;
+    const int offset = tid_k * K_QUANTS_PER_ITERATION;
 
     uint32_t uaux[2];
     const uint8_t * d = (const uint8_t *)uaux;
@@ -405,15 +426,29 @@ static void dequantize_mul_mat_vec_q2_k(const void *__restrict__ vx,
 
 #endif
 
-    // sum up partial sums and write back result
+    // Sub-group level reduction (within 16-wide sub-group)
 #pragma unroll
-    for (int mask = QK_WARP_SIZE / 2; mask > 0; mask >>= 1) {
+    for (int mask = WARP_SIZE / 2; mask > 0; mask >>= 1) {
         tmp +=
             dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), tmp, mask);
     }
 
-    if (item_ct1.get_local_id(2) == 0) {
-        dst[row] = tmp;
+    // Two-level work-group reduction using SLM
+    constexpr int num_sub_groups = QK_WARP_SIZE / WARP_SIZE;
+    if (tid_in_sg == 0) {
+        slm_partial[sg_id] = tmp;
+    }
+    item_ct1.barrier(sycl::access::fence_space::local_space);
+
+    // First sub-group performs final reduction
+    if (sg_id == 0) {
+        float final_sum = (tid_in_sg < num_sub_groups) ? slm_partial[tid_in_sg] : 0.0f;
+        for (int mask = WARP_SIZE / 2; mask > 0; mask >>= 1) {
+            final_sum += dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), final_sum, mask);
+        }
+        if (tid_in_sg == 0) {
+            dst[row] = final_sum;
+        }
     }
 }
 
@@ -428,11 +463,16 @@ static void dequantize_mul_mat_vec_q3_k(const void *__restrict__ vx,
                                         const float *__restrict__ yy,
                                         float *__restrict__ dst,
                                         const int ncols, int nrows,
-                                        const sycl::nd_item<3> &item_ct1) {
+                                        const sycl::nd_item<3> &item_ct1,
+                                        float * __restrict__ slm_partial) {
 
     const int row = item_ct1.get_group(2) * item_ct1.get_local_range(1) +
                     item_ct1.get_local_id(1);
     if (row >= nrows) return;
+
+    const int tid = item_ct1.get_local_id(2);
+    const int sg_id = tid / WARP_SIZE;
+    const int tid_in_sg = tid % WARP_SIZE;
 
     const int num_blocks_per_row = ncols / QK_K;
     const int ib0 = row*num_blocks_per_row;
@@ -446,15 +486,15 @@ static void dequantize_mul_mat_vec_q3_k(const void *__restrict__ vx,
     const uint16_t kmask1 = 0x0303;
     const uint16_t kmask2 = 0x0f0f;
 
-    const int tid =
-        item_ct1.get_local_id(2) / K_QUANTS_PER_ITERATION; // 0...31 or 0...16
+    const int tid_k =
+        tid / K_QUANTS_PER_ITERATION; // 0...31 or 0...16
     const int ix =
-        item_ct1.get_local_id(2) % K_QUANTS_PER_ITERATION; // 0 or 0,1
+        tid % K_QUANTS_PER_ITERATION; // 0 or 0,1
 
     const int n  = K_QUANTS_PER_ITERATION;               // iterations in the inner loop
     const int step = 16/K_QUANTS_PER_ITERATION;
-    const int im = tid/step;                             // 0 or 1. 0 computes 0..., 1 computes 128...
-    const int in = tid - step*im;                        // 0....15 or 0...7
+    const int im = tid_k/step;                             // 0 or 1. 0 computes 0..., 1 computes 128...
+    const int in = tid_k - step*im;                        // 0....15 or 0...7
 
     const uint8_t m = 1 << (4*im);
 
@@ -497,9 +537,9 @@ static void dequantize_mul_mat_vec_q3_k(const void *__restrict__ vx,
     }
 #else
 
-    const int tid = item_ct1.get_local_id(2)/(2*K_QUANTS_PER_ITERATION);  // 0...15 or 0...7
-    const int ix  = item_ct1.get_local_id(2)%(2*K_QUANTS_PER_ITERATION);  // 0....1 or 0...3
-    const int offset = tid * K_QUANTS_PER_ITERATION;         // 0...15 or 0...14
+    const int tid_k = tid/(2*K_QUANTS_PER_ITERATION);  // 0...15 or 0...7
+    const int ix  = tid%(2*K_QUANTS_PER_ITERATION);  // 0....1 or 0...3
+    const int offset = tid_k * K_QUANTS_PER_ITERATION;         // 0...15 or 0...14
     const int in = offset/8;                                 // 0 or 1
     const int im = offset%8;                                 // 0...7
 
@@ -524,15 +564,29 @@ static void dequantize_mul_mat_vec_q3_k(const void *__restrict__ vx,
     }
 #endif
 
-    // sum up partial sums and write back result
+    // Sub-group level reduction (within 16-wide sub-group)
 #pragma unroll
-    for (int mask = QK_WARP_SIZE / 2; mask > 0; mask >>= 1) {
+    for (int mask = WARP_SIZE / 2; mask > 0; mask >>= 1) {
         tmp +=
             dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), tmp, mask);
     }
 
-    if (item_ct1.get_local_id(2) == 0) {
-        dst[row] = tmp;
+    // Two-level work-group reduction using SLM
+    constexpr int num_sub_groups = QK_WARP_SIZE / WARP_SIZE;
+    if (tid_in_sg == 0) {
+        slm_partial[sg_id] = tmp;
+    }
+    item_ct1.barrier(sycl::access::fence_space::local_space);
+
+    // First sub-group performs final reduction
+    if (sg_id == 0) {
+        float final_sum = (tid_in_sg < num_sub_groups) ? slm_partial[tid_in_sg] : 0.0f;
+        for (int mask = WARP_SIZE / 2; mask > 0; mask >>= 1) {
+            final_sum += dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), final_sum, mask);
+        }
+        if (tid_in_sg == 0) {
+            dst[row] = final_sum;
+        }
     }
 }
 
@@ -547,11 +601,17 @@ static void dequantize_mul_mat_vec_q4_k(const void *__restrict__ vx,
                                         const float *__restrict__ yy,
                                         float *__restrict__ dst,
                                         const int ncols, int nrows,
-                                        const sycl::nd_item<3> &item_ct1) {
+                                        const sycl::nd_item<3> &item_ct1,
+                                        float * __restrict__ slm_partial) {
 
     const int row = item_ct1.get_group(2) * item_ct1.get_local_range(1) +
                     item_ct1.get_local_id(1);
     if (row >= nrows) return;
+
+    const int tid = item_ct1.get_local_id(2);
+    const int sg_id = tid / WARP_SIZE;
+    const int tid_in_sg = tid % WARP_SIZE;
+
     const int num_blocks_per_row = ncols / QK_K;
     const int ib0 = row*num_blocks_per_row;
 
@@ -562,15 +622,15 @@ static void dequantize_mul_mat_vec_q4_k(const void *__restrict__ vx,
     const uint16_t kmask2 = 0x0f0f;
     const uint16_t kmask3 = 0xc0c0;
 
-    const int tid =
-        item_ct1.get_local_id(2) / K_QUANTS_PER_ITERATION; // 0...31 or 0...16
+    const int tid_k =
+        tid / K_QUANTS_PER_ITERATION; // 0...31 or 0...16
     const int ix =
-        item_ct1.get_local_id(2) % K_QUANTS_PER_ITERATION; // 0 or 0,1
+        tid % K_QUANTS_PER_ITERATION; // 0 or 0,1
 
     const int step = 8/K_QUANTS_PER_ITERATION;           // 8 or 4
 
-    const int il  = tid/step;                            // 0...3
-    const int ir  = tid - step*il;                       // 0...7 or 0...3
+    const int il  = tid_k/step;                            // 0...3
+    const int ir  = tid_k - step*il;                       // 0...7 or 0...3
     const int n   = 2 * K_QUANTS_PER_ITERATION;          // 2 or 4
 
     const int im = il/2;  // 0 or 1. 0 computes 0,32 + 128,160, 1 computes 64,96 + 192,224
@@ -647,10 +707,10 @@ static void dequantize_mul_mat_vec_q4_k(const void *__restrict__ vx,
 
     }
 #else
-    const int tid = item_ct1.get_local_id(2)/(2*K_QUANTS_PER_ITERATION);  // 0...15
-    const int ix  = item_ct1.get_local_id(2)%(2*K_QUANTS_PER_ITERATION);
+    const int tid_k = tid/(2*K_QUANTS_PER_ITERATION);  // 0...15
+    const int ix  = tid%(2*K_QUANTS_PER_ITERATION);
 
-    const int step = tid * K_QUANTS_PER_ITERATION;
+    const int step = tid_k * K_QUANTS_PER_ITERATION;
 
     uint16_t aux16[2];
     const uint8_t * s = (const uint8_t *)aux16;
@@ -677,15 +737,29 @@ static void dequantize_mul_mat_vec_q4_k(const void *__restrict__ vx,
 
 #endif
 
-    // sum up partial sums and write back result
+    // Sub-group level reduction (within 16-wide sub-group)
 #pragma unroll
-    for (int mask = QK_WARP_SIZE / 2; mask > 0; mask >>= 1) {
+    for (int mask = WARP_SIZE / 2; mask > 0; mask >>= 1) {
         tmp +=
             dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), tmp, mask);
     }
 
-    if (tid == 0) {
-        dst[row] = tmp;
+    // Two-level work-group reduction using SLM
+    constexpr int num_sub_groups = QK_WARP_SIZE / WARP_SIZE;
+    if (tid_in_sg == 0) {
+        slm_partial[sg_id] = tmp;
+    }
+    item_ct1.barrier(sycl::access::fence_space::local_space);
+
+    // First sub-group performs final reduction
+    if (sg_id == 0) {
+        float final_sum = (tid_in_sg < num_sub_groups) ? slm_partial[tid_in_sg] : 0.0f;
+        for (int mask = WARP_SIZE / 2; mask > 0; mask >>= 1) {
+            final_sum += dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), final_sum, mask);
+        }
+        if (tid_in_sg == 0) {
+            dst[row] = final_sum;
+        }
     }
 }
 
@@ -700,9 +774,14 @@ static void dequantize_mul_mat_vec_q5_k(const void *__restrict__ vx,
                                         const float *__restrict__ yy,
                                         float *__restrict__ dst,
                                         const int ncols,
-                                        const sycl::nd_item<3> &item_ct1) {
+                                        const sycl::nd_item<3> &item_ct1,
+                                        float * __restrict__ slm_partial) {
 
     const int row = item_ct1.get_group(2);
+    const int tid = item_ct1.get_local_id(2);
+    const int sg_id = tid / WARP_SIZE;
+    const int tid_in_sg = tid % WARP_SIZE;
+
     const int num_blocks_per_row = ncols / QK_K;
     const int ib0 = row*num_blocks_per_row;
 
@@ -715,11 +794,11 @@ static void dequantize_mul_mat_vec_q5_k(const void *__restrict__ vx,
     const uint16_t kmask2 = 0x0f0f;
     const uint16_t kmask3 = 0xc0c0;
 
-    const int tid = item_ct1.get_local_id(2) / 2; // 0...15
-    const int ix = item_ct1.get_local_id(2) % 2;
+    const int tid_k = tid / 2; // 0...15
+    const int ix = tid % 2;
 
-    const int il  = tid/4;     // 0...3
-    const int ir  = tid - 4*il;// 0...3
+    const int il  = tid_k/4;     // 0...3
+    const int ir  = tid_k - 4*il;// 0...3
     const int n   = 2;
 
     const int im = il/2;  // 0 or 1. 0 computes 0,32 + 128,160, 1 computes 64,96 + 192,224
@@ -788,9 +867,9 @@ static void dequantize_mul_mat_vec_q5_k(const void *__restrict__ vx,
     }
 
 #else
-    const int tid = item_ct1.get_local_id(2)/(2*K_QUANTS_PER_ITERATION);  // 0...15
-    const int ix  = item_ct1.get_local_id(2)%(2*K_QUANTS_PER_ITERATION);
-    const int step = tid * K_QUANTS_PER_ITERATION;
+    const int tid_k = tid/(2*K_QUANTS_PER_ITERATION);  // 0...15
+    const int ix  = tid%(2*K_QUANTS_PER_ITERATION);
+    const int step = tid_k * K_QUANTS_PER_ITERATION;
     const int im = step/8;
     const int in = step%8;
 
@@ -811,26 +890,44 @@ static void dequantize_mul_mat_vec_q5_k(const void *__restrict__ vx,
     }
 #endif
 
-    // sum up partial sums and write back result
+    // Sub-group level reduction (within 16-wide sub-group)
 #pragma unroll
-    for (int mask = QK_WARP_SIZE / 2; mask > 0; mask >>= 1) {
+    for (int mask = WARP_SIZE / 2; mask > 0; mask >>= 1) {
         tmp +=
             dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), tmp, mask);
     }
 
-    if (item_ct1.get_local_id(2) == 0) {
-        dst[row] = tmp;
+    // Two-level work-group reduction using SLM
+    constexpr int num_sub_groups = QK_WARP_SIZE / WARP_SIZE;
+    if (tid_in_sg == 0) {
+        slm_partial[sg_id] = tmp;
+    }
+    item_ct1.barrier(sycl::access::fence_space::local_space);
+
+    // First sub-group performs final reduction
+    if (sg_id == 0) {
+        float final_sum = (tid_in_sg < num_sub_groups) ? slm_partial[tid_in_sg] : 0.0f;
+        for (int mask = WARP_SIZE / 2; mask > 0; mask >>= 1) {
+            final_sum += dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), final_sum, mask);
+        }
+        if (tid_in_sg == 0) {
+            dst[row] = final_sum;
+        }
     }
 }
 
 static void dequantize_mul_mat_vec_q6_k(const void * __restrict__ vx, const float * __restrict__ yy, float * __restrict__ dst, const int ncols, int nrows,
-                                        const sycl::nd_item<3> &item_ct1) {
+                                        const sycl::nd_item<3> &item_ct1, float * __restrict__ slm_partial) {
 
     static_assert(16%K_QUANTS_PER_ITERATION == 0, "16 must be divisible by K_QUANTS_PER_ITERATION");
 
     const int row = item_ct1.get_group(2) * item_ct1.get_local_range(1) +
                     item_ct1.get_local_id(1);
     if (row >= nrows) return;
+
+    const int tid = item_ct1.get_local_id(2);
+    const int sg_id = tid / WARP_SIZE;
+    const int tid_in_sg = tid % WARP_SIZE;
 
     const int num_blocks_per_row = ncols / QK_K;
     const int ib0 = row*num_blocks_per_row;
@@ -839,15 +936,15 @@ static void dequantize_mul_mat_vec_q6_k(const void * __restrict__ vx, const floa
 
 #if QK_K == 256
 
-    const int tid =
-        item_ct1.get_local_id(2) / K_QUANTS_PER_ITERATION; // 0...31 or 0...16
+    const int tid_k =
+        tid / K_QUANTS_PER_ITERATION; // 0...31 or 0...16
     const int ix =
-        item_ct1.get_local_id(2) % K_QUANTS_PER_ITERATION; // 0 or 0, 1
+        tid % K_QUANTS_PER_ITERATION; // 0 or 0, 1
 
     const int step = 16/K_QUANTS_PER_ITERATION;          // 16 or 8
 
-    const int im = tid/step;                             // 0 or 1. 0 computes 0..., 1 computes 128...
-    const int in = tid - step*im;                        // 0...15 or 0...7
+    const int im = tid_k/step;                             // 0 or 1. 0 computes 0..., 1 computes 128...
+    const int in = tid_k - step*im;                        // 0...15 or 0...7
 
 #if K_QUANTS_PER_ITERATION == 1
     const int l0 = K_QUANTS_PER_ITERATION*in;            // 0...15
@@ -897,10 +994,10 @@ static void dequantize_mul_mat_vec_q6_k(const void * __restrict__ vx, const floa
 
 #else
 
-    const int tid = item_ct1.get_local_id(2)/(2*K_QUANTS_PER_ITERATION);  // 0...7
-    const int ix  = item_ct1.get_local_id(2)%(2*K_QUANTS_PER_ITERATION);  // 0...3
+    const int tid_k = tid/(2*K_QUANTS_PER_ITERATION);  // 0...7
+    const int ix  = tid%(2*K_QUANTS_PER_ITERATION);  // 0...3
 
-    const int step = tid * K_QUANTS_PER_ITERATION;
+    const int step = tid_k * K_QUANTS_PER_ITERATION;
 
     float tmp = 0; // partial sum for thread in warp
 
@@ -926,15 +1023,29 @@ static void dequantize_mul_mat_vec_q6_k(const void * __restrict__ vx, const floa
 
 #endif
 
-    // sum up partial sums and write back result
+    // Sub-group level reduction (within 16-wide sub-group)
 #pragma unroll
-    for (int mask = QK_WARP_SIZE / 2; mask > 0; mask >>= 1) {
+    for (int mask = WARP_SIZE / 2; mask > 0; mask >>= 1) {
         tmp +=
             dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), tmp, mask);
     }
 
-    if (tid == 0) {
-        dst[row] = tmp;
+    // Two-level work-group reduction using SLM
+    constexpr int num_sub_groups = QK_WARP_SIZE / WARP_SIZE;
+    if (tid_in_sg == 0) {
+        slm_partial[sg_id] = tmp;
+    }
+    item_ct1.barrier(sycl::access::fence_space::local_space);
+
+    // First sub-group performs final reduction
+    if (sg_id == 0) {
+        float final_sum = (tid_in_sg < num_sub_groups) ? slm_partial[tid_in_sg] : 0.0f;
+        for (int mask = WARP_SIZE / 2; mask > 0; mask >>= 1) {
+            final_sum += dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), final_sum, mask);
+        }
+        if (tid_in_sg == 0) {
+            dst[row] = final_sum;
+        }
     }
 }
 
@@ -1106,15 +1217,20 @@ static void dequantize_mul_mat_vec_q2_K_sycl(const void *vx, const float *y,
                                              const int nrows,
                                              dpct::queue_ptr stream) {
     GGML_ASSERT(ncols % QK_K == 0);
-    const int ny = 2; // very slightly faster than 1 even when K_QUANTS_PER_ITERATION = 2
+    const int ny = 2;
     const int block_num_y = (nrows + ny - 1) / ny;
     const sycl::range<3> block_nums(1, 1, block_num_y);
     const sycl::range<3> block_dims(1, ny, QK_WARP_SIZE);
-    stream->parallel_for(
-        sycl::nd_range<3>(block_nums * block_dims, block_dims),
-        [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(QK_WARP_SIZE)]] {
-            dequantize_mul_mat_vec_q2_k(vx, y, dst, ncols, nrows, item_ct1);
-        });
+    constexpr int num_sub_groups = QK_WARP_SIZE / WARP_SIZE;
+    stream->submit([&](sycl::handler &cgh) {
+        sycl::local_accessor<float, 1> slm_partial_acc_ct1(num_sub_groups, cgh);
+        cgh.parallel_for(
+            sycl::nd_range<3>(block_nums * block_dims, block_dims),
+            [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                dequantize_mul_mat_vec_q2_k(vx, y, dst, ncols, nrows, item_ct1,
+                    slm_partial_acc_ct1.get_multi_ptr<sycl::access::decorated::no>().get());
+            });
+    });
 }
 
 static void dequantize_mul_mat_vec_q3_K_sycl(const void *vx, const float *y,
@@ -1126,11 +1242,16 @@ static void dequantize_mul_mat_vec_q3_K_sycl(const void *vx, const float *y,
     const int block_num_y = (nrows + ny - 1) / ny;
     const sycl::range<3> block_nums(1, 1, block_num_y);
     const sycl::range<3> block_dims(1, ny, QK_WARP_SIZE);
-    stream->parallel_for(
-        sycl::nd_range<3>(block_nums * block_dims, block_dims),
-        [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(QK_WARP_SIZE)]] {
-            dequantize_mul_mat_vec_q3_k(vx, y, dst, ncols, nrows, item_ct1);
-        });
+    constexpr int num_sub_groups = QK_WARP_SIZE / WARP_SIZE;
+    stream->submit([&](sycl::handler &cgh) {
+        sycl::local_accessor<float, 1> slm_partial_acc_ct1(num_sub_groups, cgh);
+        cgh.parallel_for(
+            sycl::nd_range<3>(block_nums * block_dims, block_dims),
+            [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                dequantize_mul_mat_vec_q3_k(vx, y, dst, ncols, nrows, item_ct1,
+                    slm_partial_acc_ct1.get_multi_ptr<sycl::access::decorated::no>().get());
+            });
+    });
 }
 
 static void dequantize_mul_mat_vec_q4_K_sycl(const void *vx, const float *y,
@@ -1142,11 +1263,16 @@ static void dequantize_mul_mat_vec_q4_K_sycl(const void *vx, const float *y,
     const int block_num_y = (nrows + ny - 1) / ny;
     const sycl::range<3> block_nums(1, 1, block_num_y);
     const sycl::range<3> block_dims(1, ny, QK_WARP_SIZE);
-    stream->parallel_for(
-        sycl::nd_range<3>(block_nums * block_dims, block_dims),
-        [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(QK_WARP_SIZE)]] {
-            dequantize_mul_mat_vec_q4_k(vx, y, dst, ncols, nrows, item_ct1);
-        });
+    constexpr int num_sub_groups = QK_WARP_SIZE / WARP_SIZE;
+    stream->submit([&](sycl::handler &cgh) {
+        sycl::local_accessor<float, 1> slm_partial_acc_ct1(num_sub_groups, cgh);
+        cgh.parallel_for(
+            sycl::nd_range<3>(block_nums * block_dims, block_dims),
+            [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                dequantize_mul_mat_vec_q4_k(vx, y, dst, ncols, nrows, item_ct1,
+                    slm_partial_acc_ct1.get_multi_ptr<sycl::access::decorated::no>().get());
+            });
+    });
 }
 
 static void dequantize_mul_mat_vec_q5_K_sycl(const void *vx, const float *y,
@@ -1155,11 +1281,16 @@ static void dequantize_mul_mat_vec_q5_K_sycl(const void *vx, const float *y,
                                              dpct::queue_ptr stream) {
     GGML_ASSERT(ncols % QK_K == 0);
     const sycl::range<3> block_dims(1, 1, QK_WARP_SIZE);
-    stream->parallel_for(
-        sycl::nd_range<3>(sycl::range<3>(1, 1, nrows) * block_dims, block_dims),
-        [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(QK_WARP_SIZE)]] {
-            dequantize_mul_mat_vec_q5_k(vx, y, dst, ncols, item_ct1);
-        });
+    constexpr int num_sub_groups = QK_WARP_SIZE / WARP_SIZE;
+    stream->submit([&](sycl::handler &cgh) {
+        sycl::local_accessor<float, 1> slm_partial_acc_ct1(num_sub_groups, cgh);
+        cgh.parallel_for(
+            sycl::nd_range<3>(sycl::range<3>(1, 1, nrows) * block_dims, block_dims),
+            [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                dequantize_mul_mat_vec_q5_k(vx, y, dst, ncols, item_ct1,
+                    slm_partial_acc_ct1.get_multi_ptr<sycl::access::decorated::no>().get());
+            });
+    });
 }
 
 static void dequantize_mul_mat_vec_q6_K_sycl(const void *vx, const float *y,
@@ -1171,11 +1302,16 @@ static void dequantize_mul_mat_vec_q6_K_sycl(const void *vx, const float *y,
     const int block_num_y = (nrows + ny - 1) / ny;
     const sycl::range<3> block_nums(1, 1, block_num_y);
     const sycl::range<3> block_dims(1, ny, QK_WARP_SIZE);
-    stream->parallel_for(
-        sycl::nd_range<3>(block_nums * block_dims, block_dims),
-        [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(QK_WARP_SIZE)]] {
-            dequantize_mul_mat_vec_q6_k(vx, y, dst, ncols, nrows, item_ct1);
-        });
+    constexpr int num_sub_groups = QK_WARP_SIZE / WARP_SIZE;
+    stream->submit([&](sycl::handler &cgh) {
+        sycl::local_accessor<float, 1> slm_partial_acc_ct1(num_sub_groups, cgh);
+        cgh.parallel_for(
+            sycl::nd_range<3>(block_nums * block_dims, block_dims),
+            [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                dequantize_mul_mat_vec_q6_k(vx, y, dst, ncols, nrows, item_ct1,
+                    slm_partial_acc_ct1.get_multi_ptr<sycl::access::decorated::no>().get());
+            });
+    });
 }
 
 void ggml_sycl_op_dequantize_mul_mat_vec(
