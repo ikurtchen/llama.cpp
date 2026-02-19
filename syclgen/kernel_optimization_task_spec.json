@@ -30,6 +30,8 @@
         },
         {
           "task_id": "task_002",
+          "status": "completed",
+          "completed_at": "2026-02-19T02:02:00Z",
           "kernel_id": "sk_001",
           "optimization_ids": [],
           "name": "Benchmark softmax",
@@ -40,10 +42,13 @@
           "dependencies": [],
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -k SOFT_MAX",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
-          "files_to_modify": []
+          "files_to_modify": [],
+          "notes": "Benchmarked 29 test cases. Time range: 5.74 - 2522.35 us. Bandwidth: 10.64 - 264.98 GB/s. Results appended to baseline_results.json"
         },
         {
           "task_id": "task_003",
+          "status": "completed",
+          "completed_at": "2026-02-19T02:07:00Z",
           "kernel_id": "sk_003",
           "optimization_ids": [],
           "name": "Benchmark norm kernels",
@@ -54,10 +59,13 @@
           "dependencies": [],
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -k NORM,RMS_NORM,GROUP_NORM",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
-          "files_to_modify": []
+          "files_to_modify": [],
+          "notes": "No benchmark test cases defined in test-backend-ops for these kernels. Benchmark ran but produced no timing data."
         },
         {
           "task_id": "task_004",
+          "status": "completed",
+          "completed_at": "2026-02-19T02:07:00Z",
           "kernel_id": "sk_010",
           "optimization_ids": [],
           "name": "Benchmark dmmv kernels",
@@ -68,10 +76,13 @@
           "dependencies": [],
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -k MUL_MAT_VEC",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
-          "files_to_modify": []
+          "files_to_modify": [],
+          "notes": "No benchmark test cases defined in test-backend-ops for this kernel. Benchmark ran but produced no timing data."
         },
         {
           "task_id": "task_005",
+          "status": "completed",
+          "completed_at": "2026-02-19T02:07:00Z",
           "kernel_id": "sk_009",
           "optimization_ids": [],
           "name": "Benchmark mmvq kernels",
@@ -82,10 +93,13 @@
           "dependencies": [],
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -k MUL_MAT_VEC_Q",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
-          "files_to_modify": []
+          "files_to_modify": [],
+          "notes": "No benchmark test cases defined in test-backend-ops for this kernel. Benchmark ran but produced no timing data."
         },
         {
           "task_id": "task_006",
+          "status": "completed",
+          "completed_at": "2026-02-19T02:07:00Z",
           "kernel_id": "sk_007",
           "optimization_ids": [],
           "name": "Benchmark cpy kernels",
@@ -96,10 +110,13 @@
           "dependencies": [],
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -k CPY",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
-          "files_to_modify": []
+          "files_to_modify": [],
+          "notes": "Benchmarked 14 test cases. Time range: 65.74 - 10864.15 us. Bandwidth: 9.03 - 180.65 GB/s. 2 bf16 cases not supported. Results appended to baseline_results.json"
         },
         {
           "task_id": "task_007",
+          "status": "completed",
+          "completed_at": "2026-02-19T02:12:00Z",
           "kernel_id": "sk_002",
           "optimization_ids": [],
           "name": "Benchmark rope kernels",
@@ -110,10 +127,13 @@
           "dependencies": [],
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -k ROPE",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
-          "files_to_modify": []
+          "files_to_modify": [],
+          "notes": "Benchmarked 56 test cases. Time range: 4.87 - 138.32 us. Bandwidth: 0.17 - 1514.23 GB/s. Results appended to baseline_results.json"
         },
         {
           "task_id": "task_008",
+          "status": "completed",
+          "completed_at": "2026-02-19T02:12:00Z",
           "kernel_id": "sk_004",
           "optimization_ids": [],
           "name": "Benchmark element_wise kernels",
@@ -124,10 +144,13 @@
           "dependencies": [],
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -k SILU,GELU,RELU,TANH",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
-          "files_to_modify": []
+          "files_to_modify": [],
+          "notes": "No benchmark test cases defined in test-backend-ops for these kernels. Benchmark ran but produced no timing data."
         },
         {
           "task_id": "task_009",
+          "status": "completed",
+          "completed_at": "2026-02-19T02:12:00Z",
           "kernel_id": "sk_005",
           "optimization_ids": [],
           "name": "Benchmark convert kernels",
@@ -138,10 +161,13 @@
           "dependencies": [],
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -k DEQUANT",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
-          "files_to_modify": []
+          "files_to_modify": [],
+          "notes": "No benchmark test cases defined in test-backend-ops for this kernel. Benchmark ran but produced no timing data."
         },
         {
           "task_id": "task_010",
+          "status": "completed",
+          "completed_at": "2026-02-19T02:12:00Z",
           "kernel_id": "sk_006",
           "optimization_ids": [],
           "name": "Benchmark binbcast kernels",
@@ -152,10 +178,13 @@
           "dependencies": [],
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -k ADD,MUL,DIV",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
-          "files_to_modify": []
+          "files_to_modify": [],
+          "notes": "Benchmarked 2 test cases for ADD. Time range: 69.81 - 177.50 us. Bandwidth: 0.66 - 132.04 GB/s. MUL and DIV have no benchmark test cases. Results appended to baseline_results.json"
         },
         {
           "task_id": "task_011",
+          "status": "completed",
+          "completed_at": "2026-02-19T02:12:00Z",
           "kernel_id": "sk_011",
           "optimization_ids": [],
           "name": "Benchmark getrows kernels",
@@ -166,10 +195,13 @@
           "dependencies": [],
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -k GET_ROWS",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
-          "files_to_modify": []
+          "files_to_modify": [],
+          "notes": "No benchmark test cases defined in test-backend-ops for this kernel. Benchmark ran but produced no timing data."
         },
         {
           "task_id": "task_012",
+          "status": "completed",
+          "completed_at": "2026-02-19T02:12:00Z",
           "kernel_id": "sk_012",
           "optimization_ids": [],
           "name": "Benchmark wkv kernels",
@@ -180,10 +212,13 @@
           "dependencies": [],
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -k WKV",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
-          "files_to_modify": []
+          "files_to_modify": [],
+          "notes": "No benchmark test cases defined in test-backend-ops for this kernel. Benchmark ran but produced no timing data."
         },
         {
           "task_id": "task_013",
+          "status": "completed",
+          "completed_at": "2026-02-19T02:12:00Z",
           "kernel_id": "sk_013",
           "optimization_ids": [],
           "name": "Benchmark gla kernel",
@@ -194,7 +229,8 @@
           "dependencies": [],
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -k GLA",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
-          "files_to_modify": []
+          "files_to_modify": [],
+          "notes": "No benchmark test cases defined in test-backend-ops for this kernel. Benchmark ran but produced no timing data."
         }
       ]
     },
