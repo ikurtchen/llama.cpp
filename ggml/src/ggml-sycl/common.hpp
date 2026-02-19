@@ -89,6 +89,10 @@ extern int g_ggml_sycl_prioritize_dmmv;
     #define SYCL_USE_XMX
 #endif
 
+// Define GGML_SYCL_USE_XMX_JOINT_MATRIX to enable joint_matrix XMX path
+// This requires Intel XMX hardware support and DPC++ compiler with matrix extension
+// #define GGML_SYCL_USE_XMX_JOINT_MATRIX
+
 // max batch size to use MMQ kernels when tensor cores are available
 #define MMQ_MAX_BATCH_SIZE 32
 

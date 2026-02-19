@@ -13,6 +13,26 @@
 #include "mmq.hpp"
 #include "vecdotq.hpp"
 
+#ifdef GGML_SYCL_USE_XMX_JOINT_MATRIX
+#include <sycl/ext/oneapi/experimental/matrix.hpp>
+
+using namespace sycl::ext::oneapi::experimental::matrix;
+
+constexpr int XMX_M = 8;
+constexpr int XMX_N = 16;
+constexpr int XMX_K = 32;
+
+template <typename T, int M, int N>
+using xmx_accumulator = joint_matrix<sycl::sub_group, T, use::accumulator, M, N>;
+
+template <typename T, int M, int K, typename L = layout::row_major>
+using xmx_matrix_a = joint_matrix<sycl::sub_group, T, use::a, M, K, L>;
+
+template <typename T, int K, int N, typename L = layout::col_major>
+using xmx_matrix_b = joint_matrix<sycl::sub_group, T, use::b, K, N, L>;
+
+#endif
+
 typedef void (*allocate_tiles_sycl_t)(
     int** x_ql,
     sycl::half2** x_dm,
@@ -1191,6 +1211,200 @@ static __dpct_inline__ float vec_dot_q6_K_q8_1_mul_mat(
     return vec_dot_q6_K_q8_1_impl_mmq(&x_ql[index_x], &y_qs[index_y], sc, x_dmf[i * (WARP_SIZE/QI6_K) + i/QI6_K], &y_df[index_y/QI8_1]);
 }
 
+#ifdef GGML_SYCL_USE_XMX_JOINT_MATRIX
+
+#define XMX_TILE_M 8
+#define XMX_TILE_N 16
+#define XMX_TILE_K 32
+
+#define MMQ_X_Q8_0_XMX 64
+#define MMQ_Y_Q8_0_XMX 64
+#define NWARPS_Q8_0_XMX 4
+
+template <int mmq_y, int nwarps, bool need_check>
+static __dpct_inline__ void
+load_tiles_q8_0_xmx(const void *__restrict__ vx, int8_t *__restrict__ x_int8,
+                    float *__restrict__ x_d, const int &i_offset,
+                    const int &i_max, const int &k, const int &blocks_per_row) {
+    GGML_SYCL_ASSUME(i_offset >= 0);
+    GGML_SYCL_ASSUME(i_offset < nwarps);
+    GGML_SYCL_ASSUME(k >= 0);
+
+    const int kbx = k / QI8_0;
+    const int kqsx = k % QI8_0;
+
+    const block_q8_0 * bx0 = (const block_q8_0 *) vx;
+
+#pragma unroll
+    for (int i0 = 0; i0 < mmq_y; i0 += nwarps) {
+        int i = i0 + i_offset;
+
+        if (need_check) {
+            i = sycl::min(i, i_max);
+        }
+
+        const block_q8_0 * bxi = bx0 + i * blocks_per_row + kbx;
+
+        const int8_t * qs8 = bxi->qs;
+        for (int j = 0; j < QI8_0; j += 4) {
+            const int idx = i * XMX_TILE_K + kqsx + j;
+            x_int8[idx + 0] = qs8[kqsx + j + 0];
+            x_int8[idx + 1] = qs8[kqsx + j + 1];
+            x_int8[idx + 2] = qs8[kqsx + j + 2];
+            x_int8[idx + 3] = qs8[kqsx + j + 3];
+        }
+    }
+
+    const int blocks_per_tile_x_row = WARP_SIZE / QI8_0;
+    const int kbxd = k % blocks_per_tile_x_row;
+
+#pragma unroll
+    for (int i0 = 0; i0 < mmq_y; i0 += nwarps * QI8_0) {
+        int i = i0 + i_offset * QI8_0 + k / blocks_per_tile_x_row;
+
+        if (need_check) {
+            i = sycl::min(i, i_max);
+        }
+
+        const block_q8_0 * bxi = bx0 + i * blocks_per_row + kbxd;
+
+        x_d[i * (WARP_SIZE / QI8_0) + i / QI8_0 + kbxd] = bxi->d;
+    }
+}
+
+template <int mmq_x, int nwarps, bool need_check>
+static __dpct_inline__ void
+load_y_tiles_xmx(const block_q8_1 *__restrict__ y, int8_t *__restrict__ y_int8,
+                 sycl::half2 *__restrict__ y_ds, const int &col_y_0,
+                 const int &ncols_y, const int &blocks_per_col_y,
+                 const int &kb, const sycl::nd_item<3> &item_ct1) {
+    const int n = item_ct1.get_local_id(1);
+    const int sg_id = item_ct1.get_local_id(2) / 16;
+    const int lane = item_ct1.get_local_id(2) % 16;
+
+#pragma unroll
+    for (int j = 0; j < mmq_x; j += nwarps) {
+        const int col_y_eff = need_check ?
+            sycl::min(col_y_0 + j + n, ncols_y - 1) :
+            col_y_0 + j + n;
+
+        const block_q8_1 * by0 = &y[col_y_eff * blocks_per_col_y + kb];
+
+        for (int k = 0; k < XMX_TILE_K; k += 16) {
+            const int idx = (j + n) * XMX_TILE_K + k + lane * 2;
+            const int y_idx = k + lane * 2;
+            y_int8[idx + 0] = by0->qs[y_idx + 0];
+            y_int8[idx + 1] = by0->qs[y_idx + 1];
+        }
+
+        y_ds[(j + n)] = by0->ds;
+    }
+}
+
+template <int mmq_x, int mmq_y, int nwarps, bool need_check>
+static void mul_mat_q8_0_xmx(
+    const void *__restrict__ vx, const void *__restrict__ vy,
+    float *__restrict__ dst, const int ncols_x, const int nrows_x,
+    const int ncols_y, const int nrows_y, const int nrows_dst,
+    const sycl::nd_item<3> &item_ct1, int8_t *tile_x_int8,
+    float *tile_x_d, int8_t *tile_y_int8, sycl::half2 *tile_y_ds) {
+
+    const block_q8_0 * x = (const block_q8_0 *) vx;
+    const block_q8_1 * y = (const block_q8_1 *) vy;
+
+    const int blocks_per_row_x = ncols_x / QK8_0;
+    const int blocks_per_col_y = nrows_y / QK8_1;
+
+    const int row_dst_0 = item_ct1.get_group(2) * mmq_y;
+    const int col_dst_0 = item_ct1.get_group(1) * mmq_x;
+
+    sycl::sub_group sg = item_ct1.get_sub_group();
+
+    float sum[mmq_y / WARP_SIZE][mmq_x / nwarps] = {{0.0f}};
+
+    const int nb_k = (ncols_x + XMX_TILE_K - 1) / XMX_TILE_K;
+
+    for (int kb = 0; kb < nb_k; ++kb) {
+        const int k = kb * (XMX_TILE_K / QK8_0);
+
+        load_tiles_q8_0_xmx<mmq_y, nwarps, need_check>(
+            x + row_dst_0 * blocks_per_row_x, tile_x_int8, tile_x_d,
+            item_ct1.get_local_id(1), nrows_x - row_dst_0 - 1, k * QI8_0,
+            blocks_per_row_x);
+
+        load_y_tiles_xmx<mmq_x, nwarps, need_check>(
+            y, tile_y_int8, tile_y_ds, col_dst_0, ncols_y,
+            blocks_per_col_y, kb, item_ct1);
+
+        item_ct1.barrier();
+
+        for (int m = 0; m < mmq_y; m += XMX_TILE_M) {
+            for (int n = 0; n < mmq_x; n += XMX_TILE_N) {
+                joint_matrix<sycl::sub_group, int32_t, use::accumulator,
+                             XMX_TILE_M, XMX_TILE_N> acc;
+
+                joint_matrix_fill(sg, acc, 0);
+
+                {
+                    joint_matrix<sycl::sub_group, int8_t, use::a,
+                                 XMX_TILE_M, XMX_TILE_K, layout::row_major> mat_a;
+                    joint_matrix<sycl::sub_group, int8_t, use::b,
+                                 XMX_TILE_K, XMX_TILE_N, layout::col_major> mat_b;
+
+                    joint_matrix_load(sg, mat_a,
+                                      tile_x_int8 + m * XMX_TILE_K, XMX_TILE_K);
+                    joint_matrix_load(sg, mat_b,
+                                      tile_y_int8 + n * XMX_TILE_K, XMX_TILE_K);
+
+                    joint_matrix_mad(sg, acc, mat_a, mat_b, acc);
+                }
+
+                int32_t acc_data[XMX_TILE_N];
+                joint_matrix_store(sg, acc, acc_data, XMX_TILE_N, layout::row_major);
+
+                const int sg_local_id = item_ct1.get_local_id(2) % 16;
+                for (int ni = 0; ni < XMX_TILE_N; ++ni) {
+                    const int row_in_tile = sg_local_id;
+                    const int global_row = m + row_in_tile;
+                    const int global_col = n + ni;
+
+                    if (global_row < mmq_y && global_col < mmq_x) {
+                        const int out_i = global_row / WARP_SIZE;
+                        const int out_j = global_col / nwarps;
+                        const float dx = tile_x_d[global_row / QI8_0];
+                        const float dy = tile_y_ds[global_col][0];
+                        sum[out_i][out_j] += acc_data[ni] * dx * dy;
+                    }
+                }
+            }
+        }
+
+        item_ct1.barrier();
+    }
+
+#pragma unroll
+    for (int j = 0; j < mmq_x; j += nwarps) {
+        const int col_dst = col_dst_0 + j + item_ct1.get_local_id(1);
+
+        if (col_dst >= ncols_y) {
+            return;
+        }
+
+#pragma unroll
+        for (int i = 0; i < mmq_y; i += WARP_SIZE) {
+            const int row_dst = row_dst_0 + item_ct1.get_local_id(2) + i;
+
+            if (row_dst >= nrows_dst) {
+                continue;
+            }
+
+            dst[col_dst * nrows_dst + row_dst] = sum[i / WARP_SIZE][j / nwarps];
+        }
+    }
+}
+
+#endif
+
 template <int qk, int qr, int qi, bool need_sum, typename block_q_t, int mmq_x,
           int mmq_y, int nwarps, load_tiles_sycl_t load_tiles, int vdr,
           vec_dot_q_mul_mat_sycl_t vec_dot>
@@ -2241,6 +2455,11 @@ static void ggml_mul_mat_q8_0_q8_1_sycl(const void *vx, const void *vy,
         CHECK_TRY_ERROR(id = get_current_device_id()));
     const int compute_capability = ggml_sycl_info().devices[id].cc;
 
+#ifdef GGML_SYCL_USE_XMX_JOINT_MATRIX
+    const int mmq_x  = MMQ_X_Q8_0_XMX;
+    const int mmq_y  = MMQ_Y_Q8_0_XMX;
+    const int nwarps = NWARPS_Q8_0_XMX;
+#else
     int mmq_x, mmq_y, nwarps;
     if (compute_capability >= VER_GEN13) {
         mmq_x  =  MMQ_X_Q8_0_RDNA2;
@@ -2261,12 +2480,78 @@ static void ggml_mul_mat_q8_0_q8_1_sycl(const void *vx, const void *vy,
     } else {
         GGML_ABORT("fatal error");
     }
+#endif
 
     const int block_num_x = (nrows_x + mmq_y - 1) / mmq_y;
     const int block_num_y = (ncols_y + mmq_x - 1) / mmq_x;
     const sycl::range<3> block_nums(1, block_num_y, block_num_x);
     const sycl::range<3> block_dims(1, nwarps, WARP_SIZE);
 
+#ifdef GGML_SYCL_USE_XMX_JOINT_MATRIX
+    if (nrows_x % mmq_y == 0) {
+        const bool need_check = false;
+        {
+            dpct::has_capability_or_fail(stream->get_device(),
+                                         {sycl::aspect::fp16});
+
+            stream->submit([&](sycl::handler &cgh) {
+                sycl::local_accessor<int8_t, 1> tile_x_int8_acc_ct1(
+                    sycl::range<1>(mmq_y * XMX_TILE_K), cgh);
+                sycl::local_accessor<float, 1> tile_x_d_acc_ct1(
+                    sycl::range<1>(mmq_y * (WARP_SIZE / QI8_0) + mmq_y / QI8_0),
+                    cgh);
+                sycl::local_accessor<int8_t, 1> tile_y_int8_acc_ct1(
+                    sycl::range<1>(mmq_x * XMX_TILE_K), cgh);
+                sycl::local_accessor<sycl::half2, 1> tile_y_ds_acc_ct1(
+                    sycl::range<1>(mmq_x), cgh);
+
+                cgh.parallel_for(
+                    sycl::nd_range<3>(block_nums * block_dims, block_dims),
+                    [=](sycl::nd_item<3> item_ct1)
+                        [[intel::reqd_sub_group_size(16)]] {
+                            mul_mat_q8_0_xmx<mmq_x, mmq_y, nwarps, need_check>(
+                                vx, vy, dst, ncols_x, nrows_x, ncols_y, nrows_y,
+                                nrows_dst, item_ct1,
+                                get_pointer(tile_x_int8_acc_ct1),
+                                get_pointer(tile_x_d_acc_ct1),
+                                get_pointer(tile_y_int8_acc_ct1),
+                                get_pointer(tile_y_ds_acc_ct1));
+                    });
+            });
+        }
+    } else {
+        const bool need_check = true;
+        {
+            dpct::has_capability_or_fail(stream->get_device(),
+                                         {sycl::aspect::fp16});
+
+            stream->submit([&](sycl::handler &cgh) {
+                sycl::local_accessor<int8_t, 1> tile_x_int8_acc_ct1(
+                    sycl::range<1>(mmq_y * XMX_TILE_K), cgh);
+                sycl::local_accessor<float, 1> tile_x_d_acc_ct1(
+                    sycl::range<1>(mmq_y * (WARP_SIZE / QI8_0) + mmq_y / QI8_0),
+                    cgh);
+                sycl::local_accessor<int8_t, 1> tile_y_int8_acc_ct1(
+                    sycl::range<1>(mmq_x * XMX_TILE_K), cgh);
+                sycl::local_accessor<sycl::half2, 1> tile_y_ds_acc_ct1(
+                    sycl::range<1>(mmq_x), cgh);
+
+                cgh.parallel_for(
+                    sycl::nd_range<3>(block_nums * block_dims, block_dims),
+                    [=](sycl::nd_item<3> item_ct1)
+                        [[intel::reqd_sub_group_size(16)]] {
+                            mul_mat_q8_0_xmx<mmq_x, mmq_y, nwarps, need_check>(
+                                vx, vy, dst, ncols_x, nrows_x, ncols_y, nrows_y,
+                                nrows_dst, item_ct1,
+                                get_pointer(tile_x_int8_acc_ct1),
+                                get_pointer(tile_x_d_acc_ct1),
+                                get_pointer(tile_y_int8_acc_ct1),
+                                get_pointer(tile_y_ds_acc_ct1));
+                    });
+            });
+        }
+    }
+#else
     if (nrows_x % mmq_y == 0) {
         const bool need_check = false;
         /*
@@ -2338,6 +2623,7 @@ static void ggml_mul_mat_q8_0_q8_1_sycl(const void *vx, const void *vy,
             });
         }
     }
+#endif
 }
 catch (sycl::exception const &exc) {
   std::cerr << exc.what() << "Exception caught at file:" << __FILE__

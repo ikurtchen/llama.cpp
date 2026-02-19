@@ -127,6 +127,15 @@
 
 ## Optimization Activity
 
+[2026-02-19] In progress task_014: Implement XMX/joint_matrix compute path for mmq
+  - Kernel: sk_008 (MUL_MAT)
+  - Implemented: Q8_0 XMX joint_matrix path using sycl::ext::oneapi::experimental::matrix
+  - Guarded by: #ifdef GGML_SYCL_USE_XMX_JOINT_MATRIX (disabled by default)
+  - Tile sizes: M=8, N=16, K=32 (Xe2 native XMX granularity)
+  - Correctness: PASS (default dp4a path unaffected)
+  - Remaining: Implement XMX path for Q4_0, Q4_1, Q5_0, Q5_1, K-quant types
+  - Note: joint_matrix API is experimental; requires testing on XMX hardware
+
 [2026-02-19] Completed task_001: Benchmark mmq (quantized matmul)
   - Kernel: sk_008 (MUL_MAT)
   - Correctness: N/A (baseline measurement)

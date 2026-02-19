@@ -241,6 +241,7 @@
       "tasks": [
         {
           "task_id": "task_014",
+          "status": "in_progress",
           "kernel_id": "sk_008",
           "optimization_ids": ["opt_008_001"],
           "name": "Implement XMX/joint_matrix compute path for mmq",
@@ -251,7 +252,8 @@
           "dependencies": ["task_001"],
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -k MUL_MAT",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
-          "files_to_modify": ["ggml/src/ggml-sycl/mmq.cpp", "ggml/src/ggml-sycl/mmq.hpp"]
+          "files_to_modify": ["ggml/src/ggml-sycl/mmq.cpp", "ggml/src/ggml-sycl/mmq.hpp"],
+          "notes": "Q8_0 XMX joint_matrix path implemented (guarded by GGML_SYCL_USE_XMX_JOINT_MATRIX). Remaining: implement for Q4_0, Q4_1, Q5_0, Q5_1, Q2_K, Q3_K, Q4_K, Q5_K, Q6_K. Build succeeds, unit tests pass for default dp4a path."
         },
         {
           "task_id": "task_015",
