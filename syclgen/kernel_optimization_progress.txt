@@ -9,7 +9,7 @@
 - Analysis complete: Yes
 - Kernels with optimization potential: 13
 - Optimization tasks created: 42
-- Optimization tasks completed: 15 (Phase 1 complete, Phase 2 in progress)
+- Optimization tasks completed: 16 (Phase 1 complete, Phase 2 in progress — task_014 blocked)
 - Kernels with benchmark data: MUL_MAT, SOFT_MAX, CPY, ROPE, ADD
 
 ## Kernels Analyzed
@@ -127,14 +127,25 @@
 
 ## Optimization Activity
 
-[2026-02-19] In progress task_014: Implement XMX/joint_matrix compute path for mmq
+[2026-02-19] Completed task_015: Fix mmq tile size mismatch bug
   - Kernel: sk_008 (MUL_MAT)
-  - Implemented: Q8_0 XMX joint_matrix path using sycl::ext::oneapi::experimental::matrix
+  - Optimization: Removed cc-based tile size selection in all 10 dispatch functions
+  - Problem: Dispatch selected tile sizes based on compute_capability (RDNA2/RDNA1/AMPERE/PASCAL) but kernels always used AMPERE constants. This caused mismatch on newer Intel GPUs.
+  - Fix: Dispatch now always uses AMPERE values matching kernel constants
+  - Correctness: PASS (726/726 MUL_MAT unit tests)
+  - Files modified: ggml/src/ggml-sycl/mmq.cpp (202 lines replaced with 43 lines)
+  - Note: This was a latent bug on B60 (uses VER_GEN9 → AMPERE), but would have caused issues on newer Intel GPUs
+
+[2026-02-19] Blocked task_014: Implement XMX/joint_matrix compute path for mmq
+  - Kernel: sk_008 (MUL_MAT)
+  - Status: BLOCKED — oneAPI 2025.3 joint_matrix API incompatibility
+  - Issue: The implementation was written for an older oneAPI version. Current oneAPI 2025.3 has significant API changes:
+    1. joint_matrix_load/store now require multi_ptr instead of raw pointers
+    2. Accumulator storage pattern using thread-local array (acc_data[XMX_TILE_N]) incompatible with joint_matrix_store semantics
+  - Fix required: Use sycl::address_space_cast, restructure to use SLM for accumulator storage
+  - Current state: Q8_0 XMX path code exists but doesn't compile with oneAPI 2025.3
   - Guarded by: #ifdef GGML_SYCL_USE_XMX_JOINT_MATRIX (disabled by default)
-  - Tile sizes: M=8, N=16, K=32 (Xe2 native XMX granularity)
-  - Correctness: PASS (default dp4a path unaffected)
-  - Remaining: Implement XMX path for Q4_0, Q4_1, Q5_0, Q5_1, K-quant types
-  - Note: joint_matrix API is experimental; requires testing on XMX hardware
+  - Default dp4a path: unaffected, continues to work correctly
 
 [2026-02-19] Completed task_001: Benchmark mmq (quantized matmul)
   - Kernel: sk_008 (MUL_MAT)

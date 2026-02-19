@@ -241,7 +241,8 @@
       "tasks": [
         {
           "task_id": "task_014",
-          "status": "in_progress",
+          "status": "blocked",
+          "blocked_reason": "oneAPI 2025.3 joint_matrix API incompatibility — requires multi_ptr and SLM accumulator storage",
           "kernel_id": "sk_008",
           "optimization_ids": ["opt_008_001"],
           "name": "Implement XMX/joint_matrix compute path for mmq",
@@ -253,10 +254,12 @@
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -k MUL_MAT",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
           "files_to_modify": ["ggml/src/ggml-sycl/mmq.cpp", "ggml/src/ggml-sycl/mmq.hpp"],
-          "notes": "Q8_0 XMX joint_matrix path implemented (guarded by GGML_SYCL_USE_XMX_JOINT_MATRIX). Remaining: implement for Q4_0, Q4_1, Q5_0, Q5_1, Q2_K, Q3_K, Q4_K, Q5_K, Q6_K. Build succeeds, unit tests pass for default dp4a path."
+          "notes": "Q8_0 XMX joint_matrix path implemented but blocked by oneAPI API changes: (1) joint_matrix_load/store now require multi_ptr instead of raw pointers, (2) accumulator storage pattern using thread-local array incompatible with joint_matrix_store semantics. Fixes needed: use sycl::address_space_cast, restructure to use SLM for accumulator storage. Default dp4a path unaffected."
         },
         {
           "task_id": "task_015",
+          "status": "completed",
+          "completed_at": "2026-02-19T03:15:00Z",
           "kernel_id": "sk_008",
           "optimization_ids": ["opt_008_002"],
           "name": "Fix mmq tile size mismatch bug",
@@ -267,7 +270,8 @@
           "dependencies": ["task_001"],
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t unit -k MUL_MAT",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
-          "files_to_modify": ["ggml/src/ggml-sycl/mmq.cpp"]
+          "files_to_modify": ["ggml/src/ggml-sycl/mmq.cpp"],
+          "notes": "Fixed by removing cc-based tile size selection in all 10 dispatch functions. Dispatch now always uses AMPERE values matching the kernel constants. Build succeeded, 726/726 MUL_MAT unit tests passed."
         },
         {
           "task_id": "task_016",

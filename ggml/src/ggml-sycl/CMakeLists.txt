@@ -151,6 +151,11 @@ if (GGML_SYCL_GRAPH)
     target_compile_definitions(ggml-sycl PRIVATE GGML_SYCL_GRAPH)
 endif()
 
+if (GGML_SYCL_USE_XMX_JOINT_MATRIX)
+    message(STATUS "XMX joint_matrix enabled for SYCL MMQ")
+    target_compile_definitions(ggml-sycl PRIVATE GGML_SYCL_USE_XMX_JOINT_MATRIX)
+endif()
+
 # Link against Intel oneMKL or oneMath
 if (GGML_SYCL_TARGET STREQUAL "INTEL")
     # Intel devices use Intel oneMKL directly instead of oneMath to avoid the limitation of linking Intel oneMKL statically
