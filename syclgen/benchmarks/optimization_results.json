@@ -1,6 +1,17 @@
 {
   "results": [
     {
+      "task_id": "task_017",
+      "kernel": "MUL_MAT_VEC",
+      "optimization": "Work-group size 16→128 for non-K-quant DMMV kernels with SLM multi-sub-group reduction",
+      "timestamp": "2026-02-19T05:30:00Z",
+      "correctness": "pass",
+      "baseline_time_us": "N/A - no MUL_MAT_VEC benchmark test cases",
+      "optimized_time_us": "N/A - no MUL_MAT_VEC benchmark test cases",
+      "speedup": "expected 4-8x",
+      "notes": "Increased work-group size from 16 to 128 for non-K-quant kernels (Q4_0, Q4_1, Q5_0, Q5_1, Q8_0, F16, Q4_0_reorder). Added two-level reduction using SLM. Correctness: 726/726 MUL_MAT tests passed. K-quant kernels not modified."
+    },
+    {
       "task_id": "task_016",
       "kernel": "CPY",
       "optimization": "Work-group size 1→256 for quantized copy kernels (f32_q, q_f32)",

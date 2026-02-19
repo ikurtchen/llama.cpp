@@ -9,7 +9,7 @@
 - Analysis complete: Yes
 - Kernels with optimization potential: 13
 - Optimization tasks created: 42
-- Optimization tasks completed: 16 (Phase 1 complete, Phase 2 in progress — task_014 blocked)
+- Optimization tasks completed: 17 (Phase 1 complete, Phase 2 in progress — task_014 blocked)
 - Kernels with benchmark data: MUL_MAT, SOFT_MAX, CPY, ROPE, ADD
 
 ## Kernels Analyzed
@@ -126,6 +126,18 @@
   - MEDIUM: soft_max_back_f32 work-group size too small (only 16 on Intel)
 
 ## Optimization Activity
+
+[2026-02-19] Completed task_017: Increase dmmv work-group size from 16-32 to 128-256
+  - Kernel: sk_010 (MUL_MAT_VEC)
+  - Optimization: Increased work-group size from 16 to 128 for non-K-quant kernels
+  - Changes:
+    - Added DMMV_BLOCK_SIZE=128 constant in dmmv.cpp
+    - Updated dequantize_mul_mat_vec and dequantize_mul_mat_vec_reorder with SLM-based multi-sub-group reduction
+    - Updated dispatch functions for Q4_0, Q4_1, Q5_0, Q5_1, Q8_0, F16, Q4_0_reorder
+    - Added sycl::local_accessor for SLM allocation
+  - Correctness: PASS (726/726 MUL_MAT unit tests)
+  - Note: K-quant kernels (Q2_K-Q6_K) not modified - use different threading model with QK_WARP_SIZE=32
+  - Expected improvement: 4-8x throughput from better Xe2 XVE utilization (8 sub-groups vs 1)
 
 [2026-02-19] Completed task_016: Fix quantized copy work-group size from 1 to 256
   - Kernel: sk_007 (CPY)

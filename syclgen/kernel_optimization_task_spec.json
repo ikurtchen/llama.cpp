@@ -293,6 +293,8 @@
         },
         {
           "task_id": "task_017",
+          "status": "completed",
+          "completed_at": "2026-02-19T05:30:00Z",
           "kernel_id": "sk_010",
           "optimization_ids": ["opt_010_001"],
           "name": "Increase dmmv work-group size from 16-32 to 128-256",
@@ -303,7 +305,8 @@
           "dependencies": ["task_004"],
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -k MUL_MAT_VEC",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
-          "files_to_modify": ["ggml/src/ggml-sycl/dmmv.cpp"]
+          "files_to_modify": ["ggml/src/ggml-sycl/dmmv.cpp"],
+          "notes": "Increased work-group size from 16 to 128 for non-K-quant kernels (Q4_0, Q4_1, Q5_0, Q5_1, Q8_0, F16, Q4_0_reorder). Added two-level reduction using SLM for multi-sub-group reduction. Correctness: 726/726 MUL_MAT tests passed. K-quant kernels (Q2_K-Q6_K) not modified - use different threading model with QK_WARP_SIZE=32."
         },
         {
           "task_id": "task_018",

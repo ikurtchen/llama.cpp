@@ -3,6 +3,29 @@
 #include "dequantize.hpp"
 #include "presets.hpp"
 
+// ============================================================================
+// Optimization: task_017 - Increase work-group size for DMMV kernels
+// Target: Intel Arc Pro B60 (Xe2 architecture, SIMD16, 20 Xe-cores)
+// 
+// Original: WARP_SIZE=16 threads per work-group (single sub-group)
+// Optimized: DMMV_BLOCK_SIZE=128 threads (8 sub-groups of 16 threads each)
+//
+// Key changes:
+// 1. Increased work-group size from 16 to 128 threads
+// 2. Added two-level reduction:
+//    - Sub-group (warp) level reduction using dpct::permute_sub_group_by_xor
+//    - Work-group level reduction using SLM (local_accessor)
+// 3. Each sub-group leader writes partial result to SLM
+// 4. First sub-group performs final reduction across all sub-groups
+//
+// Expected improvement: 4-8x throughput on Intel Xe2 due to better
+// utilization of XVEs (only 1 hardware thread per XVE was active before)
+// ============================================================================
+
+#ifndef DMMV_BLOCK_SIZE
+#define DMMV_BLOCK_SIZE 128
+#endif
+
 static void convert_f16(const void * vx, const int64_t ib, const int iqs, dfloat2 & v){
     const sycl::half *x = (const sycl::half *)vx;
 
@@ -19,180 +42,225 @@ static void convert_f32(const void * vx, const int64_t ib, const int iqs, dfloat
     v.y() = x[ib + iqs + 1];
 }
 
-template <int qk, int qr, dequantize_kernel_t dequantize_kernel>
+template <int qk, int qr, dequantize_kernel_t dequantize_kernel, int block_size = DMMV_BLOCK_SIZE>
 static void dequantize_mul_mat_vec(const void * __restrict__ vx, const dfloat * __restrict__ y, float * __restrict__ dst, const int ncols, const int nrows,
-                                   const sycl::nd_item<3> &item_ct1) {
+                                   const sycl::nd_item<3> &item_ct1, float * __restrict__ slm_partial) {
     // qk = quantized weights per x block
     // qr = number of quantized weights per data value in x block
-    const int row = item_ct1.get_group(2) * item_ct1.get_local_range(1) +
-                    item_ct1.get_local_id(1);
+    const int row = item_ct1.get_group(2);
 
     if (row >= nrows) {
         return;
     }
 
     const int tid = item_ct1.get_local_id(2);
+    const int sg_id = tid / WARP_SIZE;
+    const int tid_in_sg = tid % WARP_SIZE;
+    const int num_sub_groups = block_size / WARP_SIZE;
 
-    const int iter_stride = 2*GGML_SYCL_DMMV_X;
-    const int vals_per_iter = iter_stride / WARP_SIZE; // num quantized vals per thread and i iter
+    const int iter_stride = 2*GGML_SYCL_DMMV_X * (block_size / WARP_SIZE);
+    const int vals_per_iter = iter_stride / block_size;
     const int y_offset = qr == 1 ? 1 : qk/2;
 
 // partial sum for each thread
 #ifdef GGML_SYCL_F16
-    sycl::half2 tmp = {0.0f, 0.0f}; // two sums for f16 to take advantage of half2 intrinsics
+    sycl::half2 tmp = {0.0f, 0.0f};
 #else
     float tmp = 0.0f;
 #endif // GGML_SYCL_F16
 
-    for (int i = 0; i < ncols; i += iter_stride) {
-        const int col = i + vals_per_iter*tid;
-        const int ib = (row*ncols + col)/qk; // x block index
-        const int iqs = (col%qk)/qr; // x quant index
-        const int iybs = col - col%qk; // y block start index
+    for (int i = tid * vals_per_iter; i < ncols; i += iter_stride) {
+        const int col = i;
+        if (col >= ncols) break;
+        const int ib = (row*ncols + col)/qk;
+        const int iqs = (col%qk)/qr;
+        const int iybs = col - col%qk;
 
-// processing >2 values per i iter is faster for fast GPUs
 #pragma unroll
         for (int j = 0; j < vals_per_iter; j += 2) {
-            // process 2 vals per j iter
+            const int curr_col = col + j;
+            if (curr_col >= ncols) break;
+            const int curr_ib = (row*ncols + curr_col)/qk;
+            const int curr_iqs = (curr_col%qk)/qr;
+            const int curr_iybs = curr_col - curr_col%qk;
 
-            // dequantize
-            // for qr = 2 the iqs needs to increase by 1 per j iter because 2 weights per data val
             dfloat2 v;
-            dequantize_kernel(vx, ib, iqs + j/qr, v);
+            dequantize_kernel(vx, curr_ib, curr_iqs, v);
 
-            // matrix multiplication
-            // for qr = 2 the y index needs to increase by 1 per j iter because of y_offset = qk/2
 #ifdef GGML_SYCL_F16
-            dfloat2 t1{y[iybs + iqs + j / qr + 0],
-                        y[iybs + iqs + j / qr + y_offset]};
-
+            dfloat2 t1{y[curr_iybs + curr_iqs + 0],
+                        y[curr_iybs + curr_iqs + y_offset]};
             tmp += v * t1;
 #else
-            tmp += v.x() * y[iybs + iqs + j / qr + 0];
-            tmp += v.y() * y[iybs + iqs + j / qr + y_offset];
-#endif // GGML_SYCL_F16
+            tmp += v.x() * y[curr_iybs + curr_iqs + 0];
+            tmp += v.y() * y[curr_iybs + curr_iqs + y_offset];
+#endif
         }
     }
 
-    // sum up partial sums and write back result
+    // Sub-group (warp) level reduction
     const int mask_start = ncols > GGML_SYCL_DMMV_X ? WARP_SIZE >> 1 : WARP_SIZE >> 2;
     for (int mask = mask_start; mask > 0; mask >>= 1) {
-        tmp +=
-            dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), tmp, mask);
+        tmp += dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), tmp, mask);
     }
 
-    if (tid == 0) {
+    // Two-level work-group reduction using SLM
+    if constexpr (block_size > WARP_SIZE) {
+        // Each sub-group leader writes partial result to SLM
+        if (tid_in_sg == 0) {
 #ifdef GGML_SYCL_F16
-        dst[row] = tmp.x() + tmp.y();
+            slm_partial[sg_id] = tmp.x() + tmp.y();
 #else
-        dst[row] = tmp;
-#endif // GGML_SYCL_F16
+            slm_partial[sg_id] = tmp;
+#endif
+        }
+        item_ct1.barrier(sycl::access::fence_space::local_space);
+
+        // First sub-group performs final reduction
+        if (sg_id == 0) {
+            float final_sum = (tid_in_sg < num_sub_groups) ? slm_partial[tid_in_sg] : 0.0f;
+            for (int mask = WARP_SIZE >> 1; mask > 0; mask >>= 1) {
+                final_sum += dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), final_sum, mask);
+            }
+            if (tid_in_sg == 0) {
+                dst[row] = final_sum;
+            }
+        }
+    } else {
+        // Single sub-group: original behavior
+        if (tid == 0) {
+#ifdef GGML_SYCL_F16
+            dst[row] = tmp.x() + tmp.y();
+#else
+            dst[row] = tmp;
+#endif
+        }
     }
 }
 
-template <int qk, int qr, dequantize_kernel_t_reorder dequantize_kernel_reorder>
+template <int qk, int qr, dequantize_kernel_t_reorder dequantize_kernel_reorder, int block_size = DMMV_BLOCK_SIZE>
 static void dequantize_mul_mat_vec_reorder(const void * __restrict__ vx, const dfloat * __restrict__ y, float * __restrict__ dst, const int ncols, const int nrows,
-                                   const sycl::nd_item<3> &item_ct1) {
+                                   const sycl::nd_item<3> &item_ct1, float * __restrict__ slm_partial) {
     // qk = quantized weights per x block
     // qr = number of quantized weights per data value in x block
-    const int row = item_ct1.get_group(2) * item_ct1.get_local_range(1) +
-                    item_ct1.get_local_id(1);
+    const int row = item_ct1.get_group(2);
 
     if (row >= nrows) {
         return;
     }
 
     const int tid = item_ct1.get_local_id(2);
+    const int sg_id = tid / WARP_SIZE;
+    const int tid_in_sg = tid % WARP_SIZE;
+    const int num_sub_groups = block_size / WARP_SIZE;
 
-
-    const int ncols_left = ncols % (QK4_0*WARP_SIZE);
+    const int ncols_left = ncols % (QK4_0*block_size);
     const int ncols_align = ncols - ncols_left;
-    const int iter_stride = 8*2*GGML_SYCL_DMMV_X;
-    const int vals_per_iter = iter_stride / WARP_SIZE; // num quantized vals per thread and i iter //64/16=4, 512/16/2= 16
+    const int iter_stride = 8*2*GGML_SYCL_DMMV_X * (block_size / WARP_SIZE);
+    const int vals_per_iter = iter_stride / block_size;
     const int y_offset = qr == 1 ? 1 : qk/2;
 
 // partial sum for each thread
 #ifdef GGML_SYCL_F16
-    sycl::half2 tmp = {0.0f, 0.0f}; // two sums for f16 to take advantage of half2 intrinsics
+    sycl::half2 tmp = {0.0f, 0.0f};
 #else
     float tmp = 0.0f;
-#endif // GGML_SYCL_F16
+#endif
     const char *d_ptr = (const char*)vx+ncols*nrows/2;
     int i=0;
-    for (i = 0; i < ncols_align; i += iter_stride) {
-        const int col = i + vals_per_iter*tid;
-        const int ib = (row*ncols + col)/qk; // x block index
-        const int iqs = (col%qk)/qr; // x quant index
-        const int iybs = col - col%qk; // y block start index
+    for (i = tid * vals_per_iter; i < ncols_align; i += iter_stride) {
+        const int col = i;
+        if (col >= ncols_align) break;
+        const int ib = (row*ncols + col)/qk;
+        const int iqs = (col%qk)/qr;
+        const int iybs = col - col%qk;
 
-// processing >2 values per i iter is faster for fast GPUs
 #pragma unroll
         for (int j = 0; j < vals_per_iter; j += 2) {
-            // process 2 vals per j iter
+            const int curr_col = col + j;
+            if (curr_col >= ncols_align) break;
+            const int curr_ib = (row*ncols + curr_col)/qk;
+            const int curr_iqs = (curr_col%qk)/qr;
+            const int curr_iybs = curr_col - curr_col%qk;
 
-            // dequantize
-            // for qr = 2 the iqs needs to increase by 1 per j iter because 2 weights per data val
             dfloat2 v;
-            dequantize_kernel_reorder((const void *)d_ptr, ib, (const void *)vx, ib * QK4_0 / 2 +iqs+j/qr, v);
+            dequantize_kernel_reorder((const void *)d_ptr, curr_ib, (const void *)vx, curr_ib * QK4_0 / 2 + curr_iqs, v);
 
-            // matrix multiplication
-            // for qr = 2 the y index needs to increase by 1 per j iter because of y_offset = qk/2
 #ifdef GGML_SYCL_F16
-            dfloat2 t1{y[iybs + iqs + j / qr + 0],
-                        y[iybs + iqs + j / qr + y_offset]};
-
+            dfloat2 t1{y[curr_iybs + curr_iqs + 0],
+                        y[curr_iybs + curr_iqs + y_offset]};
             tmp += v * t1;
 #else
-            tmp += v.x() * y[iybs + iqs + j / qr + 0];
-            tmp += v.y() * y[iybs + iqs + j / qr + y_offset];
-#endif // GGML_SYCL_F16
+            tmp += v.x() * y[curr_iybs + curr_iqs + 0];
+            tmp += v.y() * y[curr_iybs + curr_iqs + y_offset];
+#endif
         }
     }
 
     for (; i < ncols; i += iter_stride) {
-        if (tid>=ncols_left/QK4_0) continue;
-        const int col = i + vals_per_iter*tid;
-        const int ib = (row*ncols + col)/qk; // x block index
-        const int iqs = (col%qk)/qr; // x quant index
-        const int iybs = col - col%qk; // y block start index
+        const int col = tid * vals_per_iter + (i - ncols_align);
+        if (col >= ncols_left) break;
+        const int actual_col = ncols_align + col;
+        const int ib = (row*ncols + actual_col)/qk;
+        const int iqs = (actual_col%qk)/qr;
+        const int iybs = actual_col - actual_col%qk;
 
-// processing >2 values per i iter is faster for fast GPUs
 #pragma unroll
         for (int j = 0; j < vals_per_iter; j += 2) {
-            // process 2 vals per j iter
+            const int curr_col = actual_col + j;
+            if (curr_col >= ncols) break;
+            const int curr_ib = (row*ncols + curr_col)/qk;
+            const int curr_iqs = (curr_col%qk)/qr;
+            const int curr_iybs = curr_col - curr_col%qk;
 
-            // dequantize
-            // for qr = 2 the iqs needs to increase by 1 per j iter because 2 weights per data val
             dfloat2 v;
-            dequantize_kernel_reorder((const void *)d_ptr, ib, (const void *)vx, ib * QK4_0 / 2 +iqs+j/qr, v);
+            dequantize_kernel_reorder((const void *)d_ptr, curr_ib, (const void *)vx, curr_ib * QK4_0 / 2 + curr_iqs, v);
 
-            // matrix multiplication
-            // for qr = 2 the y index needs to increase by 1 per j iter because of y_offset = qk/2
 #ifdef GGML_SYCL_F16
-            dfloat2 t1{y[iybs + iqs + j / qr + 0],
-                        y[iybs + iqs + j / qr + y_offset]};
-
+            dfloat2 t1{y[curr_iybs + curr_iqs + 0],
+                        y[curr_iybs + curr_iqs + y_offset]};
             tmp += v * t1;
 #else
-            tmp += v.x() * y[iybs + iqs + j / qr + 0];
-            tmp += v.y() * y[iybs + iqs + j / qr + y_offset];
-#endif // GGML_SYCL_F16
+            tmp += v.x() * y[curr_iybs + curr_iqs + 0];
+            tmp += v.y() * y[curr_iybs + curr_iqs + y_offset];
+#endif
         }
     }
 
-    // sum up partial sums and write back result
+    // Sub-group (warp) level reduction
     const int mask_start = ncols > GGML_SYCL_DMMV_X ? WARP_SIZE >> 1 : WARP_SIZE >> 2;
     for (int mask = mask_start; mask > 0; mask >>= 1) {
-        tmp +=
-            dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), tmp, mask);
+        tmp += dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), tmp, mask);
     }
 
-    if (tid == 0) {
+    // Two-level work-group reduction using SLM
+    if constexpr (block_size > WARP_SIZE) {
+        if (tid_in_sg == 0) {
 #ifdef GGML_SYCL_F16
-        dst[row] = tmp.x() + tmp.y();
+            slm_partial[sg_id] = tmp.x() + tmp.y();
 #else
-        dst[row] = tmp;
-#endif // GGML_SYCL_F16
+            slm_partial[sg_id] = tmp;
+#endif
+        }
+        item_ct1.barrier(sycl::access::fence_space::local_space);
+
+        if (sg_id == 0) {
+            float final_sum = (tid_in_sg < num_sub_groups) ? slm_partial[tid_in_sg] : 0.0f;
+            for (int mask = WARP_SIZE >> 1; mask > 0; mask >>= 1) {
+                final_sum += dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), final_sum, mask);
+            }
+            if (tid_in_sg == 0) {
+                dst[row] = final_sum;
+            }
+        }
+    } else {
+        if (tid == 0) {
+#ifdef GGML_SYCL_F16
+            dst[row] = tmp.x() + tmp.y();
+#else
+            dst[row] = tmp;
+#endif
+        }
     }
 }
 
@@ -201,19 +269,25 @@ static void convert_mul_mat_vec_f16_sycl(const void *vx, const dfloat *y,
                                          const int nrows,
                                          dpct::queue_ptr stream) {
     GGML_ASSERT(ncols % GGML_SYCL_DMMV_X == 0);
-    const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
+    const int block_num_y = nrows;
     const sycl::range<3> block_nums(1, 1, block_num_y);
-    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, WARP_SIZE);
+    const sycl::range<3> block_dims(1, 1, DMMV_BLOCK_SIZE);
+    const int num_sub_groups = DMMV_BLOCK_SIZE / WARP_SIZE;
     {
         dpct::has_capability_or_fail(stream->get_device(),
                                      {sycl::aspect::fp16});
 
-        stream->parallel_for(
-            sycl::nd_range<3>(block_nums * block_dims, block_dims),
-            [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
-                dequantize_mul_mat_vec<1, 1, convert_f16>(vx, y, dst, ncols,
-                                                          nrows, item_ct1);
-            });
+        stream->submit([&](sycl::handler &cgh) {
+            sycl::local_accessor<float, 1> slm_partial_acc_ct1(num_sub_groups, cgh);
+
+            cgh.parallel_for(
+                sycl::nd_range<3>(block_nums * block_dims, block_dims),
+                [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                    dequantize_mul_mat_vec<1, 1, convert_f16, DMMV_BLOCK_SIZE>(
+                        vx, y, dst, ncols, nrows, item_ct1,
+                        slm_partial_acc_ct1.get_multi_ptr<sycl::access::decorated::no>().get());
+                });
+        });
     }
 }
 
@@ -869,20 +943,25 @@ static void dequantize_mul_mat_vec_q4_0_sycl_reorder(const void *vx, const dfloa
                                              const int nrows,
                                              dpct::queue_ptr stream) {
     GGML_ASSERT(ncols % GGML_SYCL_DMMV_X == 0);
-    const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
-    // the number of rows may exceed maximum grid size in the y or z dimensions, use the x dimension instead
+    const int block_num_y = nrows;
     const sycl::range<3> block_nums(1, 1, block_num_y);
-    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, WARP_SIZE);
+    const sycl::range<3> block_dims(1, 1, DMMV_BLOCK_SIZE);
+    const int num_sub_groups = DMMV_BLOCK_SIZE / WARP_SIZE;
     {
         dpct::has_capability_or_fail(stream->get_device(),
                                      {sycl::aspect::fp16});
 
-        stream->parallel_for(
-            sycl::nd_range<3>(block_nums * block_dims, block_dims),
-            [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
-                dequantize_mul_mat_vec_reorder<QK4_0, QR4_0, dequantize_q4_0_reorder>(
-                    vx, y, dst, ncols, nrows, item_ct1);
-            });
+        stream->submit([&](sycl::handler &cgh) {
+            sycl::local_accessor<float, 1> slm_partial_acc_ct1(num_sub_groups, cgh);
+
+            cgh.parallel_for(
+                sycl::nd_range<3>(block_nums * block_dims, block_dims),
+                [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                    dequantize_mul_mat_vec_reorder<QK4_0, QR4_0, dequantize_q4_0_reorder, DMMV_BLOCK_SIZE>(
+                        vx, y, dst, ncols, nrows, item_ct1,
+                        slm_partial_acc_ct1.get_multi_ptr<sycl::access::decorated::no>().get());
+                });
+        });
     }
 }
 
@@ -892,20 +971,25 @@ static void dequantize_mul_mat_vec_q4_0_sycl(const void *vx, const dfloat *y,
                                              const int nrows,
                                              dpct::queue_ptr stream) {
     GGML_ASSERT(ncols % GGML_SYCL_DMMV_X == 0);
-    const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
-    // the number of rows may exceed maximum grid size in the y or z dimensions, use the x dimension instead
+    const int block_num_y = nrows;
     const sycl::range<3> block_nums(1, 1, block_num_y);
-    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, WARP_SIZE);
+    const sycl::range<3> block_dims(1, 1, DMMV_BLOCK_SIZE);
+    const int num_sub_groups = DMMV_BLOCK_SIZE / WARP_SIZE;
     {
         dpct::has_capability_or_fail(stream->get_device(),
                                      {sycl::aspect::fp16});
 
-        stream->parallel_for(
-            sycl::nd_range<3>(block_nums * block_dims, block_dims),
-            [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
-                dequantize_mul_mat_vec<QK4_0, QR4_0, dequantize_q4_0>(
-                    vx, y, dst, ncols, nrows, item_ct1);
-            });
+        stream->submit([&](sycl::handler &cgh) {
+            sycl::local_accessor<float, 1> slm_partial_acc_ct1(num_sub_groups, cgh);
+
+            cgh.parallel_for(
+                sycl::nd_range<3>(block_nums * block_dims, block_dims),
+                [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                    dequantize_mul_mat_vec<QK4_0, QR4_0, dequantize_q4_0, DMMV_BLOCK_SIZE>(
+                        vx, y, dst, ncols, nrows, item_ct1,
+                        slm_partial_acc_ct1.get_multi_ptr<sycl::access::decorated::no>().get());
+                });
+        });
     }
 }
 
@@ -914,19 +998,25 @@ static void dequantize_mul_mat_vec_q4_1_sycl(const void *vx, const dfloat *y,
                                              const int nrows,
                                              dpct::queue_ptr stream) {
     GGML_ASSERT(ncols % GGML_SYCL_DMMV_X == 0);
-    const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
+    const int block_num_y = nrows;
     const sycl::range<3> block_nums(1, 1, block_num_y);
-    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, WARP_SIZE);
+    const sycl::range<3> block_dims(1, 1, DMMV_BLOCK_SIZE);
+    const int num_sub_groups = DMMV_BLOCK_SIZE / WARP_SIZE;
     {
         dpct::has_capability_or_fail(stream->get_device(),
                                      {sycl::aspect::fp16});
 
-        stream->parallel_for(
-            sycl::nd_range<3>(block_nums * block_dims, block_dims),
-            [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
-                dequantize_mul_mat_vec<QK4_1, QR4_1, dequantize_q4_1>(
-                    vx, y, dst, ncols, nrows, item_ct1);
-            });
+        stream->submit([&](sycl::handler &cgh) {
+            sycl::local_accessor<float, 1> slm_partial_acc_ct1(num_sub_groups, cgh);
+
+            cgh.parallel_for(
+                sycl::nd_range<3>(block_nums * block_dims, block_dims),
+                [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                    dequantize_mul_mat_vec<QK4_1, QR4_1, dequantize_q4_1, DMMV_BLOCK_SIZE>(
+                        vx, y, dst, ncols, nrows, item_ct1,
+                        slm_partial_acc_ct1.get_multi_ptr<sycl::access::decorated::no>().get());
+                });
+        });
     }
 }
 
@@ -935,19 +1025,25 @@ static void dequantize_mul_mat_vec_q5_0_sycl(const void *vx, const dfloat *y,
                                              const int nrows,
                                              dpct::queue_ptr stream) {
     GGML_ASSERT(ncols % GGML_SYCL_DMMV_X == 0);
-    const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
+    const int block_num_y = nrows;
     const sycl::range<3> block_nums(1, 1, block_num_y);
-    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, WARP_SIZE);
+    const sycl::range<3> block_dims(1, 1, DMMV_BLOCK_SIZE);
+    const int num_sub_groups = DMMV_BLOCK_SIZE / WARP_SIZE;
     {
         dpct::has_capability_or_fail(stream->get_device(),
                                      {sycl::aspect::fp16});
 
-        stream->parallel_for(
-            sycl::nd_range<3>(block_nums * block_dims, block_dims),
-            [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
-                dequantize_mul_mat_vec<QK5_0, QR5_0, dequantize_q5_0>(
-                    vx, y, dst, ncols, nrows, item_ct1);
-            });
+        stream->submit([&](sycl::handler &cgh) {
+            sycl::local_accessor<float, 1> slm_partial_acc_ct1(num_sub_groups, cgh);
+
+            cgh.parallel_for(
+                sycl::nd_range<3>(block_nums * block_dims, block_dims),
+                [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                    dequantize_mul_mat_vec<QK5_0, QR5_0, dequantize_q5_0, DMMV_BLOCK_SIZE>(
+                        vx, y, dst, ncols, nrows, item_ct1,
+                        slm_partial_acc_ct1.get_multi_ptr<sycl::access::decorated::no>().get());
+                });
+        });
     }
 }
 
@@ -956,19 +1052,25 @@ static void dequantize_mul_mat_vec_q5_1_sycl(const void *vx, const dfloat *y,
                                              const int nrows,
                                              dpct::queue_ptr stream) {
     GGML_ASSERT(ncols % GGML_SYCL_DMMV_X == 0);
-    const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
+    const int block_num_y = nrows;
     const sycl::range<3> block_nums(1, 1, block_num_y);
-    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, WARP_SIZE);
+    const sycl::range<3> block_dims(1, 1, DMMV_BLOCK_SIZE);
+    const int num_sub_groups = DMMV_BLOCK_SIZE / WARP_SIZE;
     {
         dpct::has_capability_or_fail(stream->get_device(),
                                      {sycl::aspect::fp16});
 
-        stream->parallel_for(
-            sycl::nd_range<3>(block_nums * block_dims, block_dims),
-            [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
-                dequantize_mul_mat_vec<QK5_1, QR5_1, dequantize_q5_1>(
-                    vx, y, dst, ncols, nrows, item_ct1);
-            });
+        stream->submit([&](sycl::handler &cgh) {
+            sycl::local_accessor<float, 1> slm_partial_acc_ct1(num_sub_groups, cgh);
+
+            cgh.parallel_for(
+                sycl::nd_range<3>(block_nums * block_dims, block_dims),
+                [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                    dequantize_mul_mat_vec<QK5_1, QR5_1, dequantize_q5_1, DMMV_BLOCK_SIZE>(
+                        vx, y, dst, ncols, nrows, item_ct1,
+                        slm_partial_acc_ct1.get_multi_ptr<sycl::access::decorated::no>().get());
+                });
+        });
     }
 }
 
@@ -977,19 +1079,25 @@ static void dequantize_mul_mat_vec_q8_0_sycl(const void *vx, const dfloat *y,
                                              const int nrows,
                                              dpct::queue_ptr stream) {
     GGML_ASSERT(ncols % GGML_SYCL_DMMV_X == 0);
-    const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
+    const int block_num_y = nrows;
     const sycl::range<3> block_nums(1, 1, block_num_y);
-    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, WARP_SIZE);
+    const sycl::range<3> block_dims(1, 1, DMMV_BLOCK_SIZE);
+    const int num_sub_groups = DMMV_BLOCK_SIZE / WARP_SIZE;
     {
         dpct::has_capability_or_fail(stream->get_device(),
                                      {sycl::aspect::fp16});
 
-        stream->parallel_for(
-            sycl::nd_range<3>(block_nums * block_dims, block_dims),
-            [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
-                dequantize_mul_mat_vec<QK8_0, QR8_0, dequantize_q8_0>(
-                    vx, y, dst, ncols, nrows, item_ct1);
-            });
+        stream->submit([&](sycl::handler &cgh) {
+            sycl::local_accessor<float, 1> slm_partial_acc_ct1(num_sub_groups, cgh);
+
+            cgh.parallel_for(
+                sycl::nd_range<3>(block_nums * block_dims, block_dims),
+                [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                    dequantize_mul_mat_vec<QK8_0, QR8_0, dequantize_q8_0, DMMV_BLOCK_SIZE>(
+                        vx, y, dst, ncols, nrows, item_ct1,
+                        slm_partial_acc_ct1.get_multi_ptr<sycl::access::decorated::no>().get());
+                });
+        });
     }
 }
 
