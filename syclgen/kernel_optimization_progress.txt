@@ -9,7 +9,7 @@
 - Analysis complete: Yes
 - Kernels with optimization potential: 13
 - Optimization tasks created: 42
-- Optimization tasks completed: 14 (Phase 1 complete, Phase 2 started)
+- Optimization tasks completed: 15 (Phase 1 complete, Phase 2 in progress)
 - Kernels with benchmark data: MUL_MAT, SOFT_MAX, CPY, ROPE, ADD
 
 ## Kernels Analyzed
@@ -198,3 +198,9 @@
   - Optimization: Removed sizeof(float) multiplier from shared_mem_size calculation
   - Correctness: PASS (8/8 unit tests: RWKV_WKV6: 4/4, RWKV_WKV7: 4/4)
   - SLM reduced: 4096→1024 bytes (WKV6), 2560→640 bytes (WKV7) for head_size=64
+
+[2026-02-19] Completed task_019: Fix off-by-one boundary check in K-quant dmmv
+  - Kernel: sk_010 (MUL_MAT_VEC)
+  - Optimization: Changed 'row > nrows' to 'row >= nrows' in 4 K-quant kernels
+  - Kernels fixed: q2_k, q3_k, q4_k, q6_k (lines 237, 361, 480, 759)
+  - Correctness: PASS (all MUL_MAT tests including K-quant types)

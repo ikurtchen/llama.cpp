@@ -311,6 +311,8 @@
         },
         {
           "task_id": "task_019",
+          "status": "completed",
+          "completed_at": "2026-02-19T02:28:00Z",
           "kernel_id": "sk_010",
           "optimization_ids": ["opt_010_004"],
           "name": "Fix off-by-one boundary check in K-quant dmmv",
@@ -321,7 +323,8 @@
           "dependencies": [],
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t unit -k MUL_MAT_VEC",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
-          "files_to_modify": ["ggml/src/ggml-sycl/dmmv.cpp"]
+          "files_to_modify": ["ggml/src/ggml-sycl/dmmv.cpp"],
+          "notes": "Changed 'row > nrows' to 'row >= nrows' in 4 K-quant kernels (q2_k, q3_k, q4_k, q6_k). All MUL_MAT tests passed including K-quant types."
         },
         {
           "task_id": "task_020",
