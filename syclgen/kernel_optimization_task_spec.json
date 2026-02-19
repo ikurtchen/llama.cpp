@@ -363,17 +363,21 @@
         },
         {
           "task_id": "task_021",
+          "status": "completed",
+          "completed_at": "2026-02-19T10:30:00Z",
           "kernel_id": "sk_009",
           "optimization_ids": ["opt_009_002"],
           "name": "Increase mmvq non-reorder work-group size from 16 to 64+",
           "description": "Non-reorder path uses only 16 threads per work-group. CUDA uses 128. This severely limits memory latency hiding and throughput.",
           "priority": "high",
           "expected_improvement": "2-3x throughput from better memory latency hiding",
+          "actual_improvement": "~1.0x measured (neutral impact - SLM reduction overhead may offset gains)",
           "estimated_effort": "medium",
           "dependencies": ["task_005"],
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -k MUL_MAT_VEC_Q",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
-          "files_to_modify": ["ggml/src/ggml-sycl/mmvq.cpp"]
+          "files_to_modify": ["ggml/src/ggml-sycl/mmvq.cpp"],
+          "notes": "Changed work-group size from 16 to 64 threads (1 to 4 sub-groups) for all non-reorder mmvq kernels. Added SLM-based inter-sub-group reduction with partial sums stored in SLM, barrier, then leader sub-group reduction. Updated mul_mat_vec_q, mul_mat_vec_q_batched, and all 9 IQ-type kernels + their 31 dispatch functions. Correctness: PASS (726/726 MUL_MAT tests). Performance: ~1.00x speedup (neutral - SLM reduction overhead may offset gains from larger work-group). Architecturally correct for Xe2 SIMD16."
         },
         {
           "task_id": "task_022",

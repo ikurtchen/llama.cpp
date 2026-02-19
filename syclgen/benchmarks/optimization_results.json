@@ -1,6 +1,27 @@
 {
   "results": [
     {
+      "task_id": "task_021",
+      "kernel": "MUL_MAT_VEC_Q",
+      "optimization": "Work-group size 16→64 (1→4 sub-groups) with SLM inter-sub-group reduction for mmvq non-reorder path",
+      "timestamp": "2026-02-19T10:30:00Z",
+      "correctness": "pass",
+      "baseline_time_us": {
+        "q4_0_n1": 84.32,
+        "q4_K_n1": 94.89,
+        "q2_K_n1": 111.21,
+        "q6_K_n1": 236.28
+      },
+      "optimized_time_us": {
+        "q4_0_n1": 84.14,
+        "q4_K_n1": 94.62,
+        "q2_K_n1": 115.66,
+        "q6_K_n1": 236.10
+      },
+      "speedup": 1.0,
+      "notes": "Changed work-group size from 16 to 64 threads (4 sub-groups) for all non-reorder mmvq kernels. Added SLM-based inter-sub-group reduction. Updated mul_mat_vec_q, mul_mat_vec_q_batched, and all 9 IQ-type kernels + 31 dispatch functions. Correctness: 726/726 MUL_MAT tests passed. Performance: ~1.0x (neutral - SLM reduction overhead may offset gains). Architecturally correct for Xe2 SIMD16."
+    },
+    {
       "task_id": "task_018",
       "kernel": "MUL_MAT_VEC (K-quant)",
       "optimization": "SIMD32→SIMD16 native for K-quant DMMV kernels with SLM two-level reduction",

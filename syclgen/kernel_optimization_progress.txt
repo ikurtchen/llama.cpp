@@ -127,6 +127,19 @@
 
 ## Optimization Activity
 
+[2026-02-19] Completed task_021: Increase mmvq non-reorder work-group size from 16 to 64
+  - Kernel: sk_009 (MUL_MAT_VEC_Q)
+  - Optimization: Changed work-group size from 16 to 64 threads (1 to 4 sub-groups) with SLM inter-sub-group reduction
+  - Changes:
+    - Added nwarps template parameter (default 4) to mul_mat_vec_q and mul_mat_vec_q_batched
+    - Added SLM-based inter-sub-group reduction: partial sums stored in SLM, barrier, then leader sub-group reduction
+    - Updated all 11 standard quant type dispatch functions + all 9 IQ-type kernels and their dispatch functions
+    - Changed block_dims from (1, GGML_SYCL_MMV_Y, WARP_SIZE) to (1, GGML_SYCL_MMV_Y, 4*WARP_SIZE)
+  - Reorder kernels: Unchanged (already use 16 sub-groups)
+  - Correctness: PASS (726/726 MUL_MAT unit tests including all quant types)
+  - Performance: ~1.0x speedup (neutral - SLM reduction overhead may offset gains from larger work-group)
+  - Note: Architecturally correct for Xe2 SIMD16, provides foundation for future optimizations
+
 [2026-02-19] Completed task_020: Implement multi-column batching for mmvq
   - Kernel: sk_009 (MUL_MAT_VEC_Q)
   - Optimization: Batch up to 8 columns per kernel launch, eliminating redundant weight reads
