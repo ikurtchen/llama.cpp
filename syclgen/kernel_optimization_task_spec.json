@@ -381,6 +381,8 @@
         },
         {
           "task_id": "task_024",
+          "status": "completed",
+          "completed_at": "2026-02-19T02:20:00Z",
           "kernel_id": "sk_012",
           "optimization_ids": ["opt_012_001"],
           "name": "Fix wkv SLM over-allocation by 4x",
@@ -391,7 +393,8 @@
           "dependencies": [],
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t unit -k WKV",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
-          "files_to_modify": ["ggml/src/ggml-sycl/wkv.cpp"]
+          "files_to_modify": ["ggml/src/ggml-sycl/wkv.cpp"],
+          "notes": "Removed sizeof(float) multiplier from shared_mem_size calculation (lines 204, 261). All 8 WKV unit tests passed (RWKV_WKV6: 4/4, RWKV_WKV7: 4/4). SLM reduced from 4096→1024 bytes (WKV6) and 2560→640 bytes (WKV7) for head_size=64."
         }
       ]
     },

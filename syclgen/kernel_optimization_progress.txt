@@ -9,7 +9,7 @@
 - Analysis complete: Yes
 - Kernels with optimization potential: 13
 - Optimization tasks created: 42
-- Optimization tasks completed: 13 (Phase 1 baseline benchmarks complete)
+- Optimization tasks completed: 14 (Phase 1 complete, Phase 2 started)
 - Kernels with benchmark data: MUL_MAT, SOFT_MAX, CPY, ROPE, ADD
 
 ## Kernels Analyzed
@@ -192,3 +192,9 @@
 [2026-02-19] Completed task_013: Benchmark gla kernel
   - Kernel: sk_013 (GLA)
   - Status: No benchmark test cases defined in test-backend-ops
+
+[2026-02-19] Completed task_024: Fix wkv SLM over-allocation by 4x
+  - Kernel: sk_012 (WKV)
+  - Optimization: Removed sizeof(float) multiplier from shared_mem_size calculation
+  - Correctness: PASS (8/8 unit tests: RWKV_WKV6: 4/4, RWKV_WKV7: 4/4)
+  - SLM reduced: 4096→1024 bytes (WKV6), 2560→640 bytes (WKV7) for head_size=64

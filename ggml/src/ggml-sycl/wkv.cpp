@@ -201,7 +201,7 @@ void ggml_sycl_op_rwkv_wkv6(ggml_backend_sycl_context& ctx, ggml_tensor* dst) {
     dpct::queue_ptr stream = ctx.stream();
 
     // Calculate execution configuration
-    const size_t shared_mem_size = C / H * 4 * sizeof(float); // For k, r, tf, td
+    const size_t shared_mem_size = C / H * 4; // For k, r, tf, td (element count, not bytes)
     sycl::range<3> block_dims(1, 1, C / H);
     sycl::range<3> grid_dims(1, 1, B * H);
 
@@ -258,7 +258,7 @@ void ggml_sycl_op_rwkv_wkv7(ggml_backend_sycl_context& ctx, ggml_tensor* dst) {
     dpct::queue_ptr stream = ctx.stream();
 
     // Calculate execution configuration
-    const size_t shared_mem_size = C / H * 5 * sizeof(float); // For r, w, k, a, b
+    const size_t shared_mem_size = C / H * 5; // For r, w, k, a, b (element count, not bytes)
     sycl::range<3> block_dims(1, 1, C / H);
     sycl::range<3> grid_dims(1, 1, B * H);
 
