@@ -1,0 +1,997 @@
+{
+  "timestamp": "2026-02-19T01:57:58.214244Z",
+  "hardware": "Intel Arc Pro B60",
+  "server": "b60",
+  "results": [
+    {
+      "kernel": "MUL_MAT",
+      "test_cases": [
+        {
+          "name": "MUL_MAT(type_a=f16,type_b=f32,m=16416,n=1,k=128,bs=[8,1],nr=[4,1],per=[0,2,1,3],k_v=0,o=1)",
+          "time_us": 606.2,
+          "throughput_gflops": 221.84,
+          "bandwidth_gbs": 7.04
+        },
+        {
+          "name": "MUL_MAT(type_a=f16,type_b=f32,m=128,n=1,k=16416,bs=[8,1],nr=[4,1],per=[0,1,2,3],k_v=32832,o=1)",
+          "time_us": 749.66,
+          "throughput_gflops": 179.39,
+          "bandwidth_gbs": 5.69
+        },
+        {
+          "name": "MUL_MAT(type_a=f32,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 699.6,
+          "throughput_gflops": 167.87,
+          "bandwidth_gbs": 335.84
+        },
+        {
+          "name": "MUL_MAT(type_a=f16,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 346.69,
+          "throughput_gflops": 338.74,
+          "bandwidth_gbs": 338.96
+        },
+        {
+          "name": "MUL_MAT(type_a=bf16,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": null,
+          "throughput_gflops": null,
+          "bandwidth_gbs": null,
+          "status": "not supported"
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_0,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 84.32,
+          "throughput_gflops": 1390.0,
+          "bandwidth_gbs": 349.07
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_1,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 201.59,
+          "throughput_gflops": 582.58,
+          "bandwidth_gbs": 146.01
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_0,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 725.95,
+          "throughput_gflops": 161.77,
+          "bandwidth_gbs": 50.66
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_1,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 237.91,
+          "throughput_gflops": 493.64,
+          "bandwidth_gbs": 154.57
+        },
+        {
+          "name": "MUL_MAT(type_a=q8_0,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 847.15,
+          "throughput_gflops": 138.63,
+          "bandwidth_gbs": 69.4
+        },
+        {
+          "name": "MUL_MAT(type_a=mxfp4,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 597.37,
+          "throughput_gflops": 196.6,
+          "bandwidth_gbs": 49.27
+        },
+        {
+          "name": "MUL_MAT(type_a=q2_K,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 111.21,
+          "throughput_gflops": 1060.0,
+          "bandwidth_gbs": 186.31
+        },
+        {
+          "name": "MUL_MAT(type_a=q3_K,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 636.32,
+          "throughput_gflops": 184.56,
+          "bandwidth_gbs": 37.97
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_K,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 94.89,
+          "throughput_gflops": 1240.0,
+          "bandwidth_gbs": 310.19
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_K,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 305.35,
+          "throughput_gflops": 384.61,
+          "bandwidth_gbs": 120.43
+        },
+        {
+          "name": "MUL_MAT(type_a=q6_K,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 236.28,
+          "throughput_gflops": 497.04,
+          "bandwidth_gbs": 186.7
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_xxs,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 186.6,
+          "throughput_gflops": 629.38,
+          "bandwidth_gbs": 79.07
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_xs,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 314.32,
+          "throughput_gflops": 373.63,
+          "bandwidth_gbs": 58.61
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_s,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 197.78,
+          "throughput_gflops": 593.8,
+          "bandwidth_gbs": 111.71
+        },
+        {
+          "name": "MUL_MAT(type_a=iq3_xxs,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 374.66,
+          "throughput_gflops": 313.46,
+          "bandwidth_gbs": 49.17
+        },
+        {
+          "name": "MUL_MAT(type_a=iq1_s,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 143.29,
+          "throughput_gflops": 819.61,
+          "bandwidth_gbs": 77.35
+        },
+        {
+          "name": "MUL_MAT(type_a=iq1_m,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 84.46,
+          "throughput_gflops": 1390.0,
+          "bandwidth_gbs": 152.96
+        },
+        {
+          "name": "MUL_MAT(type_a=iq4_nl,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 712.84,
+          "throughput_gflops": 164.75,
+          "bandwidth_gbs": 41.29
+        },
+        {
+          "name": "MUL_MAT(type_a=iq3_s,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 298.32,
+          "throughput_gflops": 393.67,
+          "bandwidth_gbs": 74.06
+        },
+        {
+          "name": "MUL_MAT(type_a=iq4_xs,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 201.52,
+          "throughput_gflops": 582.77,
+          "bandwidth_gbs": 146.06
+        },
+        {
+          "name": "MUL_MAT(type_a=f32,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 691.22,
+          "throughput_gflops": 339.81,
+          "bandwidth_gbs": 340.02
+        },
+        {
+          "name": "MUL_MAT(type_a=f16,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2013.21,
+          "throughput_gflops": 116.67,
+          "bandwidth_gbs": 58.41
+        },
+        {
+          "name": "MUL_MAT(type_a=bf16,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": null,
+          "throughput_gflops": null,
+          "bandwidth_gbs": null,
+          "status": "not supported"
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_0,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1080.22,
+          "throughput_gflops": 217.44,
+          "bandwidth_gbs": 27.32
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_1,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 204.13,
+          "throughput_gflops": 1150.0,
+          "bandwidth_gbs": 144.55
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_0,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1195.75,
+          "throughput_gflops": 196.43,
+          "bandwidth_gbs": 30.82
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_1,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 265.6,
+          "throughput_gflops": 884.34,
+          "bandwidth_gbs": 138.73
+        },
+        {
+          "name": "MUL_MAT(type_a=q8_0,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1998.44,
+          "throughput_gflops": 117.53,
+          "bandwidth_gbs": 29.46
+        },
+        {
+          "name": "MUL_MAT(type_a=mxfp4,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1184.63,
+          "throughput_gflops": 198.27,
+          "bandwidth_gbs": 24.91
+        },
+        {
+          "name": "MUL_MAT(type_a=q2_K,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 428.5,
+          "throughput_gflops": 548.15,
+          "bandwidth_gbs": 48.53
+        },
+        {
+          "name": "MUL_MAT(type_a=q3_K,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1065.1,
+          "throughput_gflops": 220.52,
+          "bandwidth_gbs": 22.75
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_K,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 210.36,
+          "throughput_gflops": 1120.0,
+          "bandwidth_gbs": 140.27
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_K,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 248.58,
+          "throughput_gflops": 944.91,
+          "bandwidth_gbs": 148.23
+        },
+        {
+          "name": "MUL_MAT(type_a=q6_K,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1754.16,
+          "throughput_gflops": 133.9,
+          "bandwidth_gbs": 25.19
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_xxs,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 370.84,
+          "throughput_gflops": 633.38,
+          "bandwidth_gbs": 39.98
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_xs,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 629.04,
+          "throughput_gflops": 373.39,
+          "bandwidth_gbs": 29.41
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_s,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 397.76,
+          "throughput_gflops": 590.5,
+          "bandwidth_gbs": 55.73
+        },
+        {
+          "name": "MUL_MAT(type_a=iq3_xxs,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 742.84,
+          "throughput_gflops": 316.19,
+          "bandwidth_gbs": 24.9
+        },
+        {
+          "name": "MUL_MAT(type_a=iq1_s,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 283.39,
+          "throughput_gflops": 828.83,
+          "bandwidth_gbs": 39.37
+        },
+        {
+          "name": "MUL_MAT(type_a=iq1_m,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 163.08,
+          "throughput_gflops": 1440.0,
+          "bandwidth_gbs": 79.67
+        },
+        {
+          "name": "MUL_MAT(type_a=iq4_nl,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1422.95,
+          "throughput_gflops": 165.07,
+          "bandwidth_gbs": 20.74
+        },
+        {
+          "name": "MUL_MAT(type_a=iq3_s,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 594.22,
+          "throughput_gflops": 395.28,
+          "bandwidth_gbs": 37.31
+        },
+        {
+          "name": "MUL_MAT(type_a=iq4_xs,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 397.62,
+          "throughput_gflops": 590.71,
+          "bandwidth_gbs": 74.21
+        },
+        {
+          "name": "MUL_MAT(type_a=f32,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 690.06,
+          "throughput_gflops": 510.57,
+          "bandwidth_gbs": 340.7
+        },
+        {
+          "name": "MUL_MAT(type_a=f16,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2013.26,
+          "throughput_gflops": 175.0,
+          "bandwidth_gbs": 58.44
+        },
+        {
+          "name": "MUL_MAT(type_a=bf16,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": null,
+          "throughput_gflops": null,
+          "bandwidth_gbs": null,
+          "status": "not supported"
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_0,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1613.22,
+          "throughput_gflops": 218.4,
+          "bandwidth_gbs": 18.34
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_1,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 308.75,
+          "throughput_gflops": 1140.0,
+          "bandwidth_gbs": 95.81
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_0,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1797.21,
+          "throughput_gflops": 196.04,
+          "bandwidth_gbs": 20.54
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_1,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 398.83,
+          "throughput_gflops": 883.39,
+          "bandwidth_gbs": 92.57
+        },
+        {
+          "name": "MUL_MAT(type_a=q8_0,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2995.45,
+          "throughput_gflops": 117.62,
+          "bandwidth_gbs": 19.68
+        },
+        {
+          "name": "MUL_MAT(type_a=mxfp4,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1781.64,
+          "throughput_gflops": 197.75,
+          "bandwidth_gbs": 16.6
+        },
+        {
+          "name": "MUL_MAT(type_a=q2_K,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 643.01,
+          "throughput_gflops": 547.93,
+          "bandwidth_gbs": 32.45
+        },
+        {
+          "name": "MUL_MAT(type_a=q3_K,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1600.0,
+          "throughput_gflops": 220.2,
+          "bandwidth_gbs": 15.19
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_K,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 320.65,
+          "throughput_gflops": 1100.0,
+          "bandwidth_gbs": 92.25
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_K,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 376.44,
+          "throughput_gflops": 935.93,
+          "bandwidth_gbs": 98.08
+        },
+        {
+          "name": "MUL_MAT(type_a=q6_K,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2647.11,
+          "throughput_gflops": 133.1,
+          "bandwidth_gbs": 16.72
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_xxs,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 554.86,
+          "throughput_gflops": 634.98,
+          "bandwidth_gbs": 26.86
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_xs,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 811.38,
+          "throughput_gflops": 434.23,
+          "bandwidth_gbs": 22.89
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_s,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 596.81,
+          "throughput_gflops": 590.34,
+          "bandwidth_gbs": 37.27
+        },
+        {
+          "name": "MUL_MAT(type_a=iq3_xxs,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1131.39,
+          "throughput_gflops": 311.41,
+          "bandwidth_gbs": 16.41
+        },
+        {
+          "name": "MUL_MAT(type_a=iq1_s,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 415.28,
+          "throughput_gflops": 848.4,
+          "bandwidth_gbs": 27.04
+        },
+        {
+          "name": "MUL_MAT(type_a=iq1_m,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 249.45,
+          "throughput_gflops": 1410.0,
+          "bandwidth_gbs": 52.38
+        },
+        {
+          "name": "MUL_MAT(type_a=iq4_nl,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2148.5,
+          "throughput_gflops": 163.98,
+          "bandwidth_gbs": 13.77
+        },
+        {
+          "name": "MUL_MAT(type_a=iq3_s,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 880.4,
+          "throughput_gflops": 400.18,
+          "bandwidth_gbs": 25.26
+        },
+        {
+          "name": "MUL_MAT(type_a=iq4_xs,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 597.85,
+          "throughput_gflops": 589.31,
+          "bandwidth_gbs": 49.48
+        },
+        {
+          "name": "MUL_MAT(type_a=f32,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 692.84,
+          "throughput_gflops": 678.02,
+          "bandwidth_gbs": 339.44
+        },
+        {
+          "name": "MUL_MAT(type_a=f16,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2014.28,
+          "throughput_gflops": 233.22,
+          "bandwidth_gbs": 58.45
+        },
+        {
+          "name": "MUL_MAT(type_a=bf16,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": null,
+          "throughput_gflops": null,
+          "bandwidth_gbs": null,
+          "status": "not supported"
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_0,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2146.53,
+          "throughput_gflops": 218.85,
+          "bandwidth_gbs": 13.82
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_1,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 414.97,
+          "throughput_gflops": 1130.0,
+          "bandwidth_gbs": 71.46
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_0,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2391.16,
+          "throughput_gflops": 196.46,
+          "bandwidth_gbs": 15.47
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_1,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 531.51,
+          "throughput_gflops": 883.82,
+          "bandwidth_gbs": 69.6
+        },
+        {
+          "name": "MUL_MAT(type_a=q8_0,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 3994.42,
+          "throughput_gflops": 117.6,
+          "bandwidth_gbs": 14.77
+        },
+        {
+          "name": "MUL_MAT(type_a=mxfp4,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2372.09,
+          "throughput_gflops": 198.04,
+          "bandwidth_gbs": 12.5
+        },
+        {
+          "name": "MUL_MAT(type_a=q2_K,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 863.82,
+          "throughput_gflops": 543.82,
+          "bandwidth_gbs": 24.24
+        },
+        {
+          "name": "MUL_MAT(type_a=q3_K,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2142.06,
+          "throughput_gflops": 219.3,
+          "bandwidth_gbs": 11.38
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_K,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 434.66,
+          "throughput_gflops": 1080.0,
+          "bandwidth_gbs": 68.23
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_K,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 505.12,
+          "throughput_gflops": 929.99,
+          "bandwidth_gbs": 73.24
+        },
+        {
+          "name": "MUL_MAT(type_a=q6_K,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 3510.73,
+          "throughput_gflops": 133.81,
+          "bandwidth_gbs": 12.63
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_xxs,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 766.14,
+          "throughput_gflops": 613.15,
+          "bandwidth_gbs": 19.55
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_xs,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1249.61,
+          "throughput_gflops": 375.93,
+          "bandwidth_gbs": 14.92
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_s,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 788.35,
+          "throughput_gflops": 595.88,
+          "bandwidth_gbs": 28.31
+        },
+        {
+          "name": "MUL_MAT(type_a=iq3_xxs,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1498.64,
+          "throughput_gflops": 313.46,
+          "bandwidth_gbs": 12.44
+        },
+        {
+          "name": "MUL_MAT(type_a=iq1_s,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 552.43,
+          "throughput_gflops": 850.36,
+          "bandwidth_gbs": 20.46
+        },
+        {
+          "name": "MUL_MAT(type_a=iq1_m,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 325.48,
+          "throughput_gflops": 1440.0,
+          "bandwidth_gbs": 40.37
+        },
+        {
+          "name": "MUL_MAT(type_a=iq4_nl,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2859.76,
+          "throughput_gflops": 164.27,
+          "bandwidth_gbs": 10.37
+        },
+        {
+          "name": "MUL_MAT(type_a=iq3_s,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1187.35,
+          "throughput_gflops": 395.64,
+          "bandwidth_gbs": 18.79
+        },
+        {
+          "name": "MUL_MAT(type_a=iq4_xs,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 798.57,
+          "throughput_gflops": 588.25,
+          "bandwidth_gbs": 37.14
+        },
+        {
+          "name": "MUL_MAT(type_a=f32,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 674.36,
+          "throughput_gflops": 870.76,
+          "bandwidth_gbs": 348.85
+        },
+        {
+          "name": "MUL_MAT(type_a=f16,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1987.72,
+          "throughput_gflops": 295.42,
+          "bandwidth_gbs": 59.27
+        },
+        {
+          "name": "MUL_MAT(type_a=bf16,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": null,
+          "throughput_gflops": null,
+          "bandwidth_gbs": null,
+          "status": "not supported"
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_0,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2697.6,
+          "throughput_gflops": 217.68,
+          "bandwidth_gbs": 11.02
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_1,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 515.28,
+          "throughput_gflops": 1140.0,
+          "bandwidth_gbs": 57.69
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_0,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2989.42,
+          "throughput_gflops": 196.43,
+          "bandwidth_gbs": 12.4
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_1,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 657.13,
+          "throughput_gflops": 893.59,
+          "bandwidth_gbs": 56.41
+        },
+        {
+          "name": "MUL_MAT(type_a=q8_0,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 4975.75,
+          "throughput_gflops": 118.01,
+          "bandwidth_gbs": 11.88
+        },
+        {
+          "name": "MUL_MAT(type_a=mxfp4,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2957.42,
+          "throughput_gflops": 198.55,
+          "bandwidth_gbs": 10.05
+        },
+        {
+          "name": "MUL_MAT(type_a=q2_K,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1080.37,
+          "throughput_gflops": 543.52,
+          "bandwidth_gbs": 19.45
+        },
+        {
+          "name": "MUL_MAT(type_a=q3_K,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2698.86,
+          "throughput_gflops": 217.57,
+          "bandwidth_gbs": 9.06
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_K,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 532.34,
+          "throughput_gflops": 1100.0,
+          "bandwidth_gbs": 55.85
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_K,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 631.76,
+          "throughput_gflops": 929.46,
+          "bandwidth_gbs": 58.68
+        },
+        {
+          "name": "MUL_MAT(type_a=q6_K,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 4384.31,
+          "throughput_gflops": 133.93,
+          "bandwidth_gbs": 10.13
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_xxs,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 920.26,
+          "throughput_gflops": 638.08,
+          "bandwidth_gbs": 16.35
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_xs,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1570.0,
+          "throughput_gflops": 374.01,
+          "bandwidth_gbs": 11.92
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_s,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 994.68,
+          "throughput_gflops": 590.35,
+          "bandwidth_gbs": 22.51
+        },
+        {
+          "name": "MUL_MAT(type_a=iq3_xxs,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1877.82,
+          "throughput_gflops": 312.7,
+          "bandwidth_gbs": 9.97
+        },
+        {
+          "name": "MUL_MAT(type_a=iq1_s,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 695.4,
+          "throughput_gflops": 844.42,
+          "bandwidth_gbs": 16.36
+        },
+        {
+          "name": "MUL_MAT(type_a=iq1_m,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 410.09,
+          "throughput_gflops": 1430.0,
+          "bandwidth_gbs": 32.22
+        },
+        {
+          "name": "MUL_MAT(type_a=iq4_nl,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 3563.35,
+          "throughput_gflops": 164.79,
+          "bandwidth_gbs": 8.34
+        },
+        {
+          "name": "MUL_MAT(type_a=iq3_s,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1471.01,
+          "throughput_gflops": 399.18,
+          "bandwidth_gbs": 15.22
+        },
+        {
+          "name": "MUL_MAT(type_a=iq4_xs,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 996.87,
+          "throughput_gflops": 589.05,
+          "bandwidth_gbs": 29.82
+        },
+        {
+          "name": "MUL_MAT(type_a=f32,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 675.98,
+          "throughput_gflops": 1390.0,
+          "bandwidth_gbs": 348.34
+        },
+        {
+          "name": "MUL_MAT(type_a=f16,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1984.35,
+          "throughput_gflops": 473.47,
+          "bandwidth_gbs": 59.48
+        },
+        {
+          "name": "MUL_MAT(type_a=bf16,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": null,
+          "throughput_gflops": null,
+          "bandwidth_gbs": null,
+          "status": "not supported"
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_0,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 4315.9,
+          "throughput_gflops": 217.69,
+          "bandwidth_gbs": 6.94
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_1,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 826.2,
+          "throughput_gflops": 1140.0,
+          "bandwidth_gbs": 36.25
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_0,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 4779.0,
+          "throughput_gflops": 196.59,
+          "bandwidth_gbs": 7.8
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_1,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1053.91,
+          "throughput_gflops": 891.46,
+          "bandwidth_gbs": 35.38
+        },
+        {
+          "name": "MUL_MAT(type_a=q8_0,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 7957.65,
+          "throughput_gflops": 118.07,
+          "bandwidth_gbs": 7.45
+        },
+        {
+          "name": "MUL_MAT(type_a=mxfp4,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 4734.36,
+          "throughput_gflops": 198.45,
+          "bandwidth_gbs": 6.33
+        },
+        {
+          "name": "MUL_MAT(type_a=q2_K,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1722.41,
+          "throughput_gflops": 545.47,
+          "bandwidth_gbs": 12.33
+        },
+        {
+          "name": "MUL_MAT(type_a=q3_K,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 4309.24,
+          "throughput_gflops": 218.03,
+          "bandwidth_gbs": 5.73
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_K,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 868.58,
+          "throughput_gflops": 1080.0,
+          "bandwidth_gbs": 34.48
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_K,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1013.62,
+          "throughput_gflops": 926.9,
+          "bandwidth_gbs": 36.79
+        },
+        {
+          "name": "MUL_MAT(type_a=q6_K,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 7001.79,
+          "throughput_gflops": 134.18,
+          "bandwidth_gbs": 6.37
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_xxs,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1542.67,
+          "throughput_gflops": 609.03,
+          "bandwidth_gbs": 9.9
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_xs,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2513.83,
+          "throughput_gflops": 373.74,
+          "bandwidth_gbs": 7.53
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_s,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1589.38,
+          "throughput_gflops": 591.13,
+          "bandwidth_gbs": 14.23
+        },
+        {
+          "name": "MUL_MAT(type_a=iq3_xxs,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2980.72,
+          "throughput_gflops": 315.2,
+          "bandwidth_gbs": 6.35
+        },
+        {
+          "name": "MUL_MAT(type_a=iq1_s,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1108.35,
+          "throughput_gflops": 847.68,
+          "bandwidth_gbs": 10.47
+        },
+        {
+          "name": "MUL_MAT(type_a=iq1_m,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 653.16,
+          "throughput_gflops": 1440.0,
+          "bandwidth_gbs": 20.57
+        },
+        {
+          "name": "MUL_MAT(type_a=iq4_nl,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 5704.16,
+          "throughput_gflops": 164.71,
+          "bandwidth_gbs": 5.25
+        },
+        {
+          "name": "MUL_MAT(type_a=iq3_s,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2351.01,
+          "throughput_gflops": 399.63,
+          "bandwidth_gbs": 9.62
+        },
+        {
+          "name": "MUL_MAT(type_a=iq4_xs,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1605.1,
+          "throughput_gflops": 585.34,
+          "bandwidth_gbs": 18.66
+        },
+        {
+          "name": "MUL_MAT(type_a=f32,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 5030.16,
+          "throughput_gflops": 11950.0,
+          "bandwidth_gbs": 54.2
+        },
+        {
+          "name": "MUL_MAT(type_a=f16,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 6278.95,
+          "throughput_gflops": 9580.0,
+          "bandwidth_gbs": 24.72
+        },
+        {
+          "name": "MUL_MAT(type_a=bf16,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": null,
+          "throughput_gflops": null,
+          "bandwidth_gbs": null,
+          "status": "not supported"
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_0,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 6578.34,
+          "throughput_gflops": 9140.0,
+          "bandwidth_gbs": 10.2
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_1,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 6321.47,
+          "throughput_gflops": 9510.0,
+          "bandwidth_gbs": 10.62
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_0,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 6502.16,
+          "throughput_gflops": 9250.0,
+          "bandwidth_gbs": 11.45
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_1,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 5716.05,
+          "throughput_gflops": 10520.0,
+          "bandwidth_gbs": 13.02
+        },
+        {
+          "name": "MUL_MAT(type_a=q8_0,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 5739.11,
+          "throughput_gflops": 10480.0,
+          "bandwidth_gbs": 16.81
+        },
+        {
+          "name": "MUL_MAT(type_a=mxfp4,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 6584.11,
+          "throughput_gflops": 9130.0,
+          "bandwidth_gbs": 10.19
+        },
+        {
+          "name": "MUL_MAT(type_a=q2_K,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 5713.18,
+          "throughput_gflops": 10520.0,
+          "bandwidth_gbs": 10.22
+        },
+        {
+          "name": "MUL_MAT(type_a=q3_K,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 6309.73,
+          "throughput_gflops": 9530.0,
+          "bandwidth_gbs": 9.8
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_K,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 5641.95,
+          "throughput_gflops": 10660.0,
+          "bandwidth_gbs": 11.89
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_K,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 5666.34,
+          "throughput_gflops": 10610.0,
+          "bandwidth_gbs": 13.14
+        },
+        {
+          "name": "MUL_MAT(type_a=q6_K,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 5698.52,
+          "throughput_gflops": 10550.0,
+          "bandwidth_gbs": 14.35
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_xxs,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 6476.39,
+          "throughput_gflops": 9280.0,
+          "bandwidth_gbs": 8.1
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_xs,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 6292.98,
+          "throughput_gflops": 9560.0,
+          "bandwidth_gbs": 8.91
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_s,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 6302.55,
+          "throughput_gflops": 9540.0,
+          "bandwidth_gbs": 9.48
+        },
+        {
+          "name": "MUL_MAT(type_a=iq3_xxs,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 6509.95,
+          "throughput_gflops": 9240.0,
+          "bandwidth_gbs": 8.62
+        },
+        {
+          "name": "MUL_MAT(type_a=iq1_s,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 6285.03,
+          "throughput_gflops": 9570.0,
+          "bandwidth_gbs": 7.76
+        },
+        {
+          "name": "MUL_MAT(type_a=iq1_m,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 6268.49,
+          "throughput_gflops": 9590.0,
+          "bandwidth_gbs": 8.07
+        },
+        {
+          "name": "MUL_MAT(type_a=iq4_nl,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 6622.53,
+          "throughput_gflops": 9080.0,
+          "bandwidth_gbs": 10.13
+        },
+        {
+          "name": "MUL_MAT(type_a=iq3_s,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 6305.01,
+          "throughput_gflops": 9540.0,
+          "bandwidth_gbs": 9.48
+        },
+        {
+          "name": "MUL_MAT(type_a=iq4_xs,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 6252.97,
+          "throughput_gflops": 9620.0,
+          "bandwidth_gbs": 10.73
+        }
+      ]
+    }
+  ]
+}

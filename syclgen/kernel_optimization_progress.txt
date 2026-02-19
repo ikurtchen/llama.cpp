@@ -8,7 +8,8 @@
 - Kernels analyzed so far: 13
 - Analysis complete: Yes
 - Kernels with optimization potential: 13
-- Optimization tasks created: 0 (pending finalization)
+- Optimization tasks created: 42
+- Optimization tasks completed: 1
 
 ## Kernels Analyzed
 - [x] sk_001: softmax SYCL kernels — high potential (6 optimization opportunities)
@@ -122,3 +123,14 @@
   - HIGH: Manual SLM block reduction with 5 barriers can be replaced with sycl::reduce_over_group
   - MEDIUM: No vectorized memory access (scalar float only) — 20-40% memory throughput improvement possible
   - MEDIUM: soft_max_back_f32 work-group size too small (only 16 on Intel)
+
+## Optimization Activity
+
+[2026-02-19] Completed task_001: Benchmark mmq (quantized matmul)
+  - Kernel: sk_008 (MUL_MAT)
+  - Correctness: N/A (baseline measurement)
+  - Performance: 163 test cases benchmarked, time range 84.32 - 7957.65 us
+  - Throughput: Fastest quantized kernels (q4_0, iq1_m, q4_K) achieve ~1.2-1.4 TFLOPS for n=1
+  - Large batch (n=512): Best throughput ~9-11 TFLOPS
+  - Note: bf16 type not supported
+  - Baseline saved: syclgen/benchmarks/baseline_results.json

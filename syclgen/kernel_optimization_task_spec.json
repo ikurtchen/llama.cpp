@@ -13,6 +13,8 @@
       "tasks": [
         {
           "task_id": "task_001",
+          "status": "completed",
+          "completed_at": "2026-02-19T01:58:00Z",
           "kernel_id": "sk_008",
           "optimization_ids": [],
           "name": "Benchmark mmq (quantized matmul)",
@@ -23,7 +25,8 @@
           "dependencies": [],
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -k MUL_MAT",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
-          "files_to_modify": []
+          "files_to_modify": [],
+          "notes": "Benchmarked 163 test cases. Fastest quantized kernels (q4_0, iq1_m, q4_K) achieve ~1.2-1.4 TFLOPS for n=1. Large batch (n=512) achieves best throughput (~9-11 TFLOPS). bf16 type not supported. Time range: 84.32 - 7957.65 us. Baseline saved to syclgen/benchmarks/baseline_results.json"
         },
         {
           "task_id": "task_002",
