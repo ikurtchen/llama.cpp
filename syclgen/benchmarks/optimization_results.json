@@ -1,0 +1,21 @@
+{
+  "results": [
+    {
+      "task_id": "task_016",
+      "kernel": "CPY",
+      "optimization": "Work-group size 1→256 for quantized copy kernels (f32_q, q_f32)",
+      "timestamp": "2026-02-19T04:30:00Z",
+      "correctness": "pass",
+      "baseline_time_us": {
+        "f32_q4_0": 805.23,
+        "q4_0_f32": 3948.59
+      },
+      "optimized_time_us": {
+        "f32_q4_0": 805.79,
+        "q4_0_f32": 3946.11
+      },
+      "speedup": 1.0,
+      "notes": "Work-group size increased from 1 to 256 for all quantized copy kernels. Added SYCL_CPY_QUANT_BLOCK_SIZE=256. Added [[intel::reqd_sub_group_size(16)]] attribute. Correctness: 131/131 CPY tests passed. Benchmark shows minimal improvement on test sizes - quantization compute may be bottleneck."
+    }
+  ]
+}

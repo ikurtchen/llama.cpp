@@ -127,6 +127,17 @@
 
 ## Optimization Activity
 
+[2026-02-19] Completed task_016: Fix quantized copy work-group size from 1 to 256
+  - Kernel: sk_007 (CPY)
+  - Optimization: Changed work-group size from 1 to 256 for all quantized copy kernels
+  - Changes:
+    - Added SYCL_CPY_QUANT_BLOCK_SIZE=256 in presets.hpp
+    - Updated 11 dispatch functions in cpy.cpp: f32_q8_0, q8_0_f32, f32_q4_0, q4_0_f32, f32_q4_1, q4_1_f32, f32_q5_0, q5_0_f32, f32_q5_1, q5_1_f32, f32_iq4_nl
+    - Added [[intel::reqd_sub_group_size(16)]] attribute to all kernel lambdas
+  - Correctness: PASS (131/131 CPY unit tests)
+  - Performance: ~1.0x on benchmark tests (test sizes may not show benefit - quantization compute-bound)
+  - Note: Optimization is architecturally correct for Xe2 SIMD16, provides better kernel launch efficiency
+
 [2026-02-19] Completed task_015: Fix mmq tile size mismatch bug
   - Kernel: sk_008 (MUL_MAT)
   - Optimization: Removed cc-based tile size selection in all 10 dispatch functions

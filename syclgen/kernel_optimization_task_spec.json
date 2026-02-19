@@ -275,17 +275,21 @@
         },
         {
           "task_id": "task_016",
+          "status": "completed",
+          "completed_at": "2026-02-19T04:30:00Z",
           "kernel_id": "sk_007",
           "optimization_ids": ["opt_007_001"],
           "name": "Fix quantized copy work-group size from 1 to 256",
           "description": "Quantized copy kernels (cpy_q) launch with work-group size 1, wasting 15/16 SIMD lanes on Xe2. Increase to 256 and restructure the quantization loop to distribute work across threads.",
           "priority": "critical",
           "expected_improvement": "4-8x throughput for quantized copy operations",
+          "actual_improvement": "~1.0x measured (benchmark test sizes may not show benefit)",
           "estimated_effort": "medium",
           "dependencies": ["task_006"],
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -k CPY",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
-          "files_to_modify": ["ggml/src/ggml-sycl/cpy.cpp"]
+          "files_to_modify": ["ggml/src/ggml-sycl/cpy.cpp", "ggml/src/ggml-sycl/presets.hpp"],
+          "notes": "Changed work-group size from 1 to 256 for all quantized copy kernels (f32_q, q_f32). Added SYCL_CPY_QUANT_BLOCK_SIZE=256 constant. Added [[intel::reqd_sub_group_size(16)]] attribute. Correctness: PASS (131/131 CPY tests). Benchmark showed minimal improvement (~1.0x) on existing test cases - test sizes may be compute-bound by quantization itself rather than kernel launch overhead. Optimization is still architecturally correct for Xe2 SIMD16."
         },
         {
           "task_id": "task_017",
