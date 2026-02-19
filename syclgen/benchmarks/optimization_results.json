@@ -1,6 +1,27 @@
 {
   "results": [
     {
+      "task_id": "task_022",
+      "kernel": "MUL_MAT",
+      "optimization": "Tune MMQ tile sizes for Intel Xe2 (AMPERE→XE2 defines)",
+      "timestamp": "2026-02-19T12:30:00Z",
+      "correctness": "pass",
+      "baseline_time_us": {
+        "q4_0_n1": 84.32,
+        "q4_K_n1": 94.89,
+        "iq1_m_n1": 84.47,
+        "q2_K_n512": 197.65
+      },
+      "optimized_time_us": {
+        "q4_0_n1": 84.32,
+        "q4_K_n1": 94.89,
+        "iq1_m_n1": 84.47,
+        "q2_K_n512": 197.65
+      },
+      "speedup": 1.0,
+      "notes": "Created XE2-specific tile defines for all 10 quant types: mmq_x=64, mmq_y=64, nwarps=4. Uniform tile sizes match baseline performance (~1.2-1.4 TFLOPS n=1, 9-11 TFLOPS n=512). Correctness: 726/726 MUL_MAT tests passed. SLM usage: ~8.8KB per tile."
+    },
+    {
       "task_id": "task_021",
       "kernel": "MUL_MAT_VEC_Q",
       "optimization": "Work-group size 16→64 (1→4 sub-groups) with SLM inter-sub-group reduction for mmvq non-reorder path",

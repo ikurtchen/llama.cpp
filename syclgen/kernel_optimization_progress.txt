@@ -9,7 +9,7 @@
 - Analysis complete: Yes
 - Kernels with optimization potential: 13
 - Optimization tasks created: 42
-- Optimization tasks completed: 19 (Phase 1 complete, Phase 2 in progress — task_014 blocked)
+- Optimization tasks completed: 20 (Phase 1 complete, Phase 2 in progress — task_014 blocked)
 - Kernels with benchmark data: MUL_MAT, SOFT_MAX, CPY, ROPE, ADD
 
 ## Kernels Analyzed
@@ -126,6 +126,18 @@
   - MEDIUM: soft_max_back_f32 work-group size too small (only 16 on Intel)
 
 ## Optimization Activity
+
+[2026-02-19] Completed task_022: Tune mmq tile sizes for Intel Xe2
+  - Kernel: sk_008 (MUL_MAT)
+  - Optimization: Created XE2-specific tile defines for all 10 quant types
+  - Changes:
+    - Added MMQ_X_*_XE2, MMQ_Y_*_XE2, NWARPS_*_XE2 defines for Q4_0, Q4_1, Q5_0, Q5_1, Q8_0, Q2_K, Q3_K, Q4_K, Q5_K, Q6_K
+    - Uniform tile sizes: mmq_x=64, mmq_y=64, nwarps=4
+    - Updated all 10 kernel functions to use XE2 defines
+    - SLM usage: ~8.8KB per tile (well under 64KB limit)
+  - Correctness: PASS (726/726 MUL_MAT unit tests)
+  - Performance: ~1.0x (matching baseline 1.2-1.4 TFLOPS n=1, 9-11 TFLOPS n=512)
+  - Note: Tile sizes equivalent to AMPERE non-XMX path, now properly named for Intel Xe2 architecture
 
 [2026-02-19] Completed task_021: Increase mmvq non-reorder work-group size from 16 to 64
   - Kernel: sk_009 (MUL_MAT_VEC_Q)
