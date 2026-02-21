@@ -1,6 +1,25 @@
 {
   "results": [
     {
+      "task_id": "task_026",
+      "kernel": "SOFT_MAX",
+      "optimization": "Added vec4 vectorized memory access (sycl::vec<float, 4>) for all column loops",
+      "timestamp": "2026-02-21T17:30:00Z",
+      "correctness": "pass",
+      "baseline_time_us": {
+        "[4096,4096,5,1]": 2522.35,
+        "[12888,256,5,1]": 464.74,
+        "[65536,16,1,1]": 32.70
+      },
+      "optimized_time_us": {
+        "[4096,4096,5,1]": 2504.3,
+        "[12888,256,5,1]": 461.8,
+        "[65536,16,1,1]": 32.5
+      },
+      "speedup": 1.0,
+      "notes": "Vec4 vectorization for max/exp/norm loops with tail handling. Correctness: 212/212 tests. Peak bandwidth ~262 GB/s (~57% theoretical). Memory-bound kernel already well-optimized."
+    },
+    {
       "task_id": "task_025",
       "kernel": "SOFT_MAX",
       "optimization": "Added reqd_sub_group_size + replaced manual reduction with reduce_over_group",

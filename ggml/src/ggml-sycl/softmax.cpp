@@ -76,47 +76,99 @@ static void soft_max_f32(const float *         x,
     mask += (i11*p.nb11 + i12*p.nb12 + i13*p.nb13) / sizeof(T) * (mask != nullptr);
     dst  += int64_t(rowx)*ncols;
 
-    // OPTIMIZED: warp_id and lane_id removed - no longer needed after reduce_over_group optimization
     const float slope = get_alibi_slope(p.max_bias, i02, p.n_head_log2, p.m0, p.m1);
 
-    // OPTIMIZED: buf_iw removed - no longer needed for inter-warp reduction
-    // shared memory buffer to cache values between iterations:
     float *vals = use_shared ? (float *)dpct_local : dst;
     float max_val = sinks ? sinks[i02] : -INFINITY;
+
+    // OPTIMIZATION: vec4 vectorized memory access (task_026, opt_001_003)
+    // Reference: hw_spec_b60.md - Xe2 SIMD16, optimization_guide.md - vectorization
+    // Processes 4 elements per iteration, reducing memory transactions by 4x
+    // Template specializations (32,64,128,256,512,1024,2048,4096) are all multiples of 4
+    constexpr int VEC_SIZE = 4;
+    const int ncols_vec = ncols / VEC_SIZE;
+    const int ncols_tail = ncols % VEC_SIZE;
+
 #pragma unroll
-    for (int col0 = 0; col0 < ncols; col0 += block_size) {
+    for (int col0 = 0; col0 < ncols_vec; col0 += block_size) {
         const int col = col0 + tid;
 
-        if (ncols_template == 0 && col >= ncols) {
+        if (ncols_template == 0 && col >= ncols_vec) {
             break;
         }
 
-        const float val = x[col]*p.scale + (mask ? slope*t2f32(mask[col]) : 0.0f);
-
-        vals[col] = val;
-        max_val   = sycl::max(max_val, val);
+        if (ncols_template == 0 || col < ncols_vec) {
+            const int base_idx = col * VEC_SIZE;
+            sycl::vec<float, 4> x_vec = *reinterpret_cast<const sycl::vec<float, 4>*>(&x[base_idx]);
+            
+            float local_max = -INFINITY;
+            sycl::vec<float, 4> val_vec;
+#pragma unroll
+            for (int i = 0; i < VEC_SIZE; ++i) {
+                const float mask_val = mask ? slope * t2f32(mask[base_idx + i]) : 0.0f;
+                val_vec[i] = x_vec[i] * p.scale + mask_val;
+                local_max = sycl::max(local_max, val_vec[i]);
+            }
+            
+            *reinterpret_cast<sycl::vec<float, 4>*>(&vals[base_idx]) = val_vec;
+            max_val = sycl::max(max_val, local_max);
+        }
     }
-    // find the max value in the work-group using reduce_over_group
-    // OPTIMIZED: replaced manual warp-shuffle + SLM inter-warp reduction with single reduce_over_group call
-    // This eliminates 2 barriers and the buf_iw SLM buffer allocation for inter-warp reduction
+
+    if (ncols_tail > 0 && (ncols_template == 0 || ncols_vec * VEC_SIZE < ncols)) {
+        const int tail_start = ncols_vec * VEC_SIZE;
+        const int col = tid;
+        
+        if (ncols_template == 0 && col >= ncols_tail) {
+            // skip
+        } else if (col < ncols_tail) {
+            const int idx = tail_start + col;
+            const float val = x[idx]*p.scale + (mask ? slope*t2f32(mask[idx]) : 0.0f);
+            vals[idx] = val;
+            max_val = sycl::max(max_val, val);
+        }
+    }
     max_val = sycl::reduce_over_group(item_ct1.get_group(), max_val, sycl::maximum<float>());
-    float tmp = 0.0f; // partial sum
+    float tmp = 0.0f;
 
 #pragma unroll
-    for (int col0 = 0; col0 < ncols; col0 += block_size) {
+    for (int col0 = 0; col0 < ncols_vec; col0 += block_size) {
         const int col = col0 + tid;
 
-        if (ncols_template == 0 && col >= ncols) {
+        if (ncols_template == 0 && col >= ncols_vec) {
             break;
         }
 
-        const float val = sycl::native::exp(vals[col] - max_val);
-        tmp += val;
-        vals[col] = val;
+        if (ncols_template == 0 || col < ncols_vec) {
+            const int base_idx = col * VEC_SIZE;
+            sycl::vec<float, 4> val_vec = *reinterpret_cast<const sycl::vec<float, 4>*>(&vals[base_idx]);
+            
+            float local_sum = 0.0f;
+#pragma unroll
+            for (int i = 0; i < VEC_SIZE; ++i) {
+                val_vec[i] = sycl::native::exp(val_vec[i] - max_val);
+                local_sum += val_vec[i];
+            }
+            
+            *reinterpret_cast<sycl::vec<float, 4>*>(&vals[base_idx]) = val_vec;
+            tmp += local_sum;
+        }
     }
-    // find the sum of exps in the work-group using reduce_over_group
-    // OPTIMIZED: replaced manual warp-shuffle + SLM inter-warp reduction with single reduce_over_group call
-    // This eliminates 3 barriers and the nreduce loop
+
+    if (ncols_tail > 0 && (ncols_template == 0 || ncols_vec * VEC_SIZE < ncols)) {
+        const int tail_start = ncols_vec * VEC_SIZE;
+        const int col = tid;
+        
+        if (ncols_template == 0 && col >= ncols_tail) {
+            // skip
+        } else if (col < ncols_tail) {
+            const int idx = tail_start + col;
+            const float val = sycl::native::exp(vals[idx] - max_val);
+            tmp += val;
+            vals[idx] = val;
+        }
+    }
+
     tmp = sycl::reduce_over_group(item_ct1.get_group(), tmp, sycl::plus<float>());
     if (sinks) {
         tmp += sycl::native::exp(sinks[i02] - max_val);
@@ -124,14 +176,36 @@ static void soft_max_f32(const float *         x,
     const float inv_sum = 1.0f / tmp;
 
 #pragma unroll
-    for (int col0 = 0; col0 < ncols; col0 += block_size) {
+    for (int col0 = 0; col0 < ncols_vec; col0 += block_size) {
         const int col = col0 + tid;
 
-        if (ncols_template == 0 && col >= ncols) {
-            return;
+        if (ncols_template == 0 && col >= ncols_vec) {
+            break;
         }
 
-        dst[col] = vals[col] * inv_sum;
+        if (ncols_template == 0 || col < ncols_vec) {
+            const int base_idx = col * VEC_SIZE;
+            sycl::vec<float, 4> val_vec = *reinterpret_cast<const sycl::vec<float, 4>*>(&vals[base_idx]);
+            
+#pragma unroll
+            for (int i = 0; i < VEC_SIZE; ++i) {
+                val_vec[i] *= inv_sum;
+            }
+            
+            *reinterpret_cast<sycl::vec<float, 4>*>(&dst[base_idx]) = val_vec;
+        }
+    }
+
+    if (ncols_tail > 0 && (ncols_template == 0 || ncols_vec * VEC_SIZE < ncols)) {
+        const int tail_start = ncols_vec * VEC_SIZE;
+        const int col = tid;
+        
+        if (ncols_template == 0 && col >= ncols_tail) {
+            return;
+        } else if (col < ncols_tail) {
+            const int idx = tail_start + col;
+            dst[idx] = vals[idx] * inv_sum;
+        }
     }
 }
 #ifdef __clang__

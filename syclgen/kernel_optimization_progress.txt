@@ -9,7 +9,7 @@
 - Analysis complete: Yes
 - Kernels with optimization potential: 13
 - Optimization tasks created: 42
-- Optimization tasks completed: 21 (Phase 1 complete, Phase 2 complete except task_014 blocked, Phase 3 in progress)
+- Optimization tasks completed: 22 (Phase 1 complete, Phase 2 complete except task_014 blocked, Phase 3 in progress)
 - Kernels with benchmark data: MUL_MAT, SOFT_MAX, CPY, ROPE, ADD
 
 ## Kernels Analyzed
@@ -126,6 +126,19 @@
   - MEDIUM: soft_max_back_f32 work-group size too small (only 16 on Intel)
 
 ## Optimization Activity
+
+[2026-02-21] Completed task_026: Add vec4 vectorized memory access to softmax
+  - Kernel: sk_001 (SOFT_MAX)
+  - Optimization: Added sycl::vec<float, 4> vectorized loads/stores for all three column loops
+  - Changes:
+    - Max value computation loop: vec4 loads, local max across 4 elements
+    - Exp + sum loop: vec4 loads/stores, compute 4 exps per iteration
+    - Normalization loop: vec4 loads/stores, multiply 4 elements by inv_sum
+    - Added tail handling for ncols % 4 != 0 (non-multiple-of-4 column counts)
+    - Template specializations (32,64,128,256,512,1024,2048,4096) are all multiples of 4 - full vectorization
+  - Correctness: PASS (212/212 SOFT_MAX unit tests)
+  - Performance: ~1.0x (peak ~262 GB/s, ~57% of theoretical 456 GB/s)
+  - Note: Kernel already memory-bound; vec4 provides architectural correctness for Xe2 memory subsystem
 
 [2026-02-21] Completed task_025: Fix softmax reqd_sub_group_size and reduction
   - Kernel: sk_001 (SOFT_MAX)
