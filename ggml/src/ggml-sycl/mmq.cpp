@@ -1548,6 +1548,165 @@ mul_mat_q(const void *__restrict__ vx, const void *__restrict__ vy,
     }
 }
 
+#ifdef GGML_SYCL_USE_STREAM_K
+
+template <int qk, int qr, int qi, bool need_sum, typename block_q_t, int mmq_x,
+          int mmq_y, int nwarps, load_tiles_sycl_t load_tiles, int vdr,
+          vec_dot_q_mul_mat_sycl_t vec_dot>
+static __dpct_inline__ void
+mul_mat_q_stream_k(const void *__restrict__ vx, const void *__restrict__ vy,
+                   float *__restrict__ dst, const int ncols_x, const int nrows_x,
+                   const int ncols_y, const int nrows_y, const int nrows_dst,
+                   int *tile_x_ql, sycl::half2 *tile_x_dm, int *tile_x_qh,
+                   int *tile_x_sc, const sycl::nd_item<3> &item_ct1, int *tile_y_qs,
+                   sycl::half2 *tile_y_ds, const int blocks_per_row_x,
+                   float *__restrict__ tmp_fixup, const int n_xe_cores) {
+
+    const block_q_t  * x = (const block_q_t  *) vx;
+    const block_q8_1 * y = (const block_q8_1 *) vy;
+
+    const int blocks_per_col_y = nrows_y / QK8_1;
+    const int blocks_per_warp = WARP_SIZE / qi;
+
+    const int ntx = (nrows_x + mmq_y - 1) / mmq_y;
+    const int nty = (ncols_y + mmq_x - 1) / mmq_x;
+    const int ntiles = ntx * nty;
+
+    const int total_kbc = ntiles * blocks_per_row_x;
+    const int kbc_per_group = (total_kbc + n_xe_cores - 1) / n_xe_cores;
+    const int kbc_start = item_ct1.get_group(2) * kbc_per_group;
+    const int kbc_end = sycl::min(kbc_start + kbc_per_group, total_kbc);
+
+    float sum[mmq_y/WARP_SIZE][mmq_x/nwarps] = {{0.0f}};
+
+    for (int kbc = kbc_start; kbc < kbc_end; ++kbc) {
+        int tmp = kbc;
+        const int kb = tmp % blocks_per_row_x;
+        tmp /= blocks_per_row_x;
+        const int jt = tmp / ntx;
+        const int it = tmp % ntx;
+
+        const int row_dst_0 = it * mmq_y;
+        const int col_dst_0 = jt * mmq_x;
+
+        load_tiles(x + row_dst_0 * blocks_per_row_x + kb / blocks_per_warp * blocks_per_warp,
+                   tile_x_ql, tile_x_dm, tile_x_qh, tile_x_sc,
+                   item_ct1.get_local_id(1), nrows_x - row_dst_0 - 1,
+                   item_ct1.get_local_id(2), blocks_per_row_x);
+
+#pragma unroll
+        for (int ir = 0; ir < qr; ++ir) {
+            const int kqs = ir * WARP_SIZE + item_ct1.get_local_id(2);
+            const int kbxd = kqs / QI8_1;
+
+#pragma unroll
+            for (int i = 0; i < mmq_x; i += nwarps) {
+                const int col_y_eff = sycl::min(col_dst_0 + item_ct1.get_local_id(1) + i, ncols_y - 1);
+                const block_q8_1 * by0 = &y[col_y_eff * blocks_per_col_y + kb * (qk/QK8_1) + kbxd];
+                const int index_y = (item_ct1.get_local_id(1) + i) * WARP_SIZE + kqs % WARP_SIZE;
+                tile_y_qs[index_y] = get_int_from_int8_aligned(by0->qs, item_ct1.get_local_id(2) % QI8_1);
+            }
+
+#pragma unroll
+            for (int ids0 = 0; ids0 < mmq_x; ids0 += nwarps * QI8_1) {
+                const int ids = (ids0 + item_ct1.get_local_id(1) * QI8_1 +
+                                 item_ct1.get_local_id(2) / (WARP_SIZE / QI8_1)) % mmq_x;
+                const int kby = item_ct1.get_local_id(2) % (WARP_SIZE / QI8_1);
+                const int col_y_eff = sycl::min(col_dst_0 + ids, ncols_y - 1);
+
+                const sycl::half2 *dsi_src = &y[col_y_eff * blocks_per_col_y + kb * (qk/QK8_1) +
+                                                  ir * (WARP_SIZE/QI8_1) + kby].ds;
+                sycl::half2 *dsi_dst = &tile_y_ds[ids * (WARP_SIZE/QI8_1) + kby];
+                if (need_sum) {
+                    *dsi_dst = *dsi_src;
+                } else {
+                    float * dfi_dst = (float *) dsi_dst;
+                    *dfi_dst = (*dsi_src)[0];
+                }
+            }
+
+            item_ct1.barrier(sycl::access::fence_space::local_space);
+
+            for (int k = ir*WARP_SIZE/qr; k < (ir+1)*WARP_SIZE/qr; k += vdr) {
+#pragma unroll
+                for (int j = 0; j < mmq_x; j += nwarps) {
+#pragma unroll
+                    for (int i = 0; i < mmq_y; i += WARP_SIZE) {
+                        sum[i / WARP_SIZE][j / nwarps] += vec_dot(
+                            tile_x_ql, tile_x_dm, tile_x_qh, tile_x_sc,
+                            tile_y_qs, tile_y_ds, item_ct1.get_local_id(2) + i,
+                            item_ct1.get_local_id(1) + j, k);
+                    }
+                }
+            }
+
+            item_ct1.barrier(sycl::access::fence_space::local_space);
+        }
+    }
+
+    const int first_tile_of_group = kbc_start / blocks_per_row_x;
+    const int last_tile_of_group = (kbc_end - 1) / blocks_per_row_x;
+    const bool crosses_tiles = (first_tile_of_group != last_tile_of_group);
+
+    if (crosses_tiles) {
+        const int fixup_idx = item_ct1.get_group(2);
+#pragma unroll
+        for (int j = 0; j < mmq_x; j += nwarps) {
+#pragma unroll
+            for (int i = 0; i < mmq_y; i += WARP_SIZE) {
+                const int idx = fixup_idx * mmq_x * mmq_y + (item_ct1.get_local_id(1) + j) * mmq_y +
+                                item_ct1.get_local_id(2) + i;
+                if (idx < n_xe_cores * mmq_x * mmq_y) {
+                    tmp_fixup[idx] = sum[i/WARP_SIZE][j/nwarps];
+                }
+            }
+        }
+    } else {
+        const int tmp = kbc_start;
+        const int kb_start = tmp % blocks_per_row_x;
+        const int tile_idx = tmp / blocks_per_row_x;
+        const int jt = tile_idx / ntx;
+        const int it = tile_idx % ntx;
+        const int row_dst_0 = it * mmq_y;
+        const int col_dst_0 = jt * mmq_x;
+
+#pragma unroll
+        for (int j = 0; j < mmq_x; j += nwarps) {
+            const int col_dst = col_dst_0 + j + item_ct1.get_local_id(1);
+            if (col_dst >= ncols_y) continue;
+
+#pragma unroll
+            for (int i = 0; i < mmq_y; i += WARP_SIZE) {
+                const int row_dst = row_dst_0 + item_ct1.get_local_id(2) + i;
+                if (row_dst >= nrows_dst) continue;
+                dst[col_dst * nrows_dst + row_dst] = sum[i/WARP_SIZE][j/nwarps];
+            }
+        }
+    }
+}
+
+template <int mmq_x, int mmq_y>
+static void mul_mat_q_stream_k_fixup(
+    float *__restrict__ dst, const float *__restrict__ tmp_fixup,
+    const int ncols_dst, const int nrows_dst, const int n_xe_cores,
+    const sycl::nd_item<3> &item_ct1) {
+
+    const int col_dst = item_ct1.get_group(1) * mmq_x + item_ct1.get_local_id(1);
+    const int row_dst = item_ct1.get_global_id(2);
+
+    if (col_dst >= ncols_dst || row_dst >= nrows_dst) return;
+
+    float sum = 0.0f;
+    for (int g = 0; g < n_xe_cores; ++g) {
+        const int idx = g * mmq_x * mmq_y + item_ct1.get_local_id(1) * mmq_y + item_ct1.get_local_id(2);
+        sum += tmp_fixup[idx];
+    }
+
+    dst[col_dst * nrows_dst + row_dst] = sum;
+}
+
+#endif // GGML_SYCL_USE_STREAM_K
+
 #define  MMQ_X_Q4_0_RDNA2  64
 #define  MMQ_Y_Q4_0_RDNA2  128
 #define NWARPS_Q4_0_RDNA2  8
