@@ -441,17 +441,21 @@
       "tasks": [
         {
           "task_id": "task_025",
+          "status": "completed",
+          "completed_at": "2026-02-21T16:30:00Z",
           "kernel_id": "sk_001",
           "optimization_ids": ["opt_001_001", "opt_001_002"],
           "name": "Fix softmax reqd_sub_group_size and reduction",
           "description": "Add missing [[sycl::reqd_sub_group_size(WARP_SIZE)]] (correctness risk) and replace manual SLM block reduction with sycl::reduce_over_group (10-20% speedup, eliminates 5 barriers).",
           "priority": "high",
           "expected_improvement": "10-20% from efficient reduction + correctness fix",
+          "actual_improvement": "~1.0x (memory-bound kernel, reduction was not bottleneck)",
           "estimated_effort": "medium",
           "dependencies": ["task_002"],
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -k SOFT_MAX",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
-          "files_to_modify": ["ggml/src/ggml-sycl/softmax.cpp"]
+          "files_to_modify": ["ggml/src/ggml-sycl/softmax.cpp"],
+          "notes": "Added [[sycl::reqd_sub_group_size(WARP_SIZE)]] to fallback forward and backward kernel launches. Replaced manual 5-barrier reduction with sycl::reduce_over_group for both MAX and SUM. Correctness: PASS (212/212 SOFT_MAX tests). Performance: ~0-1% (unchanged - kernel is memory-bound). Code simplified by ~40 lines, SLM usage reduced."
         },
         {
           "task_id": "task_026",

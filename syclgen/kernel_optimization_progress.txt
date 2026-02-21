@@ -9,7 +9,7 @@
 - Analysis complete: Yes
 - Kernels with optimization potential: 13
 - Optimization tasks created: 42
-- Optimization tasks completed: 20 (Phase 1 complete, Phase 2 in progress — task_014 blocked)
+- Optimization tasks completed: 21 (Phase 1 complete, Phase 2 complete except task_014 blocked, Phase 3 in progress)
 - Kernels with benchmark data: MUL_MAT, SOFT_MAX, CPY, ROPE, ADD
 
 ## Kernels Analyzed
@@ -126,6 +126,19 @@
   - MEDIUM: soft_max_back_f32 work-group size too small (only 16 on Intel)
 
 ## Optimization Activity
+
+[2026-02-21] Completed task_025: Fix softmax reqd_sub_group_size and reduction
+  - Kernel: sk_001 (SOFT_MAX)
+  - Optimization: Added [[sycl::reqd_sub_group_size(WARP_SIZE)]] + replaced manual reduction with reduce_over_group
+  - Changes:
+    - Added reqd_sub_group_size attribute to fallback forward (line 258) and backward (line 282) kernel launches
+    - Replaced manual MAX reduction (5 barriers) with sycl::reduce_over_group(item.get_group(), max_val, sycl::maximum<float>())
+    - Replaced manual SUM reduction (5 barriers) with sycl::reduce_over_group(item.get_group(), tmp, sycl::plus<float>())
+    - Removed ~40 lines of manual reduction logic
+    - Reduced SLM allocation (removed inter-warp buffer)
+  - Correctness: PASS (212/212 SOFT_MAX unit tests)
+  - Performance: ~1.0x (memory-bound kernel, reduction was not the bottleneck)
+  - Note: Code simplification and correctness guarantee achieved; performance unchanged due to memory-bound nature
 
 [2026-02-19] Completed task_022: Tune mmq tile sizes for Intel Xe2
   - Kernel: sk_008 (MUL_MAT)

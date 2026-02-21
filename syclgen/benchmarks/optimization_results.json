@@ -1,6 +1,27 @@
 {
   "results": [
     {
+      "task_id": "task_025",
+      "kernel": "SOFT_MAX",
+      "optimization": "Added reqd_sub_group_size + replaced manual reduction with reduce_over_group",
+      "timestamp": "2026-02-21T16:30:00Z",
+      "correctness": "pass",
+      "baseline_time_us": {
+        "[4096,4096,5,1]": 2522.35,
+        "[12888,256,5,1]": 464.74,
+        "[77,4096,5,1]": 207.18,
+        "[1024,1024,10,1]": 1053.80
+      },
+      "optimized_time_us": {
+        "[4096,4096,5,1]": 2513.51,
+        "[12888,256,5,1]": 468.19,
+        "[77,4096,5,1]": 208.47,
+        "[1024,1024,10,1]": 1055.72
+      },
+      "speedup": 1.0,
+      "notes": "Replaced manual 5-barrier reduction with sycl::reduce_over_group. Added [[sycl::reqd_sub_group_size(WARP_SIZE)]]. Code simplified ~40 lines, SLM reduced. Performance ~0-1% (memory-bound kernel). Correctness: 212/212 tests passed."
+    },
+    {
       "task_id": "task_022",
       "kernel": "MUL_MAT",
       "optimization": "Tune MMQ tile sizes for Intel Xe2 (AMPERE→XE2 defines)",

@@ -55,8 +55,6 @@ static void soft_max_f32(const float *         x,
                                ? item_ct1.get_local_range(2)
                                : block_size_template;
     const int nthreads = block_size;
-    const int nwarps = nthreads / WARP_SIZE;
-    size_t nreduce = nwarps / WARP_SIZE;
 
     const int tid = item_ct1.get_local_id(2);
 
@@ -78,15 +76,12 @@ static void soft_max_f32(const float *         x,
     mask += (i11*p.nb11 + i12*p.nb12 + i13*p.nb13) / sizeof(T) * (mask != nullptr);
     dst  += int64_t(rowx)*ncols;
 
-    const int warp_id = item_ct1.get_local_id(2) / WARP_SIZE;
-    const int lane_id = item_ct1.get_local_id(2) % WARP_SIZE;
-
+    // OPTIMIZED: warp_id and lane_id removed - no longer needed after reduce_over_group optimization
     const float slope = get_alibi_slope(p.max_bias, i02, p.n_head_log2, p.m0, p.m1);
 
-    float * buf_iw = (float *) dpct_local;
-
+    // OPTIMIZED: buf_iw removed - no longer needed for inter-warp reduction
     // shared memory buffer to cache values between iterations:
-    float *vals = use_shared ? buf_iw + sycl::max(nwarps, WARP_SIZE) : dst;
+    float *vals = use_shared ? (float *)dpct_local : dst;
     float max_val = sinks ? sinks[i02] : -INFINITY;
 #pragma unroll
     for (int col0 = 0; col0 < ncols; col0 += block_size) {
@@ -101,23 +96,10 @@ static void soft_max_f32(const float *         x,
         vals[col] = val;
         max_val   = sycl::max(max_val, val);
     }
-    // find the max value in the block
-    max_val = warp_reduce_max(max_val);
-
-    if (block_size > WARP_SIZE) {
-        if (warp_id == 0) {
-            buf_iw[lane_id] = -INFINITY;
-        }
-        item_ct1.barrier();
-
-        if (lane_id == 0) {
-            buf_iw[warp_id] = max_val;
-        }
-        item_ct1.barrier();
-
-        max_val = buf_iw[lane_id];
-        max_val = warp_reduce_max(max_val);
-    }
+    // find the max value in the work-group using reduce_over_group
+    // OPTIMIZED: replaced manual warp-shuffle + SLM inter-warp reduction with single reduce_over_group call
+    // This eliminates 2 barriers and the buf_iw SLM buffer allocation for inter-warp reduction
+    max_val = sycl::reduce_over_group(item_ct1.get_group(), max_val, sycl::maximum<float>());
     float tmp = 0.0f; // partial sum
 
 #pragma unroll
@@ -132,29 +114,10 @@ static void soft_max_f32(const float *         x,
         tmp += val;
         vals[col] = val;
     }
-    // find the sum of exps in the block
-    tmp = warp_reduce_sum(tmp);
-    if (block_size > WARP_SIZE) {
-        item_ct1.barrier();
-        if (warp_id == 0) {
-            buf_iw[lane_id] = 0.0f;
-            for (size_t i = 1; i < nreduce; i += 1) {
-                buf_iw[lane_id + i * WARP_SIZE] = 0.f;
-            }
-        }
-        item_ct1.barrier();
-
-        if (lane_id == 0) {
-            buf_iw[warp_id] = tmp;
-        }
-        item_ct1.barrier();
-
-        tmp = buf_iw[lane_id];
-        for (size_t i = 1; i < nreduce; i += 1) {
-            tmp += buf_iw[lane_id + i * WARP_SIZE];
-        }
-        tmp = warp_reduce_sum(tmp);
-    }
+    // find the sum of exps in the work-group using reduce_over_group
+    // OPTIMIZED: replaced manual warp-shuffle + SLM inter-warp reduction with single reduce_over_group call
+    // This eliminates 3 barriers and the nreduce loop
+    tmp = sycl::reduce_over_group(item_ct1.get_group(), tmp, sycl::plus<float>());
     if (sinks) {
         tmp += sycl::native::exp(sinks[i02] - max_val);
     }
@@ -271,8 +234,9 @@ static void soft_max_f32_sycl(const float *x, const T *mask,
 
     const dpct::dim3 block_dims(nth, 1, 1);
     const dpct::dim3 block_nums(params.ne01, params.ne02, params.ne03);
-    const size_t nbytes_shared =
-        (GGML_PAD(ncols_x, WARP_SIZE) + WARP_SIZE) * sizeof(float);
+    // OPTIMIZED: removed + WARP_SIZE padding since buf_iw is no longer used
+    // (reduce_over_group eliminates the need for inter-warp reduction buffer)
+    const size_t nbytes_shared = GGML_PAD(ncols_x, WARP_SIZE) * sizeof(float);
 
     const int id       = get_current_device_id();
     const size_t smpbo = ggml_sycl_info().devices[id].smpbo;
@@ -282,22 +246,24 @@ static void soft_max_f32_sycl(const float *x, const T *mask,
             x, mask, sinks, dst, params, stream, block_dims, block_nums,
             nbytes_shared);
     } else {
-        const size_t nbytes_shared_low = WARP_SIZE * sizeof(float);
-
+        // OPTIMIZED: fallback path uses use_shared=false, so no SLM needed
+        // (vals goes to dst in global memory, and buf_iw was removed)
         stream->submit([&](sycl::handler &cgh) {
+            // Minimal SLM allocation (0-sized accessor may have issues on some platforms)
             sycl::local_accessor<uint8_t, 1> dpct_local_acc_ct1(
-                sycl::range<1>(nbytes_shared_low), cgh);
+                sycl::range<1>(1), cgh);
 
             cgh.parallel_for(
                 sycl::nd_range<3>(block_nums * block_dims, block_dims),
-                [=](sycl::nd_item<3> item_ct1) {
-                    soft_max_f32<false, 0, 0>(
-                        x, mask, sinks, dst, params,
-                        dpct_local_acc_ct1
-                            .get_multi_ptr<sycl::access::decorated::no>()
-                            .get());
-                    GGML_UNUSED(item_ct1);
-                });
+                [=](sycl::nd_item<3> item_ct1)
+                    [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                        soft_max_f32<false, 0, 0>(
+                            x, mask, sinks, dst, params,
+                            dpct_local_acc_ct1
+                                .get_multi_ptr<sycl::access::decorated::no>()
+                                .get());
+                        GGML_UNUSED(item_ct1);
+                    });
         });
     }
 }
@@ -313,10 +279,11 @@ static void soft_max_back_f32_sycl(const float *   grad,
     const dpct::dim3 block_nums(nrows, 1, 1);
 
     stream->parallel_for(sycl::nd_range<3>(block_nums * block_dims, block_dims),
-                         [=](sycl::nd_item<3> item_ct1) {
-                             soft_max_back_f32(grad, dstf, dst, ncols, scale);
-                             GGML_UNUSED(item_ct1);
-                         });
+                         [=](sycl::nd_item<3> item_ct1)
+                             [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                                 soft_max_back_f32(grad, dstf, dst, ncols, scale);
+                                 GGML_UNUSED(item_ct1);
+                             });
 }
 
 void ggml_sycl_op_soft_max(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
