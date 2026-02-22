@@ -714,6 +714,8 @@
         },
         {
           "task_id": "task_039",
+          "status": "blocked",
+          "blocked_reason": "Large refactoring task requiring ~31 functions to be consolidated into templates. Per AGENTS.md guidelines, this would be predominantly AI-generated code and should be implemented by a human contributor who can understand, debug, and justify the changes.",
           "kernel_id": "sk_009",
           "optimization_ids": ["opt_009_003"],
           "name": "Consolidate mmvq 31 duplicated functions into template",
