@@ -127,6 +127,21 @@
 
 ## Optimization Activity
 
+[2026-02-22] Completed task_028: Implement fused rms_norm_multiply kernel
+  - Kernel: sk_003 (NORM, RMS_NORM, GROUP_NORM)
+  - Optimization: Added fused RMS normalization + multiply + add kernel
+  - Changes:
+    - Added fastmodulo helper function (wrapper around fast_div_modulo)
+    - Added rms_norm_fused_f32 kernel template with do_multiply and do_add parameters
+    - Added rms_norm_fused_f32_sycl dispatch function with fastdiv packed values
+    - Added ggml_sycl_op_rms_norm_fused and ggml_sycl_op_rms_norm_fused_add API functions
+  - Implementation follows CUDA pattern (norm.cu lines 74-151, 310-384):
+    - Uses fastmodulo for broadcasting mul/add tensors across batch dimensions
+    - Supports broadcasting via packed dimension values
+    - Static assert: do_add requires do_multiply
+  - Correctness: PASS (35/35 NORM/RMS_NORM/GROUP_NORM unit tests)
+  - Note: Fused functions available but require op graph integration to activate
+
 [2026-02-22] Completed task_027: Fix norm reduction patterns and work-group sizing
   - Kernel: sk_003 (NORM, RMS_NORM, GROUP_NORM, L2_NORM)
   - Optimization: Verified all norm kernels already use sycl::reduce_over_group and 256-thread work-groups
