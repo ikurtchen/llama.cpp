@@ -31,8 +31,9 @@ static void rope_yarn(
         // Get n-d magnitude scaling corrected for interpolation
         mscale *= 1.0f + 0.1f * sycl::log(1.0f / freq_scale);
     }
-    *cos_theta = sycl::cos(theta) * mscale;
-    *sin_theta = sycl::sin(theta) * mscale;
+    // Use native math for Xe2 performance (task_029)
+    *cos_theta = sycl::native::cos(theta) * mscale;
+    *sin_theta = sycl::native::sin(theta) * mscale;
     if (!forward) {
         *sin_theta *= -1.0f;
     }
@@ -62,7 +63,8 @@ static void rope_norm(const T * x, T * dst, const int ne0, const int ne1, const 
         return;
     }
 
-    const float theta_base = pos[channel0] * sycl::pow(theta_scale, i0 / 2.0f);
+    // Use native math for Xe2 performance (task_029)
+    const float theta_base = pos[channel0] * sycl::native::exp2(sycl::native::log2(theta_scale) * (i0 / 2.0f));
 
     const float freq_factor = has_ff ? freq_factors[i0 / 2] : 1.0f;
 
@@ -102,7 +104,8 @@ static void rope_neox(const T * x, T * dst, const int ne0, const int ne1, const 
         return;
     }
 
-    const float theta_base = pos[channel0] * sycl::pow(theta_scale, i0 / 2.0f);
+    // Use native math for Xe2 performance (task_029)
+    const float theta_base = pos[channel0] * sycl::native::exp2(sycl::native::log2(theta_scale) * (i0 / 2.0f));
 
     const float freq_factor = has_ff ? freq_factors[i0 / 2] : 1.0f;
 
@@ -146,29 +149,31 @@ static void rope_multi(const T * x, T * dst, const int ne0, const int ne1, const
     const int sector = (i0 / 2) % sect_dims;
 
 
+    // Use native math for Xe2 performance (task_029)
+    const float theta_scale_exp = sycl::native::exp2(sycl::native::log2(theta_scale) * (i0/2.0f));
     float theta_base = 0.0;
     if (is_imrope) {
         if (sector % 3 == 1 && sector < 3 * sections.v[1]) {
-            theta_base = pos[channel_x + ne2 * 1]*sycl::pow(theta_scale, i0/2.0f);
+            theta_base = pos[channel_x + ne2 * 1] * theta_scale_exp;
         } else if (sector % 3 == 2 && sector < 3 * sections.v[2]) {
-            theta_base = pos[channel_x + ne2 * 2]*sycl::pow(theta_scale, i0/2.0f);
+            theta_base = pos[channel_x + ne2 * 2] * theta_scale_exp;
         } else if (sector % 3 == 0 && sector < 3 * sections.v[0]) {
-            theta_base = pos[channel_x]*sycl::pow(theta_scale, i0/2.0f);
+            theta_base = pos[channel_x] * theta_scale_exp;
         } else {
-            theta_base = pos[channel_x + ne2 * 3]*sycl::pow(theta_scale, i0/2.0f);
+            theta_base = pos[channel_x + ne2 * 3] * theta_scale_exp;
         }
     } else {
         if (sector < sections.v[0]) {
-            theta_base = pos[channel_x]*sycl::pow(theta_scale, i0/2.0f);
+            theta_base = pos[channel_x] * theta_scale_exp;
         }
         else if (sector >= sections.v[0] && sector < sec_w) {
-            theta_base = pos[channel_x + ne2 * 1]*sycl::pow(theta_scale, i0/2.0f);
+            theta_base = pos[channel_x + ne2 * 1] * theta_scale_exp;
         }
         else if (sector >= sec_w && sector < sec_w + sections.v[2]) {
-            theta_base = pos[channel_x + ne2 * 2]*sycl::pow(theta_scale, i0/2.0f);
+            theta_base = pos[channel_x + ne2 * 2] * theta_scale_exp;
         }
         else if (sector >= sec_w + sections.v[2]) {
-            theta_base = pos[channel_x + ne2 * 3]*sycl::pow(theta_scale, i0/2.0f);
+            theta_base = pos[channel_x + ne2 * 3] * theta_scale_exp;
         }
     }
 
@@ -206,14 +211,15 @@ static void rope_vision(const T * x, T * dst, const int ne0, const int ne1, cons
     const int sect_dims = sections.v[0] + sections.v[1];
     const int sector    = (i0 / 2) % sect_dims;
 
+    // Use native math for Xe2 performance (task_029)
     float theta_base = 0.0f;
     if (sector < sections.v[0]) {
         const int p = sector;
-        theta_base  = pos[channel_x] * sycl::pow(theta_scale, (float) p);
+        theta_base  = pos[channel_x] * sycl::native::exp2(sycl::native::log2(theta_scale) * (float) p);
     } else {
         // Simplified from CUDA backend code: if (sector >= sections.v[0] && sector < sec_w) which is just sector >= sections.v[0]
         const int p = sector - sections.v[0];
-        theta_base  = pos[channel_x + ne2] * sycl::pow(theta_scale, (float) p);
+        theta_base  = pos[channel_x + ne2] * sycl::native::exp2(sycl::native::log2(theta_scale) * (float) p);
     }
 
     const float freq_factor = has_ff ? freq_factors[i0 / 2] : 1.0f;

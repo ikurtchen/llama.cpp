@@ -9,7 +9,7 @@
 - Analysis complete: Yes
 - Kernels with optimization potential: 13
 - Optimization tasks created: 42
-- Optimization tasks completed: 23 (Phase 1 complete, Phase 2 complete except task_014 blocked, Phase 3 in progress)
+- Optimization tasks completed: 24 (Phase 1 complete, Phase 2 complete except task_014 blocked, Phase 3 in progress)
 - Kernels with benchmark data: MUL_MAT, SOFT_MAX, CPY, ROPE, ADD
 
 ## Kernels Analyzed
@@ -126,6 +126,19 @@
   - MEDIUM: soft_max_back_f32 work-group size too small (only 16 on Intel)
 
 ## Optimization Activity
+
+[2026-02-22] Completed task_029: Use native sin/cos/pow for RoPE
+  - Kernel: sk_002 (ROPE)
+  - Optimization: Replace sycl::cos/sin/pow with native:: variants for Xe2
+  - Changes:
+    - rope_yarn() lines 34-35: sycl::cos/sin → sycl::native::cos/sin
+    - rope_norm(): sycl::pow → native::exp2(native::log2(...)*...) at line 67
+    - rope_neox(): sycl::pow → native::exp2(native::log2(...)*...) at line 108
+    - rope_multi(): sycl::pow → native::exp2(native::log2(...)*...) with precomputed theta_scale_exp
+    - rope_vision(): sycl::pow → native::exp2(native::log2(...)*...) at lines 218, 222
+  - Correctness: PASS (248/248 ROPE unit tests)
+  - Performance: 1.59x speedup for mrope f32 kernel, neutral for norm/neox paths
+  - Note: Native math functions provide measurable speedup on compute-heavy paths; rope_multi benefits most
 
 [2026-02-22] Completed task_028: Implement fused rms_norm_multiply kernel
   - Kernel: sk_003 (NORM, RMS_NORM, GROUP_NORM)

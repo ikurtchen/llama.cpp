@@ -513,17 +513,21 @@
         },
         {
           "task_id": "task_029",
+          "status": "completed",
+          "completed_at": "2026-02-22T18:30:00Z",
           "kernel_id": "sk_002",
           "optimization_ids": ["opt_002_001", "opt_002_002"],
           "name": "Use native sin/cos/pow for RoPE",
           "description": "Replace standard sycl::sin/cos with native::sin/cos (15-30% speedup) and replace sycl::pow with native::exp2(native::log2()*...) (10-20% speedup) on Xe2.",
           "priority": "high",
           "expected_improvement": "15-30% overall RoPE speedup",
+          "actual_improvement": "1.59x for mrope f32, neutral for norm/neox paths",
           "estimated_effort": "small",
           "dependencies": ["task_007"],
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -k ROPE",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
-          "files_to_modify": ["ggml/src/ggml-sycl/rope.cpp"]
+          "files_to_modify": ["ggml/src/ggml-sycl/rope.cpp"],
+          "notes": "Replaced sycl::cos/sin with native::cos/sin in rope_yarn(). Replaced sycl::pow with native::exp2(native::log2(...)*...) in all 4 kernel variants (rope_norm, rope_neox, rope_multi, rope_vision). Correctness: 248/248 ROPE tests passed. mrope kernel (mode=8) shows 59% speedup for f32. norm/neox kernels show neutral performance within measurement noise."
         },
         {
           "task_id": "task_030",

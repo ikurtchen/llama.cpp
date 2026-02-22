@@ -1,6 +1,25 @@
 {
   "results": [
     {
+      "task_id": "task_029",
+      "kernel": "ROPE",
+      "optimization": "Replace sycl::cos/sin/pow with native:: variants for Xe2",
+      "timestamp": "2026-02-22T18:30:00Z",
+      "correctness": "pass",
+      "baseline_time_us": {
+        "f32_[128,32,512]_mode0": 40.98,
+        "f32_[128,12,512]_mrope": 36.68,
+        "f16_[128,32,512]_mode0": 38.88
+      },
+      "optimized_time_us": {
+        "f32_[128,32,512]_mode0": 41.26,
+        "f32_[128,12,512]_mrope": 23.08,
+        "f16_[128,32,512]_mode0": 38.75
+      },
+      "speedup": "1.59x for mrope f32, neutral for norm/neox",
+      "notes": "Replaced sycl::cos/sin with native::cos/sin in rope_yarn(). Replaced sycl::pow with native::exp2(native::log2(...)*...). mrope kernel (mode=8) shows 59% speedup for f32. norm/neox kernels show neutral performance. Correctness: 248/248 ROPE tests passed."
+    },
+    {
       "task_id": "task_028",
       "kernel": "RMS_NORM",
       "optimization": "Added fused rms_norm_multiply kernel (RMS norm + element-wise multiply + add)",
