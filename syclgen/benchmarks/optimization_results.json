@@ -1,6 +1,29 @@
 {
   "results": [
     {
+      "task_id": "task_030",
+      "kernel": "ROPE",
+      "optimization": "Added [[sycl::reqd_sub_group_size(16)]] to all 8 RoPE kernel launch paths",
+      "timestamp": "2026-02-22T19:30:00Z",
+      "correctness": "pass",
+      "baseline_time_us": {
+        "f32_norm_128x32x512": 40.98,
+        "f32_neox_80x32x512": 35.56,
+        "f32_vision_128x12x2_mode40": 138.32,
+        "f32_vision_80x16x2_mode24": 76.85,
+        "f16_norm_128x32x512": 38.88
+      },
+      "optimized_time_us": {
+        "f32_norm_128x32x512": 41.03,
+        "f32_neox_80x32x512": 35.49,
+        "f32_vision_128x12x2_mode40": 4.99,
+        "f32_vision_80x16x2_mode24": 4.78,
+        "f16_norm_128x32x512": 38.74
+      },
+      "speedup": "15-28x for small vision kernels, 1.0x for large kernels",
+      "notes": "Added [[sycl::reqd_sub_group_size(16)]] to all 8 parallel_for lambdas (rope_norm, rope_neox, rope_multi, rope_vision - each with 2 freq_factors paths). Correctness: 248/248 ROPE tests passed. Small vision kernels (2 positions) saw 15-28x speedup from proper SIMD16 execution; large kernels (512 positions) unchanged. The attribute ensures Xe2 native SIMD16 instead of potentially suboptimal SIMD32."
+    },
+    {
       "task_id": "task_029",
       "kernel": "ROPE",
       "optimization": "Replace sycl::cos/sin/pow with native:: variants for Xe2",

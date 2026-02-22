@@ -127,6 +127,20 @@
 
 ## Optimization Activity
 
+[2026-02-22] Completed task_030: Add reqd_sub_group_size(16) to all RoPE launch paths
+  - Kernel: sk_002 (ROPE)
+  - Optimization: Added [[sycl::reqd_sub_group_size(16)]] to all 8 parallel_for kernel lambdas
+  - Changes:
+    - rope_norm_sycl: 2 paths (freq_factors nullptr and non-nullptr)
+    - rope_neox_sycl: 2 paths
+    - rope_multi_sycl: 2 paths
+    - rope_vision_sycl: 2 paths
+  - Correctness: PASS (248/248 ROPE unit tests)
+  - Performance: 15-28x speedup for small vision kernels (mode=24,40), neutral for large kernels
+    - vision 128x12x2 mode=40: 138.32 → 4.99 us (27.7x)
+    - vision 80x16x2 mode=24: 76.85 → 4.78 us (16.1x)
+  - Note: Small workloads benefit dramatically from proper SIMD16 execution on Xe2; large workloads already had good occupancy
+
 [2026-02-22] Completed task_029: Use native sin/cos/pow for RoPE
   - Kernel: sk_002 (ROPE)
   - Optimization: Replace sycl::cos/sin/pow with native:: variants for Xe2
