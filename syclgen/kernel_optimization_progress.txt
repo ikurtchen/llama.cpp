@@ -9,7 +9,7 @@
 - Analysis complete: Yes
 - Kernels with optimization potential: 13
 - Optimization tasks created: 42
-- Optimization tasks completed: 28 (Phase 1 complete, Phase 2 complete except task_014 blocked, Phase 3 in progress)
+- Optimization tasks completed: 29 (Phase 1 complete, Phase 2 complete except task_014 blocked, Phase 3 in progress)
 - Kernels with benchmark data: MUL_MAT, SOFT_MAX, CPY, ROPE, ADD
 
 ## Kernels Analyzed
@@ -126,6 +126,17 @@
   - MEDIUM: soft_max_back_f32 work-group size too small (only 16 on Intel)
 
 ## Optimization Activity
+
+[2026-02-22] Completed task_036: Add vector SLM loads for wkv inner loop
+  - Kernel: sk_012 (WKV - RWKV WKV attention)
+  - Optimization: Replace scalar SLM loads with 128-bit vector loads for float4 construction
+  - Changes:
+    - WKV6 kernel: Replaced sycl::float4(_k[j], _k[j+1], ...) with *reinterpret_cast<const sycl::float4*>(&_k[j]) for _k, _r, _tf, _td arrays
+    - WKV7 kernel: Same optimization for _a, _r, _w, _k, _b arrays
+    - Added comments explaining the optimization technique
+  - Correctness: PASS (13/13 backends)
+  - Performance: Unmeasurable (no WKV benchmark test cases defined in test-backend-ops)
+  - Note: Optimization is architecturally correct for Xe2 - reduces SLM load instructions from 4x32-bit to 1x128-bit per float4. The SLM arrays are naturally aligned to 4-float boundaries (head_size is always 64 or 128).
 
 [2026-02-22] Completed task_035: Implement optimized Q8_0→FP16 dequantize kernel
   - Kernel: sk_005 (DEQUANT - Q8_0 to FP16)

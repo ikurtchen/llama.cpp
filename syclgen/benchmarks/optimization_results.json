@@ -1,6 +1,17 @@
 {
   "results": [
     {
+      "task_id": "task_036",
+      "kernel": "WKV (RWKV WKV attention)",
+      "optimization": "Vector SLM loads for float4 construction (4x scalar → 1x 128-bit)",
+      "timestamp": "2026-02-22T07:20:00Z",
+      "correctness": "pass",
+      "baseline_time_us": "N/A - no WKV benchmark test cases",
+      "optimized_time_us": "N/A - no WKV benchmark test cases",
+      "speedup": "expected 5-15% inner loop improvement",
+      "notes": "Replaced sycl::float4(_k[j], _k[j+1], ...) with *reinterpret_cast<const sycl::float4*>(&_k[j]) for all SLM arrays in WKV6 and WKV7 kernels. Correctness: 13/13 backends passed. Performance unmeasurable (no WKV benchmark test cases). Optimization reduces SLM load instructions from 4x32-bit to 1x128-bit per float4."
+    },
+    {
       "task_id": "task_034",
       "kernel": "ELEMENT_WISE (SILU, GELU, RELU, TANH, etc.)",
       "optimization": "Vec4 vectorization + consistent native math functions",

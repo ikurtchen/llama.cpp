@@ -60,14 +60,15 @@ static void rwkv_wkv6_f32_kernel(
         float y = 0;
 
         // Process in chunks of 4 for better vectorization
+        // Optimized: use vectorized SLM loads instead of 4 scalar loads (128-bit aligned access)
         sycl::float4 k4, r4, tf4, td4, s4;
         #pragma unroll
         for (int j = 0; j < head_size; j += 4) {
-            // Load data in vec4 chunks
-            k4 = sycl::float4(_k[j], _k[j+1], _k[j+2], _k[j+3]);
-            r4 = sycl::float4(_r[j], _r[j+1], _r[j+2], _r[j+3]);
-            tf4 = sycl::float4(_tf[j], _tf[j+1], _tf[j+2], _tf[j+3]);
-            td4 = sycl::float4(_td[j], _td[j+1], _td[j+2], _td[j+3]);
+            // Load SLM data via reinterpret_cast for single 128-bit aligned load
+            k4 = *reinterpret_cast<const sycl::float4*>(&_k[j]);
+            r4 = *reinterpret_cast<const sycl::float4*>(&_r[j]);
+            tf4 = *reinterpret_cast<const sycl::float4*>(&_tf[j]);
+            td4 = *reinterpret_cast<const sycl::float4*>(&_td[j]);
             s4 = sycl::float4(state[j], state[j+1], state[j+2], state[j+3]);
 
             // Compute key-value product
@@ -141,11 +142,12 @@ static void rwkv_wkv7_f32_kernel(
 
         const float _v = v[t];
         float y = 0, sa = 0;
+        // Optimized: use vectorized SLM loads instead of 4 scalar loads (128-bit aligned access)
         sycl::float4 a4, s4;
 
         #pragma unroll
         for (int j = 0; j < head_size; j += 4) {
-            a4 = sycl::float4(_a[j], _a[j+1], _a[j+2], _a[j+3]);
+            a4 = *reinterpret_cast<const sycl::float4*>(&_a[j]);
             s4 = sycl::float4(state[j], state[j+1], state[j+2], state[j+3]);
             sa += sycl::dot(a4, s4);
         }
@@ -153,10 +155,11 @@ static void rwkv_wkv7_f32_kernel(
         sycl::float4 r4, w4, k4, b4;
         #pragma unroll
         for (int j = 0; j < head_size; j += 4) {
-            r4 = sycl::float4(_r[j], _r[j+1], _r[j+2], _r[j+3]);
-            w4 = sycl::float4(_w[j], _w[j+1], _w[j+2], _w[j+3]);
-            k4 = sycl::float4(_k[j], _k[j+1], _k[j+2], _k[j+3]);
-            b4 = sycl::float4(_b[j], _b[j+1], _b[j+2], _b[j+3]);
+            // Load SLM data via reinterpret_cast for single 128-bit aligned load
+            r4 = *reinterpret_cast<const sycl::float4*>(&_r[j]);
+            w4 = *reinterpret_cast<const sycl::float4*>(&_w[j]);
+            k4 = *reinterpret_cast<const sycl::float4*>(&_k[j]);
+            b4 = *reinterpret_cast<const sycl::float4*>(&_b[j]);
             s4 = sycl::float4(state[j], state[j+1], state[j+2], state[j+3]);
 
             sycl::float4 kv4 = k4 * _v;

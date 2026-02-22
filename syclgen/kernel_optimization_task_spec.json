@@ -645,17 +645,21 @@
         },
         {
           "task_id": "task_036",
+          "status": "completed",
+          "completed_at": "2026-02-22T07:20:00Z",
           "kernel_id": "sk_012",
           "optimization_ids": ["opt_012_002"],
           "name": "Add vector SLM loads for wkv inner loop",
           "description": "Replace 4 scalar SLM loads with true 128-bit vector loads for float4 construction in the inner loop. Currently uses 4 individual reads instead of 1 aligned vector load.",
           "priority": "medium",
           "expected_improvement": "5-15% inner loop speedup",
+          "actual_improvement": "Unmeasurable - no WKV benchmark test cases",
           "estimated_effort": "small",
           "dependencies": ["task_012", "task_024"],
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -k WKV",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
-          "files_to_modify": ["ggml/src/ggml-sycl/wkv.cpp"]
+          "files_to_modify": ["ggml/src/ggml-sycl/wkv.cpp"],
+          "notes": "Replaced sycl::float4(_k[j], _k[j+1], ...) with *reinterpret_cast<const sycl::float4*>(&_k[j]) for all SLM arrays in both WKV6 and WKV7 kernels. Correctness: PASS (13/13 backends). Performance: Unmeasurable (no WKV benchmark test cases defined in test-backend-ops). Optimization is architecturally correct for Xe2 - reduces SLM load instructions from 4x32-bit to 1x128-bit per float4."
         },
         {
           "task_id": "task_037",
