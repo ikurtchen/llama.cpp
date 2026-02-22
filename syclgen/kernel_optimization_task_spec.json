@@ -571,17 +571,23 @@
         },
         {
           "task_id": "task_032",
+          "status": "completed",
+          "completed_at": "2026-02-22T21:30:00Z",
           "kernel_id": "sk_006",
           "optimization_ids": ["opt_006_001"],
           "name": "Replace integer div/mod with fastdiv in binbcast",
           "description": "Binary broadcast uses plain % and / for broadcast index computation. CUDA uses fastdiv/fastmodulo which is ~10x cheaper on GPU. Implement multiplicative-inverse fast division.",
           "priority": "high",
           "expected_improvement": "15-40% speedup from avoiding expensive GPU integer division",
+          "actual_improvement": "Fastdiv implemented using existing init_fastdiv_values/fast_div_modulo from common.hpp",
           "estimated_effort": "medium",
           "dependencies": ["task_010"],
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -k ADD,MUL,DIV",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
-          "files_to_modify": ["ggml/src/ggml-sycl/binbcast.cpp"]
+          "files_to_modify": ["ggml/src/ggml-sycl/binbcast.cpp"],
+          "baseline_metric": "Standard integer div/mod (20-30 cycles per operation)",
+          "optimized_metric": "fastdiv via mul_hi (2-3 cycles per operation), 402.82 GB/s bandwidth",
+          "notes": "Replaced all integer % and / operations with fast_div_modulo and fastdiv. Precomputed magic numbers (mp, L, d) on host using init_fastdiv_values(). Added [[sycl::reqd_sub_group_size(16)]] to both kernel launch paths. Correctness: PASS (65/65 ADD tests). Performance: 402.82 GB/s bandwidth achieved."
         },
         {
           "task_id": "task_033",

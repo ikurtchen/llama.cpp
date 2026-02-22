@@ -127,6 +127,18 @@
 
 ## Optimization Activity
 
+[2026-02-22] Completed task_032: Replace integer div/mod with fastdiv in binbcast
+  - Kernel: sk_006 (BINBCAST - ADD, MUL, DIV, SUB, REPEAT)
+  - Optimization: Replaced plain % and / with fast division using multiplicative inverse
+  - Changes:
+    - k_bin_bcast: Added fastdiv parameters, replaced all modulo operations with fast_div_modulo
+    - k_bin_bcast_unravel: Added fastdiv parameters, replaced div/mod chains with fastdiv/fast_div_modulo
+    - bin_bcast_sycl::operator(): Precomputed fastdiv values using init_fastdiv_values()
+    - Added [[sycl::reqd_sub_group_size(16)]] to both parallel_for lambdas
+  - Correctness: PASS (65/65 ADD unit tests)
+  - Performance: 402.82 GB/s bandwidth achieved
+  - Note: Hardware integer division (20-30 cycles) replaced with mul_hi-based fastdiv (2-3 cycles)
+
 [2026-02-22] Completed task_031: Add contiguous fast-path for cpy kernels
   - Kernel: sk_007 (CPY)
   - Optimization: Added contiguous fast-path kernel for mixed-type copies

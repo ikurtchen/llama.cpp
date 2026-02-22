@@ -13,25 +13,26 @@ static void k_bin_bcast(const src0_t * src0, const src1_t * src1, dst_t * dst,
         /*int s0, */ int s1,  int s2,  int s3,
         /*int s00,*/ int s01, int s02, int s03,
         /*int s10,*/ int s11, int s12, int s13,
+        const sycl::uint3 fd_ne3, const sycl::uint3 fd_ne10,
+        const sycl::uint3 fd_ne11, const sycl::uint3 fd_ne12, const sycl::uint3 fd_ne13,
         const sycl::nd_item<3> &item_ct1) {
     const int i0s = item_ct1.get_local_range(2) * item_ct1.get_group(2) +
                     item_ct1.get_local_id(2);
     const int i1 = (item_ct1.get_local_range(1) * item_ct1.get_group(1) +
                     item_ct1.get_local_id(1));
-    const int i2 = (item_ct1.get_local_range(0) * item_ct1.get_group(0) +
-                    item_ct1.get_local_id(0)) /
-                   ne3;
-    const int i3 = (item_ct1.get_local_range(0) * item_ct1.get_group(0) +
-                    item_ct1.get_local_id(0)) %
-                   ne3;
+    const int i2_i3_idx = item_ct1.get_local_range(0) * item_ct1.get_group(0) +
+                          item_ct1.get_local_id(0);
+    const sycl::uint2 i2_i3 = fast_div_modulo(i2_i3_idx, fd_ne3);
+    const int i2 = i2_i3.y();
+    const int i3 = i2_i3.x();
 
     if (i0s >= ne0 || i1 >= ne1 || i2 >= ne2 || i3 >= ne3) {
         return;
     }
 
-    const int i11 = i1 % ne11;
-    const int i12 = i2 % ne12;
-    const int i13 = i3 % ne13;
+    const int i11 = fast_div_modulo(i1, fd_ne11).y();
+    const int i12 = fast_div_modulo(i2, fd_ne12).y();
+    const int i13 = fast_div_modulo(i3, fd_ne13).y();
 
     const size_t i_src0 =  i3*s03 +  i2*s02 +  i1*s01;
     const size_t i_src1 = i13*s13 + i12*s12 + i11*s11;
@@ -43,7 +44,7 @@ static void k_bin_bcast(const src0_t * src0, const src1_t * src1, dst_t * dst,
 
     for (int i0 = i0s; i0 < ne0;
          i0 += item_ct1.get_local_range(2) * item_ct1.get_group_range(2)) {
-        const int i10 = i0 % ne10;
+        const int i10 = fast_div_modulo(i0, fd_ne10).y();
         dst_row[i0] = (dst_t)bin_op(src0 ? (float)src0_row[i0] : 0.0f, (float)src1_row[i10]);
     }
 }
@@ -55,23 +56,32 @@ static void k_bin_bcast_unravel(const src0_t * src0, const src1_t * src1, dst_t 
         /*int s0, */ int s1,  int s2,  int s3,
         /*int s00,*/ int s01, int s02, int s03,
         /*int s10,*/ int s11, int s12, int s13,
+        const sycl::uint3 fd_ne0, const sycl::uint3 fd_ne1, const sycl::uint3 fd_ne2,
+        const sycl::uint3 fd_ne1_ne0, const sycl::uint3 fd_ne2_ne1_ne0,
+        const sycl::uint3 fd_ne10, const sycl::uint3 fd_ne11,
+        const sycl::uint3 fd_ne12, const sycl::uint3 fd_ne13,
         const sycl::nd_item<3> &item_ct1) {
 
     const int i = item_ct1.get_local_range(2) * item_ct1.get_group(2) +
                   item_ct1.get_local_id(2);
 
-    const int i3 = i/(ne2*ne1*ne0);
-    const int i2 = (i/(ne1*ne0)) % ne2;
-    const int i1 = (i/ne0) % ne1;
-    const int i0 = i % ne0;
+    const int i3 = fastdiv(i, fd_ne2_ne1_ne0);
+    const sycl::uint2 i_i3 = fast_div_modulo(i, fd_ne2_ne1_ne0);
+    const int i_rem = i_i3.y();
+    const sycl::uint2 i2_i1ne0 = fast_div_modulo(i_rem, fd_ne2);
+    const int i2 = i2_i1ne0.x();
+    const int i1ne0_rem = i2_i1ne0.y();
+    const sycl::uint2 i1_i0 = fast_div_modulo(i1ne0_rem, fd_ne1);
+    const int i1 = i1_i0.x();
+    const int i0 = i1_i0.y();
 
     if (i0 >= ne0 || i1 >= ne1 || i2 >= ne2 || i3 >= ne3) {
         return;
     }
 
-    const int i11 = i1 % ne11;
-    const int i12 = i2 % ne12;
-    const int i13 = i3 % ne13;
+    const int i11 = fast_div_modulo(i1, fd_ne11).y();
+    const int i12 = fast_div_modulo(i2, fd_ne12).y();
+    const int i13 = fast_div_modulo(i3, fd_ne13).y();
 
     const size_t i_src0 =  i3*s03 +  i2*s02 +  i1*s01;
     const size_t i_src1 = i13*s13 + i12*s12 + i11*s11;
@@ -81,7 +91,7 @@ static void k_bin_bcast_unravel(const src0_t * src0, const src1_t * src1, dst_t 
     const src1_t * src1_row = src1 + i_src1;
     dst_t * dst_row = dst + i_dst;
 
-    const int i10 = i0 % ne10;
+    const int i10 = fast_div_modulo(i0, fd_ne10).y();
     dst_row[i0] = (dst_t)bin_op(src0 ? (float)src0_row[i0] : 0.0f, (float)src1_row[i10]);
 }
 
@@ -199,6 +209,18 @@ struct bin_bcast_sycl {
             GGML_ASSERT(s0 == 1);
             GGML_ASSERT(s10 == 1);
 
+            const sycl::uint3 fd_ne3 = init_fastdiv_values((uint32_t)ne3);
+            const sycl::uint3 fd_ne10 = init_fastdiv_values((uint32_t)ne10);
+            const sycl::uint3 fd_ne11 = init_fastdiv_values((uint32_t)ne11);
+            const sycl::uint3 fd_ne12 = init_fastdiv_values((uint32_t)ne12);
+            const sycl::uint3 fd_ne13 = init_fastdiv_values((uint32_t)ne13);
+
+            const sycl::uint3 fd_ne0 = init_fastdiv_values((uint32_t)ne0);
+            const sycl::uint3 fd_ne1 = init_fastdiv_values((uint32_t)ne1);
+            const sycl::uint3 fd_ne2 = init_fastdiv_values((uint32_t)ne2);
+            const sycl::uint3 fd_ne1_ne0 = init_fastdiv_values((uint32_t)(ne1 * ne0));
+            const sycl::uint3 fd_ne2_ne1_ne0 = init_fastdiv_values((uint32_t)(ne2 * ne1 * ne0));
+
             const int block_size = 128;
 
             int64_t hne0 = std::max(ne0/2LL, 1LL);
@@ -219,7 +241,6 @@ struct bin_bcast_sycl {
                 (hne0 + block_dims[2] - 1) / block_dims[2]);
 
             if (block_nums[0] > 65535) {
-                // this is the maximum number of blocks in z direction, fallback to 1D grid kernel
                 int block_num = (ne0*ne1*ne2*ne3 + block_size - 1) / block_size;
                 {
                     dpct::has_capability_or_fail(stream->get_device(),
@@ -229,29 +250,28 @@ struct bin_bcast_sycl {
                         sycl::nd_range<3>(sycl::range<3>(1, 1, block_num) *
                                               sycl::range<3>(1, 1, block_size),
                                           sycl::range<3>(1, 1, block_size)),
-                        [=](sycl::nd_item<3> item_ct1) {
+                        [=](sycl::nd_item<3> item_ct1)
+                        [[sycl::reqd_sub_group_size(16)]] {
                             k_bin_bcast_unravel<bin_op>(
                                 src0_dd, src1_dd, dst_dd, ne0, ne1, ne2, ne3,
                                 ne10, ne11, ne12, ne13, s1, s2, s3, s01, s02,
-                                s03, s11, s12, s13, item_ct1);
+                                s03, s11, s12, s13, fd_ne0, fd_ne1, fd_ne2,
+                                fd_ne1_ne0, fd_ne2_ne1_ne0, fd_ne10, fd_ne11,
+                                fd_ne12, fd_ne13, item_ct1);
                         });
                 }
             } else {
-                /*
-                DPCT1049:16: The work-group size passed to the SYCL kernel may
-                exceed the limit. To get the device limit, query
-                info::device::max_work_group_size. Adjust the work-group size if
-                needed.
-                */
                 dpct::has_capability_or_fail(stream->get_device(),
                                              {sycl::aspect::fp16});
 
                 stream->parallel_for(
                     sycl::nd_range<3>(block_nums * block_dims, block_dims),
-                    [=](sycl::nd_item<3> item_ct1) {
+                    [=](sycl::nd_item<3> item_ct1)
+                    [[sycl::reqd_sub_group_size(16)]] {
                         k_bin_bcast<bin_op>(src0_dd, src1_dd, dst_dd, ne0, ne1,
                                             ne2, ne3, ne10, ne11, ne12, ne13,
                                             s1, s2, s3, s01, s02, s03, s11, s12, s13,
+                                            fd_ne3, fd_ne10, fd_ne11, fd_ne12, fd_ne13,
                                             item_ct1);
                     });
             }
