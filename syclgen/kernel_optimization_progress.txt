@@ -9,7 +9,7 @@
 - Analysis complete: Yes
 - Kernels with optimization potential: 13
 - Optimization tasks created: 42
-- Optimization tasks completed: 29 (Phase 1 complete, Phase 2 complete except task_014 blocked, Phase 3 in progress)
+- Optimization tasks completed: 30 (Phase 1 complete, Phase 2 complete except task_014 blocked, Phase 3 complete)
 - Kernels with benchmark data: MUL_MAT, SOFT_MAX, CPY, ROPE, ADD
 
 ## Kernels Analyzed
@@ -126,6 +126,16 @@
   - MEDIUM: soft_max_back_f32 work-group size too small (only 16 on Intel)
 
 ## Optimization Activity
+
+[2026-02-22] Completed task_037: Add reqd_sub_group_size and loop unrolling to gla
+  - Kernel: sk_013 (GLA - Gated Linear Attention)
+  - Optimization: Added SIMD16 attribute + loop unrolling
+  - Changes:
+    - Line 21: Added [[sycl::reqd_sub_group_size(16)]] to parallel_for lambda
+    - Line 48: Added #pragma unroll 8 to inner j-loop (balances 16/32 trip counts)
+  - Correctness: PASS (4/4 GLA tests)
+  - Performance: Unmeasurable (no GLA benchmark test cases defined in test-backend-ops)
+  - Note: Optimization is architecturally correct for Xe2 SIMD16; unroll 8 balances register pressure for HEAD_SIZE=128
 
 [2026-02-22] Completed task_036: Add vector SLM loads for wkv inner loop
   - Kernel: sk_012 (WKV - RWKV WKV attention)

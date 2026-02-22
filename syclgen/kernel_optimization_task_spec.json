@@ -663,6 +663,8 @@
         },
         {
           "task_id": "task_037",
+          "status": "completed",
+          "completed_at": "2026-02-22T20:00:00Z",
           "kernel_id": "sk_013",
           "optimization_ids": ["opt_013_001", "opt_013_002"],
           "name": "Add reqd_sub_group_size and loop unrolling to gla",
@@ -673,7 +675,8 @@
           "dependencies": ["task_013"],
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -k GLA",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
-          "files_to_modify": ["ggml/src/ggml-sycl/gla.cpp"]
+          "files_to_modify": ["ggml/src/ggml-sycl/gla.cpp"],
+          "notes": "Added [[sycl::reqd_sub_group_size(16)]] to kernel lambda (line 21) and #pragma unroll 8 to inner j-loop (line 48). Correctness: PASS (4/4 GLA tests). Benchmark: N/A (no GLA benchmark test cases defined)."
         }
       ]
     },
