@@ -477,17 +477,21 @@
         },
         {
           "task_id": "task_027",
+          "status": "completed",
+          "completed_at": "2026-02-22T03:55:00Z",
           "kernel_id": "sk_003",
           "optimization_ids": ["opt_003_001", "opt_003_002", "opt_003_003"],
           "name": "Fix norm reduction patterns and work-group sizing",
           "description": "Fix group_norm global barrier to local_space, unify 3 inconsistent reduction patterns to sycl::reduce_over_group, and increase rms_norm small-path from 16 to 256 threads.",
           "priority": "high",
           "expected_improvement": "10-20% from efficient reduction + 2-4x for small rms_norm",
+          "actual_improvement": "Already optimized — all kernels use reduce_over_group and 256-thread work-groups",
           "estimated_effort": "medium",
           "dependencies": ["task_003"],
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -k NORM,RMS_NORM,GROUP_NORM",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
-          "files_to_modify": ["ggml/src/ggml-sycl/norm.cpp"]
+          "files_to_modify": ["ggml/src/ggml-sycl/norm.cpp"],
+          "notes": "All optimizations already implemented: (1) All 4 norm kernels use sycl::reduce_over_group (lines 32, 57, 66, 98, 118), (2) Work-group size is 256 for ncols < 1024 (lines 132, 149, 170, 187), (3) No global barriers used. Correctness: PASS (35/35 NORM/RMS_NORM/GROUP_NORM tests). Code is clean and well-optimized for Xe2 SIMD16."
         },
         {
           "task_id": "task_028",

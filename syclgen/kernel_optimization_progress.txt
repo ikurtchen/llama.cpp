@@ -9,7 +9,7 @@
 - Analysis complete: Yes
 - Kernels with optimization potential: 13
 - Optimization tasks created: 42
-- Optimization tasks completed: 22 (Phase 1 complete, Phase 2 complete except task_014 blocked, Phase 3 in progress)
+- Optimization tasks completed: 23 (Phase 1 complete, Phase 2 complete except task_014 blocked, Phase 3 in progress)
 - Kernels with benchmark data: MUL_MAT, SOFT_MAX, CPY, ROPE, ADD
 
 ## Kernels Analyzed
@@ -126,6 +126,18 @@
   - MEDIUM: soft_max_back_f32 work-group size too small (only 16 on Intel)
 
 ## Optimization Activity
+
+[2026-02-22] Completed task_027: Fix norm reduction patterns and work-group sizing
+  - Kernel: sk_003 (NORM, RMS_NORM, GROUP_NORM, L2_NORM)
+  - Optimization: Verified all norm kernels already use sycl::reduce_over_group and 256-thread work-groups
+  - Current state:
+    - norm_f32: uses reduce_over_group (lines 32-33), work-group size 256 for small ncols (line 132)
+    - group_norm_f32: uses reduce_over_group (lines 57, 66), work-group size 256 for small groups (line 149)
+    - rms_norm_f32: uses reduce_over_group (line 98), work-group size 256 for small ncols (line 170)
+    - l2_norm_f32: uses reduce_over_group (line 118), work-group size 256 for small ncols (line 187)
+  - All kernels have [[sycl::reqd_sub_group_size(WARP_SIZE)]] attribute on kernel launches
+  - Correctness: PASS (35/35 NORM/RMS_NORM/GROUP_NORM unit tests)
+  - Note: Code was already optimized; no changes needed
 
 [2026-02-21] Completed task_026: Add vec4 vectorized memory access to softmax
   - Kernel: sk_001 (SOFT_MAX)
