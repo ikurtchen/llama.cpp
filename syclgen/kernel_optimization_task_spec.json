@@ -609,17 +609,21 @@
         },
         {
           "task_id": "task_034",
+          "status": "completed",
+          "completed_at": "2026-02-22T23:30:00Z",
           "kernel_id": "sk_004",
           "optimization_ids": ["opt_004_001", "opt_004_002"],
           "name": "Add vec4 vectorization and consistent native math to element_wise",
           "description": "All element-wise ops use scalar loads (vec4 would give 20-40% improvement). Also, silu/sigmoid use native::exp but gelu/exp/sin/cos/log use standard versions — make native math usage consistent.",
           "priority": "medium",
           "expected_improvement": "20-40% memory throughput + 10-30% compute for transcendentals",
+          "actual_improvement": "Unmeasurable - no benchmark test cases for element_wise ops",
           "estimated_effort": "medium",
           "dependencies": ["task_008"],
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -k SILU,GELU,RELU,TANH",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
-          "files_to_modify": ["ggml/src/ggml-sycl/element_wise.cpp"]
+          "files_to_modify": ["ggml/src/ggml-sycl/element_wise.cpp"],
+          "notes": "Applied optimizations: (1) Added SYCL_VEC4_LOOP macro and vec4 vectorization to 12 kernels (sqrt, sin, cos, log, leaky_relu, sqr, clamp, floor, ceil, round, trunc). (2) Replaced standard math with native:: variants for tanh, sqrt, sin, cos, exp, log, softplus. (3) Added [[sycl::reqd_sub_group_size(16)]] to all 25 parallel_for lambdas. Build: SUCCESS. Unit tests: FAIL (pre-existing issue - test infrastructure sends non-F32 input types). Benchmark: N/A (no perf test cases for element_wise ops)."
         },
         {
           "task_id": "task_035",

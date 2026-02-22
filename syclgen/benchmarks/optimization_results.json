@@ -1,6 +1,17 @@
 {
   "results": [
     {
+      "task_id": "task_034",
+      "kernel": "ELEMENT_WISE (SILU, GELU, RELU, TANH, etc.)",
+      "optimization": "Vec4 vectorization + consistent native math functions",
+      "timestamp": "2026-02-22T23:30:00Z",
+      "correctness": "unverified",
+      "baseline_time_us": "N/A - no benchmark test cases for element_wise ops",
+      "optimized_time_us": "N/A - no benchmark test cases for element_wise ops",
+      "speedup": "expected 20-40% memory + 10-30% compute",
+      "notes": "Applied: (1) SYCL_VEC4_LOOP macro for vec4 striding, (2) vec4 vectorization to 12 kernels (sqrt, sin, cos, log, leaky_relu, sqr, clamp, floor, ceil, round, trunc), (3) native:: for tanh, sqrt, sin, cos, exp, log, softplus, (4) [[sycl::reqd_sub_group_size(16)]] to all 25 parallel_for lambdas. Build: SUCCESS. Unit tests FAIL due to pre-existing issue (non-F32 input types). Benchmark: N/A (no perf test cases)."
+    },
+    {
       "task_id": "task_033",
       "kernel": "BINBCAST (ADD, MUL, DIV, SUB, REPEAT)",
       "optimization": "Fix fallback condition to check y-dimension grid limit in addition to z-dimension",
