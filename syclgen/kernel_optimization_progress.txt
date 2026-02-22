@@ -9,7 +9,7 @@
 - Analysis complete: Yes
 - Kernels with optimization potential: 13
 - Optimization tasks created: 42
-- Optimization tasks completed: 25 (Phase 1 complete, Phase 2 complete except task_014 blocked, Phase 3 in progress)
+- Optimization tasks completed: 26 (Phase 1 complete, Phase 2 complete except task_014 blocked, Phase 3 in progress)
 - Kernels with benchmark data: MUL_MAT, SOFT_MAX, CPY, ROPE, ADD
 
 ## Kernels Analyzed
@@ -126,6 +126,16 @@
   - MEDIUM: soft_max_back_f32 work-group size too small (only 16 on Intel)
 
 ## Optimization Activity
+
+[2026-02-22] Completed task_033: Fix binbcast fallback condition (y-dim check)
+  - Kernel: sk_006 (BINBCAST - ADD, MUL, DIV, SUB, REPEAT)
+  - Optimization: Added y-dimension grid limit check to fallback condition
+  - Changes:
+    - Changed `if (block_nums[0] > 65535)` to `if (block_nums[0] > 65535 || block_nums[1] > 65535)` at line 243
+    - Ensures unravel path is used when either dimension 0 (ne2*ne3) or dimension 1 (ne1) exceeds SYCL grid limit
+  - Correctness: PASS (65/65 ADD unit tests)
+  - Performance: No regression (403 GB/s bandwidth, cumulative effect of fastdiv + fix)
+  - Note: Fixes potential correctness bug for tensors with large y-dimensions that would silently fail
 
 [2026-02-22] Completed task_032: Replace integer div/mod with fastdiv in binbcast
   - Kernel: sk_006 (BINBCAST - ADD, MUL, DIV, SUB, REPEAT)

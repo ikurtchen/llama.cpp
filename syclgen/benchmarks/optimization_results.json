@@ -1,6 +1,17 @@
 {
   "results": [
     {
+      "task_id": "task_033",
+      "kernel": "BINBCAST (ADD, MUL, DIV, SUB, REPEAT)",
+      "optimization": "Fix fallback condition to check y-dimension grid limit in addition to z-dimension",
+      "timestamp": "2026-02-22T22:30:00Z",
+      "correctness": "pass",
+      "baseline_time_us": "N/A - correctness fix",
+      "optimized_time_us": "403 GB/s bandwidth achieved",
+      "speedup": "N/A - correctness fix prevents incorrect behavior for large y-dimension tensors",
+      "notes": "Changed `if (block_nums[0] > 65535)` to `if (block_nums[0] > 65535 || block_nums[1] > 65535)` at line 243. Ensures unravel path is used when EITHER dimension 0 (ne2*ne3) OR dimension 1 (ne1) exceeds SYCL grid limit of 65535. Correctness: 65/65 ADD tests passed."
+    },
+    {
       "task_id": "task_032",
       "kernel": "BINBCAST (ADD, MUL, DIV, SUB, REPEAT)",
       "optimization": "Replace integer div/mod with fastdiv using multiplicative inverse (init_fastdiv_values/fast_div_modulo)",

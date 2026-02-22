@@ -240,7 +240,7 @@ struct bin_bcast_sycl {
                 (ne1 + block_dims[1] - 1) / block_dims[1],
                 (hne0 + block_dims[2] - 1) / block_dims[2]);
 
-            if (block_nums[0] > 65535) {
+            if (block_nums[0] > 65535 || block_nums[1] > 65535) {
                 int block_num = (ne0*ne1*ne2*ne3 + block_size - 1) / block_size;
                 {
                     dpct::has_capability_or_fail(stream->get_device(),

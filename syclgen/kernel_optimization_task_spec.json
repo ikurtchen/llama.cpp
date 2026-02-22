@@ -591,17 +591,21 @@
         },
         {
           "task_id": "task_033",
+          "status": "completed",
+          "completed_at": "2026-02-22T22:30:00Z",
           "kernel_id": "sk_006",
           "optimization_ids": ["opt_006_003"],
           "name": "Fix binbcast fallback condition (y-dim check)",
           "description": "The fallback condition only checks the z-dimension grid limit but misses the y-dimension check. This could cause incorrect behavior for tensors with large y-dimensions.",
           "priority": "medium",
           "expected_improvement": "Correctness fix",
+          "actual_improvement": "Correctness fix - prevents incorrect behavior for large y-dimension tensors",
           "estimated_effort": "small",
           "dependencies": [],
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t unit -k ADD",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
-          "files_to_modify": ["ggml/src/ggml-sycl/binbcast.cpp"]
+          "files_to_modify": ["ggml/src/ggml-sycl/binbcast.cpp"],
+          "notes": "Changed fallback condition from `if (block_nums[0] > 65535)` to `if (block_nums[0] > 65535 || block_nums[1] > 65535)` at line 243. This ensures the unravel path is used when EITHER dimension 0 (ne2*ne3) OR dimension 1 (ne1) would exceed the SYCL grid limit of 65535. Correctness: PASS (65/65 ADD tests). Benchmark shows no regression (403 GB/s bandwidth achieved)."
         },
         {
           "task_id": "task_034",
