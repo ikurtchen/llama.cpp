@@ -1,6 +1,17 @@
 {
   "results": [
     {
+      "task_id": "task_038",
+      "kernel": "Multiple (rope, element_wise, convert, binbcast, cpy, getrows, wkv, gla)",
+      "optimization": "Remove DPCT migration artifacts (code quality cleanup)",
+      "timestamp": "2026-02-22T20:00:00Z",
+      "correctness": "pass",
+      "baseline_time_us": "N/A - code quality only",
+      "optimized_time_us": "N/A - code quality only",
+      "speedup": "N/A - no performance impact",
+      "notes": "Cleaned ~124 lines across 8 files: (1) __dpct_inline__→inline, (2) dpct::queue_ptr→queue_ptr, (3) u_int→uint32_t, (4) Guarded has_capability_or_fail with if constexpr, (5) Removed DPCT comment blocks. Build: SUCCESS. Code quality improvement only - no algorithmic changes."
+    },
+    {
       "task_id": "task_036",
       "kernel": "WKV (RWKV WKV attention)",
       "optimization": "Vector SLM loads for float4 construction (4x scalar → 1x 128-bit)",

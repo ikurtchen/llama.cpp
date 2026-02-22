@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <sycl/sycl.hpp>
+#include <type_traits>
 
 #include "ggml.h"
 
@@ -243,8 +244,9 @@ struct bin_bcast_sycl {
             if (block_nums[0] > 65535 || block_nums[1] > 65535) {
                 int block_num = (ne0*ne1*ne2*ne3 + block_size - 1) / block_size;
                 {
-                    dpct::has_capability_or_fail(stream->get_device(),
-                                                 {sycl::aspect::fp16});
+                    if constexpr (std::is_same_v<dst_t, sycl::half>) {
+                        dpct::has_capability_or_fail(stream->get_device(), {sycl::aspect::fp16});
+                    }
 
                     stream->parallel_for(
                         sycl::nd_range<3>(sycl::range<3>(1, 1, block_num) *
@@ -261,8 +263,9 @@ struct bin_bcast_sycl {
                         });
                 }
             } else {
-                dpct::has_capability_or_fail(stream->get_device(),
-                                             {sycl::aspect::fp16});
+                if constexpr (std::is_same_v<dst_t, sycl::half>) {
+                    dpct::has_capability_or_fail(stream->get_device(), {sycl::aspect::fp16});
+                }
 
                 stream->parallel_for(
                     sycl::nd_range<3>(block_nums * block_dims, block_dims),
@@ -282,7 +285,7 @@ struct bin_bcast_sycl {
 template <class op>
 inline void ggml_sycl_op_bin_bcast(ggml_backend_sycl_context & ctx, const ggml_tensor * src0, const ggml_tensor * src1,
                                    ggml_tensor * dst) {
-    dpct::queue_ptr main_stream = ctx.stream();
+    queue_ptr main_stream = ctx.stream();
     GGML_TENSOR_BINARY_OP_LOCALS
 
     if (src0->type == GGML_TYPE_F32 && src1->type == GGML_TYPE_F32 && dst->type == GGML_TYPE_F32) {

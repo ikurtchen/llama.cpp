@@ -1,6 +1,7 @@
 #include "rope.hpp"
 #include "ggml-sycl/common.hpp"
 #include "ggml.h"
+#include <type_traits>
 
 struct rope_corr_dims {
     float v[2];
@@ -246,24 +247,16 @@ static void rope_norm_sycl(const T * x, T * dst, const int ne0, const int ne1, c
 
     const float theta_scale = powf(freq_base, -2.0f / n_dims);
 
-    dpct::has_capability_or_fail(stream->get_device(), { sycl::aspect::fp16 });
+    if constexpr (std::is_same_v<T, sycl::half>) {
+        dpct::has_capability_or_fail(stream->get_device(), { sycl::aspect::fp16 });
+    }
 
     if (freq_factors == nullptr) {
-        /*
-        DPCT1049:40: The work-group size passed to the SYCL kernel may exceed
-        the limit. To get the device limit, query
-        info::device::max_work_group_size. Adjust the work-group size if needed.
-        */
         stream->parallel_for(sycl::nd_range<3>(block_nums * block_dims, block_dims), [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(16)]] {
             rope_norm<T, forward, false>(x, dst, ne0, ne1, s1, s2, n_dims, pos, freq_scale, ext_factor, attn_factor, corr_dims,
                                  theta_scale, freq_factors, item_ct1);
         });
     } else {
-        /*
-        DPCT1049:41: The work-group size passed to the SYCL kernel may exceed
-        the limit. To get the device limit, query
-        info::device::max_work_group_size. Adjust the work-group size if needed.
-        */
         stream->parallel_for(sycl::nd_range<3>(block_nums * block_dims, block_dims), [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(16)]] {
             rope_norm<T, forward, true>(x, dst, ne0, ne1, s1, s2, n_dims, pos, freq_scale, ext_factor, attn_factor, corr_dims,
                                 theta_scale, freq_factors, item_ct1);
@@ -283,7 +276,9 @@ static void rope_neox_sycl(const T * x, T * dst, const int ne0, const int ne1, c
 
     const float theta_scale = powf(freq_base, -2.0f / n_dims);
 
-    dpct::has_capability_or_fail(stream->get_device(), { sycl::aspect::fp16 });
+    if constexpr (std::is_same_v<T, sycl::half>) {
+        dpct::has_capability_or_fail(stream->get_device(), { sycl::aspect::fp16 });
+    }
 
     if (freq_factors == nullptr) {
         stream->parallel_for(sycl::nd_range<3>(block_nums * block_dims, block_dims), [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(16)]] {

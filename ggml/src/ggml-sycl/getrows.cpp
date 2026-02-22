@@ -14,6 +14,7 @@
 #include "common.hpp"
 #include "dequantize.hpp"
 #include "getrows.hpp"
+#include <type_traits>
 
 
 template<int qk, int qr, dequantize_kernel_t dequantize_kernel, typename dst_t>
@@ -153,8 +154,9 @@ static void get_rows_sycl_float(ggml_backend_sycl_context & ctx, const ggml_tens
     //const size_t s13 = nb13 / ggml_element_size(src1);
 
     {
-        dpct::has_capability_or_fail(stream->get_device(),
-                                     {sycl::aspect::fp16});
+        if constexpr (std::is_same_v<src0_t, sycl::half>) {
+            dpct::has_capability_or_fail(stream->get_device(), {sycl::aspect::fp16});
+        }
 
         stream->parallel_for(
             sycl::nd_range<3>(block_nums * block_dims, block_dims),

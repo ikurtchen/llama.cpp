@@ -1,14 +1,15 @@
 #include <sycl/sycl.hpp>
+#include <cstdint>
 
 #include "common.hpp"
 
-template <u_int HEAD_SIZE>
-static void gated_linear_attn_f32_kernel(const dpct::queue_ptr stream, u_int B, u_int T, u_int C, u_int H, float scale,
+template <uint32_t HEAD_SIZE>
+static void gated_linear_attn_f32_kernel(const queue_ptr stream, uint32_t B, uint32_t T, uint32_t C, uint32_t H, float scale,
                                          const float * k, const float * v, const float * r, const float * td,
                                          const float * s, float * dst) {
-    const u_int head_size    = HEAD_SIZE;
-    const u_int state_size   = C * head_size;
-    const u_int n_seq_tokens = T / B;
+    const uint32_t head_size    = HEAD_SIZE;
+    const uint32_t state_size   = C * head_size;
+    const uint32_t n_seq_tokens = T / B;
     sycl::range<1> block_dims((C / H));
     sycl::range<1> grid_dims((B * H));
     stream->submit([&](sycl::handler & cgh) {
@@ -19,20 +20,20 @@ static void gated_linear_attn_f32_kernel(const dpct::queue_ptr stream, u_int B, 
 
         // opt_013_001: reqd_sub_group_size(16) for Xe2 SIMD16 native width
         cgh.parallel_for(sycl::nd_range<1>(grid_dims * block_dims, block_dims), [=](sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(16)]] {
-            u_int tid = item.get_local_id(0);
-            u_int bid = item.get_group(0);
+            uint32_t tid = item.get_local_id(0);
+            uint32_t bid = item.get_group(0);
 
-            u_int batch_i = bid / H;
-            u_int head_i  = bid % H;
+            uint32_t batch_i = bid / H;
+            uint32_t head_i  = bid % H;
 
             float state[head_size];
 
 #pragma unroll
-            for (u_int i = 0; i < head_size; i++) {
+            for (uint32_t i = 0; i < head_size; i++) {
                 state[i] = s[batch_i * state_size + head_i * head_size * head_size + i * head_size + tid];
             }
 
-            for (u_int t = batch_i * n_seq_tokens * C + head_i * head_size + tid;
+            for (uint32_t t = batch_i * n_seq_tokens * C + head_i * head_size + tid;
                  t < (batch_i + 1) * n_seq_tokens * C + head_i * head_size + tid; t += C) {
 
                 item.barrier(sycl::access::fence_space::local_space);  //sync threads
@@ -46,7 +47,7 @@ static void gated_linear_attn_f32_kernel(const dpct::queue_ptr stream, u_int B, 
 
                 // opt_013_002: unroll to pipeline FMA ops; unroll 8 balances 16/32 trip counts
 #pragma unroll 8
-                for (u_int j = 0; j < head_size; j += 4) {
+                for (uint32_t j = 0; j < head_size; j += 4) {
                     const sycl::float4 & k  = (sycl::float4 &) (_k[j]);
                     const sycl::float4 & r  = (sycl::float4 &) (_r[j]);
                     const sycl::float4 & td = (sycl::float4 &) (_td[j]);
@@ -71,7 +72,7 @@ static void gated_linear_attn_f32_kernel(const dpct::queue_ptr stream, u_int B, 
                 dst[t] = y * scale;
             }
 #pragma unroll
-            for (u_int i = 0; i < head_size; i++) {
+            for (uint32_t i = 0; i < head_size; i++) {
                 dst[T * C + batch_i * state_size + head_i * head_size * head_size + i * head_size + tid] = state[i];
             }
         });
@@ -91,7 +92,7 @@ void ggml_sycl_op_gated_linear_attn(ggml_backend_sycl_context & ctx, ggml_tensor
     const int64_t C = dst->ne[0];
     const int64_t H = dst->src[0]->ne[1];
 
-    dpct::queue_ptr stream = ctx.stream();
+    queue_ptr stream = ctx.stream();
     GGML_ASSERT(dst->src[4]->type == GGML_TYPE_F32);
     GGML_ASSERT(C % H == 0);
     GGML_ASSERT(C / H == 64 || C / H == 128);

@@ -199,12 +199,11 @@ void ggml_sycl_op_rwkv_wkv6(ggml_backend_sycl_context& ctx, ggml_tensor* dst) {
 
     GGML_ASSERT(dst->src[5]->type == GGML_TYPE_F32);
     GGML_ASSERT(C % H == 0);
-    GGML_ASSERT(C / H == WKV_BLOCK_SIZE || C / H == WKV_BLOCK_SIZE * 2); // The current sycl kernel is designed for RWKV6, HEAD_SIZE == 64
+    GGML_ASSERT(C / H == WKV_BLOCK_SIZE || C / H == WKV_BLOCK_SIZE * 2);
 
-    dpct::queue_ptr stream = ctx.stream();
+    queue_ptr stream = ctx.stream();
 
-    // Calculate execution configuration
-    const size_t shared_mem_size = C / H * 4; // For k, r, tf, td (element count, not bytes)
+    const size_t shared_mem_size = C / H * 4;
     sycl::range<3> block_dims(1, 1, C / H);
     sycl::range<3> grid_dims(1, 1, B * H);
 
@@ -258,10 +257,9 @@ void ggml_sycl_op_rwkv_wkv7(ggml_backend_sycl_context& ctx, ggml_tensor* dst) {
     GGML_ASSERT(C % H == 0);
     GGML_ASSERT(C / H == WKV_BLOCK_SIZE || C / H == WKV_BLOCK_SIZE * 2);
 
-    dpct::queue_ptr stream = ctx.stream();
+    queue_ptr stream = ctx.stream();
 
-    // Calculate execution configuration
-    const size_t shared_mem_size = C / H * 5; // For r, w, k, a, b (element count, not bytes)
+    const size_t shared_mem_size = C / H * 5;
     sycl::range<3> block_dims(1, 1, C / H);
     sycl::range<3> grid_dims(1, 1, B * H);
 

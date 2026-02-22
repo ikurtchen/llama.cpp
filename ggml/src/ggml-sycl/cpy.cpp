@@ -241,17 +241,13 @@ static void ggml_cpy_f32_f32_sycl(const char * cx, char * cdst, const int ne, co
                                   const int ne10, const int ne11, const int ne12, const int nb10, const int nb11,
                                   const int nb12, const int nb13, queue_ptr stream) {
     const int num_blocks = (ne + SYCL_CPY_BLOCK_SIZE - 1) / SYCL_CPY_BLOCK_SIZE;
-    {
-        dpct::has_capability_or_fail(stream->get_device(), { sycl::aspect::fp16 });
-
-        stream->parallel_for(
-            sycl::nd_range<3>(sycl::range<3>(1, 1, num_blocks) * sycl::range<3>(1, 1, SYCL_CPY_BLOCK_SIZE),
-                              sycl::range<3>(1, 1, SYCL_CPY_BLOCK_SIZE)),
-            [=](sycl::nd_item<3> item_ct1) {
-                cpy_f32_f16<cpy_1_f32_f32>(cx, cdst, ne, ne00, ne01, ne02, nb00, nb01, nb02, nb03, ne10, ne11, ne12,
-                                           nb10, nb11, nb12, nb13, item_ct1);
-            });
-    }
+    stream->parallel_for(
+        sycl::nd_range<3>(sycl::range<3>(1, 1, num_blocks) * sycl::range<3>(1, 1, SYCL_CPY_BLOCK_SIZE),
+                          sycl::range<3>(1, 1, SYCL_CPY_BLOCK_SIZE)),
+        [=](sycl::nd_item<3> item_ct1) {
+            cpy_f32_f16<cpy_1_f32_f32>(cx, cdst, ne, ne00, ne01, ne02, nb00, nb01, nb02, nb03, ne10, ne11, ne12,
+                                       nb10, nb11, nb12, nb13, item_ct1);
+        });
 }
 
 static void ggml_cpy_f32_f16_sycl(const char * cx, char * cdst, const int ne, const int ne00, const int ne01,

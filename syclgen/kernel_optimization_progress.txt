@@ -9,7 +9,7 @@
 - Analysis complete: Yes
 - Kernels with optimization potential: 13
 - Optimization tasks created: 42
-- Optimization tasks completed: 30 (Phase 1 complete, Phase 2 complete except task_014 blocked, Phase 3 complete)
+- Optimization tasks completed: 31 (Phase 1 complete, Phase 2 complete except task_014 blocked, Phase 3 complete, Phase 4 task_038 complete)
 - Kernels with benchmark data: MUL_MAT, SOFT_MAX, CPY, ROPE, ADD
 
 ## Kernels Analyzed
@@ -126,6 +126,22 @@
   - MEDIUM: soft_max_back_f32 work-group size too small (only 16 on Intel)
 
 ## Optimization Activity
+
+[2026-02-22] Completed task_038: Remove DPCT migration artifacts across all kernels
+  - Kernels: Multiple (rope, element_wise, convert, binbcast, cpy, getrows, wkv, gla)
+  - Optimization: Clean up DPCT migration artifacts for code quality
+  - Changes:
+    - element_wise.cpp: __dpct_inline__ → inline (34 occurrences)
+    - gla.cpp: u_int → uint32_t (11 occurrences), added #include <cstdint>
+    - rope.cpp: Guarded has_capability_or_fail with if constexpr, removed DPCT comments
+    - convert.cpp: dpct::queue_ptr → queue_ptr, guarded has_capability_or_fail
+    - binbcast.cpp: dpct::queue_ptr → queue_ptr, guarded has_capability_or_fail
+    - cpy.cpp: Removed unnecessary fp16 capability check from f32-only function
+    - getrows.cpp: Guarded has_capability_or_fail with if constexpr
+    - wkv.cpp: dpct::queue_ptr → queue_ptr
+  - Correctness: Build SUCCESS
+  - Performance: N/A (code quality only)
+  - Note: ~124 lines cleaned across 8 files. No algorithmic changes.
 
 [2026-02-22] Completed task_037: Add reqd_sub_group_size and loop unrolling to gla
   - Kernel: sk_013 (GLA - Gated Linear Attention)
