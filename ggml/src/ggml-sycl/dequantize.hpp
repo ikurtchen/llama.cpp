@@ -838,4 +838,46 @@ static void dequantize_block_mxfp4(const void * __restrict__ vx, dst_t * __restr
     }
 }
 
+#define SYCL_Q8_0_NE_ALIGN 2048
+
+template <bool need_check>
+static void dequantize_block_q8_0_f16(const void * __restrict__ vx, sycl::half * __restrict__ y,
+                                      const int64_t k, int * vals,
+                                      const sycl::nd_item<3> &item_ct1) {
+    constexpr int nint = SYCL_Q8_0_NE_ALIGN/sizeof(int) + WARP_SIZE;
+
+    const int64_t   i0 = SYCL_Q8_0_NE_ALIGN * item_ct1.get_group(2);
+    const int * x0 = ((const int *) vx) + item_ct1.get_group(2) * nint;
+    sycl::vec<sycl::half, 2> * y2 = (sycl::vec<sycl::half, 2> *) (y + i0);
+
+    const int tid = item_ct1.get_local_id(2);
+
+#pragma unroll
+    for (int ix0 = 0; ix0 < nint; ix0 += WARP_SIZE) {
+        if (need_check && i0*sizeof(block_q8_0)/QK8_0 + sizeof(int)*(ix0 + tid) >= k*sizeof(block_q8_0)/QK8_0) {
+            break;
+        }
+        const int ix = ix0 + tid;
+        vals[ix] = x0[ix];
+    }
+
+    item_ct1.barrier(sycl::access::fence_space::local_space);
+
+#pragma unroll
+    for (int iy = 0; iy < SYCL_Q8_0_NE_ALIGN; iy += 2*WARP_SIZE) {
+        if (need_check && i0 + iy + 2*tid >= k) {
+            return;
+        }
+
+        const sycl::half * b0 = ((const sycl::half *) vals) + (sizeof(block_q8_0)/sizeof(sycl::half)) * ((iy + 2*tid)/QK8_0);
+        const sycl::half d = *b0;
+        const sycl::char2 qs = ((const sycl::char2 *) (b0 + 1))[tid % (QK8_0/2)];
+
+        sycl::vec<sycl::half, 2> result;
+        result.x() = sycl::half((float)qs.x() * (float)d);
+        result.y() = sycl::half((float)qs.y() * (float)d);
+        y2[iy/2 + tid] = result;
+    }
+}
+
 #endif // GGML_SYCL_DEQUANTIZE_HPP

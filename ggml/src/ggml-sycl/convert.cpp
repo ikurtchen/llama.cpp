@@ -528,6 +528,37 @@ static void convert_unary_sycl(const void * vx, dst_t * y, const int64_t k, dpct
     convert_unary_nc_sycl<src_t>(vx, y, k, 1, 1, 1, k, k, k, queue);
 }
 
+static void dequantize_row_q8_0_f16_sycl(const void * vx, sycl::half * y, const int64_t k,
+                                         dpct::queue_ptr stream) {
+    GGML_ASSERT(k % QK8_0 == 0);
+    const int64_t nb = (k + SYCL_Q8_0_NE_ALIGN - 1) / SYCL_Q8_0_NE_ALIGN;
+    constexpr int nint = SYCL_Q8_0_NE_ALIGN/sizeof(int) + WARP_SIZE;
+
+    dpct::has_capability_or_fail(stream->get_device(), {sycl::aspect::fp16});
+
+    if (k % SYCL_Q8_0_NE_ALIGN == 0) {
+        stream->submit([&](sycl::handler &cgh) {
+            sycl::local_accessor<int, 1> vals_acc(sycl::range<1>(nint), cgh);
+            cgh.parallel_for(
+                sycl::nd_range<3>(sycl::range<3>(1, 1, nb) * sycl::range<3>(1, 1, WARP_SIZE),
+                                  sycl::range<3>(1, 1, WARP_SIZE)),
+                [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                    dequantize_block_q8_0_f16<false>(vx, y, k, get_pointer(vals_acc), item_ct1);
+                });
+        });
+    } else {
+        stream->submit([&](sycl::handler &cgh) {
+            sycl::local_accessor<int, 1> vals_acc(sycl::range<1>(nint), cgh);
+            cgh.parallel_for(
+                sycl::nd_range<3>(sycl::range<3>(1, 1, nb) * sycl::range<3>(1, 1, WARP_SIZE),
+                                  sycl::range<3>(1, 1, WARP_SIZE)),
+                [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                    dequantize_block_q8_0_f16<true>(vx, y, k, get_pointer(vals_acc), item_ct1);
+                });
+        });
+    }
+}
+
 
 to_fp16_sycl_t ggml_get_to_fp16_sycl(ggml_type type, ggml_tensor * dst) {
     switch (type) {
@@ -545,7 +576,7 @@ to_fp16_sycl_t ggml_get_to_fp16_sycl(ggml_type type, ggml_tensor * dst) {
         case GGML_TYPE_Q5_1:
             return dequantize_block_sycl<QK5_1, QR5_1, dequantize_q5_1>;
         case GGML_TYPE_Q8_0:
-            return dequantize_block_sycl<QK8_0, QR8_0, dequantize_q8_0>;
+            return dequantize_row_q8_0_f16_sycl;
         case GGML_TYPE_Q2_K:
             return dequantize_row_q2_K_sycl;
         case GGML_TYPE_Q3_K:

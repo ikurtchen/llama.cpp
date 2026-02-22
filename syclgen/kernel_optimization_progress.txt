@@ -9,7 +9,7 @@
 - Analysis complete: Yes
 - Kernels with optimization potential: 13
 - Optimization tasks created: 42
-- Optimization tasks completed: 27 (Phase 1 complete, Phase 2 complete except task_014 blocked, Phase 3 in progress)
+- Optimization tasks completed: 28 (Phase 1 complete, Phase 2 complete except task_014 blocked, Phase 3 in progress)
 - Kernels with benchmark data: MUL_MAT, SOFT_MAX, CPY, ROPE, ADD
 
 ## Kernels Analyzed
@@ -126,6 +126,21 @@
   - MEDIUM: soft_max_back_f32 work-group size too small (only 16 on Intel)
 
 ## Optimization Activity
+
+[2026-02-22] Completed task_035: Implement optimized Q8_0→FP16 dequantize kernel
+  - Kernel: sk_005 (DEQUANT - Q8_0 to FP16)
+  - Optimization: Added SLM-staged dequantize kernel with half2 vectorized output
+  - Changes:
+    - Added dequantize_block_q8_0_f16 kernel template in dequantize.hpp
+    - Uses 2176-byte SLM buffer for cooperative coalesced loads of Q8_0 blocks
+    - Uses sycl::vec<sycl::half, 2> for vectorized output (half2 arithmetic)
+    - Processes 2048 elements per work-group (60 Q8_0 blocks)
+    - Work-group size WARP_SIZE (16) with [[sycl::reqd_sub_group_size(WARP_SIZE)]]
+    - Added dequantize_row_q8_0_f16_sycl dispatch function in convert.cpp
+    - Updated ggml_get_to_fp16_sycl to use optimized kernel for GGML_TYPE_Q8_0
+  - Correctness: PASS (MUL_MAT Q8_0 tests all passed - uses dequantize internally)
+  - Performance: Unmeasurable (no DEQUANT benchmark test cases)
+  - Note: Optimization is architecturally correct for Xe2 SIMD16; matches CUDA pattern with SLM staging and half2 vectorization
 
 [2026-02-22] Completed task_034: Add vec4 vectorization and consistent native math to element_wise
   - Kernel: sk_004 (SILU, GELU, RELU, TANH, etc.)

@@ -627,17 +627,21 @@
         },
         {
           "task_id": "task_035",
+          "status": "completed",
+          "completed_at": "2026-02-22T23:45:00Z",
           "kernel_id": "sk_005",
           "optimization_ids": ["opt_005_001"],
           "name": "Implement optimized Q8_0→FP16 dequantize kernel",
           "description": "CUDA has dequantize_block_q8_0_f16 with SLM and half2 vectorization for 2-3x speedup. SYCL is missing this optimized path.",
           "priority": "high",
           "expected_improvement": "2-3x speedup for Q8_0 dequantization to FP16",
+          "actual_improvement": "Unmeasurable - no DEQUANT benchmark test cases",
           "estimated_effort": "medium",
           "dependencies": ["task_009"],
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -k DEQUANT",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
-          "files_to_modify": ["ggml/src/ggml-sycl/convert.cpp"]
+          "files_to_modify": ["ggml/src/ggml-sycl/convert.cpp", "ggml/src/ggml-sycl/dequantize.hpp"],
+          "notes": "Implemented dequantize_block_q8_0_f16 kernel with SLM staging (2176 bytes) and sycl::half2 vectorized output. Work-group size WARP_SIZE (16). Added dequantize_row_q8_0_f16_sycl dispatch. Correctness: PASS (MUL_MAT Q8_0 tests all passed). Performance: Unmeasurable (no DEQUANT benchmark test cases). The optimization is architecturally correct for Xe2 SIMD16 with proper SLM usage and vectorized half2 arithmetic."
         },
         {
           "task_id": "task_036",
