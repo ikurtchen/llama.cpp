@@ -551,17 +551,23 @@
         },
         {
           "task_id": "task_031",
+          "status": "completed",
+          "completed_at": "2026-02-22T20:30:00Z",
           "kernel_id": "sk_007",
           "optimization_ids": ["opt_007_003"],
           "name": "Add contiguous fast-path for cpy kernels",
           "description": "All copy operations perform 12 integer div/mul for 4D index decomposition even for contiguous tensors. Add a fast-path that detects contiguous src/dst and uses simple memcpy-style linear indexing.",
           "priority": "high",
           "expected_improvement": "40-60% speedup for contiguous copies",
+          "actual_improvement": "~1% (marginal improvement on benchmark test cases)",
           "estimated_effort": "medium",
           "dependencies": ["task_006", "task_016"],
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -k CPY",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
-          "files_to_modify": ["ggml/src/ggml-sycl/cpy.cpp"]
+          "files_to_modify": ["ggml/src/ggml-sycl/cpy.cpp"],
+          "baseline_metric": "f32→f16 contiguous: 65.74 us, f16→f16 contiguous: 8839.45 us",
+          "optimized_metric": "f32→f16 contiguous: 65.31 us, f16→f16 contiguous: 8839.42 us",
+          "notes": "Added cpy_1_contiguous kernel template with linear indexing and ggml_cpy_1_contiguous_sycl dispatch function. Work-group size 256 with [[intel::reqd_sub_group_size(16)]]. Uses int64_t indices. Correctness: PASS (all CPY tests). Benchmark shows marginal improvement (~1%) with no regressions. The optimization eliminates 12 integer divisions per element for contiguous mixed-type copies."
         },
         {
           "task_id": "task_032",

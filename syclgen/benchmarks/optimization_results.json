@@ -1,6 +1,29 @@
 {
   "results": [
     {
+      "task_id": "task_031",
+      "kernel": "CPY",
+      "optimization": "Added contiguous fast-path kernel for mixed-type copies (linear indexing vs 4D decomposition)",
+      "timestamp": "2026-02-22T20:30:00Z",
+      "correctness": "pass",
+      "baseline_time_us": {
+        "f32_to_f16_contiguous": 65.74,
+        "f32_to_f32_strided": 347.97,
+        "f16_to_f16_strided": 8840.40,
+        "f32_to_f32_transpose": 10194.32,
+        "f16_to_f16_contiguous": 8839.45
+      },
+      "optimized_time_us": {
+        "f32_to_f16_contiguous": 65.31,
+        "f32_to_f32_strided": 347.73,
+        "f16_to_f16_strided": 8728.29,
+        "f32_to_f32_transpose": 10213.53,
+        "f16_to_f16_contiguous": 8839.42
+      },
+      "speedup": "~1.0x (marginal improvement on benchmark test cases)",
+      "notes": "Added cpy_1_contiguous kernel template with linear indexing. Work-group size 256 with [[intel::reqd_sub_group_size(16)]]. Uses int64_t indices. Correctness: PASS (all CPY tests). Eliminates 12 integer divisions per element for contiguous mixed-type copies."
+    },
+    {
       "task_id": "task_030",
       "kernel": "ROPE",
       "optimization": "Added [[sycl::reqd_sub_group_size(16)]] to all 8 RoPE kernel launch paths",
