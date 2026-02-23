@@ -9,9 +9,9 @@
 - Analysis complete: Yes
 - Kernels with optimization potential: 13
 - Optimization tasks created: 42
-- Optimization tasks completed: 32 (Phase 1 complete, Phase 2 complete except task_014 blocked, Phase 3 complete, Phase 4 task_038-040 complete)
-- Optimization tasks blocked: 4 (task_014: XMX joint_matrix API incompatibility, task_041-042: require human implementation per AGENTS.md)
-- Remaining tasks (task_041-042) are large feature additions blocked per AGENTS.md guidelines
+- Optimization tasks completed: 33 (Phase 1 complete, Phase 2 complete except task_014 blocked, Phase 3 complete, Phase 4 task_038-040 complete, task_041 partial - opt_011_001 complete)
+- Optimization tasks blocked: 3 (task_014: XMX joint_matrix API incompatibility, task_041 remaining components: pending, task_042: pending)
+- task_041 is in_progress: opt_011_001 (getrows F16/BF16 dst types) completed; remaining components (opt_005_003, opt_008_007, opt_010_007) pending
 - Kernels with benchmark data: MUL_MAT, SOFT_MAX, CPY, ROPE, ADD
 
 ## Kernels Analyzed
@@ -128,6 +128,15 @@
   - MEDIUM: soft_max_back_f32 work-group size too small (only 16 on Intel)
 
 ## Optimization Activity
+
+[2026-02-23] Partial task_041: Add F16/BF16 dst type support to getrows (opt_011_001)
+  - Kernel: sk_011 (GET_ROWS)
+  - Optimization: Added F16 and BF16 destination type support to ggml_sycl_op_get_rows
+  - Changes:
+    - Added GGML_TYPE_F16 case in dst type switch (calls template with sycl::half)
+    - Added GGML_TYPE_BF16 case in dst type switch (guarded with #ifdef GGML_SYCL_HAS_BF16)
+  - Correctness: Build SUCCESS, 43/43 GET_ROWS tests pass
+  - Note: I32 src0 type and I32 dst type were already implemented. The existing code already had the two-level type switch pattern matching CUDA. This completes the type coverage for getrows to match CUDA's API surface (F16/BF16/I32/F32 dst types, F16/BF16/I32/F32 src0 types, plus quantized types). Task_041 remains in_progress for other components (opt_005_003, opt_008_007, opt_010_007).
 
 [2026-02-23] Completed task_039: Remove duplicate code from mmvq.cpp (partial consolidation)
   - Kernel: sk_009 (MUL_MAT_VEC_Q)

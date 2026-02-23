@@ -750,7 +750,8 @@
         },
         {
           "task_id": "task_041",
-          "status": "pending",
+          "status": "in_progress",
+          "started_at": "2026-02-23T13:00:00Z",
           "kernel_id": "multiple",
           "optimization_ids": ["opt_005_003", "opt_008_007", "opt_010_007", "opt_011_001"],
           "name": "Add missing quant type support",
@@ -766,7 +767,8 @@
             "ggml/src/ggml-sycl/convert.cpp",
             "ggml/src/ggml-sycl/dmmv.cpp",
             "ggml/src/ggml-sycl/getrows.cpp"
-          ]
+          ],
+          "notes": "opt_011_001 (getrows F16/BF16 dst types) completed 2026-02-23: Added F16 and BF16 destination type support to ggml_sycl_op_get_rows. Build SUCCESS, 43/43 GET_ROWS tests pass. Remaining: opt_005_003 (NC dequant), opt_008_007 (template dispatch), opt_010_007 (vectorized Y loads)."
         },
         {
           "task_id": "task_042",
