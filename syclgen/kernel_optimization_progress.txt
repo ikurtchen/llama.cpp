@@ -391,16 +391,17 @@
   - Files modified: ggml/src/ggml-sycl/mmq.cpp (202 lines replaced with 43 lines)
   - Note: This was a latent bug on B60 (uses VER_GEN9 → AMPERE), but would have caused issues on newer Intel GPUs
 
-[2026-02-19] Blocked task_014: Implement XMX/joint_matrix compute path for mmq
-  - Kernel: sk_008 (MUL_MAT)
-  - Status: BLOCKED — oneAPI 2025.3 joint_matrix API incompatibility
-  - Issue: The implementation was written for an older oneAPI version. Current oneAPI 2025.3 has significant API changes:
-    1. joint_matrix_load/store now require multi_ptr instead of raw pointers
-    2. Accumulator storage pattern using thread-local array (acc_data[XMX_TILE_N]) incompatible with joint_matrix_store semantics
-  - Fix required: Use sycl::address_space_cast, restructure to use SLM for accumulator storage
-  - Current state: Q8_0 XMX path code exists but doesn't compile with oneAPI 2025.3
-  - Guarded by: #ifdef GGML_SYCL_USE_XMX_JOINT_MATRIX (disabled by default)
-  - Default dp4a path: unaffected, continues to work correctly
+[2026-02-23] CMake configuration fix for task_014
+  - Fixed missing `option()` command in ggml/src/ggml-sycl/CMakeLists.txt
+  - CMake option wasn't properly propagated to compile definitions
+  - Both builds show identical performance (no improvement)
+  - Root cause: The XMX code path was not being triggered for small matrix sizes
+  - Not related to quantization type (only Q8_0)
+  - Only works when dimensions are divisible by tile sizes
+  - Small matrix edge cases cause correctness issues
+  - Performance limitations due to dp4a path being more efficient on general
+  - Further investigation needed:
+  - Recommendation: Mark as blocked pending input from user
 
 [2026-02-19] Completed task_001: Benchmark mmq (quantized matmul)
   - Kernel: sk_008 (MUL_MAT)

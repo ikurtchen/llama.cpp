@@ -151,6 +151,8 @@ if (GGML_SYCL_GRAPH)
     target_compile_definitions(ggml-sycl PRIVATE GGML_SYCL_GRAPH)
 endif()
 
+option(GGML_SYCL_USE_XMX_JOINT_MATRIX "ggml: use XMX joint_matrix for SYCL MMQ" OFF)
+
 if (GGML_SYCL_USE_XMX_JOINT_MATRIX)
     message(STATUS "XMX joint_matrix enabled for SYCL MMQ")
     target_compile_definitions(ggml-sycl PRIVATE GGML_SYCL_USE_XMX_JOINT_MATRIX)

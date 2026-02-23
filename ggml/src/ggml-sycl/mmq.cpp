@@ -14,9 +14,9 @@
 #include "vecdotq.hpp"
 
 #ifdef GGML_SYCL_USE_XMX_JOINT_MATRIX
-#include <sycl/ext/oneapi/matrix/matrix.hpp>
+#include <sycl/ext/oneapi/experimental/matrix/matrix.hpp>
 
-using namespace sycl::ext::oneapi::matrix;
+using namespace sycl::ext::oneapi::experimental::matrix;
 
 constexpr int XMX_M = 8;
 constexpr int XMX_N = 16;
@@ -28,7 +28,7 @@ using xmx_accumulator = joint_matrix<sycl::sub_group, T, use::accumulator, M, N>
 template <typename T, int M, int K, typename L = layout::row_major>
 using xmx_matrix_a = joint_matrix<sycl::sub_group, T, use::a, M, K, L>;
 
-template <typename T, int K, int N, typename L = layout::col_major>
+template <typename T, int K, int N, typename L = layout::row_major>
 using xmx_matrix_b = joint_matrix<sycl::sub_group, T, use::b, K, N, L>;
 
 #endif
@@ -1307,7 +1307,8 @@ static void mul_mat_q8_0_xmx(
     float *__restrict__ dst, const int ncols_x, const int nrows_x,
     const int ncols_y, const int nrows_y, const int nrows_dst,
     const sycl::nd_item<3> &item_ct1, int8_t *tile_x_int8,
-    float *tile_x_d, int8_t *tile_y_int8, sycl::half2 *tile_y_ds) {
+    float *tile_x_d, int8_t *tile_y_int8, sycl::half2 *tile_y_ds,
+    int32_t *tile_acc) {
 
     const block_q8_0 * x = (const block_q8_0 *) vx;
     const block_q8_1 * y = (const block_q8_1 *) vy;
@@ -1349,20 +1350,33 @@ static void mul_mat_q8_0_xmx(
                     joint_matrix<sycl::sub_group, int8_t, use::a,
                                  XMX_TILE_M, XMX_TILE_K, layout::row_major> mat_a;
                     joint_matrix<sycl::sub_group, int8_t, use::b,
-                                 XMX_TILE_K, XMX_TILE_N, layout::col_major> mat_b;
+                                 XMX_TILE_K, XMX_TILE_N, layout::row_major> mat_b;
 
-                    joint_matrix_load(sg, mat_a,
-                                      tile_x_int8 + m * XMX_TILE_K, XMX_TILE_K);
-                    joint_matrix_load(sg, mat_b,
-                                      tile_y_int8 + n * XMX_TILE_K, XMX_TILE_K);
+                    auto ptr_a = sycl::address_space_cast<
+                        sycl::access::address_space::local_space,
+                        sycl::access::decorated::no>(
+                            tile_x_int8 + m * XMX_TILE_K);
+                    auto ptr_b = sycl::address_space_cast<
+                        sycl::access::address_space::local_space,
+                        sycl::access::decorated::no>(
+                            tile_y_int8 + n * XMX_TILE_K);
+                    joint_matrix_load(sg, mat_a, ptr_a, XMX_TILE_K);
+                    joint_matrix_load(sg, mat_b, ptr_b, XMX_TILE_K);
 
                     joint_matrix_mad(sg, acc, mat_a, mat_b, acc);
                 }
 
-                int32_t acc_data[XMX_TILE_N];
-                joint_matrix_store(sg, acc, acc_data, XMX_TILE_N, layout::row_major);
+                const int sg_id = item_ct1.get_sub_group().get_group_id()[0];
+                auto acc_ptr = sycl::address_space_cast<
+                    sycl::access::address_space::local_space,
+                    sycl::access::decorated::no>(
+                        tile_acc + sg_id * XMX_TILE_M * XMX_TILE_N);
+                joint_matrix_store(sg, acc, acc_ptr, XMX_TILE_N);
+
+                sycl::group_barrier(sg);
 
                 const int sg_local_id = item_ct1.get_local_id(2) % 16;
+                const int32_t *acc_data = tile_acc + sg_id * XMX_TILE_M * XMX_TILE_N;
                 for (int ni = 0; ni < XMX_TILE_N; ++ni) {
                     const int row_in_tile = sg_local_id;
                     const int global_row = m + row_in_tile;
@@ -1373,7 +1387,7 @@ static void mul_mat_q8_0_xmx(
                         const int out_j = global_col / nwarps;
                         const float dx = tile_x_d[global_row / QI8_0];
                         const float dy = tile_y_ds[global_col][0];
-                        sum[out_i][out_j] += acc_data[ni] * dx * dy;
+                        sum[out_i][out_j] += acc_data[row_in_tile * XMX_TILE_N + ni] * dx * dy;
                     }
                 }
             }
@@ -2674,6 +2688,8 @@ static void ggml_mul_mat_q8_0_q8_1_sycl(const void *vx, const void *vy,
                     sycl::range<1>(mmq_x * XMX_TILE_K), cgh);
                 sycl::local_accessor<sycl::half2, 1> tile_y_ds_acc_ct1(
                     sycl::range<1>(mmq_x), cgh);
+                sycl::local_accessor<int32_t, 1> tile_acc_ct1(
+                    sycl::range<1>(nwarps * 2 * XMX_TILE_M * XMX_TILE_N), cgh);
 
                 cgh.parallel_for(
                     sycl::nd_range<3>(block_nums * block_dims, block_dims),
@@ -2685,7 +2701,8 @@ static void ggml_mul_mat_q8_0_q8_1_sycl(const void *vx, const void *vy,
                                 get_pointer(tile_x_int8_acc_ct1),
                                 get_pointer(tile_x_d_acc_ct1),
                                 get_pointer(tile_y_int8_acc_ct1),
-                                get_pointer(tile_y_ds_acc_ct1));
+                                get_pointer(tile_y_ds_acc_ct1),
+                                get_pointer(tile_acc_ct1));
                     });
             });
         }
@@ -2705,6 +2722,8 @@ static void ggml_mul_mat_q8_0_q8_1_sycl(const void *vx, const void *vy,
                     sycl::range<1>(mmq_x * XMX_TILE_K), cgh);
                 sycl::local_accessor<sycl::half2, 1> tile_y_ds_acc_ct1(
                     sycl::range<1>(mmq_x), cgh);
+                sycl::local_accessor<int32_t, 1> tile_acc_ct1(
+                    sycl::range<1>(nwarps * 2 * XMX_TILE_M * XMX_TILE_N), cgh);
 
                 cgh.parallel_for(
                     sycl::nd_range<3>(block_nums * block_dims, block_dims),
@@ -2716,7 +2735,8 @@ static void ggml_mul_mat_q8_0_q8_1_sycl(const void *vx, const void *vy,
                                 get_pointer(tile_x_int8_acc_ct1),
                                 get_pointer(tile_x_d_acc_ct1),
                                 get_pointer(tile_y_int8_acc_ct1),
-                                get_pointer(tile_y_ds_acc_ct1));
+                                get_pointer(tile_y_ds_acc_ct1),
+                                get_pointer(tile_acc_ct1));
                     });
             });
         }

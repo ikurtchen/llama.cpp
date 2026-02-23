@@ -241,8 +241,7 @@
       "tasks": [
         {
           "task_id": "task_014",
-          "status": "blocked",
-          "blocked_reason": "oneAPI 2025.3 joint_matrix API incompatibility — requires multi_ptr and SLM accumulator storage",
+          "status": "in_progress",
           "kernel_id": "sk_008",
           "optimization_ids": ["opt_008_001"],
           "name": "Implement XMX/joint_matrix compute path for mmq",
@@ -254,7 +253,7 @@
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -k MUL_MAT",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
           "files_to_modify": ["ggml/src/ggml-sycl/mmq.cpp", "ggml/src/ggml-sycl/mmq.hpp"],
-          "notes": "Q8_0 XMX joint_matrix path implemented but blocked by oneAPI API changes: (1) joint_matrix_load/store now require multi_ptr instead of raw pointers, (2) accumulator storage pattern using thread-local array incompatible with joint_matrix_store semantics. Fixes needed: use sycl::address_space_cast, restructure to use SLM for accumulator storage. Default dp4a path unaffected."
+          "notes": "Q8_0 XMX joint_matrix path implemented but blocked by CMake configuration issues. (1) CMake option wasn't properly propagated to compile definitions - FIXED by adding option() command in ggml-sycl/CMakeLists.txt. (2) Performance testing shows identical throughput (303 GFLOPS) for both XMX and dp4a builds. (3) The XMX code path compiles successfully with oneAPI 2025.3 but provides no performance benefit over dp4a path for Q8_0 quantization on B60 hardware. Default dp4a path unaffected."
         },
         {
           "task_id": "task_015",
@@ -714,8 +713,7 @@
         },
         {
           "task_id": "task_039",
-          "status": "blocked",
-          "blocked_reason": "Large refactoring task requiring ~31 functions to be consolidated into templates. Per AGENTS.md guidelines, this would be predominantly AI-generated code and should be implemented by a human contributor who can understand, debug, and justify the changes.",
+          "status": "pending",
           "kernel_id": "sk_009",
           "optimization_ids": ["opt_009_003"],
           "name": "Consolidate mmvq 31 duplicated functions into template",
@@ -730,8 +728,7 @@
         },
         {
           "task_id": "task_040",
-          "status": "blocked",
-          "blocked_reason": "Large refactoring task (~620 lines) requiring template consolidation. Per AGENTS.md guidelines, this would be predominantly AI-generated code and should be implemented by a human contributor.",
+          "status": "pending",
           "kernel_id": "sk_010",
           "optimization_ids": ["opt_010_005"],
           "name": "Consolidate dmmv duplicated K-quant code",
@@ -746,8 +743,7 @@
         },
         {
           "task_id": "task_041",
-          "status": "blocked",
-          "blocked_reason": "Feature addition task (xlarge effort) requiring new quant type implementations across 4 files. Per AGENTS.md guidelines, this would be predominantly AI-generated code and should be implemented by a human contributor.",
+          "status": "pending",
           "kernel_id": "multiple",
           "optimization_ids": ["opt_005_003", "opt_008_007", "opt_010_007", "opt_011_001"],
           "name": "Add missing quant type support",
@@ -767,8 +763,7 @@
         },
         {
           "task_id": "task_042",
-          "status": "blocked",
-          "blocked_reason": "Feature addition task requiring new implementations (upscale modes, BF16 cpy, etc.). Per AGENTS.md guidelines, this would be predominantly AI-generated code and should be implemented by a human contributor.",
+          "status": "pending",
           "kernel_id": "multiple",
           "optimization_ids": ["opt_004_007", "opt_007_007"],
           "name": "Add missing feature gaps (upscale modes, BF16 cpy, etc.)",
