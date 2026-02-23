@@ -241,19 +241,21 @@
       "tasks": [
         {
           "task_id": "task_014",
-          "status": "in_progress",
+          "status": "blocked",
+          "blocked_reason": "Performance expectation not met - XMX joint_matrix path shows no improvement over dp4a for Q8_0 on B60 (303 GFLOPS both). CMake configuration fixed. Implementation complete but needs performance investigation.",
           "kernel_id": "sk_008",
           "optimization_ids": ["opt_008_001"],
           "name": "Implement XMX/joint_matrix compute path for mmq",
           "description": "The mmq kernel has SYCL_USE_XMX but only uses it to change tile sizes — no actual joint_matrix code exists. Implement a true XMX compute path using sycl::joint_matrix for the inner matmul loop. This is the single highest-impact optimization across all 13 kernels.",
           "priority": "critical",
           "expected_improvement": "3-5x throughput for quantized matrix multiply",
+          "actual_improvement": "1.0x (no improvement)",
           "estimated_effort": "xlarge",
           "dependencies": ["task_001"],
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -k MUL_MAT",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
           "files_to_modify": ["ggml/src/ggml-sycl/mmq.cpp", "ggml/src/ggml-sycl/mmq.hpp"],
-          "notes": "Q8_0 XMX joint_matrix path implemented but blocked by CMake configuration issues. (1) CMake option wasn't properly propagated to compile definitions - FIXED by adding option() command in ggml-sycl/CMakeLists.txt. (2) Performance testing shows identical throughput (303 GFLOPS) for both XMX and dp4a builds. (3) The XMX code path compiles successfully with oneAPI 2025.3 but provides no performance benefit over dp4a path for Q8_0 quantization on B60 hardware. Default dp4a path unaffected."
+          "notes": "Q8_0 XMX joint_matrix path implemented and compiles with oneAPI 2025.3. CMake configuration fixed (added option() command). Performance testing shows identical throughput (303 GFLOPS) for both XMX and dp4a builds - no improvement observed. The XMX path requires dimensions divisible by tile sizes (64x64x32). For Q8_0 quantized matmul on B60, the dp4a path is equally efficient. Default dp4a path remains recommended. Further investigation needed to determine workloads where XMX provides benefit."
         },
         {
           "task_id": "task_015",
