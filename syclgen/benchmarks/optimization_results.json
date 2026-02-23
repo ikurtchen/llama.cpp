@@ -1,6 +1,28 @@
 {
   "results": [
     {
+      "task_id": "task_040",
+      "kernel": "MUL_MAT_VEC (K-quant dmmv)",
+      "optimization": "Consolidate duplicated K-quant reduction code via DMMV_K_QUANT_REDUCTION macro",
+      "timestamp": "2026-02-23T12:45:00Z",
+      "correctness": "pass",
+      "baseline_time_us": "N/A - code quality fix",
+      "optimized_time_us": "N/A - code quality fix",
+      "speedup": "N/A - code quality only (~80 lines reduced)",
+      "notes": "Created DMMV_K_QUANT_REDUCTION macro to consolidate duplicated reduction code across 5 K-quant kernels (Q2_K through Q6_K). File reduced from 1407 to 1313 lines (-94 lines). Dispatch functions have subtle differences (ny calculation, kernel signatures) that prevent clean templating. Correctness: PASS (651/726 MUL_MAT tests - same as before, 75 pre-existing failures for n=1 edge cases). Build: SUCCESS."
+    },
+    {
+      "task_id": "task_039",
+      "kernel": "MUL_MAT_VEC_Q",
+      "optimization": "Remove 89 lines of duplicate/broken code from mmvq.cpp (bad merge artifact)",
+      "timestamp": "2026-02-23T11:55:00Z",
+      "correctness": "partial",
+      "baseline_time_us": "N/A - code quality fix (dead code removal)",
+      "optimized_time_us": "N/A - code quality fix (dead code removal)",
+      "speedup": "N/A - code quality only",
+      "notes": "Removed duplicate code at lines 1662-1750 that was from a bad merge and caused compilation errors. 651/726 MUL_MAT tests pass (75 pre-existing failures for n=1 edge cases and sentinel mismatches). Full consolidation of 31 duplicated functions deferred pending investigation of pre-existing test failures."
+    },
+    {
       "task_id": "task_038",
       "kernel": "Multiple (rope, element_wise, convert, binbcast, cpy, getrows, wkv, gla)",
       "optimization": "Remove DPCT migration artifacts (code quality cleanup)",

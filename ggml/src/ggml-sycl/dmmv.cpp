@@ -26,6 +26,28 @@
 #define DMMV_BLOCK_SIZE 128
 #endif
 
+#define DMMV_K_QUANT_REDUCTION(tmp, item_ct1, slm_partial, sg_id, tid_in_sg, dst, row) \
+    do { \
+        _Pragma("unroll") \
+        for (int mask = WARP_SIZE / 2; mask > 0; mask >>= 1) { \
+            tmp += dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), tmp, mask); \
+        } \
+        constexpr int num_sub_groups = QK_WARP_SIZE / WARP_SIZE; \
+        if (tid_in_sg == 0) { \
+            slm_partial[sg_id] = tmp; \
+        } \
+        item_ct1.barrier(sycl::access::fence_space::local_space); \
+        if (sg_id == 0) { \
+            float final_sum = (tid_in_sg < num_sub_groups) ? slm_partial[tid_in_sg] : 0.0f; \
+            for (int mask = WARP_SIZE / 2; mask > 0; mask >>= 1) { \
+                final_sum += dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), final_sum, mask); \
+            } \
+            if (tid_in_sg == 0) { \
+                dst[row] = final_sum; \
+            } \
+        } \
+    } while(0)
+
 static void convert_f16(const void * vx, const int64_t ib, const int iqs, dfloat2 & v){
     const sycl::half *x = (const sycl::half *)vx;
 
@@ -426,30 +448,7 @@ static void dequantize_mul_mat_vec_q2_k(const void *__restrict__ vx,
 
 #endif
 
-    // Sub-group level reduction (within 16-wide sub-group)
-#pragma unroll
-    for (int mask = WARP_SIZE / 2; mask > 0; mask >>= 1) {
-        tmp +=
-            dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), tmp, mask);
-    }
-
-    // Two-level work-group reduction using SLM
-    constexpr int num_sub_groups = QK_WARP_SIZE / WARP_SIZE;
-    if (tid_in_sg == 0) {
-        slm_partial[sg_id] = tmp;
-    }
-    item_ct1.barrier(sycl::access::fence_space::local_space);
-
-    // First sub-group performs final reduction
-    if (sg_id == 0) {
-        float final_sum = (tid_in_sg < num_sub_groups) ? slm_partial[tid_in_sg] : 0.0f;
-        for (int mask = WARP_SIZE / 2; mask > 0; mask >>= 1) {
-            final_sum += dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), final_sum, mask);
-        }
-        if (tid_in_sg == 0) {
-            dst[row] = final_sum;
-        }
-    }
+    DMMV_K_QUANT_REDUCTION(tmp, item_ct1, slm_partial, sg_id, tid_in_sg, dst, row);
 }
 
 /*
@@ -564,30 +563,7 @@ static void dequantize_mul_mat_vec_q3_k(const void *__restrict__ vx,
     }
 #endif
 
-    // Sub-group level reduction (within 16-wide sub-group)
-#pragma unroll
-    for (int mask = WARP_SIZE / 2; mask > 0; mask >>= 1) {
-        tmp +=
-            dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), tmp, mask);
-    }
-
-    // Two-level work-group reduction using SLM
-    constexpr int num_sub_groups = QK_WARP_SIZE / WARP_SIZE;
-    if (tid_in_sg == 0) {
-        slm_partial[sg_id] = tmp;
-    }
-    item_ct1.barrier(sycl::access::fence_space::local_space);
-
-    // First sub-group performs final reduction
-    if (sg_id == 0) {
-        float final_sum = (tid_in_sg < num_sub_groups) ? slm_partial[tid_in_sg] : 0.0f;
-        for (int mask = WARP_SIZE / 2; mask > 0; mask >>= 1) {
-            final_sum += dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), final_sum, mask);
-        }
-        if (tid_in_sg == 0) {
-            dst[row] = final_sum;
-        }
-    }
+    DMMV_K_QUANT_REDUCTION(tmp, item_ct1, slm_partial, sg_id, tid_in_sg, dst, row);
 }
 
 /*
@@ -737,30 +713,7 @@ static void dequantize_mul_mat_vec_q4_k(const void *__restrict__ vx,
 
 #endif
 
-    // Sub-group level reduction (within 16-wide sub-group)
-#pragma unroll
-    for (int mask = WARP_SIZE / 2; mask > 0; mask >>= 1) {
-        tmp +=
-            dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), tmp, mask);
-    }
-
-    // Two-level work-group reduction using SLM
-    constexpr int num_sub_groups = QK_WARP_SIZE / WARP_SIZE;
-    if (tid_in_sg == 0) {
-        slm_partial[sg_id] = tmp;
-    }
-    item_ct1.barrier(sycl::access::fence_space::local_space);
-
-    // First sub-group performs final reduction
-    if (sg_id == 0) {
-        float final_sum = (tid_in_sg < num_sub_groups) ? slm_partial[tid_in_sg] : 0.0f;
-        for (int mask = WARP_SIZE / 2; mask > 0; mask >>= 1) {
-            final_sum += dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), final_sum, mask);
-        }
-        if (tid_in_sg == 0) {
-            dst[row] = final_sum;
-        }
-    }
+    DMMV_K_QUANT_REDUCTION(tmp, item_ct1, slm_partial, sg_id, tid_in_sg, dst, row);
 }
 
 /*
@@ -890,30 +843,7 @@ static void dequantize_mul_mat_vec_q5_k(const void *__restrict__ vx,
     }
 #endif
 
-    // Sub-group level reduction (within 16-wide sub-group)
-#pragma unroll
-    for (int mask = WARP_SIZE / 2; mask > 0; mask >>= 1) {
-        tmp +=
-            dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), tmp, mask);
-    }
-
-    // Two-level work-group reduction using SLM
-    constexpr int num_sub_groups = QK_WARP_SIZE / WARP_SIZE;
-    if (tid_in_sg == 0) {
-        slm_partial[sg_id] = tmp;
-    }
-    item_ct1.barrier(sycl::access::fence_space::local_space);
-
-    // First sub-group performs final reduction
-    if (sg_id == 0) {
-        float final_sum = (tid_in_sg < num_sub_groups) ? slm_partial[tid_in_sg] : 0.0f;
-        for (int mask = WARP_SIZE / 2; mask > 0; mask >>= 1) {
-            final_sum += dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), final_sum, mask);
-        }
-        if (tid_in_sg == 0) {
-            dst[row] = final_sum;
-        }
-    }
+    DMMV_K_QUANT_REDUCTION(tmp, item_ct1, slm_partial, sg_id, tid_in_sg, dst, row);
 }
 
 static void dequantize_mul_mat_vec_q6_k(const void * __restrict__ vx, const float * __restrict__ yy, float * __restrict__ dst, const int ncols, int nrows,
@@ -1023,30 +953,7 @@ static void dequantize_mul_mat_vec_q6_k(const void * __restrict__ vx, const floa
 
 #endif
 
-    // Sub-group level reduction (within 16-wide sub-group)
-#pragma unroll
-    for (int mask = WARP_SIZE / 2; mask > 0; mask >>= 1) {
-        tmp +=
-            dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), tmp, mask);
-    }
-
-    // Two-level work-group reduction using SLM
-    constexpr int num_sub_groups = QK_WARP_SIZE / WARP_SIZE;
-    if (tid_in_sg == 0) {
-        slm_partial[sg_id] = tmp;
-    }
-    item_ct1.barrier(sycl::access::fence_space::local_space);
-
-    // First sub-group performs final reduction
-    if (sg_id == 0) {
-        float final_sum = (tid_in_sg < num_sub_groups) ? slm_partial[tid_in_sg] : 0.0f;
-        for (int mask = WARP_SIZE / 2; mask > 0; mask >>= 1) {
-            final_sum += dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), final_sum, mask);
-        }
-        if (tid_in_sg == 0) {
-            dst[row] = final_sum;
-        }
-    }
+    DMMV_K_QUANT_REDUCTION(tmp, item_ct1, slm_partial, sg_id, tid_in_sg, dst, row);
 }
 
 static void dequantize_mul_mat_vec_q4_0_sycl_reorder(const void *vx, const dfloat *y,
