@@ -1211,6 +1211,89 @@ static __dpct_inline__ float vec_dot_q6_K_q8_1_mul_mat(
     return vec_dot_q6_K_q8_1_impl_mmq(&x_ql[index_x], &y_qs[index_y], sc, x_dmf[i * (WARP_SIZE/QI6_K) + i/QI6_K], &y_df[index_y/QI8_1]);
 }
 
+#define VDR_IQ4_NL_Q8_1_MMQ 4
+
+template <int mmq_y>
+static __dpct_inline__ void
+allocate_tiles_iq4_nl(int **x_ql, sycl::half2 **x_dm, int **x_qh, int **x_sc,
+                      int *tile_x_qs_iq4_nl, float *tile_x_d_iq4_nl) {
+    (void)x_qh; (void)x_sc;
+
+    *x_ql = tile_x_qs_iq4_nl;
+    *x_dm = (sycl::half2 *)tile_x_d_iq4_nl;
+}
+
+template <int mmq_y, int nwarps, bool need_check>
+static __dpct_inline__ void
+load_tiles_iq4_nl(const void *__restrict__ vx, int *__restrict__ x_ql,
+                  sycl::half2 *__restrict__ x_dm, int *__restrict__ x_qh,
+                  int *__restrict__ x_sc, const int &i_offset, const int &i_max,
+                  const int &k, const int &blocks_per_row) {
+    (void)x_qh; (void)x_sc;
+
+    GGML_SYCL_ASSUME(i_offset >= 0);
+    GGML_SYCL_ASSUME(i_offset <  nwarps);
+    GGML_SYCL_ASSUME(k >= 0);
+    GGML_SYCL_ASSUME(k <  WARP_SIZE);
+
+    const int kbx  = k / QI4_NL;
+    const int kqsx = k % QI4_NL;
+
+    const block_iq4_nl * bx0 = (const block_iq4_nl *) vx;
+
+#pragma unroll
+    for (int i0 = 0; i0 < mmq_y; i0 += nwarps) {
+        int i = i0 + i_offset;
+
+        if (need_check) {
+            i = sycl::min(i, i_max);
+        }
+
+        const block_iq4_nl * bxi = bx0 + i*blocks_per_row + kbx;
+
+        const int aux_q4 = get_int_b1(bxi->qs, kqsx);
+        const sycl::int2 v = get_int_from_table_16(aux_q4, kvalues_iq4nl);
+
+        const int k0 = kbx * (2 * QI4_NL) + kqsx;
+        x_ql[i * (2*WARP_SIZE + 1) + k0] = v.x();
+        x_ql[i * (2*WARP_SIZE + 1) + k0 + QI4_NL] = v.y();
+    }
+
+    const int blocks_per_tile_x_row = WARP_SIZE / QI4_NL;
+    const int kbxd = k % blocks_per_tile_x_row;
+    float * x_dmf = (float *) x_dm;
+
+#pragma unroll
+    for (int i0 = 0; i0 < mmq_y; i0 += nwarps * QI4_NL) {
+        int i = i0 + i_offset * QI4_NL + k / blocks_per_tile_x_row;
+
+        if (need_check) {
+            i = sycl::min(i, i_max);
+        }
+
+        const block_iq4_nl * bxi = bx0 + i*blocks_per_row + kbxd;
+
+        x_dmf[i * (WARP_SIZE/QI4_NL) + i / QI4_NL + kbxd] = bxi->d;
+    }
+}
+
+static __dpct_inline__ float vec_dot_iq4_nl_q8_1_mul_mat(
+    const int *__restrict__ x_ql, const sycl::half2 *__restrict__ x_dm,
+    const int *__restrict__ x_qh, const int *__restrict__ x_sc,
+    const int *__restrict__ y_qs, const sycl::half2 *__restrict__ y_ds,
+    const int &i, const int &j, const int &k) {
+    (void)x_qh; (void)x_sc;
+
+    const float * x_dmf = (const float *) x_dm;
+    const float * y_df  = (const float *) y_ds;
+
+    const int kbx = k / (2*QI4_NL);
+
+    return vec_dot_q8_0_q8_1_impl<VDR_IQ4_NL_Q8_1_MMQ>
+        (&x_ql[i * (2*WARP_SIZE + 1) + k], &y_qs[j * WARP_SIZE + k], x_dmf[i * (WARP_SIZE/QI4_NL) + i/QI4_NL + kbx],
+         y_df[j * (WARP_SIZE/QI8_1) + k/QI8_1]);
+}
+
 #ifdef GGML_SYCL_USE_XMX_JOINT_MATRIX
 
 #define XMX_TILE_M 8
@@ -2243,6 +2326,33 @@ template <bool need_check> static void
     mul_mat_q<QK_K, QR6_K, QI6_K, false, block_q6_K, mmq_x, mmq_y, nwarps,
               load_tiles_q6_K<mmq_y, nwarps, need_check>, VDR_Q6_K_Q8_1_MMQ,
               vec_dot_q6_K_q8_1_mul_mat>(
+        vx, vy, dst, ncols_x, nrows_x, ncols_y, nrows_y, nrows_dst, tile_x_ql,
+        tile_x_dm, tile_x_qh, tile_x_sc, item_ct1, tile_y_qs, tile_y_ds);
+}
+
+#define  MMQ_X_IQ4_NL_XE2 64
+#define  MMQ_Y_IQ4_NL_XE2 64
+#define NWARPS_IQ4_NL_XE2 4
+
+template <bool need_check> static void
+    mul_mat_iq4_nl(
+    const void * __restrict__ vx, const void * __restrict__ vy, float * __restrict__ dst,
+    const int ncols_x, const int nrows_x, const int ncols_y, const int nrows_y, const int nrows_dst,
+    const sycl::nd_item<3> &item_ct1, int *tile_x_qs_iq4_nl, float *tile_x_d_iq4_nl,
+    int *tile_y_qs, sycl::half2 *tile_y_ds) {
+    int   * tile_x_ql = nullptr;
+    sycl::half2 *tile_x_dm = nullptr;
+    int   * tile_x_qh = nullptr;
+    int   * tile_x_sc = nullptr;
+
+    const int mmq_x  =  MMQ_X_IQ4_NL_XE2;
+    const int mmq_y  =  MMQ_Y_IQ4_NL_XE2;
+    const int nwarps = NWARPS_IQ4_NL_XE2;
+    allocate_tiles_iq4_nl<mmq_y>(&tile_x_ql, &tile_x_dm, &tile_x_qh, &tile_x_sc,
+                                tile_x_qs_iq4_nl, tile_x_d_iq4_nl);
+    mul_mat_q<QK4_NL, QR4_NL, QI4_NL, false, block_iq4_nl, mmq_x, mmq_y, nwarps,
+              load_tiles_iq4_nl<mmq_y, nwarps, need_check>, VDR_IQ4_NL_Q8_1_MMQ,
+              vec_dot_iq4_nl_q8_1_mul_mat>(
         vx, vy, dst, ncols_x, nrows_x, ncols_y, nrows_y, nrows_dst, tile_x_ql,
         tile_x_dm, tile_x_qh, tile_x_sc, item_ct1, tile_y_qs, tile_y_ds);
 }
@@ -3355,6 +3465,95 @@ catch (sycl::exception const &exc) {
   std::exit(1);
 }
 
+static void ggml_mul_mat_iq4_nl_q8_1_sycl(const void *vx, const void *vy,
+                                          float *dst, const int ncols_x,
+                                          const int nrows_x, const int ncols_y,
+                                          const int nrows_y, const int nrows_dst,
+                                          dpct::queue_ptr stream) try {
+
+    int id;
+    SYCL_CHECK(
+        CHECK_TRY_ERROR(id = get_current_device_id()));
+    const int compute_capability = ggml_sycl_info().devices[id].cc;
+    (void)compute_capability;
+
+    const int mmq_x  =  MMQ_X_IQ4_NL_XE2;
+    const int mmq_y  =  MMQ_Y_IQ4_NL_XE2;
+    const int nwarps = NWARPS_IQ4_NL_XE2;
+
+    const int block_num_x = (nrows_x + mmq_y - 1) / mmq_y;
+    const int block_num_y = (ncols_y + mmq_x - 1) / mmq_x;
+    const sycl::range<3> block_nums(1, block_num_y, block_num_x);
+    const sycl::range<3> block_dims(1, nwarps, WARP_SIZE);
+
+    if (nrows_x % mmq_y == 0) {
+        const bool need_check = false;
+        {
+            dpct::has_capability_or_fail(stream->get_device(),
+                                         {sycl::aspect::fp16});
+
+            stream->submit([&](sycl::handler &cgh) {
+                sycl::local_accessor<int, 1> tile_x_qs_iq4_nl_acc_ct1(
+                    sycl::range<1>(mmq_y * (2 * WARP_SIZE) + mmq_y), cgh);
+                sycl::local_accessor<float, 1> tile_x_d_iq4_nl_acc_ct1(
+                    sycl::range<1>(mmq_y * (WARP_SIZE / QI4_NL) + mmq_y / QI4_NL),
+                    cgh);
+                sycl::local_accessor<int, 1> tile_y_qs_acc_ct1(
+                    sycl::range<1>(mmq_x * WARP_SIZE), cgh);
+                sycl::local_accessor<sycl::half2, 1> tile_y_ds_acc_ct1(
+                    sycl::range<1>(mmq_x * WARP_SIZE / QI8_1), cgh);
+
+                cgh.parallel_for(
+                    sycl::nd_range<3>(block_nums * block_dims, block_dims),
+                    [=](sycl::nd_item<3> item_ct1) {
+                        mul_mat_iq4_nl<need_check>(
+                            vx, vy, dst, ncols_x, nrows_x, ncols_y, nrows_y,
+                            nrows_dst, item_ct1,
+                            get_pointer(tile_x_qs_iq4_nl_acc_ct1),
+                            get_pointer(tile_x_d_iq4_nl_acc_ct1),
+                            get_pointer(tile_y_qs_acc_ct1),
+                            get_pointer(tile_y_ds_acc_ct1));
+                    });
+            });
+        }
+    } else {
+        const bool need_check = true;
+        {
+            dpct::has_capability_or_fail(stream->get_device(),
+                                         {sycl::aspect::fp16});
+
+            stream->submit([&](sycl::handler &cgh) {
+                sycl::local_accessor<int, 1> tile_x_qs_iq4_nl_acc_ct1(
+                    sycl::range<1>(mmq_y * (2 * WARP_SIZE) + mmq_y), cgh);
+                sycl::local_accessor<float, 1> tile_x_d_iq4_nl_acc_ct1(
+                    sycl::range<1>(mmq_y * (WARP_SIZE / QI4_NL) + mmq_y / QI4_NL),
+                    cgh);
+                sycl::local_accessor<int, 1> tile_y_qs_acc_ct1(
+                    sycl::range<1>(mmq_x * WARP_SIZE), cgh);
+                sycl::local_accessor<sycl::half2, 1> tile_y_ds_acc_ct1(
+                    sycl::range<1>(mmq_x * WARP_SIZE / QI8_1), cgh);
+
+                cgh.parallel_for(
+                    sycl::nd_range<3>(block_nums * block_dims, block_dims),
+                    [=](sycl::nd_item<3> item_ct1) {
+                        mul_mat_iq4_nl<need_check>(
+                            vx, vy, dst, ncols_x, nrows_x, ncols_y, nrows_y,
+                            nrows_dst, item_ct1,
+                            get_pointer(tile_x_qs_iq4_nl_acc_ct1),
+                            get_pointer(tile_x_d_iq4_nl_acc_ct1),
+                            get_pointer(tile_y_qs_acc_ct1),
+                            get_pointer(tile_y_ds_acc_ct1));
+                    });
+            });
+        }
+    }
+}
+catch (sycl::exception const &exc) {
+  std::cerr << exc.what() << "Exception caught at file:" << __FILE__
+            << ", line:" << __LINE__ << std::endl;
+  std::exit(1);
+}
+
 void ggml_sycl_op_mul_mat_q(
     ggml_backend_sycl_context & ctx,
     const ggml_tensor *src0, const ggml_tensor *src1, ggml_tensor *dst,
@@ -3410,6 +3609,9 @@ void ggml_sycl_op_mul_mat_q(
             break;
         case GGML_TYPE_Q6_K:
             ggml_mul_mat_q6_K_q8_1_sycl(src0_dd_i, src1_ddq_i, dst_dd_i, ne00, row_diff, src1_ncols, src1_padded_row_size, nrows_dst, stream);
+            break;
+        case GGML_TYPE_IQ4_NL:
+            ggml_mul_mat_iq4_nl_q8_1_sycl(src0_dd_i, src1_ddq_i, dst_dd_i, ne00, row_diff, src1_ncols, src1_padded_row_size, nrows_dst, stream);
             break;
         default:
             GGML_ABORT("fatal error");

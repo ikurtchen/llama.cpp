@@ -64,6 +64,15 @@ static void convert_f32(const void * vx, const int64_t ib, const int iqs, dfloat
     v.y() = x[ib + iqs + 1];
 }
 
+#ifdef GGML_SYCL_HAS_BF16
+static void convert_bf16(const void * vx, const int64_t ib, const int iqs, dfloat2 & v){
+    const sycl::ext::oneapi::bfloat16 *x = (const sycl::ext::oneapi::bfloat16 *)vx;
+
+    v.x() = (float)x[ib + iqs + 0];
+    v.y() = (float)x[ib + iqs + 1];
+}
+#endif
+
 template <int qk, int qr, dequantize_kernel_t dequantize_kernel, int block_size = DMMV_BLOCK_SIZE>
 static void dequantize_mul_mat_vec(const void * __restrict__ vx, const dfloat * __restrict__ y, float * __restrict__ dst, const int ncols, const int nrows,
                                    const sycl::nd_item<3> &item_ct1, float * __restrict__ slm_partial) {
@@ -312,6 +321,30 @@ static void convert_mul_mat_vec_f16_sycl(const void *vx, const dfloat *y,
         });
     }
 }
+
+#ifdef GGML_SYCL_HAS_BF16
+static void convert_mul_mat_vec_bf16_sycl(const void *vx, const dfloat *y,
+                                          float *dst, const int ncols,
+                                          const int nrows,
+                                          dpct::queue_ptr stream) {
+    GGML_ASSERT(ncols % GGML_SYCL_DMMV_X == 0);
+    const int block_num_y = nrows;
+    const sycl::range<3> block_nums(1, 1, block_num_y);
+    const sycl::range<3> block_dims(1, 1, DMMV_BLOCK_SIZE);
+    const int num_sub_groups = DMMV_BLOCK_SIZE / WARP_SIZE;
+    stream->submit([&](sycl::handler &cgh) {
+        sycl::local_accessor<float, 1> slm_partial_acc_ct1(num_sub_groups, cgh);
+
+        cgh.parallel_for(
+            sycl::nd_range<3>(block_nums * block_dims, block_dims),
+            [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                dequantize_mul_mat_vec<1, 1, convert_bf16, DMMV_BLOCK_SIZE>(
+                    vx, y, dst, ncols, nrows, item_ct1,
+                    slm_partial_acc_ct1.get_multi_ptr<sycl::access::decorated::no>().get());
+            });
+    });
+}
+#endif
 
 // ============================================================================
 // Optimization: task_018 - Use SIMD16 sub-groups for K-quant DMMV kernels
@@ -1299,6 +1332,11 @@ void ggml_sycl_op_dequantize_mul_mat_vec(
         case GGML_TYPE_F16:
             convert_mul_mat_vec_f16_sycl(src0_dd_i, src1_dfloat, dst_dd_i, ne00, row_diff, stream);
             break;
+#ifdef GGML_SYCL_HAS_BF16
+        case GGML_TYPE_BF16:
+            convert_mul_mat_vec_bf16_sycl(src0_dd_i, src1_dfloat, dst_dd_i, ne00, row_diff, stream);
+            break;
+#endif
         default:
             printf("ggml_sycl_op_dequantize_mul_mat_vec unsupported GGML_TYPE %d\n", src0->type);
             GGML_ABORT("fatal error");

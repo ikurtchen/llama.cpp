@@ -707,3 +707,84 @@ to_fp16_nc_sycl_t get_to_fp16_nc_sycl(ggml_type type) {
             return nullptr;
     }
 }
+
+#ifdef GGML_SYCL_HAS_BF16
+to_bf16_sycl_t ggml_get_to_bf16_sycl(ggml_type type, ggml_tensor * dst) {
+    switch (type) {
+        case GGML_TYPE_Q4_0:
+            if (dst->src[0]->extra &&
+                ((ggml_tensor_extra_gpu*)dst->src[0]->extra)->optimized_feature.reorder) {
+                return dequantize_row_q4_0_sycl_reorder;
+            } else {
+                return dequantize_block_sycl<QK4_0, QR4_0, dequantize_q4_0>;
+            }
+        case GGML_TYPE_Q4_1:
+            return dequantize_block_sycl<QK4_1, QR4_1, dequantize_q4_1>;
+        case GGML_TYPE_Q5_0:
+            return dequantize_block_sycl<QK5_0, QR5_0, dequantize_q5_0>;
+        case GGML_TYPE_Q5_1:
+            return dequantize_block_sycl<QK5_1, QR5_1, dequantize_q5_1>;
+        case GGML_TYPE_Q8_0:
+            return dequantize_block_sycl<QK8_0, QR8_0, dequantize_q8_0>;
+        case GGML_TYPE_Q2_K:
+            return dequantize_row_q2_K_sycl;
+        case GGML_TYPE_Q3_K:
+            return dequantize_row_q3_K_sycl;
+        case GGML_TYPE_Q4_K:
+            if (dst->src[0]->extra && ((ggml_tensor_extra_gpu *) dst->src[0]->extra)->optimized_feature.reorder) {
+                return dequantize_row_q4_K_sycl_reorder;
+            } else {
+                return dequantize_row_q4_K_sycl;
+            }
+        case GGML_TYPE_Q5_K:
+            return dequantize_row_q5_K_sycl;
+        case GGML_TYPE_Q6_K:
+            if (dst->src[0]->extra && ((ggml_tensor_extra_gpu *) dst->src[0]->extra)->optimized_feature.reorder) {
+                return dequantize_row_q6_K_sycl_reorder;
+            } else {
+                return dequantize_row_q6_K_sycl;
+            }
+        case GGML_TYPE_IQ1_S:
+            return dequantize_row_iq1_s_sycl;
+        case GGML_TYPE_IQ1_M:
+            return dequantize_row_iq1_m_sycl;
+        case GGML_TYPE_IQ2_XXS:
+            return dequantize_row_iq2_xxs_sycl;
+        case GGML_TYPE_IQ2_XS:
+            return dequantize_row_iq2_xs_sycl;
+        case GGML_TYPE_IQ2_S:
+            return dequantize_row_iq2_s_sycl;
+        case GGML_TYPE_IQ3_XXS:
+            return dequantize_row_iq3_xxs_sycl;
+        case GGML_TYPE_IQ3_S:
+            return dequantize_row_iq3_s_sycl;
+        case GGML_TYPE_IQ4_XS:
+            return dequantize_row_iq4_xs_sycl;
+        case GGML_TYPE_IQ4_NL:
+            return dequantize_row_iq4_nl_sycl;
+        case GGML_TYPE_MXFP4:
+            return dequantize_row_mxfp4_sycl;
+        case GGML_TYPE_F32:
+            return convert_unary_sycl<float>;
+        case GGML_TYPE_F16:
+            return convert_unary_sycl<sycl::half>;
+        case GGML_TYPE_BF16:
+            return convert_unary_sycl<sycl::ext::oneapi::bfloat16>;
+        default:
+            return nullptr;
+    }
+}
+
+to_bf16_nc_sycl_t get_to_bf16_nc_sycl(ggml_type type) {
+    switch (type) {
+        case GGML_TYPE_F32:
+            return convert_unary_nc_sycl<float>;
+        case GGML_TYPE_F16:
+            return convert_unary_nc_sycl<sycl::half>;
+        case GGML_TYPE_BF16:
+            return convert_unary_nc_sycl<sycl::ext::oneapi::bfloat16>;
+        default:
+            return nullptr;
+    }
+}
+#endif
