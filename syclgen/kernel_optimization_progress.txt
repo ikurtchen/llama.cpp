@@ -26,6 +26,12 @@
 - [x] sk_013: gla SYCL kernel — low potential (4 optimization opportunities)
 ## Recent Activity
 
+[2026-02-25] COMPLETED task_002: Benchmark softmax baseline.
+  - Benchmark completed on Intel Arc Pro B60
+  - Best bandwidth: 265.89 GB/s (ne=[12888,256,5,1])
+  - 28 test cases run covering various tensor sizes
+  - Results saved to syclgen/benchmarks/baseline_results.json
+
 [2026-02-25] COMPLETED task_001: Benchmark mmq (quantized matmul) baseline.
   - Benchmark completed on Intel Arc Pro B60
   - Best quantized performance: q4_0 @ 1.39 TFLOPS (m=4096,n=1,k=14336)

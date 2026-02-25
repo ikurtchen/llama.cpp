@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-02-25T15:10:00Z",
+  "timestamp": "2026-02-25T15:13:15Z",
   "hardware": "Intel Arc Pro B60",
   "server": "b60",
   "results": [
@@ -107,6 +107,185 @@
           "time_us": 5677.75,
           "throughput_gflops": 10590.0,
           "bandwidth_gbs": 0.0
+        }
+      ]
+    },
+    {
+      "kernel": "SOFT_MAX",
+      "test_cases": [
+        {
+          "name": "SOFT_MAX(type=f32,ne=[4096,4096,5,1])",
+          "time_us": 2552.74,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 247.19
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[12888,256,5,1])",
+          "time_us": 463.15,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 265.89
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[77,4096,5,1])",
+          "time_us": 216.19,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 54.36
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[1024,1024,10,1])",
+          "time_us": 1098.49,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 71.21
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[77,1024,10,1])",
+          "time_us": 107.74,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 54.53
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[256,256,20,1])",
+          "time_us": 96.85,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 100.85
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[64,64,20,1])",
+          "time_us": 6.51,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 93.7
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[77,64,20,1])",
+          "time_us": 14.56,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 50.45
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[8192,1,1,1])",
+          "time_us": 5.97,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 10.22
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[8192,4,1,1])",
+          "time_us": 6.08,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 40.14
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[8192,16,1,1])",
+          "time_us": 6.17,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 158.41
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[16384,1,1,1])",
+          "time_us": 9.74,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 12.53
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[16384,4,1,1])",
+          "time_us": 9.91,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 49.28
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[16384,16,1,1])",
+          "time_us": 10.08,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 193.7
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[32768,1,1,1])",
+          "time_us": 17.25,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 14.15
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[32768,4,1,1])",
+          "time_us": 17.54,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 55.69
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[32768,16,1,1])",
+          "time_us": 17.74,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 220.16
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[65536,1,1,1])",
+          "time_us": 32.17,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 15.18
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[65536,4,1,1])",
+          "time_us": 33.0,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 59.19
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[65536,16,1,1])",
+          "time_us": 33.22,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 235.19
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[131072,1,1,1])",
+          "time_us": 62.15,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 15.71
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[131072,4,1,1])",
+          "time_us": 63.16,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 61.85
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[131072,16,1,1])",
+          "time_us": 64.71,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 241.51
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[262144,1,1,1])",
+          "time_us": 122.64,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 15.93
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[262144,4,1,1])",
+          "time_us": 123.76,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 63.13
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[262144,16,1,1])",
+          "time_us": 289.05,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 108.16
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[524288,1,1,1])",
+          "time_us": 240.66,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 16.23
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[524288,4,1,1])",
+          "time_us": 246.6,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 63.38
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[524288,16,1,1])",
+          "time_us": 628.85,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 99.48
         }
       ]
     }
