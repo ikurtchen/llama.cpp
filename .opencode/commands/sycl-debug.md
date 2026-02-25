@@ -11,5 +11,6 @@ Steps:
 3. Compare the implementations line by line
 4. Identify the bug (common issues: wrong indexing, missing synchronization, incorrect memory scope)
 5. Fix the SYCL code
-6. Re-run the test: ./syclgen/remote_run.sh test $1
-7. Report: what was wrong, what was fixed, test result after fix
+6. Read syclgen/remote_run.md to understand the test infrastructure
+7. Re-run the test: ./syclgen/remote_run.sh -t unit $1
+8. Report: what was wrong, what was fixed, test result after fix
