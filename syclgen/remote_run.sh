@@ -34,7 +34,7 @@ declare -A SERVER_CONTAINERS
 # Format: SERVER_NAME=IP:USER:PASSWORD:SSH_KEY:WORKDIR
 SERVER_IPS=(
     ["h20"]="h20"
-    ["b60"]="10.239.129.239"
+    ["b60"]="172.16.114.146"
 )
 
 SERVER_PORTS=(
@@ -63,7 +63,7 @@ SERVER_SSH_KEYS=(
 # Can be overridden by --workdir argument
 SERVER_WORKDIRS=(
     ["h20"]="/ssd/kurt/llama.cpp"
-    ["b60"]="/host/root/kurt/llama.cpp"
+    ["b60"]="/intel/kurt/llama.cpp"
 )
 
 SERVER_CONTAINERS=(
