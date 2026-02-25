@@ -1,0 +1,114 @@
+{
+  "timestamp": "2026-02-25T15:10:00Z",
+  "hardware": "Intel Arc Pro B60",
+  "server": "b60",
+  "results": [
+    {
+      "kernel": "MUL_MAT",
+      "test_cases": [
+        {
+          "name": "MUL_MAT(type_a=f32,type_b=f32,m=4096,n=1,k=14336)",
+          "time_us": 692.32,
+          "throughput_gflops": 169.63,
+          "bandwidth_gbs": 0.0
+        },
+        {
+          "name": "MUL_MAT(type_a=f16,type_b=f32,m=4096,n=1,k=14336)",
+          "time_us": 350.88,
+          "throughput_gflops": 334.71,
+          "bandwidth_gbs": 0.0
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_0,type_b=f32,m=4096,n=1,k=14336)",
+          "time_us": 84.77,
+          "throughput_gflops": 1386.0,
+          "bandwidth_gbs": 0.0
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_1,type_b=f32,m=4096,n=1,k=14336)",
+          "time_us": 203.67,
+          "throughput_gflops": 576.63,
+          "bandwidth_gbs": 0.0
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_0,type_b=f32,m=4096,n=1,k=14336)",
+          "time_us": 727.75,
+          "throughput_gflops": 161.37,
+          "bandwidth_gbs": 0.0
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_1,type_b=f32,m=4096,n=1,k=14336)",
+          "time_us": 240.27,
+          "throughput_gflops": 488.78,
+          "bandwidth_gbs": 0.0
+        },
+        {
+          "name": "MUL_MAT(type_a=q8_0,type_b=f32,m=4096,n=1,k=14336)",
+          "time_us": 847.31,
+          "throughput_gflops": 138.6,
+          "bandwidth_gbs": 0.0
+        },
+        {
+          "name": "MUL_MAT(type_a=q2_K,type_b=f32,m=4096,n=1,k=14336)",
+          "time_us": 117.14,
+          "throughput_gflops": 1002.0,
+          "bandwidth_gbs": 0.0
+        },
+        {
+          "name": "MUL_MAT(type_a=q3_K,type_b=f32,m=4096,n=1,k=14336)",
+          "time_us": 651.88,
+          "throughput_gflops": 180.16,
+          "bandwidth_gbs": 0.0
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_K,type_b=f32,m=4096,n=1,k=14336)",
+          "time_us": 94.82,
+          "throughput_gflops": 1238.0,
+          "bandwidth_gbs": 0.0
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_K,type_b=f32,m=4096,n=1,k=14336)",
+          "time_us": 303.72,
+          "throughput_gflops": 386.67,
+          "bandwidth_gbs": 0.0
+        },
+        {
+          "name": "MUL_MAT(type_a=q6_K,type_b=f32,m=4096,n=1,k=14336)",
+          "time_us": 216.69,
+          "throughput_gflops": 541.98,
+          "bandwidth_gbs": 0.0
+        },
+        {
+          "name": "MUL_MAT(type_a=iq1_m,type_b=f32,m=4096,n=1,k=14336)",
+          "time_us": 86.24,
+          "throughput_gflops": 1361.0,
+          "bandwidth_gbs": 0.0
+        },
+        {
+          "name": "MUL_MAT(type_a=f32,type_b=f32,m=4096,n=512,k=14336)",
+          "time_us": 5025.85,
+          "throughput_gflops": 11960.0,
+          "bandwidth_gbs": 0.0
+        },
+        {
+          "name": "MUL_MAT(type_a=f16,type_b=f32,m=4096,n=512,k=14336)",
+          "time_us": 6284.94,
+          "throughput_gflops": 9570.0,
+          "bandwidth_gbs": 0.0
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_0,type_b=f32,m=4096,n=512,k=14336)",
+          "time_us": 6603.36,
+          "throughput_gflops": 9110.0,
+          "bandwidth_gbs": 0.0
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_K,type_b=f32,m=4096,n=512,k=14336)",
+          "time_us": 5677.75,
+          "throughput_gflops": 10590.0,
+          "bandwidth_gbs": 0.0
+        }
+      ]
+    }
+  ]
+}
