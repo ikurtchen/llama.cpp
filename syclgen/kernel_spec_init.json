@@ -2019,166 +2019,6 @@
       "file": "ggml/src/ggml-sycl/gla.cpp",
       "source_cuda_ids": ["ck_063"],
       "status": "existing"
-    },
-    {
-      "id": "sk_014",
-      "name": "ggml_sycl_op_fill",
-      "file": "ggml/src/ggml-sycl/fill.cpp",
-      "source_cuda_ids": ["ck_059"],
-      "status": "migrated",
-      "task_id": "task_001"
-    },
-    {
-      "id": "sk_015",
-      "name": "ggml_sycl_op_diag",
-      "file": "ggml/src/ggml-sycl/diag.cpp",
-      "source_cuda_ids": ["ck_050"],
-      "status": "migrated",
-      "task_id": "task_002"
-    },
-    {
-      "id": "sk_016",
-      "name": "ggml_sycl_expm1",
-      "file": "ggml/src/ggml-sycl/element_wise.cpp",
-      "source_cuda_ids": [],
-      "status": "migrated",
-      "task_id": "task_003"
-    },
-    {
-      "id": "sk_017",
-      "name": "ggml_sycl_xielu",
-      "file": "ggml/src/ggml-sycl/element_wise.cpp",
-      "source_cuda_ids": ["ck_112"],
-      "status": "migrated",
-      "task_id": "task_004"
-    },
-    {
-      "id": "sk_018",
-      "name": "ggml_sycl_op_opt_step_sgd",
-      "file": "ggml/src/ggml-sycl/opt-step-sgd.cpp",
-      "source_cuda_ids": ["ck_080"],
-      "status": "migrated",
-      "task_id": "task_005"
-    },
-    {
-      "id": "sk_019",
-      "name": "ggml_sycl_op_opt_step_adamw",
-      "file": "ggml/src/ggml-sycl/opt-step-adamw.cpp",
-      "source_cuda_ids": ["ck_079"],
-      "status": "migrated",
-      "task_id": "task_006"
-    },
-    {
-      "id": "sk_020",
-      "name": "ggml_sycl_silu_back",
-      "file": "ggml/src/ggml-sycl/element_wise.cpp",
-      "source_cuda_ids": ["ck_113"],
-      "status": "migrated",
-      "task_id": "task_007"
-    },
-    {
-      "id": "sk_021",
-      "name": "ggml_sycl_op_get_rows_back",
-      "file": "ggml/src/ggml-sycl/getrows.cpp",
-      "source_cuda_ids": ["ck_062"],
-      "status": "migrated",
-      "task_id": "task_008"
-    },
-    {
-      "id": "sk_022",
-      "name": "ggml_sycl_op_im2col_3d",
-      "file": "ggml/src/ggml-sycl/im2col.cpp",
-      "source_cuda_ids": ["ck_065"],
-      "status": "migrated",
-      "task_id": "task_009"
-    },
-    {
-      "id": "sk_023",
-      "name": "ggml_sycl_rope_back",
-      "file": "ggml/src/ggml-sycl/rope.cpp",
-      "source_cuda_ids": [],
-      "status": "migrated",
-      "task_id": "task_010"
-    },
-    {
-      "id": "sk_024",
-      "name": "ggml_sycl_op_conv_2d",
-      "file": "ggml/src/ggml-sycl/conv2d.cpp",
-      "source_cuda_ids": ["ck_016"],
-      "status": "migrated",
-      "task_id": "task_011"
-    },
-    {
-      "id": "sk_025",
-      "name": "ggml_sycl_op_conv_2d_dw",
-      "file": "ggml/src/ggml-sycl/conv2d-dw.cpp",
-      "source_cuda_ids": ["ck_017"],
-      "status": "migrated",
-      "task_id": "task_012"
-    },
-    {
-      "id": "sk_026",
-      "name": "ggml_sycl_op_conv_transpose_2d",
-      "file": "ggml/src/ggml-sycl/conv2d-transpose.cpp",
-      "source_cuda_ids": ["ck_018"],
-      "status": "migrated",
-      "task_id": "task_013"
-    },
-    {
-      "id": "sk_027",
-      "name": "ggml_sycl_cross_entropy_loss",
-      "file": "ggml/src/ggml-sycl/cross-entropy-loss.cpp",
-      "source_cuda_ids": ["ck_046"],
-      "status": "migrated",
-      "task_id": "task_014"
-    },
-    {
-      "id": "sk_028",
-      "name": "ggml_sycl_cross_entropy_loss_back",
-      "file": "ggml/src/ggml-sycl/cross-entropy-loss.cpp",
-      "source_cuda_ids": ["ck_047"],
-      "status": "migrated",
-      "task_id": "task_015"
-    },
-    {
-      "id": "sk_029",
-      "name": "ggml_sycl_op_top_k",
-      "file": "ggml/src/ggml-sycl/top-k.cpp",
-      "source_cuda_ids": [],
-      "status": "migrated",
-      "task_id": "task_016"
-    },
-    {
-      "id": "sk_030",
-      "name": "ggml_sycl_op_cumsum",
-      "file": "ggml/src/ggml-sycl/cumsum.cpp",
-      "source_cuda_ids": ["ck_048", "ck_049"],
-      "status": "migrated",
-      "task_id": "task_017"
-    },
-    {
-      "id": "sk_031",
-      "name": "ggml_sycl_op_solve_tri",
-      "file": "ggml/src/ggml-sycl/solve_tri.cpp",
-      "source_cuda_ids": ["ck_100", "ck_101"],
-      "status": "migrated",
-      "task_id": "task_018"
-    },
-    {
-      "id": "sk_032",
-      "name": "ggml_sycl_op_ssm_scan",
-      "file": "ggml/src/ggml-sycl/ssm_scan.cpp",
-      "source_cuda_ids": ["ck_104", "ck_105"],
-      "status": "migrated",
-      "task_id": "task_019"
-    },
-    {
-      "id": "sk_033",
-      "name": "ggml_sycl_op_topk_moe",
-      "file": "ggml/src/ggml-sycl/topk-moe.cpp",
-      "source_cuda_ids": ["ck_106"],
-      "status": "migrated",
-      "task_id": "task_020"
     }
   ],
   "device_functions": [
@@ -2354,25 +2194,26 @@
     }
   ],
   "unmigrated_ops_summary": [
-    {
-      "op": "FLASH_ATTN_EXT",
-      "kernels": [
-        "ck_052",
-        "ck_053",
-        "ck_054",
-        "ck_055",
-        "ck_056",
-        "ck_057",
-        "ck_058"
-      ],
-      "complexity": "high",
-      "category": "attention"
-    }
-  ],
-  "migration_summary": {
-    "total_cuda_kernels": 21,
-    "migrated_to_sycl": 20,
-    "unmigrated": 1,
-    "finalized_at": "2026-02-25T00:00:00Z"
-  }
+    {"op": "FLASH_ATTN_EXT", "kernels": ["ck_052", "ck_053", "ck_054", "ck_055", "ck_056", "ck_057", "ck_058"], "complexity": "high", "category": "attention"},
+    {"op": "CONV_2D", "kernels": ["ck_016"], "complexity": "medium", "category": "convolution"},
+    {"op": "CONV_2D_DW", "kernels": ["ck_017"], "complexity": "medium", "category": "convolution"},
+    {"op": "CONV_TRANSPOSE_2D", "kernels": ["ck_018"], "complexity": "medium", "category": "convolution"},
+    {"op": "IM2COL_3D", "kernels": ["ck_065"], "complexity": "low", "category": "convolution"},
+    {"op": "CROSS_ENTROPY_LOSS", "kernels": ["ck_046"], "complexity": "medium", "category": "training"},
+    {"op": "CROSS_ENTROPY_LOSS_BACK", "kernels": ["ck_047"], "complexity": "medium", "category": "training"},
+    {"op": "SILU_BACK", "kernels": ["ck_113"], "complexity": "low", "category": "training"},
+    {"op": "GET_ROWS_BACK", "kernels": ["ck_062"], "complexity": "low", "category": "training"},
+    {"op": "ROPE_BACK", "kernels": [], "complexity": "medium", "category": "training"},
+    {"op": "SSM_SCAN", "kernels": ["ck_104", "ck_105"], "complexity": "high", "category": "state_space"},
+    {"op": "OPT_STEP_ADAMW", "kernels": ["ck_079"], "complexity": "low", "category": "optimizer"},
+    {"op": "OPT_STEP_SGD", "kernels": ["ck_080"], "complexity": "low", "category": "optimizer"},
+    {"op": "DIAG", "kernels": ["ck_050"], "complexity": "low", "category": "misc"},
+    {"op": "CUMSUM", "kernels": ["ck_048", "ck_049"], "complexity": "medium", "category": "misc"},
+    {"op": "TOP_K", "kernels": [], "complexity": "medium", "category": "misc"},
+    {"op": "TOPK_MOE", "kernels": ["ck_106"], "complexity": "high", "category": "misc"},
+    {"op": "SOLVE_TRI", "kernels": ["ck_100", "ck_101"], "complexity": "medium", "category": "misc"},
+    {"op": "FILL", "kernels": ["ck_059"], "complexity": "low", "category": "misc"},
+    {"op": "UNARY_XIELU", "kernels": ["ck_112"], "complexity": "low", "category": "unary"},
+    {"op": "UNARY_EXPM1", "kernels": [], "complexity": "low", "category": "unary"}
+  ]
 }
