@@ -403,9 +403,15 @@ Session 18 (2026-02-11):
     task_020 (TOPK_MOE), task_021 (FLASH_ATTN_EXT)
   - Next: task_020 (TOPK_MOE) — fused MoE top-k with softmax/sigmoid and normalization
 
+[2026-02-25] Finalize iteration — processed 20 OPs this session.
+             Total so far: 20/21 OPs recorded in kernel_spec.json.
+             Remaining: 1 OP (FLASH_ATTN_EXT — high complexity, attention category).
+             sycl_kernels entries: 33 total (sk_001 through sk_033).
+             unmigrated_ops_summary updated to reflect 1 remaining OP.
+
 Files
 -----
-syclgen/kernel_spec.json   — Full kernel catalog (121 CUDA kernels, 13 SYCL kernel groups)
+syclgen/kernel_spec.json   — Full kernel catalog (121 CUDA kernels, 33 SYCL kernel groups)
 syclgen/task_spec.json     — Migration task list (21 tasks)
 syclgen/progress.txt       — This file
 syclgen/remote_run.sh      — Remote GPU test runner (DO NOT MODIFY)
