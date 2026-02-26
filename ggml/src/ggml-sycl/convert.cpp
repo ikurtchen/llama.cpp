@@ -9,6 +9,11 @@
     #endif
 #endif
 
+// Optimization for Q8_0→FP16 dequantization
+// See hw_spec_b60.md and optimization_guide.md for details
+// Based on CUDA implementation in ggml/src/ggml-cuda/convert.cu (lines 38-77)
+#define SYCL_Q8_0_NE_ALIGN 2048
+
 template <int qk, int qr, dequantize_kernel_t dequantize_kernel, typename dst_t>
 static void dequantize_block(const void * __restrict__ vx, dst_t * __restrict__ y, const int64_t k,
                              const sycl::nd_item<3> &item_ct1) {
@@ -50,6 +55,63 @@ static void dequantize_block_sycl(const void *__restrict__ vx,
             });
     }
 }
+
+#ifdef GGML_SYCL_F16
+template <bool need_check>
+static void dequantize_block_q8_0_f16_sycl(const void * __restrict__ vx,
+                                           sycl::half * __restrict__ y,
+                                           const int64_t k,
+                                           dpct::queue_ptr stream) {
+    constexpr int nint = SYCL_Q8_0_NE_ALIGN/sizeof(int) + WARP_SIZE;
+
+    const int num_blocks = (k + SYCL_Q8_0_NE_ALIGN - 1) / SYCL_Q8_0_NE_ALIGN;
+
+    stream->submit([&](sycl::handler &cgh) {
+        sycl::local_accessor<int, 1> vals(sycl::range<1>(nint), cgh);
+
+        cgh.parallel_for(
+            sycl::nd_range<3>(sycl::range<3>(1, 1, num_blocks) *
+                                  sycl::range<3>(1, 1, WARP_SIZE),
+                              sycl::range<3>(1, 1, WARP_SIZE)),
+            [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                const int64_t i0 = SYCL_Q8_0_NE_ALIGN * item_ct1.get_group(2);
+                const int * x0 = ((const int *) vx) + item_ct1.get_group(2) * nint;
+                sycl::vec<sycl::half, 2> * y2 =
+                    (sycl::vec<sycl::half, 2> *) (y + i0);
+
+                const int tid = item_ct1.get_local_id(2);
+
+#pragma unroll
+                for (int ix0 = 0; ix0 < nint; ix0 += WARP_SIZE) {
+                    if (need_check && item_ct1.get_group(2) * nint + ix0 + tid >= (int64_t)k * sizeof(block_q8_0) / sizeof(int)) {
+                        break;
+                    }
+                    const int ix = ix0 + tid;
+                    vals[ix] = x0[ix];
+                }
+
+                item_ct1.barrier(sycl::local_fence);
+
+#pragma unroll
+                for (int iy = 0; iy < SYCL_Q8_0_NE_ALIGN; iy += 2*WARP_SIZE) {
+                    if (need_check && i0 + iy + 2*tid >= k) {
+                        return;
+                    }
+
+                    const sycl::half * b0 =
+                        ((const sycl::half *) vals.get_pointer().get()) +
+                        (sizeof(block_q8_0)/sizeof(sycl::half)) *
+                            ((iy + 2*tid)/QK8_0);
+                    const sycl::half d = *b0;
+                    const char2 qs = ((const char2 *) (b0 + 1))[tid % (QK8_0/2)];
+
+                    y2[iy/2 + tid] =
+                        sycl::vec<sycl::half, 2>(qs.x, qs.y) * sycl::vec<sycl::half, 2>(d, d);
+                }
+            });
+    });
+}
+#endif // GGML_SYCL_F16
 
 template <typename dst_t>
 static void dequantize_row_q2_K_sycl(const void *vx, dst_t *y, const int64_t k,
@@ -528,6 +590,20 @@ static void convert_unary_sycl(const void * vx, dst_t * y, const int64_t k, dpct
     convert_unary_nc_sycl<src_t>(vx, y, k, 1, 1, 1, k, k, k, queue);
 }
 
+#ifdef GGML_SYCL_F16
+template <typename dst_t>
+static void dequantize_row_q8_0_f16_sycl(const void *vx, dst_t *y, const int64_t k,
+                                        dpct::queue_ptr stream) {
+    dpct::has_capability_or_fail(stream->get_device(), {sycl::aspect::fp16});
+
+    if (k % SYCL_Q8_0_NE_ALIGN == 0) {
+        dequantize_block_q8_0_f16_sycl<false>(vx, (sycl::half *)y, k, stream);
+    } else {
+        dequantize_block_q8_0_f16_sycl<true>(vx, (sycl::half *)y, k, stream);
+    }
+}
+#endif // GGML_SYCL_F16
+
 
 to_fp16_sycl_t ggml_get_to_fp16_sycl(ggml_type type, ggml_tensor * dst) {
     switch (type) {
@@ -545,7 +621,11 @@ to_fp16_sycl_t ggml_get_to_fp16_sycl(ggml_type type, ggml_tensor * dst) {
         case GGML_TYPE_Q5_1:
             return dequantize_block_sycl<QK5_1, QR5_1, dequantize_q5_1>;
         case GGML_TYPE_Q8_0:
+#ifdef GGML_SYCL_F16
+            return dequantize_row_q8_0_f16_sycl;
+#else
             return dequantize_block_sycl<QK8_0, QR8_0, dequantize_q8_0>;
+#endif
         case GGML_TYPE_Q2_K:
             return dequantize_row_q2_K_sycl;
         case GGML_TYPE_Q3_K:

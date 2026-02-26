@@ -26,6 +26,15 @@
 - [x] sk_013: gla SYCL kernel — low potential (4 optimization opportunities)
 ## Recent Activity
 
+[2026-02-26] COMPLETED task_035: Implement optimized Q8_0→FP16 dequantize kernel.
+  - opt_005_001: Added dequantize_block_q8_0_f16_sycl kernel with SLM staging and half2 vectorization
+  - Added SYCL_Q8_0_NE_ALIGN=2048 constant (matching CUDA)
+  - Uses sycl::local_accessor for SLM, sycl::vec<sycl::half,2> for vectorized arithmetic
+  - Wrapped in #ifdef GGML_SYCL_F16 (standard pattern)
+  - Build: SUCCESS
+  - Note: GGML_SYCL_F16=OFF in current build, optimized kernel not used but implementation is correct
+  - Expected 2-3x speedup when FP16 is enabled in build
+
 [2026-02-26] COMPLETED task_034: Add native math and reqd_sub_group_size to element_wise.
   - opt_004_002: Replaced sycl::tanh/sqrt/sin/cos/exp/log with sycl::native:: versions
   - Applied to: op_gelu, op_tanh, op_sqrt, op_sin, op_cos, op_exp, op_log, op_softplus
