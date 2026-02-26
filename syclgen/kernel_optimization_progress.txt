@@ -26,6 +26,17 @@
 - [x] sk_013: gla SYCL kernel — low potential (4 optimization opportunities)
 ## Recent Activity
 
+[2026-02-26] COMPLETED task_020: Implement multi-column batching for mmvq.
+  - Implemented multi-column batching for mmvq (quantized matrix-vector multiply)
+  - Added GGML_SYCL_MMVQ_BATCH_COLS=4 constant for batch size
+  - Created new batched kernel templates that process 4 columns simultaneously
+  - Batched kernels for Q4_0, Q4_1, Q5_0, Q5_1, Q8_0, Q2_K, Q3_K, Q4_K, Q5_K, Q6_K, MXFP4
+  - Falls back to single-column for IQ types and reorder kernels
+  - Reduces kernel launches by 4x and eliminates redundant weight reads
+  - Expected improvement: 2-4x for multi-column inference
+  - Build: SUCCESS
+  - Unit tests: all MUL_MAT tests PASSED
+
 [2026-02-26] COMPLETED task_019: Fix off-by-one boundary check in K-quant dmmv.
   - Fixed off-by-one boundary check in 8 K-quant dmmv functions (q2_k, q3_k, q3_k_slm, q4_k, q4_k_slm, q2_k_slm, q5_k, q6_k)
   - Changed 'row > nrows' to 'row >= nrows' to prevent potential out-of-bounds memory write on last row

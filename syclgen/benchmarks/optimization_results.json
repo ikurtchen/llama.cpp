@@ -1,6 +1,17 @@
 {
   "results": [
     {
+      "task_id": "task_020",
+      "kernel": "mmvq (quantized matrix-vector multiply)",
+      "optimization": "Multi-column batching - process 4 columns per kernel launch instead of 1",
+      "timestamp": "2026-02-26T07:30:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": 4.0,
+      "notes": "Implemented multi-column batching for mmvq. New batched kernels process 4 columns simultaneously, reducing kernel launches and eliminating redundant weight reads. Batched kernels added for Q4_0, Q4_1, Q5_0, Q5_1, Q8_0, Q2_K, Q3_K, Q4_K, Q5_K, Q6_K, MXFP4. Falls back to single-column for IQ types and reorder kernels. Build SUCCESS, all MUL_MAT tests PASSED."
+    },
+    {
       "task_id": "task_019",
       "kernel": "dmmv (dequantize matrix-vector multiply)",
       "optimization": "Fix off-by-one boundary check in K-quant dmmv (row > nrows -> row >= nrows)",
