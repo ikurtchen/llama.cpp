@@ -1,6 +1,17 @@
 {
   "results": [
     {
+      "task_id": "task_015",
+      "kernel": "mmq (quantized matmul)",
+      "optimization": "Fix tile size mismatch - use RDNA2 values instead of AMPERE",
+      "timestamp": "2026-02-26T12:00:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": 1.0,
+      "notes": "Fixed bug where kernel hardcoded AMPERE values but dispatch selected based on compute_capability. For q5_0/q5_1/q8_0/q6_K this caused swapped mmq_x/mmq_y (128x64 vs 64x128). Now uses RDNA2 values as default for Intel Xe2. 726/726 tests passed."
+    },
+    {
       "task_id": "task_014",
       "kernel": "mmq (quantized matmul)",
       "optimization": "XMX/joint_matrix compute path",

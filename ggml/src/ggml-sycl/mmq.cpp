@@ -2289,21 +2289,19 @@ mul_mat_q(const void *__restrict__ vx, const void *__restrict__ vy,
     }
 }
 
+// See syclgen/hw_spec_b60.md for Intel Arc Pro B60 (Xe2) specifications.
+// For SYCL (non-XMX), use RDNA2 tile sizes as default for Intel GPUs.
+
 #define  MMQ_X_Q4_0_RDNA2  64
 #define  MMQ_Y_Q4_0_RDNA2  128
 #define NWARPS_Q4_0_RDNA2  8
 #define  MMQ_X_Q4_0_RDNA1  64
 #define  MMQ_Y_Q4_0_RDNA1  64
 #define NWARPS_Q4_0_RDNA1  8
-#if defined(SYCL_USE_XMX)
-#define  MMQ_X_Q4_0_AMPERE MMQ_X_XMX
-#define  MMQ_Y_Q4_0_AMPERE MMQ_Y_XMX
-#define NWARPS_Q4_0_AMPERE NWARPS_XMX
-#else
-#define  MMQ_X_Q4_0_AMPERE 64
-#define  MMQ_Y_Q4_0_AMPERE 128
-#define NWARPS_Q4_0_AMPERE 4
-#endif
+// Use RDNA2 values as default for Intel GPUs (Xe2)
+#define  MMQ_X_Q4_0_AMPERE MMQ_X_Q4_0_RDNA2
+#define  MMQ_Y_Q4_0_AMPERE MMQ_Y_Q4_0_RDNA2
+#define NWARPS_Q4_0_AMPERE NWARPS_Q4_0_RDNA2
 #define  MMQ_X_Q4_0_PASCAL 64
 #define  MMQ_Y_Q4_0_PASCAL 64
 #define NWARPS_Q4_0_PASCAL 8
@@ -2333,21 +2331,19 @@ template <bool need_check> static void
         tile_x_dm, tile_x_qh, tile_x_sc, item_ct1, tile_y_qs, tile_y_ds);
 }
 
+// See syclgen/hw_spec_b60.md for Intel Arc Pro B60 (Xe2) specifications.
+// For SYCL (non-XMX), use RDNA2 tile sizes as default for Intel GPUs.
+
 #define  MMQ_X_Q4_1_RDNA2  64
 #define  MMQ_Y_Q4_1_RDNA2  128
 #define NWARPS_Q4_1_RDNA2  8
 #define  MMQ_X_Q4_1_RDNA1  64
 #define  MMQ_Y_Q4_1_RDNA1  64
 #define NWARPS_Q4_1_RDNA1  8
-#if defined(SYCL_USE_XMX)
-#define  MMQ_X_Q4_1_AMPERE 4
-#define  MMQ_Y_Q4_1_AMPERE 32
-#define NWARPS_Q4_1_AMPERE 4
-#else
-#define  MMQ_X_Q4_1_AMPERE 64
-#define  MMQ_Y_Q4_1_AMPERE 128
-#define NWARPS_Q4_1_AMPERE 4
-#endif
+// Use RDNA2 values as default for Intel GPUs (Xe2)
+#define  MMQ_X_Q4_1_AMPERE MMQ_X_Q4_1_RDNA2
+#define  MMQ_Y_Q4_1_AMPERE MMQ_Y_Q4_1_RDNA2
+#define NWARPS_Q4_1_AMPERE NWARPS_Q4_1_RDNA2
 #define  MMQ_X_Q4_1_PASCAL 64
 #define  MMQ_Y_Q4_1_PASCAL 64
 #define NWARPS_Q4_1_PASCAL 8
@@ -2376,21 +2372,19 @@ template <bool need_check> static void
         tile_x_dm, tile_x_qh, tile_x_sc, item_ct1, tile_y_qs, tile_y_ds);
 }
 
+// See syclgen/hw_spec_b60.md for Intel Arc Pro B60 (Xe2) specifications.
+// For SYCL (non-XMX), use RDNA2 tile sizes as default for Intel GPUs.
+
 #define  MMQ_X_Q5_0_RDNA2  64
 #define  MMQ_Y_Q5_0_RDNA2  128
 #define NWARPS_Q5_0_RDNA2  8
 #define  MMQ_X_Q5_0_RDNA1  64
 #define  MMQ_Y_Q5_0_RDNA1  64
 #define NWARPS_Q5_0_RDNA1  8
-#if defined(SYCL_USE_XMX)
-#define  MMQ_X_Q5_0_AMPERE 4
-#define  MMQ_Y_Q5_0_AMPERE 32
-#define NWARPS_Q5_0_AMPERE 4
-#else
-#define  MMQ_X_Q5_0_AMPERE 128
-#define  MMQ_Y_Q5_0_AMPERE 64
-#define NWARPS_Q5_0_AMPERE 4
-#endif
+// Use RDNA2 values as default for Intel GPUs (Xe2) - CRITICAL: AMPERE has swapped values!
+#define  MMQ_X_Q5_0_AMPERE MMQ_X_Q5_0_RDNA2
+#define  MMQ_Y_Q5_0_AMPERE MMQ_Y_Q5_0_RDNA2
+#define NWARPS_Q5_0_AMPERE NWARPS_Q5_0_RDNA2
 #define  MMQ_X_Q5_0_PASCAL 64
 #define  MMQ_Y_Q5_0_PASCAL 64
 #define NWARPS_Q5_0_PASCAL 8
@@ -2419,21 +2413,19 @@ template <bool need_check> static void
         tile_x_dm, tile_x_qh, tile_x_sc, item_ct1, tile_y_qs, tile_y_ds);
 }
 
+// See syclgen/hw_spec_b60.md for Intel Arc Pro B60 (Xe2) specifications.
+// For SYCL (non-XMX), use RDNA2 tile sizes as default for Intel GPUs.
+
 #define  MMQ_X_Q5_1_RDNA2  64
 #define  MMQ_Y_Q5_1_RDNA2  128
 #define NWARPS_Q5_1_RDNA2  8
 #define  MMQ_X_Q5_1_RDNA1  64
 #define  MMQ_Y_Q5_1_RDNA1  64
 #define NWARPS_Q5_1_RDNA1  8
-#if defined(SYCL_USE_XMX)
-#define  MMQ_X_Q5_1_AMPERE 4
-#define  MMQ_Y_Q5_1_AMPERE 32
-#define NWARPS_Q5_1_AMPERE 4
-#else
-#define  MMQ_X_Q5_1_AMPERE 128
-#define  MMQ_Y_Q5_1_AMPERE 64
-#define NWARPS_Q5_1_AMPERE 4
-#endif
+// Use RDNA2 values as default for Intel GPUs (Xe2) - CRITICAL: AMPERE has swapped values!
+#define  MMQ_X_Q5_1_AMPERE MMQ_X_Q5_1_RDNA2
+#define  MMQ_Y_Q5_1_AMPERE MMQ_Y_Q5_1_RDNA2
+#define NWARPS_Q5_1_AMPERE NWARPS_Q5_1_RDNA2
 #define  MMQ_X_Q5_1_PASCAL 64
 #define  MMQ_Y_Q5_1_PASCAL 64
 #define NWARPS_Q5_1_PASCAL 8
@@ -2462,21 +2454,19 @@ mul_mat_q5_1(
         tile_x_dm, tile_x_qh, tile_x_sc, item_ct1, tile_y_qs, tile_y_ds);
 }
 
+// See syclgen/hw_spec_b60.md for Intel Arc Pro B60 (Xe2) specifications.
+// For SYCL (non-XMX), use RDNA2 tile sizes as default for Intel GPUs.
+
 #define  MMQ_X_Q8_0_RDNA2  64
 #define  MMQ_Y_Q8_0_RDNA2  128
 #define NWARPS_Q8_0_RDNA2  8
 #define  MMQ_X_Q8_0_RDNA1  64
 #define  MMQ_Y_Q8_0_RDNA1  64
 #define NWARPS_Q8_0_RDNA1  8
-#if defined(SYCL_USE_XMX)
-#define  MMQ_X_Q8_0_AMPERE 4
-#define  MMQ_Y_Q8_0_AMPERE 32
-#define NWARPS_Q8_0_AMPERE 4
-#else
-#define  MMQ_X_Q8_0_AMPERE 128
-#define  MMQ_Y_Q8_0_AMPERE 64
-#define NWARPS_Q8_0_AMPERE 4
-#endif
+// Use RDNA2 values as default for Intel GPUs (Xe2) - CRITICAL: AMPERE has swapped values!
+#define  MMQ_X_Q8_0_AMPERE MMQ_X_Q8_0_RDNA2
+#define  MMQ_Y_Q8_0_AMPERE MMQ_Y_Q8_0_RDNA2
+#define NWARPS_Q8_0_AMPERE NWARPS_Q8_0_RDNA2
 #define  MMQ_X_Q8_0_PASCAL 64
 #define  MMQ_Y_Q8_0_PASCAL 64
 #define NWARPS_Q8_0_PASCAL 8
@@ -2505,21 +2495,19 @@ template <bool need_check> static void
         tile_x_dm, tile_x_qh, tile_x_sc, item_ct1, tile_y_qs, tile_y_ds);
 }
 
+// See syclgen/hw_spec_b60.md for Intel Arc Pro B60 (Xe2) specifications.
+// For SYCL (non-XMX), use RDNA2 tile sizes as default for Intel GPUs.
+
 #define  MMQ_X_Q2_K_RDNA2  64
 #define  MMQ_Y_Q2_K_RDNA2  128
 #define NWARPS_Q2_K_RDNA2  8
 #define  MMQ_X_Q2_K_RDNA1  128
 #define  MMQ_Y_Q2_K_RDNA1  32
 #define NWARPS_Q2_K_RDNA1  8
-#if defined(SYCL_USE_XMX)
-#define  MMQ_X_Q2_K_AMPERE 4
-#define  MMQ_Y_Q2_K_AMPERE 32
-#define NWARPS_Q2_K_AMPERE 4
-#else
-#define  MMQ_X_Q2_K_AMPERE 64
-#define  MMQ_Y_Q2_K_AMPERE 128
-#define NWARPS_Q2_K_AMPERE 4
-#endif
+// Use RDNA2 values as default for Intel GPUs (Xe2)
+#define  MMQ_X_Q2_K_AMPERE MMQ_X_Q2_K_RDNA2
+#define  MMQ_Y_Q2_K_AMPERE MMQ_Y_Q2_K_RDNA2
+#define NWARPS_Q2_K_AMPERE NWARPS_Q2_K_RDNA2
 #define  MMQ_X_Q2_K_PASCAL 64
 #define  MMQ_Y_Q2_K_PASCAL 64
 #define NWARPS_Q2_K_PASCAL 8
@@ -2549,21 +2537,19 @@ mul_mat_q2_K(
         tile_x_dm, tile_x_qh, tile_x_sc, item_ct1, tile_y_qs, tile_y_ds);
 }
 
+// See syclgen/hw_spec_b60.md for Intel Arc Pro B60 (Xe2) specifications.
+// For SYCL (non-XMX), use RDNA2 tile sizes as default for Intel GPUs.
+
 #define  MMQ_X_Q3_K_RDNA2  128
 #define  MMQ_Y_Q3_K_RDNA2  64
 #define NWARPS_Q3_K_RDNA2  8
 #define  MMQ_X_Q3_K_RDNA1  32
 #define  MMQ_Y_Q3_K_RDNA1  128
 #define NWARPS_Q3_K_RDNA1  8
-#if defined(SYCL_USE_XMX)
-#define  MMQ_X_Q3_K_AMPERE 4
-#define  MMQ_Y_Q3_K_AMPERE 32
-#define NWARPS_Q3_K_AMPERE 4
-#else
-#define  MMQ_X_Q3_K_AMPERE 128
-#define  MMQ_Y_Q3_K_AMPERE 128
-#define NWARPS_Q3_K_AMPERE 4
-#endif
+// Use RDNA2 values as default for Intel GPUs (Xe2)
+#define  MMQ_X_Q3_K_AMPERE MMQ_X_Q3_K_RDNA2
+#define  MMQ_Y_Q3_K_AMPERE MMQ_Y_Q3_K_RDNA2
+#define NWARPS_Q3_K_AMPERE NWARPS_Q3_K_RDNA2
 #define  MMQ_X_Q3_K_PASCAL 64
 #define  MMQ_Y_Q3_K_PASCAL 64
 #define NWARPS_Q3_K_PASCAL 8
@@ -2594,21 +2580,19 @@ mul_mat_q3_K(
         tile_x_dm, tile_x_qh, tile_x_sc, item_ct1, tile_y_qs, tile_y_ds);
 }
 
+// See syclgen/hw_spec_b60.md for Intel Arc Pro B60 (Xe2) specifications.
+// For SYCL (non-XMX), use RDNA2 tile sizes as default for Intel GPUs.
+
 #define  MMQ_X_Q4_K_RDNA2  64
 #define  MMQ_Y_Q4_K_RDNA2  128
 #define NWARPS_Q4_K_RDNA2  8
 #define  MMQ_X_Q4_K_RDNA1  32
 #define  MMQ_Y_Q4_K_RDNA1  64
 #define NWARPS_Q4_K_RDNA1  8
-#if defined(SYCL_USE_XMX)
-#define  MMQ_X_Q4_K_AMPERE 4
-#define  MMQ_Y_Q4_K_AMPERE 32
-#define NWARPS_Q4_K_AMPERE 4
-#else
-#define  MMQ_X_Q4_K_AMPERE 64
-#define  MMQ_Y_Q4_K_AMPERE 128
-#define NWARPS_Q4_K_AMPERE 4
-#endif
+// Use RDNA2 values as default for Intel GPUs (Xe2)
+#define  MMQ_X_Q4_K_AMPERE MMQ_X_Q4_K_RDNA2
+#define  MMQ_Y_Q4_K_AMPERE MMQ_Y_Q4_K_RDNA2
+#define NWARPS_Q4_K_AMPERE NWARPS_Q4_K_RDNA2
 #define  MMQ_X_Q4_K_PASCAL 64
 #define  MMQ_Y_Q4_K_PASCAL 64
 #define NWARPS_Q4_K_PASCAL 8
@@ -2638,21 +2622,19 @@ template <bool need_check> static void
         tile_x_dm, tile_x_qh, tile_x_sc, item_ct1, tile_y_qs, tile_y_ds);
 }
 
+// See syclgen/hw_spec_b60.md for Intel Arc Pro B60 (Xe2) specifications.
+// For SYCL (non-XMX), use RDNA2 tile sizes as default for Intel GPUs.
+
 #define  MMQ_X_Q5_K_RDNA2  64
 #define  MMQ_Y_Q5_K_RDNA2  128
 #define NWARPS_Q5_K_RDNA2  8
 #define  MMQ_X_Q5_K_RDNA1  32
 #define  MMQ_Y_Q5_K_RDNA1  64
 #define NWARPS_Q5_K_RDNA1  8
-#if defined(SYCL_USE_XMX)
-#define  MMQ_X_Q5_K_AMPERE 4
-#define  MMQ_Y_Q5_K_AMPERE 32
-#define NWARPS_Q5_K_AMPERE 4
-#else
-#define  MMQ_X_Q5_K_AMPERE 64
-#define  MMQ_Y_Q5_K_AMPERE 128
-#define NWARPS_Q5_K_AMPERE 4
-#endif
+// Use RDNA2 values as default for Intel GPUs (Xe2)
+#define  MMQ_X_Q5_K_AMPERE MMQ_X_Q5_K_RDNA2
+#define  MMQ_Y_Q5_K_AMPERE MMQ_Y_Q5_K_RDNA2
+#define NWARPS_Q5_K_AMPERE NWARPS_Q5_K_RDNA2
 #define  MMQ_X_Q5_K_PASCAL 64
 #define  MMQ_Y_Q5_K_PASCAL 64
 #define NWARPS_Q5_K_PASCAL 8
@@ -2682,21 +2664,19 @@ mul_mat_q5_K(
         tile_x_dm, tile_x_qh, tile_x_sc, item_ct1, tile_y_qs, tile_y_ds);
 }
 
+// See syclgen/hw_spec_b60.md for Intel Arc Pro B60 (Xe2) specifications.
+// For SYCL (non-XMX), use RDNA2 tile sizes as default for Intel GPUs.
+
 #define  MMQ_X_Q6_K_RDNA2  64
 #define  MMQ_Y_Q6_K_RDNA2  128
 #define NWARPS_Q6_K_RDNA2  8
 #define  MMQ_X_Q6_K_RDNA1  32
 #define  MMQ_Y_Q6_K_RDNA1  64
 #define NWARPS_Q6_K_RDNA1  8
-#if defined(SYCL_USE_XMX)
-#define  MMQ_X_Q6_K_AMPERE 4
-#define  MMQ_Y_Q6_K_AMPERE 32
-#define NWARPS_Q6_K_AMPERE 4
-#else
-#define  MMQ_X_Q6_K_AMPERE 64
-#define  MMQ_Y_Q6_K_AMPERE 64
-#define NWARPS_Q6_K_AMPERE 4
-#endif
+// Use RDNA2 values as default for Intel GPUs (Xe2)
+#define  MMQ_X_Q6_K_AMPERE MMQ_X_Q6_K_RDNA2
+#define  MMQ_Y_Q6_K_AMPERE MMQ_Y_Q6_K_RDNA2
+#define NWARPS_Q6_K_AMPERE NWARPS_Q6_K_RDNA2
 #define  MMQ_X_Q6_K_PASCAL 64
 #define  MMQ_Y_Q6_K_PASCAL 64
 #define NWARPS_Q6_K_PASCAL 8

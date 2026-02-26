@@ -26,6 +26,14 @@
 - [x] sk_013: gla SYCL kernel — low potential (4 optimization opportunities)
 ## Recent Activity
 
+[2026-02-26] COMPLETED task_015: Fix mmq tile size mismatch bug.
+  - Fixed kernel hardcoded AMPERE values to use RDNA2 values for Intel Xe2
+  - Bug: dispatch selected tile sizes based on compute_capability but kernel used hardcoded AMPERE
+  - Critical fixes: q5_0/q5_1/q8_0 had swapped mmq_x/mmq_y (128x64 vs 64x128)
+  - All quant types (q4_0, q4_1, q5_0, q5_1, q8_0, q2_K-q6_K) now use RDNA2 as default
+  - Build: SUCCESS
+  - Unit tests: 726/726 PASSED
+
 [2026-02-26] COMPLETED task_014: Implement XMX/joint_matrix compute path for mmq.
   - XMX/joint_matrix blocked by Intel oneAPI 2025.1 API change
   - experimental::matrix API moved to matrix:: (non-experimental)
