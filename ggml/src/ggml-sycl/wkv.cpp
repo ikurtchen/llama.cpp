@@ -59,16 +59,18 @@ static void rwkv_wkv6_f32_kernel(
         const float _v = v[t];
         float y = 0;
 
-        // Process in chunks of 4 for better vectorization
-        sycl::float4 k4, r4, tf4, td4, s4;
         #pragma unroll
         for (int j = 0; j < head_size; j += 4) {
-            // Load data in vec4 chunks
-            k4 = sycl::float4(_k[j], _k[j+1], _k[j+2], _k[j+3]);
-            r4 = sycl::float4(_r[j], _r[j+1], _r[j+2], _r[j+3]);
-            tf4 = sycl::float4(_tf[j], _tf[j+1], _tf[j+2], _tf[j+3]);
-            td4 = sycl::float4(_td[j], _td[j+1], _td[j+2], _td[j+3]);
-            s4 = sycl::float4(state[j], state[j+1], state[j+2], state[j+3]);
+            // Optimization: Use true vector loads from SLM instead of scalar construction.
+            // This performs a single 128-bit aligned load from shared memory instead of
+            // 4 individual 32-bit reads. Reference: hw_spec_b60.md (SIMD16, 456 GB/s bandwidth)
+            // and optimization_guide.md Section 2.2 (vectorized memory access).
+            // Note: state[] is in register, not SLM, so keep float4 construction for state.
+            const sycl::float4 k4 = *reinterpret_cast<const sycl::float4*>(&_k[j]);
+            const sycl::float4 r4 = *reinterpret_cast<const sycl::float4*>(&_r[j]);
+            const sycl::float4 tf4 = *reinterpret_cast<const sycl::float4*>(&_tf[j]);
+            const sycl::float4 td4 = *reinterpret_cast<const sycl::float4*>(&_td[j]);
+            sycl::float4 s4 = sycl::float4(state[j], state[j+1], state[j+2], state[j+3]);
 
             // Compute key-value product
             sycl::float4 kv4 = k4 * _v;
@@ -141,23 +143,21 @@ static void rwkv_wkv7_f32_kernel(
 
         const float _v = v[t];
         float y = 0, sa = 0;
-        sycl::float4 a4, s4;
 
         #pragma unroll
         for (int j = 0; j < head_size; j += 4) {
-            a4 = sycl::float4(_a[j], _a[j+1], _a[j+2], _a[j+3]);
-            s4 = sycl::float4(state[j], state[j+1], state[j+2], state[j+3]);
+            const sycl::float4 a4 = *reinterpret_cast<const sycl::float4*>(&_a[j]);
+            sycl::float4 s4 = sycl::float4(state[j], state[j+1], state[j+2], state[j+3]);
             sa += sycl::dot(a4, s4);
         }
 
-        sycl::float4 r4, w4, k4, b4;
         #pragma unroll
         for (int j = 0; j < head_size; j += 4) {
-            r4 = sycl::float4(_r[j], _r[j+1], _r[j+2], _r[j+3]);
-            w4 = sycl::float4(_w[j], _w[j+1], _w[j+2], _w[j+3]);
-            k4 = sycl::float4(_k[j], _k[j+1], _k[j+2], _k[j+3]);
-            b4 = sycl::float4(_b[j], _b[j+1], _b[j+2], _b[j+3]);
-            s4 = sycl::float4(state[j], state[j+1], state[j+2], state[j+3]);
+            const sycl::float4 r4 = *reinterpret_cast<const sycl::float4*>(&_r[j]);
+            const sycl::float4 w4 = *reinterpret_cast<const sycl::float4*>(&_w[j]);
+            const sycl::float4 k4 = *reinterpret_cast<const sycl::float4*>(&_k[j]);
+            const sycl::float4 b4 = *reinterpret_cast<const sycl::float4*>(&_b[j]);
+            sycl::float4 s4 = sycl::float4(state[j], state[j+1], state[j+2], state[j+3]);
 
             sycl::float4 kv4 = k4 * _v;
 

@@ -26,6 +26,14 @@
 - [x] sk_013: gla SYCL kernel — low potential (4 optimization opportunities)
 ## Recent Activity
 
+[2026-02-26] COMPLETED task_036: Add vector SLM loads for wkv inner loop.
+  - opt_012_002: Replaced scalar float4 construction with true vector loads using reinterpret_cast
+  - Applied to SLM arrays: _k, _r, _tf, _td in WKV6; _a, _r, _w, _k, _b in WKV7
+  - Kept float4 construction for register array (state[]) - not SLM
+  - Expected 5-15% improvement from reducing SLM loads from 4x32-bit to 1x128-bit per float4
+  - Build: SUCCESS
+  - Unit tests: WKV tests PASSED
+
 [2026-02-26] COMPLETED task_035: Implement optimized Q8_0→FP16 dequantize kernel.
   - opt_005_001: Added dequantize_block_q8_0_f16_sycl kernel with SLM staging and half2 vectorization
   - Added SYCL_Q8_0_NE_ALIGN=2048 constant (matching CUDA)
