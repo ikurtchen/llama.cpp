@@ -26,6 +26,15 @@
 - [x] sk_013: gla SYCL kernel — low potential (4 optimization opportunities)
 ## Recent Activity
 
+[2026-02-26] COMPLETED task_025: Fix softmax reqd_sub_group_size and reduction.
+  - Added [[sycl::reqd_sub_group_size(WARP_SIZE)]] to fallback forward kernel (line ~293) - correctness fix
+  - Added [[sycl::reqd_sub_group_size(WARP_SIZE)]] to backward kernel (line ~316) - correctness fix
+  - Replaced manual SLM block reduction with sycl::reduce_over_group - eliminates 5 barriers
+  - Increased backward kernel work-group from 16 to 256 for better occupancy
+  - Expected 10-20% speedup from efficient reduction + correctness
+  - Build: SUCCESS
+  - Unit tests: 212/212 SOFT_MAX tests PASSED
+
 [2026-02-26] COMPLETED task_024: Fix wkv SLM over-allocation by 4x.
   - Removed *sizeof(float) from shared_mem_size calculation in wkv.cpp
   - local_accessor<float, 1> expects element count, not byte count

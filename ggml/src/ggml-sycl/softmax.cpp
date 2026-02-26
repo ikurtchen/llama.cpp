@@ -48,8 +48,11 @@ static void soft_max_f32(const float *         x,
                          const float *         sinks,
                          float *               dst,
                          const soft_max_params p,
-                         uint8_t *             dpct_local) {
-    auto      item_ct1 = sycl::ext::oneapi::this_work_item::get_nd_item<3>();
+                         uint8_t *             dpct_local,
+                         sycl::nd_item<3>      item_ct1) {
+    // opt_001_002: Use sycl::reduce_over_group for work-group reduction
+    // instead of manual two-level SLM reduction. This eliminates 5 barriers
+    // and simplifies the code significantly. Target: Intel Arc Pro B60 Xe2 (SIMD16)
     const int ncols    = ncols_template == 0 ? p.ncols : ncols_template;
     const int block_size = block_size_template == 0
                                ? item_ct1.get_local_range(2)
@@ -101,23 +104,11 @@ static void soft_max_f32(const float *         x,
         vals[col] = val;
         max_val   = sycl::max(max_val, val);
     }
-    // find the max value in the block
-    max_val = warp_reduce_max(max_val);
-
-    if (block_size > WARP_SIZE) {
-        if (warp_id == 0) {
-            buf_iw[lane_id] = -INFINITY;
-        }
-        item_ct1.barrier();
-
-        if (lane_id == 0) {
-            buf_iw[warp_id] = max_val;
-        }
-        item_ct1.barrier();
-
-        max_val = buf_iw[lane_id];
-        max_val = warp_reduce_max(max_val);
-    }
+    // find the max value in the block using sycl::reduce_over_group
+    // opt_001_002: Replaces manual two-level SLM reduction (warp_reduce + SLM + warp_reduce)
+    // with single hardware-accelerated group reduction. Eliminates 3 barriers.
+    // See: docs/hw_spec_b60.md, docs/optimization_guide.md
+    max_val = sycl::reduce_over_group(item_ct1.get_group(), max_val, sycl::maximum<float>());
     float tmp = 0.0f; // partial sum
 
 #pragma unroll
@@ -132,29 +123,11 @@ static void soft_max_f32(const float *         x,
         tmp += val;
         vals[col] = val;
     }
-    // find the sum of exps in the block
-    tmp = warp_reduce_sum(tmp);
-    if (block_size > WARP_SIZE) {
-        item_ct1.barrier();
-        if (warp_id == 0) {
-            buf_iw[lane_id] = 0.0f;
-            for (size_t i = 1; i < nreduce; i += 1) {
-                buf_iw[lane_id + i * WARP_SIZE] = 0.f;
-            }
-        }
-        item_ct1.barrier();
-
-        if (lane_id == 0) {
-            buf_iw[warp_id] = tmp;
-        }
-        item_ct1.barrier();
-
-        tmp = buf_iw[lane_id];
-        for (size_t i = 1; i < nreduce; i += 1) {
-            tmp += buf_iw[lane_id + i * WARP_SIZE];
-        }
-        tmp = warp_reduce_sum(tmp);
-    }
+    // find the sum of exps in the block using sycl::reduce_over_group
+    // opt_001_002: Replaces manual two-level SLM reduction (warp_reduce + SLM + warp_reduce)
+    // with single hardware-accelerated group reduction. Eliminates 2 more barriers.
+    // Total: 5 barriers eliminated (3 for max + 2 for sum)
+    tmp = sycl::reduce_over_group(item_ct1.get_group(), tmp, sycl::plus<float>());
     if (sinks) {
         tmp += sycl::native::exp(sinks[i02] - max_val);
     }
@@ -176,8 +149,8 @@ static void soft_max_f32(const float *         x,
 #endif // __clang__
 
 static void soft_max_back_f32(const float *grad, const float *dstf, float *dst,
-                              const int ncols, const float scale) {
-    auto      item_ct1 = sycl::ext::oneapi::this_work_item::get_nd_item<3>();
+                              const int ncols, const float scale,
+                              sycl::nd_item<3> item_ct1) {
     const int tid      = item_ct1.get_local_id(2);
     const int rowx     = item_ct1.get_group(2);
 
@@ -186,14 +159,15 @@ static void soft_max_back_f32(const float *grad, const float *dstf, float *dst,
     dst  += int64_t(rowx)*ncols;
 
     float dgf_dot = 0.0f; // dot product of dst from forward pass and gradients
+    const int block_size = item_ct1.get_local_range(2);
 
-    for (int col = tid; col < ncols; col += WARP_SIZE) {
+    for (int col = tid; col < ncols; col += block_size) {
         dgf_dot += dstf[col]*grad[col];
     }
 
-    dgf_dot = warp_reduce_sum(dgf_dot);
+    dgf_dot = sycl::reduce_over_group(item_ct1.get_group(), dgf_dot, sycl::plus<float>());
 
-    for (int col = tid; col < ncols; col += WARP_SIZE) {
+    for (int col = tid; col < ncols; col += block_size) {
         dst[col] = scale * (grad[col] - dgf_dot) * dstf[col];
     }
 }
@@ -225,8 +199,8 @@ static void launch_soft_max_kernels(const float *           x,
                             x, mask, sinks, dst, p,
                             dpct_local_acc_ct1
                                 .get_multi_ptr<sycl::access::decorated::no>()
-                                .get());
-                        GGML_UNUSED(item_ct1);
+                                .get(),
+                            item_ct1);
                     });
             });
             return true;
@@ -251,8 +225,8 @@ static void launch_soft_max_kernels(const float *           x,
                         x, mask, sinks, dst, p,
                         dpct_local_acc_ct1
                             .get_multi_ptr<sycl::access::decorated::no>()
-                            .get());
-                    GGML_UNUSED(item_ct1);
+                            .get(),
+                        item_ct1);
                 });
     });
 }
@@ -290,14 +264,15 @@ static void soft_max_f32_sycl(const float *x, const T *mask,
 
             cgh.parallel_for(
                 sycl::nd_range<3>(block_nums * block_dims, block_dims),
-                [=](sycl::nd_item<3> item_ct1) {
-                    soft_max_f32<false, 0, 0>(
-                        x, mask, sinks, dst, params,
-                        dpct_local_acc_ct1
-                            .get_multi_ptr<sycl::access::decorated::no>()
-                            .get());
-                    GGML_UNUSED(item_ct1);
-                });
+                [=](sycl::nd_item<3> item_ct1)
+                    [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                        soft_max_f32<false, 0, 0>(
+                            x, mask, sinks, dst, params,
+                            dpct_local_acc_ct1
+                                .get_multi_ptr<sycl::access::decorated::no>()
+                                .get(),
+                            item_ct1);
+                    });
         });
     }
 }
@@ -309,14 +284,14 @@ static void soft_max_back_f32_sycl(const float *   grad,
                                    const int       nrows,
                                    const float     scale,
                                    dpct::queue_ptr stream) {
-    const dpct::dim3 block_dims(WARP_SIZE, 1, 1);
+    const dpct::dim3 block_dims(256, 1, 1);
     const dpct::dim3 block_nums(nrows, 1, 1);
 
     stream->parallel_for(sycl::nd_range<3>(block_nums * block_dims, block_dims),
-                         [=](sycl::nd_item<3> item_ct1) {
-                             soft_max_back_f32(grad, dstf, dst, ncols, scale);
-                             GGML_UNUSED(item_ct1);
-                         });
+                         [=](sycl::nd_item<3> item_ct1)
+                             [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                                 soft_max_back_f32(grad, dstf, dst, ncols, scale, item_ct1);
+                             });
 }
 
 void ggml_sycl_op_soft_max(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {

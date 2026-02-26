@@ -1,6 +1,17 @@
 {
   "results": [
     {
+      "task_id": "task_025",
+      "kernel": "softmax",
+      "optimization": "Fix reqd_sub_group_size (correctness) + replace manual SLM reduction with sycl::reduce_over_group",
+      "timestamp": "2026-02-26T21:00:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": 1.0,
+      "notes": "Added [[sycl::reqd_sub_group_size(WARP_SIZE)]] to fallback forward kernel (line ~293) and backward kernel (line ~316) - correctness fix. Replaced manual two-level SLM block reduction (5 barriers) with sycl::reduce_over_group - eliminates barrier overhead. Increased backward kernel work-group from 16 to 256. Expected 10-20% speedup. Build SUCCESS, 212/212 SOFT_MAX tests PASSED."
+    },
+    {
       "task_id": "task_024",
       "kernel": "wkv (RWKV WKV attention)",
       "optimization": "Fix SLM over-allocation - remove sizeof(float) from local_accessor size calculation",
