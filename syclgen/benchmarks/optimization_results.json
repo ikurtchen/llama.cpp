@@ -1,6 +1,17 @@
 {
   "results": [
     {
+      "task_id": "task_019",
+      "kernel": "dmmv (dequantize matrix-vector multiply)",
+      "optimization": "Fix off-by-one boundary check in K-quant dmmv (row > nrows -> row >= nrows)",
+      "timestamp": "2026-02-26T18:30:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": 1.0,
+      "notes": "Fixed off-by-one boundary check in 8 K-quant dmmv functions (q2_k, q3_k, q3_k_slm, q4_k, q4_k_slm, q2_k_slm, q5_k, q6_k). Changed 'row > nrows' to 'row >= nrows' to prevent potential out-of-bounds memory write on the last row. Build SUCCESS, 726/726 MUL_MAT tests PASSED."
+    },
+    {
       "task_id": "task_018",
       "kernel": "dmmv (dequantize matrix-vector multiply)",
       "optimization": "Change K-quant sub-group size from SIMD32 to SIMD16 native on Intel Xe2",

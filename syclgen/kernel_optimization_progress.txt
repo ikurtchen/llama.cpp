@@ -26,6 +26,12 @@
 - [x] sk_013: gla SYCL kernel — low potential (4 optimization opportunities)
 ## Recent Activity
 
+[2026-02-26] COMPLETED task_019: Fix off-by-one boundary check in K-quant dmmv.
+  - Fixed off-by-one boundary check in 8 K-quant dmmv functions (q2_k, q3_k, q3_k_slm, q4_k, q4_k_slm, q2_k_slm, q5_k, q6_k)
+  - Changed 'row > nrows' to 'row >= nrows' to prevent potential out-of-bounds memory write on last row
+  - Build: SUCCESS
+  - Unit tests: 726/726 MUL_MAT tests PASSED
+
 [2026-02-26] COMPLETED task_018: Fix QK_WARP_SIZE=32 forcing SIMD32 in K-quant dmmv.
   - Changed K-quant kernels (Q2_K through Q6_K) from forced SIMD32 to native SIMD16
   - Added GGML_SYCL_DMMV_K_SUBGRP_SIZE constant defaulting to WARP_SIZE (16 on Intel Xe2)
