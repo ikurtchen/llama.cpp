@@ -35,6 +35,17 @@
 
 ## Recent Activity
 
+[2026-02-26] IN_PROGRESS task_041: Add missing quant type support.
+  - opt_011_001: Added I32 and BF16 src0 types + I32, F16, BF16 dst types to getrows
+    * Templated k_get_rows_float on dst_t (in addition to src0_t)
+    * Added ggml_sycl_get_rows_switch_src0_type function for src0 type dispatch
+    * Added two-level dispatch in ggml_sycl_op_get_rows for dst types
+    * Now supports: src0 (F16, F32, I32, BF16, Q4_0-Q8_0), dst (F32, I32, F16, BF16)
+    * Removed unnecessary fp16 capability check
+  - Build: SUCCESS
+  - Unit tests: 35/35 GET_ROWS tests PASSED
+  - Remaining: mmq IQ types, convert BF16, dmmv BF16
+
 [2026-02-26] COMPLETED task_042: Add missing feature gaps (acc_f32 4D support + DPCT cleanup).
   - opt_007_007: Removed dpct::has_capability_or_fail() calls from cpy.cpp (4 locations)
     * ggml_cpy_f16_f32_sycl, ggml_cpy_f32_f32_sycl, ggml_cpy_f32_f16_sycl, ggml_cpy_f16_f16_sycl

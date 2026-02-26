@@ -773,8 +773,10 @@
           "name": "Add missing quant type support",
           "description": "Multiple kernels are missing support for newer quantization types: mmq missing 8 IQ types + MXFP4, convert missing BF16 first-class support, dmmv missing BF16, getrows missing I32/BF16 src0 types.",
           "priority": "low",
+          "status": "in_progress",
           "expected_improvement": "Feature completeness — enables new model architectures",
           "estimated_effort": "xlarge",
+          "current_focus": "opt_011_001: getrows I32/BF16 src0/dst types - COMPLETED",
           "dependencies": [],
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t unit -k MUL_MAT,DEQUANT,MUL_MAT_VEC,GET_ROWS",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
@@ -783,7 +785,8 @@
             "ggml/src/ggml-sycl/convert.cpp",
             "ggml/src/ggml-sycl/dmmv.cpp",
             "ggml/src/ggml-sycl/getrows.cpp"
-          ]
+          ],
+          "notes": "opt_011_001 COMPLETED: Added I32 and BF16 src0 types + I32, F16, BF16 dst types to getrows. Implemented two-level dispatch matching CUDA pattern. Build SUCCESS, 35/35 GET_ROWS tests PASSED. Remaining components: mmq IQ types, convert BF16, dmmv BF16."
         },
         {
           "task_id": "task_042",
