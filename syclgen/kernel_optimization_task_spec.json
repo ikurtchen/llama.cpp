@@ -225,6 +225,7 @@
           "expected_improvement": "3-5x throughput for quantized matrix multiply",
           "estimated_effort": "xlarge",
           "dependencies": ["task_001"],
+          "notes": "IN PROGRESS: Infrastructure added (+935 lines) - joint_matrix types, XMX tile sizes, load_tiles_xmx functions for all quant types. Actual joint_matrix::mad() compute loop pending.",
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -k MUL_MAT",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
           "files_to_modify": ["ggml/src/ggml-sycl/mmq.cpp", "ggml/src/ggml-sycl/mmq.hpp"]
