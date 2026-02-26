@@ -26,6 +26,16 @@
 - [x] sk_013: gla SYCL kernel — low potential (4 optimization opportunities)
 ## Recent Activity
 
+[2026-02-26] COMPLETED task_038 (partial): DPCT cleanup in rope.cpp + fix build error.
+  - opt_002_004: Converted nd_range<3> to nd_range<2> in all 4 rope kernels
+  - opt_002_005: Replaced manual thread indexing with get_global_id()
+  - opt_002_005: Wrapped has_capability_or_fail(fp16) with if constexpr
+  - opt_002_005: Removed DPCT migration comments
+  - Fixed pre-existing build error: sycl::native::tanh → sycl::tanh
+  - Build: SUCCESS
+  - Unit tests: 248/248 ROPE tests PASSED
+  - Note: Remaining DPCT cleanup tasks deferred (8 files total, 1 completed)
+
 [2026-02-26] COMPLETED task_037: Add reqd_sub_group_size and loop unrolling to gla.
   - opt_013_001: Added [[sycl::reqd_sub_group_size(16)]] to parallel_for lambda (line 20-21)
   - opt_013_002: Added #pragma unroll to inner j-loop (line 47)
