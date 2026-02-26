@@ -26,6 +26,14 @@
 - [x] sk_013: gla SYCL kernel — low potential (4 optimization opportunities)
 ## Recent Activity
 
+[2026-02-26] COMPLETED task_018: Fix QK_WARP_SIZE=32 forcing SIMD32 in K-quant dmmv.
+  - Changed K-quant kernels (Q2_K through Q6_K) from forced SIMD32 to native SIMD16
+  - Added GGML_SYCL_DMMV_K_SUBGRP_SIZE constant defaulting to WARP_SIZE (16 on Intel Xe2)
+  - Updated reqd_sub_group_size, block_dims, and reduction masks
+  - Expected 15-40% occupancy improvement from native SIMD16
+  - Build: SUCCESS
+  - Unit tests: 726/726 MUL_MAT tests PASSED
+
 [2026-02-26] COMPLETED task_017: Increase dmmv work-group size from 16 to 256.
   - Increased work-group size from 16 to 256 (16x increase)
   - Added SLM-based multi-sub-group reduction (16 sub-groups of SIMD16)
