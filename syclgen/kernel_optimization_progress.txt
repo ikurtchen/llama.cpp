@@ -26,6 +26,19 @@
 - [x] sk_013: gla SYCL kernel — low potential (4 optimization opportunities)
 ## Recent Activity
 
+[2026-02-26] IN_PROGRESS task_023: Stream-K mmq - blocked by build issues.
+  - Stream-K implementation attempted but had build errors
+  - Fixed pre-existing bugs that were blocking the build:
+    1. dmmv.cpp:99 - tmp.x()/tmp.y() called on scalar float when GGML_SYCL_F16 not defined
+       - Added conditional compilation to handle scalar vs vector type
+    2. mmvq.cpp batched functions - y_base incorrectly cast to single pointer instead of pointer-to-pointer
+       - Fixed type cast from `const block_q8_1 *` to `const block_q8_1 * const *`
+    3. const-correctness issues with sycl::local_accessor in dmmv.cpp and mmvq.cpp
+       - Added const qualifiers to function parameters
+  - Build: SUCCESS
+  - Unit tests: Most pass (some quantization-specific failures may be pre-existing)
+  - Status: Stream-K optimization blocked; pre-existing bugs fixed enabling build
+
 [2026-02-26] COMPLETED task_022: Tune mmq tile sizes for Intel Xe2.
   - Changed mmq_y from 128 to 64 for all quant types (Q4_0, Q4_1, Q5_0, Q5_1, Q8_0, Q2_K, Q3_K, Q4_K, Q5_K, Q6_K)
   - New tile sizes: mmq_x=64, mmq_y=64, nwarps=8

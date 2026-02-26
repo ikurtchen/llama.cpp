@@ -46,7 +46,7 @@ static void convert_f32(const void * vx, const int64_t ib, const int iqs, dfloat
 template <int qk, int qr, dequantize_kernel_t dequantize_kernel>
 static void dequantize_mul_mat_vec_slm(const void * __restrict__ vx, const dfloat * __restrict__ y, float * __restrict__ dst, const int ncols, const int nrows,
                                    const sycl::nd_item<3> &item_ct1,
-                                   sycl::local_accessor<float, 1> & partial_sums) {
+                                   const sycl::local_accessor<float, 1> & partial_sums) {
     const int row = item_ct1.get_group(2) * item_ct1.get_local_range(1) +
                     item_ct1.get_local_id(1);
 
@@ -96,7 +96,11 @@ static void dequantize_mul_mat_vec_slm(const void * __restrict__ vx, const dfloa
             dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), tmp, mask);
     }
 
+#ifdef GGML_SYCL_F16
     const float subgrp_sum = (tmp.x() + tmp.y());
+#else
+    const float subgrp_sum = tmp;
+#endif
 
     if (item_ct1.get_sub_group().get_local_id()[0] == 0) {
         partial_sums[subgrp_id] = subgrp_sum;
@@ -582,7 +586,7 @@ static void dequantize_mul_mat_vec_q3_k_slm(const void *__restrict__ vx,
                                         float *__restrict__ dst,
                                         const int ncols, int nrows,
                                         const sycl::nd_item<3> &item_ct1,
-                                        sycl::local_accessor<float, 1> & partial_sums) {
+                                        const sycl::local_accessor<float, 1> & partial_sums) {
 
     const int row = item_ct1.get_group(2) * item_ct1.get_local_range(1) +
                     item_ct1.get_local_id(1);
@@ -861,7 +865,7 @@ static void dequantize_mul_mat_vec_q4_k_slm(const void *__restrict__ vx,
                                         float *__restrict__ dst,
                                         const int ncols, int nrows,
                                         const sycl::nd_item<3> &item_ct1,
-                                        sycl::local_accessor<float, 1> & partial_sums) {
+                                        const sycl::local_accessor<float, 1> & partial_sums) {
 
     const int row = item_ct1.get_group(2) * item_ct1.get_local_range(1) +
                     item_ct1.get_local_id(1);
@@ -1019,7 +1023,7 @@ static void dequantize_mul_mat_vec_q2_k_slm(const void *__restrict__ vx,
                                         float *__restrict__ dst,
                                         const int ncols, int nrows,
                                         const sycl::nd_item<3> &item_ct1,
-                                        sycl::local_accessor<float, 1> & partial_sums) {
+                                        const sycl::local_accessor<float, 1> & partial_sums) {
 
     static_assert(16%K_QUANTS_PER_ITERATION == 0, "16 must be divisible by K_QUANTS_PER_ITERATION");
 
@@ -1286,7 +1290,7 @@ static void dequantize_mul_mat_vec_q5_k_slm(const void *__restrict__ vx,
                                         float *__restrict__ dst,
                                         const int ncols,
                                         const sycl::nd_item<3> &item_ct1,
-                                        sycl::local_accessor<float, 1> & partial_sums) {
+                                        const sycl::local_accessor<float, 1> & partial_sums) {
 
     const int row = item_ct1.get_group(2);
     const int num_blocks_per_row = ncols / QK_K;
@@ -1539,7 +1543,7 @@ static void dequantize_mul_mat_vec_q6_k(const void * __restrict__ vx, const floa
 #if GGML_SYCL_DMMV_USE_SLM
 static void dequantize_mul_mat_vec_q6_k_slm(const void * __restrict__ vx, const float * __restrict__ yy, float * __restrict__ dst, const int ncols, int nrows,
                                         const sycl::nd_item<3> &item_ct1,
-                                        sycl::local_accessor<float, 1> & partial_sums) {
+                                        const sycl::local_accessor<float, 1> & partial_sums) {
 
     static_assert(16%K_QUANTS_PER_ITERATION == 0, "16 must be divisible by K_QUANTS_PER_ITERATION");
 

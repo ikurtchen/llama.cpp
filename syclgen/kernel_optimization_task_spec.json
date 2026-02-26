@@ -398,6 +398,7 @@
           "task_id": "task_023",
           "kernel_id": "sk_008",
           "optimization_ids": ["opt_008_004"],
+          "status": "in_progress",
           "name": "Add stream-K work distribution for mmq",
           "description": "For small-batch or large-K problems, work-group count may be too low to fully utilize all 20 Xe-cores. Stream-K partitioning distributes K-dimension work across more work-groups.",
           "priority": "high",
@@ -406,7 +407,8 @@
           "dependencies": ["task_001", "task_022"],
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -k MUL_MAT",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
-          "files_to_modify": ["ggml/src/ggml-sycl/mmq.cpp"]
+          "files_to_modify": ["ggml/src/ggml-sycl/mmq.cpp"],
+          "notes": "Stream-K implementation was attempted but had to be disabled due to build errors. Additionally fixed pre-existing build bugs: (1) dmmv.cpp:99 - tmp.x()/tmp.y() called on scalar float when GGML_SYCL_F16 not defined, added conditional; (2) mmvq.cpp batched functions - y_base was incorrectly cast to single pointer instead of pointer-to-pointer, causing build failure. Build now passes."
         },
         {
           "task_id": "task_024",

@@ -129,7 +129,7 @@ static void mul_mat_vec_q(const void * __restrict__ vx, const void * __restrict_
 template <int qk, int qi, typename block_q_t, int vdr, vec_dot_q_sycl_t vec_dot_q_sycl>
 static void mul_mat_vec_q_slm(const void * __restrict__ vx, const void * __restrict__ vy, float * __restrict__ dst,
                               const int ncols, const int nrows, const sycl::nd_item<3> & item_ct1,
-                              sycl::local_accessor<float, 1> & partial_sums) {
+                              const sycl::local_accessor<float, 1> & partial_sums) {
     const int row = item_ct1.get_group(2) * item_ct1.get_local_range(1) + item_ct1.get_local_id(1);
 
     if (row >= nrows) {
@@ -211,7 +211,7 @@ static void mul_mat_vec_q_batched(const void * __restrict__ vx,
     float tmp[ncols_dst] = {0.0f};
 
     const block_q_t *  x = (const block_q_t *) vx;
-    const block_q8_1 * y_base = (const block_q8_1 *) vy;
+    const block_q8_1 * const * y_base = (const block_q8_1 * const *) vy;
 
     for (int i = item_ct1.get_local_id(2) / (qi / vdr); i < blocks_per_row; i += blocks_per_warp) {
         const int ibx = row * blocks_per_row + i;
@@ -252,7 +252,7 @@ static void mul_mat_vec_q_batched_slm(const void * __restrict__ vx,
                                       float * __restrict__ const * dst,
                                       const int ncols, const int nrows,
                                       const sycl::nd_item<3> &item_ct1,
-                                      sycl::local_accessor<float, 1> & partial_sums) {
+                                      const sycl::local_accessor<float, 1> & partial_sums) {
     const int row = item_ct1.get_group(2) * item_ct1.get_local_range(1) + item_ct1.get_local_id(1);
 
     if (row >= nrows) {
@@ -267,7 +267,7 @@ static void mul_mat_vec_q_batched_slm(const void * __restrict__ vx,
     float tmp[ncols_dst] = {0.0f};
 
     const block_q_t *  x = (const block_q_t *) vx;
-    const block_q8_1 * y_base = (const block_q8_1 *) vy;
+    const block_q8_1 * const * y_base = (const block_q8_1 * const *) vy;
 
     const int local_id = item_ct1.get_local_id(2);
     const int sg_id = item_ct1.get_sub_group().get_group_id()[0];
@@ -1462,6 +1462,51 @@ static void mul_mat_vec_iq4_xs_q8_1_sycl(const void *vx, const void *vy,
         });
     }
 }
+
+template <int ncols_dst>
+static void mul_mat_vec_q4_0_q8_1_sycl_batched(const void *vx, const void * const *vy,
+                                                float * const *dst, const int ncols,
+                                                const int nrows, dpct::queue_ptr stream);
+template <int ncols_dst>
+static void mul_mat_vec_q4_1_q8_1_sycl_batched(const void *vx, const void * const *vy,
+                                                float * const *dst, const int ncols,
+                                                const int nrows, dpct::queue_ptr stream);
+template <int ncols_dst>
+static void mul_mat_vec_q5_0_q8_1_sycl_batched(const void *vx, const void * const *vy,
+                                                float * const *dst, const int ncols,
+                                                const int nrows, dpct::queue_ptr stream);
+template <int ncols_dst>
+static void mul_mat_vec_q5_1_q8_1_sycl_batched(const void *vx, const void * const *vy,
+                                                float * const *dst, const int ncols,
+                                                const int nrows, dpct::queue_ptr stream);
+template <int ncols_dst>
+static void mul_mat_vec_q8_0_q8_1_sycl_batched(const void *vx, const void * const *vy,
+                                                float * const *dst, const int ncols,
+                                                const int nrows, dpct::queue_ptr stream);
+template <int ncols_dst>
+static void mul_mat_vec_q2_K_q8_1_sycl_batched(const void *vx, const void * const *vy,
+                                                float * const *dst, const int ncols,
+                                                const int nrows, dpct::queue_ptr stream);
+template <int ncols_dst>
+static void mul_mat_vec_q3_K_q8_1_sycl_batched(const void *vx, const void * const *vy,
+                                                float * const *dst, const int ncols,
+                                                const int nrows, dpct::queue_ptr stream);
+template <int ncols_dst>
+static void mul_mat_vec_q4_K_q8_1_sycl_batched(const void *vx, const void * const *vy,
+                                                float * const *dst, const int ncols,
+                                                const int nrows, dpct::queue_ptr stream);
+template <int ncols_dst>
+static void mul_mat_vec_q5_K_q8_1_sycl_batched(const void *vx, const void * const *vy,
+                                                float * const *dst, const int ncols,
+                                                const int nrows, dpct::queue_ptr stream);
+template <int ncols_dst>
+static void mul_mat_vec_q6_K_q8_1_sycl_batched(const void *vx, const void * const *vy,
+                                                float * const *dst, const int ncols,
+                                                const int nrows, dpct::queue_ptr stream);
+template <int ncols_dst>
+static void mul_mat_vec_mxfp4_q8_1_sycl_batched(const void *vx, const void * const *vy,
+                                                float * const *dst, const int ncols,
+                                                const int nrows, dpct::queue_ptr stream);
 
 void ggml_sycl_op_mul_mat_vec_q(ggml_backend_sycl_context & ctx, const ggml_tensor * src0, const ggml_tensor * src1,
                                 ggml_tensor * dst, const char * src0_dd_i, const float * src1_ddf_i,
