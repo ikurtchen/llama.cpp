@@ -26,6 +26,18 @@
 - [x] sk_013: gla SYCL kernel — low potential (4 optimization opportunities)
 ## Recent Activity
 
+[2026-02-26] COMPLETED task_027: Fix norm reduction patterns and work-group sizing.
+  - opt_003_001: Fixed group_norm barriers (lines 97, 132) to use local_space fence
+  - opt_003_003: Increased small-path work-group from 16 to 256 for norm/rms/l2_norm
+  - Expected 5-15% from barrier fix + 2-4x for small ncols
+  - Build: SUCCESS
+  - Unit tests: NORM 16/16, RMS_NORM 17/17, GROUP_NORM 2/2 PASSED
+
+[2026-02-26] BLOCKED task_026: Add vec4 vectorized memory access to softmax.
+  - vec4 optimization requires significant kernel restructuring
+  - Subagent implementation attempt did not complete
+  - Need more careful design
+
 [2026-02-26] COMPLETED task_025: Fix softmax reqd_sub_group_size and reduction.
   - Added [[sycl::reqd_sub_group_size(WARP_SIZE)]] to fallback forward kernel (line ~293) - correctness fix
   - Added [[sycl::reqd_sub_group_size(WARP_SIZE)]] to backward kernel (line ~316) - correctness fix

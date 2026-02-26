@@ -85,16 +85,8 @@ static void group_norm_f32(const float* x, float* dst, const int group_size, con
         if (lane_id == 0) {
             s_sum[warp_id] = tmp;
         }
-        /*
-        DPCT1118:1: SYCL group functions and algorithms must be encountered in
-        converged control flow. You may need to adjust the code.
-        */
-        /*
-        DPCT1065:54: Consider replacing sycl::nd_item::barrier() with
-        sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
-        better performance if there is no access to global memory.
-        */
-        item_ct1.barrier();
+        // opt_003_001: Use local_space fence instead of global (DPCT warning)
+        item_ct1.barrier(sycl::access::fence_space::local_space);
         tmp = 0.f;
         for (size_t i = 0; i < nreduce; i += 1)
         {
@@ -120,16 +112,8 @@ static void group_norm_f32(const float* x, float* dst, const int group_size, con
         if (lane_id == 0) {
             s_sum[warp_id] = tmp;
         }
-        /*
-        DPCT1118:2: SYCL group functions and algorithms must be encountered in
-        converged control flow. You may need to adjust the code.
-        */
-        /*
-        DPCT1065:55: Consider replacing sycl::nd_item::barrier() with
-        sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
-        better performance if there is no access to global memory.
-        */
-        item_ct1.barrier();
+        // opt_003_001: Use local_space fence instead of global (DPCT warning)
+        item_ct1.barrier(sycl::access::fence_space::local_space);
         tmp = 0.f;
         for (size_t i = 0; i < nreduce; i += 1)
         {
@@ -252,13 +236,16 @@ static void norm_f32_sycl(const float * x, float * dst, const int ncols, const i
 
     const sycl::range<3> global_dims(nsamples, nchannels, nrows);
     if (ncols < 1024) {
-        const sycl::range<3> block_dims(1, 1, WARP_SIZE);
+        const int small_wg_size = 256; // opt_003_003: Increase from WARP_SIZE(16) to 256 for better occupancy on Xe2
+        const sycl::range<3> block_dims(1, 1, small_wg_size);
         stream->submit([&](sycl::handler& cgh) {
+            sycl::local_accessor<sycl::float2, 1> s_sum_acc_ct1(
+                            sycl::range<1>(small_wg_size / WARP_SIZE), cgh);
             cgh.parallel_for(
                 sycl::nd_range<3>(global_dims * block_dims, block_dims),
                 [=](sycl::nd_item<3> item_ct1)
                 [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
-                    norm_f32(x, dst, ncols, stride_row, stride_channel, stride_sample, eps, item_ct1, nullptr, WARP_SIZE);
+                    norm_f32(x, dst, ncols, stride_row, stride_channel, stride_sample, eps, item_ct1, get_pointer(s_sum_acc_ct1), small_wg_size);
                 });
             });
     }
@@ -337,13 +324,16 @@ static void rms_norm_f32_sycl(const float* x, float* dst, const int ncols, const
 
     const sycl::range<3> global_dims(nsamples, nchannels, nrows);
     if (ncols < 1024) {
-        const sycl::range<3> block_dims(1, 1, WARP_SIZE);
+        const int small_wg_size = 256; // opt_003_003: Increase from WARP_SIZE(16) to 256 for better occupancy on Xe2
+        const sycl::range<3> block_dims(1, 1, small_wg_size);
         stream->submit([&](sycl::handler& cgh) {
+            sycl::local_accessor<float, 1> s_sum_acc_ct1(sycl::range<1>(small_wg_size / WARP_SIZE),
+                cgh);
             cgh.parallel_for(
                 sycl::nd_range<3>(global_dims * block_dims, block_dims),
                 [=](sycl::nd_item<3> item_ct1)
                 [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
-                    rms_norm_f32(x, dst, ncols, stride_row, stride_channel, stride_sample, eps, item_ct1, nullptr, WARP_SIZE);
+                    rms_norm_f32(x, dst, ncols, stride_row, stride_channel, stride_sample, eps, item_ct1, get_pointer(s_sum_acc_ct1), small_wg_size);
                 });
             });
     }
@@ -374,15 +364,18 @@ static void l2_norm_f32_sycl(const float* x, float* dst, const int ncols,
     queue_ptr stream, int device) {
     // printf("%s ncols=%d, nrows=%d, WARP_SIZE=%d\n", __func__, ncols, nrows, WARP_SIZE);
     if (ncols < 1024) {
-        const sycl::range<3> block_dims(1, 1, WARP_SIZE);
+        const int small_wg_size = 256; // opt_003_003: Increase from WARP_SIZE(16) to 256 for better occupancy on Xe2
+        const sycl::range<3> block_dims(1, 1, small_wg_size);
         stream->submit([&](sycl::handler& cgh) {
+            sycl::local_accessor<float, 1> s_sum_acc_ct1(sycl::range<1>(small_wg_size / WARP_SIZE),
+                cgh);
             cgh.parallel_for(
                 sycl::nd_range<3>(sycl::range<3>(1, 1, nrows) * block_dims,
                     block_dims),
                 [=](sycl::nd_item<3> item_ct1)
                 [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
                     l2_norm_f32(x, dst, ncols, eps, item_ct1,
-                        nullptr, WARP_SIZE);
+                        get_pointer(s_sum_acc_ct1), small_wg_size);
                 });
             });
     }

@@ -1,6 +1,28 @@
 {
   "results": [
     {
+      "task_id": "task_027",
+      "kernel": "norm (norm/rms_norm/l2_norm/group_norm)",
+      "optimization": "Fix group_norm barriers + increase small-path work-group to 256",
+      "timestamp": "2026-02-26T21:45:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": 1.0,
+      "notes": "opt_003_001: Fixed group_norm barriers (lines 97, 132) to use local_space fence instead of global. opt_003_003: Increased small-path work-group from 16 to 256 for norm_f32, rms_norm_f32, and l2_norm_f32. Added SLM allocation for cross-warp reduction. Expected 5-15% from barrier fix + 2-4x for small ncols. Build SUCCESS, NORM 16/16, RMS_NORM 17/17, GROUP_NORM 2/2 tests PASSED."
+    },
+    {
+      "task_id": "task_026",
+      "kernel": "softmax",
+      "optimization": "Add vec4 vectorized memory access (BLOCKED)",
+      "timestamp": "2026-02-26T21:30:00Z",
+      "correctness": "blocked",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": 1.0,
+      "notes": "vec4 optimization requires significant kernel restructuring - changing from strided to consecutive element access, reducing thread count by 4x, and handling tail elements properly. Subagent implementation attempt did not complete. Need more careful design."
+    },
+    {
       "task_id": "task_025",
       "kernel": "softmax",
       "optimization": "Fix reqd_sub_group_size (correctness) + replace manual SLM reduction with sycl::reduce_over_group",
