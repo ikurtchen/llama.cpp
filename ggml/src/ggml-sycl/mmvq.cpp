@@ -1,5 +1,24 @@
 #include "mmvq.hpp"
 
+/*
+ * Optimization: Increase non-reorder mmvq work-group size from 16 to 64+
+ * 
+ * hw_spec: Intel Arc Pro B60 (Xe2), SIMD16 native width, 64KB SLM per Xe-core
+ * 
+ * This optimization increases the work-group size from WARP_SIZE (16) to 
+ * GGML_SYCL_MMVQ_WG_SIZE (64), using 4 sub-groups of SIMD16 each.
+ * 
+ * The optimization uses SLM-based inter-sub-group reduction:
+ * - Each sub-group computes partial sums over blocks_per_row / nwarps blocks
+ * - After K-loop, non-leader sub-groups write partial sums to SLM
+ * - Barrier
+ * - Leader sub-group reads and accumulates partial sums
+ * - Final reduction within sub-group
+ * - Only thread 0 writes dst[row]
+ * 
+ * This increases memory latency hiding by utilizing more threads per work-group.
+ */
+
 #include "ggml.h"
 #include "common.hpp"
 #include "quants.hpp"
@@ -106,6 +125,72 @@ static void mul_mat_vec_q(const void * __restrict__ vx, const void * __restrict_
     }
 }
 
+#if GGML_SYCL_MMVQ_WG_SIZE > WARP_SIZE
+template <int qk, int qi, typename block_q_t, int vdr, vec_dot_q_sycl_t vec_dot_q_sycl>
+static void mul_mat_vec_q_slm(const void * __restrict__ vx, const void * __restrict__ vy, float * __restrict__ dst,
+                              const int ncols, const int nrows, const sycl::nd_item<3> & item_ct1,
+                              sycl::local_accessor<float, 1> & partial_sums) {
+    const int row = item_ct1.get_group(2) * item_ct1.get_local_range(1) + item_ct1.get_local_id(1);
+
+    if (row >= nrows) {
+        return;
+    }
+
+    const int     blocks_per_row = ncols / qk;
+    constexpr int nwarps = GGML_SYCL_MMVQ_WG_SIZE / WARP_SIZE;
+    constexpr int blocks_per_warp = (vdr * WARP_SIZE + qi - 1) / qi;
+
+    assert(blocks_per_warp > 0);
+
+    float tmp = 0.0f;
+
+    const block_q_t *  x = (const block_q_t *) vx;
+    const block_q8_1 * y = (const block_q8_1 *) vy;
+
+    const int local_id = item_ct1.get_local_id(2);
+    const int sg_id = item_ct1.get_sub_group().get_group_id()[0];
+    const int num_sg = item_ct1.get_local_range(2) / WARP_SIZE;
+
+    const int blocks_per_sg = (blocks_per_row + num_sg - 1) / num_sg;
+    const int start_block = sg_id * blocks_per_sg;
+
+    for (int i = start_block + local_id / (qi / vdr); i < blocks_per_row && i < start_block + blocks_per_sg; i += blocks_per_warp) {
+        const int ibx = row * blocks_per_row + i;
+        const int iby = i * (qk / QK8_1);
+
+        for (size_t elem = 0; elem < qi / vdr; elem += WARP_SIZE) {
+            const int iqs = elem + vdr * (local_id % (qi / vdr));
+            tmp += vec_dot_q_sycl(&x[ibx], &y[iby], iqs);
+        }
+    }
+
+#pragma unroll
+    for (int mask = WARP_SIZE / 2; mask > 0; mask >>= 1) {
+        tmp += dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), tmp, mask);
+    }
+
+    if (local_id == 0) {
+        partial_sums[sg_id] = tmp;
+    }
+
+    item_ct1.barrier(sycl::access::fence_space::local_space);
+
+    if (sg_id == 0 && local_id == 0) {
+        float result = partial_sums[0];
+        for (int i = 1; i < num_sg; i++) {
+            result += partial_sums[i];
+        }
+#pragma unroll
+        for (int mask = WARP_SIZE / 2; mask > 0; mask >>= 1) {
+            result += dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), result, mask);
+        }
+        if (local_id == 0) {
+            dst[row] = result;
+        }
+    }
+}
+#endif
+
 template <int qk, int qi, typename block_q_t, int vdr, int ncols_dst, vec_dot_q_sycl_t vec_dot_q_sycl>
 static void mul_mat_vec_q_batched(const void * __restrict__ vx,
                                    const void * __restrict__ const * vy,
@@ -159,6 +244,87 @@ static void mul_mat_vec_q_batched(const void * __restrict__ vx,
         }
     }
 }
+
+#if GGML_SYCL_MMVQ_WG_SIZE > WARP_SIZE
+template <int qk, int qi, typename block_q_t, int vdr, int ncols_dst, vec_dot_q_sycl_t vec_dot_q_sycl>
+static void mul_mat_vec_q_batched_slm(const void * __restrict__ vx,
+                                      const void * __restrict__ const * vy,
+                                      float * __restrict__ const * dst,
+                                      const int ncols, const int nrows,
+                                      const sycl::nd_item<3> &item_ct1,
+                                      sycl::local_accessor<float, 1> & partial_sums) {
+    const int row = item_ct1.get_group(2) * item_ct1.get_local_range(1) + item_ct1.get_local_id(1);
+
+    if (row >= nrows) {
+        return;
+    }
+
+    const int     blocks_per_row = ncols / qk;
+    constexpr int blocks_per_warp = (vdr * WARP_SIZE + qi - 1) / qi;
+
+    assert(blocks_per_warp > 0);
+
+    float tmp[ncols_dst] = {0.0f};
+
+    const block_q_t *  x = (const block_q_t *) vx;
+    const block_q8_1 * y_base = (const block_q8_1 *) vy;
+
+    const int local_id = item_ct1.get_local_id(2);
+    const int sg_id = item_ct1.get_sub_group().get_group_id()[0];
+    const int num_sg = item_ct1.get_local_range(2) / WARP_SIZE;
+
+    const int blocks_per_sg = (blocks_per_row + num_sg - 1) / num_sg;
+    const int start_block = sg_id * blocks_per_sg;
+
+    for (int i = start_block + local_id / (qi / vdr); i < blocks_per_row && i < start_block + blocks_per_sg; i += blocks_per_warp) {
+        const int ibx = row * blocks_per_row + i;
+        const int iby = i * (qk / QK8_1);
+
+        for (size_t elem = 0; elem < qi / vdr; elem += WARP_SIZE) {
+            const int iqs = elem + vdr * (local_id % (qi / vdr));
+
+#pragma unroll
+            for (int j = 0; j < ncols_dst; ++j) {
+                const block_q8_1 * y_col = y_base[j] + iby;
+                tmp[j] += vec_dot_q_sycl(&x[ibx], y_col, iqs);
+            }
+        }
+    }
+
+#pragma unroll
+    for (int j = 0; j < ncols_dst; ++j) {
+#pragma unroll
+        for (int mask = WARP_SIZE / 2; mask > 0; mask >>= 1) {
+            tmp[j] += dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), tmp[j], mask);
+        }
+    }
+
+    if (local_id == 0) {
+        for (int j = 0; j < ncols_dst; ++j) {
+            partial_sums[sg_id * ncols_dst + j] = tmp[j];
+        }
+    }
+
+    item_ct1.barrier(sycl::access::fence_space::local_space);
+
+    if (sg_id == 0 && local_id == 0) {
+        float result[ncols_dst];
+        for (int j = 0; j < ncols_dst; ++j) {
+            result[j] = partial_sums[j];
+            for (int i = 1; i < num_sg; ++i) {
+                result[j] += partial_sums[i * ncols_dst + j];
+            }
+#pragma unroll
+            for (int mask = WARP_SIZE / 2; mask > 0; mask >>= 1) {
+                result[j] += dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), result[j], mask);
+            }
+        }
+        for (int j = 0; j < ncols_dst; ++j) {
+            dst[j][row] = result[j];
+        }
+    }
+}
+#endif
 
 template <int qk, int qi, typename block_q_t, int vdr>
 static void mul_mat_vec_q_iq2_xxs_q8_1(const void *__restrict__ vx,
@@ -618,6 +784,22 @@ static void mul_mat_vec_q4_0_q8_1_sycl(const void * vx, const void * vy, float *
     GGML_ASSERT(ncols % QK4_0 == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
+#if GGML_SYCL_MMVQ_WG_SIZE > WARP_SIZE
+    constexpr int nwarps = GGML_SYCL_MMVQ_WG_SIZE / WARP_SIZE;
+    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, GGML_SYCL_MMVQ_WG_SIZE);
+
+    {
+        stream->submit([&](sycl::handler & cgh) {
+            sycl::local_accessor<float, 1> partial_sums(sycl::range<1>(nwarps), cgh);
+
+            cgh.parallel_for(sycl::nd_range<3>(block_nums * block_dims, block_dims),
+                             [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                                 mul_mat_vec_q_slm<QK4_0, QI4_0, block_q4_0, VDR_Q4_0_Q8_1_MMVQ, vec_dot_q4_0_q8_1>(
+                                     vx, vy, dst, ncols, nrows, item_ct1, partial_sums);
+                             });
+        });
+    }
+#else
     const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, WARP_SIZE);
 
     {
@@ -629,6 +811,7 @@ static void mul_mat_vec_q4_0_q8_1_sycl(const void * vx, const void * vy, float *
                              });
         });
     }
+#endif
 }
 
 static void mul_mat_vec_q4_1_q8_1_sycl(const void *vx, const void *vy,
@@ -638,6 +821,23 @@ static void mul_mat_vec_q4_1_q8_1_sycl(const void *vx, const void *vy,
     GGML_ASSERT(ncols % QK4_1 == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
+#if GGML_SYCL_MMVQ_WG_SIZE > WARP_SIZE
+    constexpr int nwarps = GGML_SYCL_MMVQ_WG_SIZE / WARP_SIZE;
+    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, GGML_SYCL_MMVQ_WG_SIZE);
+
+    stream->submit([&](sycl::handler &cgh) {
+        sycl::local_accessor<float, 1> partial_sums(sycl::range<1>(nwarps), cgh);
+
+        cgh.parallel_for(
+            sycl::nd_range<3>(block_nums * block_dims, block_dims),
+            [=](sycl::nd_item<3> item_ct1)
+                [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                    mul_mat_vec_q_slm<QK4_0, QI4_1, block_q4_1,
+                                  VDR_Q4_1_Q8_1_MMVQ, vec_dot_q4_1_q8_1>(
+                        vx, vy, dst, ncols, nrows, item_ct1, partial_sums);
+                });
+    });
+#else
     const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, WARP_SIZE);
     {
 
@@ -653,6 +853,7 @@ static void mul_mat_vec_q4_1_q8_1_sycl(const void *vx, const void *vy,
                     });
         });
     }
+#endif
 }
 
 static void mul_mat_vec_mxfp4_q8_1_sycl(const void * vx, const void * vy, float * dst, const int ncols, const int nrows,
@@ -660,6 +861,22 @@ static void mul_mat_vec_mxfp4_q8_1_sycl(const void * vx, const void * vy, float 
     GGML_ASSERT(ncols % QK_MXFP4 == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
+#if GGML_SYCL_MMVQ_WG_SIZE > WARP_SIZE
+    constexpr int nwarps = GGML_SYCL_MMVQ_WG_SIZE / WARP_SIZE;
+    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, GGML_SYCL_MMVQ_WG_SIZE);
+
+    {
+        stream->submit([&](sycl::handler & cgh) {
+            sycl::local_accessor<float, 1> partial_sums(sycl::range<1>(nwarps), cgh);
+
+            cgh.parallel_for(sycl::nd_range<3>(block_nums * block_dims, block_dims),
+                             [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                                 mul_mat_vec_q_slm<QK_MXFP4, QI_MXFP4, block_mxfp4, VDR_MXFP4_Q8_1_MMVQ, vec_dot_mxfp4_q8_1>(
+                                     vx, vy, dst, ncols, nrows, item_ct1, partial_sums);
+                             });
+        });
+    }
+#else
     const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, WARP_SIZE);
 
     {
@@ -671,6 +888,7 @@ static void mul_mat_vec_mxfp4_q8_1_sycl(const void * vx, const void * vy, float 
                              });
         });
     }
+#endif
 }
 
 
@@ -681,6 +899,23 @@ static void mul_mat_vec_q5_0_q8_1_sycl(const void *vx, const void *vy,
     GGML_ASSERT(ncols % QK5_0 == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
+#if GGML_SYCL_MMVQ_WG_SIZE > WARP_SIZE
+    constexpr int nwarps = GGML_SYCL_MMVQ_WG_SIZE / WARP_SIZE;
+    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, GGML_SYCL_MMVQ_WG_SIZE);
+
+    stream->submit([&](sycl::handler &cgh) {
+        sycl::local_accessor<float, 1> partial_sums(sycl::range<1>(nwarps), cgh);
+
+        cgh.parallel_for(
+            sycl::nd_range<3>(block_nums * block_dims, block_dims),
+            [=](sycl::nd_item<3> item_ct1)
+                [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                    mul_mat_vec_q_slm<QK5_0, QI5_0, block_q5_0,
+                                  VDR_Q5_0_Q8_1_MMVQ, vec_dot_q5_0_q8_1>(
+                        vx, vy, dst, ncols, nrows, item_ct1, partial_sums);
+                });
+    });
+#else
     const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, WARP_SIZE);
     {
 
@@ -696,6 +931,7 @@ static void mul_mat_vec_q5_0_q8_1_sycl(const void *vx, const void *vy,
                     });
         });
     }
+#endif
 }
 
 static void mul_mat_vec_q5_1_q8_1_sycl(const void *vx, const void *vy,
@@ -705,6 +941,23 @@ static void mul_mat_vec_q5_1_q8_1_sycl(const void *vx, const void *vy,
     GGML_ASSERT(ncols % QK5_1 == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
+#if GGML_SYCL_MMVQ_WG_SIZE > WARP_SIZE
+    constexpr int nwarps = GGML_SYCL_MMVQ_WG_SIZE / WARP_SIZE;
+    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, GGML_SYCL_MMVQ_WG_SIZE);
+
+    stream->submit([&](sycl::handler &cgh) {
+        sycl::local_accessor<float, 1> partial_sums(sycl::range<1>(nwarps), cgh);
+
+        cgh.parallel_for(
+            sycl::nd_range<3>(block_nums * block_dims, block_dims),
+            [=](sycl::nd_item<3> item_ct1)
+                [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                    mul_mat_vec_q_slm<QK5_1, QI5_1, block_q5_1,
+                                  VDR_Q5_1_Q8_1_MMVQ, vec_dot_q5_1_q8_1>(
+                        vx, vy, dst, ncols, nrows, item_ct1, partial_sums);
+                });
+    });
+#else
     const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, WARP_SIZE);
     {
 
@@ -720,6 +973,7 @@ static void mul_mat_vec_q5_1_q8_1_sycl(const void *vx, const void *vy,
                     });
         });
     }
+#endif
 }
 
 static void mul_mat_vec_q8_0_q8_1_sycl(const void *vx, const void *vy,
@@ -729,6 +983,23 @@ static void mul_mat_vec_q8_0_q8_1_sycl(const void *vx, const void *vy,
     GGML_ASSERT(ncols % QK8_0 == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
+#if GGML_SYCL_MMVQ_WG_SIZE > WARP_SIZE
+    constexpr int nwarps = GGML_SYCL_MMVQ_WG_SIZE / WARP_SIZE;
+    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, GGML_SYCL_MMVQ_WG_SIZE);
+
+    stream->submit([&](sycl::handler &cgh) {
+        sycl::local_accessor<float, 1> partial_sums(sycl::range<1>(nwarps), cgh);
+
+        cgh.parallel_for(
+            sycl::nd_range<3>(block_nums * block_dims, block_dims),
+            [=](sycl::nd_item<3> item_ct1)
+                [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                    mul_mat_vec_q_slm<QK8_0, QI8_0, block_q8_0,
+                                  VDR_Q8_0_Q8_1_MMVQ, vec_dot_q8_0_q8_1>(
+                        vx, vy, dst, ncols, nrows, item_ct1, partial_sums);
+                });
+    });
+#else
     const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, WARP_SIZE);
     {
 
@@ -744,6 +1015,7 @@ static void mul_mat_vec_q8_0_q8_1_sycl(const void *vx, const void *vy,
                     });
         });
     }
+#endif
 }
 
 static void mul_mat_vec_q2_K_q8_1_sycl(const void *vx, const void *vy,
@@ -753,6 +1025,23 @@ static void mul_mat_vec_q2_K_q8_1_sycl(const void *vx, const void *vy,
     GGML_ASSERT(ncols % QK_K == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
+#if GGML_SYCL_MMVQ_WG_SIZE > WARP_SIZE
+    constexpr int nwarps = GGML_SYCL_MMVQ_WG_SIZE / WARP_SIZE;
+    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, GGML_SYCL_MMVQ_WG_SIZE);
+
+    stream->submit([&](sycl::handler &cgh) {
+        sycl::local_accessor<float, 1> partial_sums(sycl::range<1>(nwarps), cgh);
+
+        cgh.parallel_for(
+            sycl::nd_range<3>(block_nums * block_dims, block_dims),
+            [=](sycl::nd_item<3> item_ct1)
+                [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                    mul_mat_vec_q_slm<QK_K, QI2_K, block_q2_K,
+                                  VDR_Q2_K_Q8_1_MMVQ, vec_dot_q2_K_q8_1>(
+                        vx, vy, dst, ncols, nrows, item_ct1, partial_sums);
+                });
+    });
+#else
     const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, WARP_SIZE);
     {
 
@@ -768,6 +1057,7 @@ static void mul_mat_vec_q2_K_q8_1_sycl(const void *vx, const void *vy,
                     });
         });
     }
+#endif
 }
 
 static void mul_mat_vec_q3_K_q8_1_sycl(const void *vx, const void *vy,
@@ -777,6 +1067,23 @@ static void mul_mat_vec_q3_K_q8_1_sycl(const void *vx, const void *vy,
     GGML_ASSERT(ncols % QK_K == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
+#if GGML_SYCL_MMVQ_WG_SIZE > WARP_SIZE
+    constexpr int nwarps = GGML_SYCL_MMVQ_WG_SIZE / WARP_SIZE;
+    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, GGML_SYCL_MMVQ_WG_SIZE);
+
+    stream->submit([&](sycl::handler &cgh) {
+        sycl::local_accessor<float, 1> partial_sums(sycl::range<1>(nwarps), cgh);
+
+        cgh.parallel_for(
+            sycl::nd_range<3>(block_nums * block_dims, block_dims),
+            [=](sycl::nd_item<3> item_ct1)
+                [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                    mul_mat_vec_q_slm<QK_K, QI3_K, block_q3_K,
+                                  VDR_Q3_K_Q8_1_MMVQ, vec_dot_q3_K_q8_1>(
+                        vx, vy, dst, ncols, nrows, item_ct1, partial_sums);
+                });
+    });
+#else
     const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, WARP_SIZE);
     {
 
@@ -792,6 +1099,7 @@ static void mul_mat_vec_q3_K_q8_1_sycl(const void *vx, const void *vy,
                     });
         });
     }
+#endif
 }
 
 static void mul_mat_vec_q4_K_q8_1_sycl(const void *vx, const void *vy,
@@ -801,6 +1109,23 @@ static void mul_mat_vec_q4_K_q8_1_sycl(const void *vx, const void *vy,
     GGML_ASSERT(ncols % QK_K == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
+#if GGML_SYCL_MMVQ_WG_SIZE > WARP_SIZE
+    constexpr int nwarps = GGML_SYCL_MMVQ_WG_SIZE / WARP_SIZE;
+    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, GGML_SYCL_MMVQ_WG_SIZE);
+
+    stream->submit([&](sycl::handler &cgh) {
+        sycl::local_accessor<float, 1> partial_sums(sycl::range<1>(nwarps), cgh);
+
+        cgh.parallel_for(
+            sycl::nd_range<3>(block_nums * block_dims, block_dims),
+            [=](sycl::nd_item<3> item_ct1)
+                [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                    mul_mat_vec_q_slm<QK_K, QI4_K, block_q4_K,
+                                  VDR_Q4_K_Q8_1_MMVQ, vec_dot_q4_K_q8_1>(
+                        vx, vy, dst, ncols, nrows, item_ct1, partial_sums);
+                });
+    });
+#else
     const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, WARP_SIZE);
     {
 
@@ -816,6 +1141,7 @@ static void mul_mat_vec_q4_K_q8_1_sycl(const void *vx, const void *vy,
                     });
         });
     }
+#endif
 }
 
 static void reorder_mul_mat_vec_q4_k_q8_1_sycl(const void * vx, const void * vy, float * dst, const int ncols,
@@ -846,6 +1172,23 @@ static void mul_mat_vec_q5_K_q8_1_sycl(const void *vx, const void *vy,
     GGML_ASSERT(ncols % QK_K == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
+#if GGML_SYCL_MMVQ_WG_SIZE > WARP_SIZE
+    constexpr int nwarps = GGML_SYCL_MMVQ_WG_SIZE / WARP_SIZE;
+    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, GGML_SYCL_MMVQ_WG_SIZE);
+
+    stream->submit([&](sycl::handler &cgh) {
+        sycl::local_accessor<float, 1> partial_sums(sycl::range<1>(nwarps), cgh);
+
+        cgh.parallel_for(
+            sycl::nd_range<3>(block_nums * block_dims, block_dims),
+            [=](sycl::nd_item<3> item_ct1)
+                [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                    mul_mat_vec_q_slm<QK_K, QI5_K, block_q5_K,
+                                  VDR_Q5_K_Q8_1_MMVQ, vec_dot_q5_K_q8_1>(
+                        vx, vy, dst, ncols, nrows, item_ct1, partial_sums);
+                });
+    });
+#else
     const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, WARP_SIZE);
     {
 
@@ -861,6 +1204,7 @@ static void mul_mat_vec_q5_K_q8_1_sycl(const void *vx, const void *vy,
                     });
         });
     }
+#endif
 }
 
 static void reorder_mul_mat_vec_q6_k_q8_1_sycl(const void * vx, const void * vy, float * dst, const int ncols,
@@ -888,6 +1232,23 @@ static void mul_mat_vec_q6_K_q8_1_sycl(const void *vx, const void *vy,
     GGML_ASSERT(ncols % QK_K == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
+#if GGML_SYCL_MMVQ_WG_SIZE > WARP_SIZE
+    constexpr int nwarps = GGML_SYCL_MMVQ_WG_SIZE / WARP_SIZE;
+    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, GGML_SYCL_MMVQ_WG_SIZE);
+
+    stream->submit([&](sycl::handler &cgh) {
+        sycl::local_accessor<float, 1> partial_sums(sycl::range<1>(nwarps), cgh);
+
+        cgh.parallel_for(
+            sycl::nd_range<3>(block_nums * block_dims, block_dims),
+            [=](sycl::nd_item<3> item_ct1)
+                [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                    mul_mat_vec_q_slm<QK_K, QI6_K, block_q6_K,
+                                  VDR_Q6_K_Q8_1_MMVQ, vec_dot_q6_K_q8_1>(
+                        vx, vy, dst, ncols, nrows, item_ct1, partial_sums);
+                });
+    });
+#else
     const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, WARP_SIZE);
     {
 
@@ -903,6 +1264,7 @@ static void mul_mat_vec_q6_K_q8_1_sycl(const void *vx, const void *vy,
                     });
         });
     }
+#endif
 }
 
 

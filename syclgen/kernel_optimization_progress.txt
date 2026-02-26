@@ -26,6 +26,16 @@
 - [x] sk_013: gla SYCL kernel — low potential (4 optimization opportunities)
 ## Recent Activity
 
+[2026-02-26] COMPLETED task_021: Increase mmvq non-reorder work-group size from 16 to 64+.
+  - Increased non-reorder mmvq work-group from 16 to 64 threads (4 sub-groups of SIMD16)
+  - Added GGML_SYCL_MMVQ_WG_SIZE=64 constant in presets.hpp
+  - Implemented SLM-based inter-sub-group reduction for cooperative processing
+  - Updated all 11 non-reorder kernels (q4_0, q4_1, q5_0, q5_1, q8_0, q2_k-q6_k, mxfp4)
+  - Falls back to 16-thread original when GGML_SYCL_MMVQ_WG_SIZE <= WARP_SIZE
+  - Build: SUCCESS
+  - Unit tests: 726/726 MUL_MAT tests PASSED
+  - Expected 2-3x throughput improvement from better memory latency hiding
+
 [2026-02-26] COMPLETED task_020: Implement multi-column batching for mmvq.
   - Implemented multi-column batching for mmvq (quantized matrix-vector multiply)
   - Added GGML_SYCL_MMVQ_BATCH_COLS=4 constant for batch size

@@ -61,6 +61,10 @@
 #define GGML_SYCL_MMV_Y 1
 #endif
 
+#ifndef GGML_SYCL_MMVQ_WG_SIZE
+#define GGML_SYCL_MMVQ_WG_SIZE 64
+#endif
+
 #ifndef K_QUANTS_PER_ITERATION
 #define K_QUANTS_PER_ITERATION 2
 #else
