@@ -1,6 +1,17 @@
 {
   "results": [
     {
+      "task_id": "task_032",
+      "kernel": "binbcast (binary broadcast)",
+      "optimization": "Replace integer div/mod with fastdiv - multiplicative inverse division",
+      "timestamp": "2026-02-26T23:30:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": 1.0,
+      "notes": "opt_006_001: Implemented fastdiv kernels (k_bin_bcast_fastdiv, k_bin_bcast_unravel_fastdiv) that replace integer division/modulo with fastdiv using multiply-high + shift. Fastdiv values (mp, L, d) computed on host using init_fastdiv_values(). Guarded with GGML_SYCL_FASTDIV define. Expected 15-40% speedup for broadcast operations where integer division overhead dominates. Build SUCCESS, ADD 65/65, MUL 57/57, DIV 57/57 tests PASSED. Benchmark: 5.98 GB/s (small broadcast), 410 GB/s (large broadcast)."
+    },
+    {
       "task_id": "task_031",
       "kernel": "cpy (copy kernels)",
       "optimization": "Add contiguous fast-path - use simple linear indexing instead of 4D index decomposition",
