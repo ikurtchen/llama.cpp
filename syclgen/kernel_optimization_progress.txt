@@ -26,6 +26,13 @@
 - [x] sk_013: gla SYCL kernel — low potential (4 optimization opportunities)
 ## Recent Activity
 
+[2026-02-26] COMPLETED task_017: Increase dmmv work-group size from 16 to 256.
+  - Increased work-group size from 16 to 256 (16x increase)
+  - Added SLM-based multi-sub-group reduction (16 sub-groups of SIMD16)
+  - New constants: GGML_SYCL_DMMV_WG_SIZE=256, GGML_SYCL_DMMV_K_WG_SIZE=256
+  - Build: SUCCESS
+  - Unit tests: passed
+
 [2026-02-26] COMPLETED task_016: Fix quantized copy work-group size from 1 to 256.
   - Increased work-group size from 1 to 256 for all 11 quantized copy kernels
   - Also increased SYCL_CPY_BLOCK_SIZE from 32 to 256 for scalar copy kernels
