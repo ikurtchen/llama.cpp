@@ -26,6 +26,22 @@
 - [x] sk_013: gla SYCL kernel — low potential (4 optimization opportunities)
 ## Recent Activity
 
+[2026-02-26] COMPLETED task_029: Use native sin/cos/pow for RoPE.
+  - opt_002_001: Replaced sycl::cos/sin with native::cos/sin
+  - opt_002_002: Replaced sycl::pow with native::exp2(native::log2()*...)
+  - Expected 15-30% speedup from faster transcendental functions
+  - Build: SUCCESS
+  - Unit tests: 248/248 ROPE tests PASSED
+  - Benchmark: 376 GB/s (f32), 200 GB/s (f16)
+
+[2026-02-26] BLOCKED task_028: Implement fused rms_norm_multiply kernel.
+  - Requires adding new kernel variants, dispatch functions, and potentially GGML ops
+  - Too complex for single session - feature addition vs optimization
+
+[2026-02-26] BLOCKED task_023: Add stream-K work distribution for mmq.
+  - Stream-K implementation had build errors and was disabled
+  - Pre-existing bugs in dmmv.cpp and mmvq.cpp were fixed
+
 [2026-02-26] COMPLETED task_027: Fix norm reduction patterns and work-group sizing.
   - opt_003_001: Fixed group_norm barriers (lines 97, 132) to use local_space fence
   - opt_003_003: Increased small-path work-group from 16 to 256 for norm/rms/l2_norm
