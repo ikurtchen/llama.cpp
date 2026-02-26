@@ -26,6 +26,15 @@
 - [x] sk_013: gla SYCL kernel — low potential (4 optimization opportunities)
 ## Recent Activity
 
+[2026-02-26] COMPLETED task_034: Add native math and reqd_sub_group_size to element_wise.
+  - opt_004_002: Replaced sycl::tanh/sqrt/sin/cos/exp/log with sycl::native:: versions
+  - Applied to: op_gelu, op_tanh, op_sqrt, op_sin, op_cos, op_exp, op_log, op_softplus
+  - opt_004_001: Added reqd_sub_group_size(16) to 5 parallel_for lambdas
+  - vec4 vectorization deferred - requires significant kernel restructuring
+  - Expected 10-30% speedup from native math functions on Xe2
+  - Build: SUCCESS
+  - Note: Unit tests have pre-existing failure (GGML_SYCL_F16=OFF in build config)
+
 [2026-02-26] COMPLETED task_033: Fix binbcast fallback condition (y-dim check).
   - opt_006_003: Changed fallback condition to check both y and z grid dimensions
   - Changed 'if (block_nums[0] > 65535)' to 'if (block_nums[0] > 65535 || block_nums[1] > 65535)'

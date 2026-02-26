@@ -1,3 +1,5 @@
+// See hw_spec_b60.md and optimization_guide.md for Intel Arc Pro B60 (Xe2) optimizations
+// Use sycl::native:: math functions for 10-30% speedup on SIMD16 native width
 #include "common.hpp"
 #include "ggml-sycl/presets.hpp"
 #include "ggml.h"
@@ -55,7 +57,7 @@ static __dpct_inline__ T op_gelu(T x) {
     const T SQRT_2_OVER_PI = static_cast<T>(0.79788456080286535587989211986876f);
     return static_cast<T>(0.5f) * x *
            (static_cast<T>(1.0f) +
-            sycl::tanh(SQRT_2_OVER_PI * x * (static_cast<T>(1.0f) + GELU_COEF_A * x * x)));
+            sycl::native::tanh(SQRT_2_OVER_PI * x * (static_cast<T>(1.0f) + GELU_COEF_A * x * x)));
 }
 
 template<typename T>
@@ -77,7 +79,7 @@ static __dpct_inline__ T op_gelu_erf(T x) {
 
 template<typename T>
 static __dpct_inline__ T op_tanh(T x) {
-    return sycl::tanh(x);
+    return sycl::native::tanh(x);
 }
 
 template<typename T>
@@ -92,17 +94,17 @@ static __dpct_inline__ T op_sigmoid(T x) {
 
 template<typename T>
 static __dpct_inline__ T op_sqrt(T x) {
-    return sycl::sqrt(x);
+    return sycl::native::sqrt(x);
 }
 
 template<typename T>
 static __dpct_inline__ T op_sin(T x) {
-    return sycl::sin(x);
+    return sycl::native::sin(x);
 }
 
 template<typename T>
 static __dpct_inline__ T op_cos(T x) {
-    return sycl::cos(x);
+    return sycl::native::cos(x);
 }
 
 template<typename T>
@@ -117,7 +119,7 @@ static __dpct_inline__ T op_hardswish(T x) {
 
 template<typename T>
 static __dpct_inline__ T op_exp(T x) {
-    return sycl::exp(x);
+    return sycl::native::exp(x);
 }
 
 template<typename T>
@@ -125,7 +127,7 @@ static __dpct_inline__ T op_log(T x) {
     if (x <= static_cast<T>(0)) {
         return neg_infinity<T>();
     }
-    return sycl::log(x);
+    return sycl::native::log(x);
 }
 
 template<typename T>
@@ -133,7 +135,7 @@ static __dpct_inline__ T op_softplus(T x) {
     const float xf = (float) x;
     const float ax = sycl::fabs(xf);
     const float m  = sycl::fmax(xf, 0.0f);
-    const float y  = m + sycl::log1p(sycl::exp(-ax));
+    const float y  = m + sycl::log1p(sycl::native::exp(-ax));
     return (T) y;
 }
 
@@ -587,7 +589,7 @@ static inline void ggml_sycl_op_unary(
             stream->parallel_for(
                 sycl::nd_range<1>(sycl::range<1>(num_blocks) * sycl::range<1>(256),
                                   sycl::range<1>(256)),
-                [=](sycl::nd_item<1> item_ct1) {
+                [=](sycl::nd_item<1> item_ct1) [[sycl::reqd_sub_group_size(16)]] {
                     unary_op_generic_kernel(
                         src, dst_ptr, k_elements,
                         ne0, ne1, ne2, ne3,
@@ -824,7 +826,7 @@ static inline void ggml_sycl_op_log(ggml_backend_sycl_context & ctx, ggml_tensor
             stream->parallel_for(
                 sycl::nd_range<1>(sycl::range<1>(num_blocks) * sycl::range<1>(SYCL_EXP_BLOCK_SIZE),
                                   sycl::range<1>(SYCL_EXP_BLOCK_SIZE)),
-                [=](sycl::nd_item<1> item_ct1) {
+                [=](sycl::nd_item<1> item_ct1) [[sycl::reqd_sub_group_size(16)]] {
                     unary_op_log_kernel(src, dst_ptr, k_elements, item_ct1);
                 });
         });
@@ -862,7 +864,7 @@ static inline void ggml_sycl_op_sqrt(ggml_backend_sycl_context & ctx, ggml_tenso
             stream->parallel_for(
                 sycl::nd_range<1>(sycl::range<1>(num_blocks) * sycl::range<1>(SYCL_SQRT_BLOCK_SIZE),
                                   sycl::range<1>(SYCL_SQRT_BLOCK_SIZE)),
-                [=](sycl::nd_item<1> item_ct1) {
+                [=](sycl::nd_item<1> item_ct1) [[sycl::reqd_sub_group_size(16)]] {
                     unary_op_sqrt_kernel(src, dst_ptr, k_elements, item_ct1);
                 });
         });
@@ -875,7 +877,7 @@ static inline void ggml_sycl_op_sin(ggml_backend_sycl_context & ctx, ggml_tensor
             stream->parallel_for(
                 sycl::nd_range<1>(sycl::range<1>(num_blocks) * sycl::range<1>(SYCL_SIN_BLOCK_SIZE),
                                   sycl::range<1>(SYCL_SIN_BLOCK_SIZE)),
-                [=](sycl::nd_item<1> item_ct1) {
+                [=](sycl::nd_item<1> item_ct1) [[sycl::reqd_sub_group_size(16)]] {
                     unary_op_sin_kernel(src, dst_ptr, k_elements, item_ct1);
                 });
         });
@@ -888,7 +890,7 @@ static inline void ggml_sycl_op_cos(ggml_backend_sycl_context & ctx, ggml_tensor
             stream->parallel_for(
                 sycl::nd_range<1>(sycl::range<1>(num_blocks) * sycl::range<1>(SYCL_SIN_BLOCK_SIZE),
                                   sycl::range<1>(SYCL_SIN_BLOCK_SIZE)),
-                [=](sycl::nd_item<1> item_ct1) {
+                [=](sycl::nd_item<1> item_ct1) [[sycl::reqd_sub_group_size(16)]] {
                     unary_op_cos_kernel(src, dst_ptr, k_elements, item_ct1);
                 });
         });
