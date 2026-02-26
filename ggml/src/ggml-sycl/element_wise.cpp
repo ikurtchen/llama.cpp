@@ -13,18 +13,22 @@
 
 
 static void acc_f32(const float * x, const float * y, float * dst, const int ne,
-    const int ne10, const int ne11, const int ne12,
-    const int nb1, const int nb2, int offset, const sycl::nd_item<1> &item_ct1) {
+    const int ne10, const int ne11, const int ne12, const int ne13,
+    const int nb1, const int nb2, const int nb3, int offset, const sycl::nd_item<1> &item_ct1) {
     const int i = SYCL_LOCAL_ID_CALC(item_ct1, 0);
     if (i >= ne) {
         return;
     }
     int src1_idx = i - offset;
-    int oz = src1_idx / nb2;
-    int oy = (src1_idx - (oz * nb2)) / nb1;
-    int ox = src1_idx % nb1;
-    if (src1_idx >= 0 && ox < ne10 && oy < ne11 && oz < ne12) {
-        dst[i] = x[i] + y[ox + oy * ne10 + oz * ne10 * ne11];
+    int tmp = src1_idx;
+    int i13 = tmp / nb3;
+    tmp -= i13 * nb3;
+    int i12 = tmp / nb2;
+    tmp -= i12 * nb2;
+    int i11 = tmp / nb1;
+    int i10 = tmp % nb1;
+    if (src1_idx >= 0 && i10 < ne10 && i11 < ne11 && i12 < ne12 && i13 < ne13) {
+        dst[i] = x[i] + y[((i13*ne12 + i12) * ne11 + i11) * ne10 + i10];
     } else {
         dst[i] = x[i];
     }
@@ -372,15 +376,15 @@ static void gated_op_fused_geglu_quick(const T * x, const T * g, T * dst, const 
 namespace ggml_sycl_detail {
 static void acc_f32_sycl(const float *x, const float *y, float *dst,
                          const int n_elements, const int ne10, const int ne11,
-                         const int ne12, const int nb1, const int nb2,
-                         const int offset, queue_ptr stream) {
+                         const int ne12, const int ne13, const int nb1, const int nb2,
+                         const int nb3, const int offset, queue_ptr stream) {
     int num_blocks = ceil_div(n_elements, SYCL_ACC_BLOCK_SIZE);
     stream->parallel_for(
         sycl::nd_range<1>(sycl::range<1>(num_blocks) *
                               sycl::range<1>(SYCL_ACC_BLOCK_SIZE),
                           sycl::range<1>(SYCL_ACC_BLOCK_SIZE)),
         [=](sycl::nd_item<1> item_ct1) {
-            acc_f32(x, y, dst, n_elements, ne10, ne11, ne12, nb1, nb2, offset,
+            acc_f32(x, y, dst, n_elements, ne10, ne11, ne12, ne13, nb1, nb2, nb3, offset,
                     item_ct1);
         });
 }
@@ -1006,7 +1010,6 @@ static inline void ggml_sycl_op_acc(ggml_backend_sycl_context & ctx, ggml_tensor
     GGML_ASSERT(dst->src[0]->type == GGML_TYPE_F32);
     GGML_ASSERT(dst->src[1]->type == GGML_TYPE_F32);
     GGML_ASSERT( dst->type == GGML_TYPE_F32);
-    GGML_ASSERT(dst->ne[3] == 1); // just 3D tensors supported
     dpct::queue_ptr main_stream = ctx.stream();
     SYCL_CHECK(ggml_sycl_set_device(ctx.device));
     const float * src0_dd = static_cast<const float *>(dst->src[0]->data);
@@ -1015,10 +1018,10 @@ static inline void ggml_sycl_op_acc(ggml_backend_sycl_context & ctx, ggml_tensor
 
     int nb1 = dst->op_params[0] / 4; // 4 bytes of float32
     int nb2 = dst->op_params[1] / 4; // 4 bytes of float32
-    // int nb3 = dst->op_params[2] / 4; // 4 bytes of float32 - unused
+    int nb3 = dst->op_params[2] / 4; // 4 bytes of float32
     int offset = dst->op_params[3] / 4; // offset in bytes
 
-    ggml_sycl_detail::acc_f32_sycl(src0_dd, src1_dd, dst_dd, (int)ggml_nelements(dst), (int)dst->src[1]->ne[0], (int)dst->src[1]->ne[1], (int)dst->src[1]->ne[2], nb1, nb2, offset, main_stream);
+    ggml_sycl_detail::acc_f32_sycl(src0_dd, src1_dd, dst_dd, (int)ggml_nelements(dst), (int)dst->src[1]->ne[0], (int)dst->src[1]->ne[1], (int)dst->src[1]->ne[2], (int)dst->src[1]->ne[3], nb1, nb2, nb3, offset, main_stream);
 }
 
 static inline void ggml_sycl_op_geglu(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
