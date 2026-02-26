@@ -57,7 +57,7 @@ static __dpct_inline__ T op_gelu(T x) {
     const T SQRT_2_OVER_PI = static_cast<T>(0.79788456080286535587989211986876f);
     return static_cast<T>(0.5f) * x *
            (static_cast<T>(1.0f) +
-            sycl::native::tanh(SQRT_2_OVER_PI * x * (static_cast<T>(1.0f) + GELU_COEF_A * x * x)));
+            sycl::tanh(SQRT_2_OVER_PI * x * (static_cast<T>(1.0f) + GELU_COEF_A * x * x)));
 }
 
 template<typename T>
@@ -79,7 +79,7 @@ static __dpct_inline__ T op_gelu_erf(T x) {
 
 template<typename T>
 static __dpct_inline__ T op_tanh(T x) {
-    return sycl::native::tanh(x);
+    return sycl::tanh(x);
 }
 
 template<typename T>
