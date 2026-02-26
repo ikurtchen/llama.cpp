@@ -26,6 +26,15 @@
 - [x] sk_013: gla SYCL kernel — low potential (4 optimization opportunities)
 ## Recent Activity
 
+[2026-02-26] COMPLETED task_016: Fix quantized copy work-group size from 1 to 256.
+  - Increased work-group size from 1 to 256 for all 11 quantized copy kernels
+  - Also increased SYCL_CPY_BLOCK_SIZE from 32 to 256 for scalar copy kernels
+  - Quantized kernels (cpy_q_f32, cpy_f32_q): 256x more parallelism
+  - Scalar kernels (cpy_f32_f32, etc.): 8x more parallelism (32->256)
+  - Build: SUCCESS
+  - Unit tests: 131/131 PASSED
+  - Benchmark: 37-39 GB/s (q4_0), 132-177 GB/s (f32/f16)
+
 [2026-02-26] COMPLETED task_015: Fix mmq tile size mismatch bug.
   - Fixed kernel hardcoded AMPERE values to use RDNA2 values for Intel Xe2
   - Bug: dispatch selected tile sizes based on compute_capability but kernel used hardcoded AMPERE
