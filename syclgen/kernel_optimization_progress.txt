@@ -26,6 +26,14 @@
 - [x] sk_013: gla SYCL kernel — low potential (4 optimization opportunities)
 ## Recent Activity
 
+[2026-02-26] COMPLETED task_024: Fix wkv SLM over-allocation by 4x.
+  - Removed *sizeof(float) from shared_mem_size calculation in wkv.cpp
+  - local_accessor<float, 1> expects element count, not byte count
+  - Two functions fixed: rwkv_wkv6_f32 (4 floats) and rwkv_wkv7_f32 (5 floats)
+  - Reduces SLM waste by 75% (4x over-allocation fixed)
+  - Build: SUCCESS
+  - Unit tests: 2/2 WKV backend tests PASSED
+
 [2026-02-26] IN_PROGRESS task_023: Stream-K mmq - blocked by build issues.
   - Stream-K implementation attempted but had build errors
   - Fixed pre-existing bugs that were blocking the build:
