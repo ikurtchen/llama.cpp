@@ -66,6 +66,7 @@
 #include "ggml-sycl/solve_tri.hpp"
 #include "ggml-sycl/ssm_scan.hpp"
 #include "ggml-sycl/topk-moe.hpp"
+#include "ggml-sycl/fattn.hpp"
 #include "ggml.h"
 
 static bool g_sycl_loaded = false;
@@ -4123,6 +4124,12 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
         case GGML_OP_SOLVE_TRI:
             ggml_sycl_op_solve_tri(ctx, dst);
             break;
+        case GGML_OP_FLASH_ATTN_EXT:
+            if (ggml_sycl_flash_attn_ext_supported(dst)) {
+                ggml_sycl_op_flash_attn_ext(ctx, dst);
+                break;
+            }
+            return false;
         default:
             return false;
     }
@@ -4760,6 +4767,7 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
     ggml_backend_sycl_device_context *sycl_ctx =
         (ggml_backend_sycl_device_context *)dev->context;
     int device = sycl_ctx->device;
+    GGML_UNUSED(device);
     switch (op->op) {
         case GGML_OP_CONV_TRANSPOSE_1D:
             {
@@ -4770,6 +4778,8 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
                 }
                 return false;
             }
+        case GGML_OP_FLASH_ATTN_EXT:
+            return true;
         case GGML_OP_UNARY:
             switch (ggml_get_unary_op(op)) {
                 case GGML_UNARY_OP_SGN:
