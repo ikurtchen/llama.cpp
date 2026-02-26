@@ -219,6 +219,17 @@
       "optimized_time_us": null,
       "speedup": 1.1,
       "notes": "opt_013_001: Added [[sycl::reqd_sub_group_size(16)]] to parallel_for lambda (line 20-21). Ensures native SIMD16 width on Xe2, preventing compiler from selecting SIMD32 which would halve occupancy. opt_013_002: Added #pragma unroll to inner j-loop (line 47). Hot inner loop iterates head_size/4 times (16 for head_size=64, 32 for head_size=128). Unrolling enables compiler to pipeline FMA operations. Expected 5-15% improvement. Build SUCCESS, GLA unit tests PASSED. GLA benchmark not available in test-backend-ops."
+    },
+    {
+      "task_id": "task_040",
+      "kernel": "dmmv (dequantize matrix-vector multiply)",
+      "optimization": "Consolidate basic quant dispatch functions into template",
+      "timestamp": "2026-02-27T00:30:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": 1.0,
+      "notes": "opt_010_005: Consolidated 5 basic quant dispatch functions (q4_0, q4_1, q5_0, q5_1, q8_0) into single dequantize_mul_mat_vec_dispatch<QK, QR, dequantize_kernel> template function. Reduced ~125 lines of duplicated boilerplate code. Build SUCCESS, MUL_MAT_VEC_Q tests PASSED. K-quant functions (q2_k, q3_k, q4_k, q5_k, q6_k) kept separate due to different y-pointer types (float* vs dfloat*) and different ny values."
     }
   ]
 }

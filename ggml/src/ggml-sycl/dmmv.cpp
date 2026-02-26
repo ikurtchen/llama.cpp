@@ -26,6 +26,47 @@
 #define DMMV_SUBGRP_CNT (GGML_SYCL_DMMV_WG_SIZE / WARP_SIZE)
 #define DMMV_K_SUBGRP_CNT (GGML_SYCL_DMMV_K_WG_SIZE / GGML_SYCL_DMMV_K_SUBGRP_SIZE)
 
+template <int QK, int QR, dequantize_kernel_t dequantize_kernel>
+static void dequantize_mul_mat_vec_dispatch(const void *vx, const dfloat *y,
+                                             float *dst, const int ncols,
+                                             const int nrows,
+                                             dpct::queue_ptr stream) {
+    GGML_ASSERT(ncols % GGML_SYCL_DMMV_X == 0);
+    const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
+    const sycl::range<3> block_nums(1, 1, block_num_y);
+#if GGML_SYCL_DMMV_USE_SLM
+    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, GGML_SYCL_DMMV_WG_SIZE);
+    {
+        dpct::has_capability_or_fail(stream->get_device(),
+                                     {sycl::aspect::fp16});
+
+        stream->submit([&](sycl::handler& cgh) {
+            sycl::local_accessor<float, 1> partial_sums(sycl::range<1>(DMMV_SUBGRP_CNT), cgh);
+
+            cgh.parallel_for(
+                sycl::nd_range<3>(block_nums * block_dims, block_dims),
+                [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                    dequantize_mul_mat_vec_slm<QK, QR, dequantize_kernel>(
+                        vx, y, dst, ncols, nrows, item_ct1, partial_sums);
+                });
+        });
+    }
+#else
+    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, WARP_SIZE);
+    {
+        dpct::has_capability_or_fail(stream->get_device(),
+                                     {sycl::aspect::fp16});
+
+        stream->parallel_for(
+            sycl::nd_range<3>(block_nums * block_dims, block_dims),
+            [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                dequantize_mul_mat_vec<QK, QR, dequantize_kernel>(
+                    vx, y, dst, ncols, nrows, item_ct1);
+            });
+    }
+#endif
+}
+
 static void convert_f16(const void * vx, const int64_t ib, const int iqs, dfloat2 & v){
     const sycl::half *x = (const sycl::half *)vx;
 
@@ -1696,200 +1737,35 @@ static void dequantize_mul_mat_vec_q4_0_sycl(const void *vx, const dfloat *y,
                                              float *dst, const int ncols,
                                              const int nrows,
                                              dpct::queue_ptr stream) {
-    GGML_ASSERT(ncols % GGML_SYCL_DMMV_X == 0);
-    const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
-    const sycl::range<3> block_nums(1, 1, block_num_y);
-#if GGML_SYCL_DMMV_USE_SLM
-    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, GGML_SYCL_DMMV_WG_SIZE);
-    {
-        dpct::has_capability_or_fail(stream->get_device(),
-                                     {sycl::aspect::fp16});
-
-        stream->submit([&](sycl::handler& cgh) {
-            sycl::local_accessor<float, 1> partial_sums(sycl::range<1>(DMMV_SUBGRP_CNT), cgh);
-
-            cgh.parallel_for(
-                sycl::nd_range<3>(block_nums * block_dims, block_dims),
-                [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
-                    dequantize_mul_mat_vec_slm<QK4_0, QR4_0, dequantize_q4_0>(
-                        vx, y, dst, ncols, nrows, item_ct1, partial_sums);
-                });
-        });
-    }
-#else
-    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, WARP_SIZE);
-    {
-        dpct::has_capability_or_fail(stream->get_device(),
-                                     {sycl::aspect::fp16});
-
-        stream->parallel_for(
-            sycl::nd_range<3>(block_nums * block_dims, block_dims),
-            [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
-                dequantize_mul_mat_vec<QK4_0, QR4_0, dequantize_q4_0>(
-                    vx, y, dst, ncols, nrows, item_ct1);
-            });
-    }
-#endif
+    dequantize_mul_mat_vec_dispatch<QK4_0, QR4_0, dequantize_q4_0>(vx, y, dst, ncols, nrows, stream);
 }
 
 static void dequantize_mul_mat_vec_q4_1_sycl(const void *vx, const dfloat *y,
                                              float *dst, const int ncols,
                                              const int nrows,
                                              dpct::queue_ptr stream) {
-    GGML_ASSERT(ncols % GGML_SYCL_DMMV_X == 0);
-    const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
-    const sycl::range<3> block_nums(1, 1, block_num_y);
-#if GGML_SYCL_DMMV_USE_SLM
-    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, GGML_SYCL_DMMV_WG_SIZE);
-    {
-        dpct::has_capability_or_fail(stream->get_device(),
-                                     {sycl::aspect::fp16});
-
-        stream->submit([&](sycl::handler& cgh) {
-            sycl::local_accessor<float, 1> partial_sums(sycl::range<1>(DMMV_SUBGRP_CNT), cgh);
-
-            cgh.parallel_for(
-                sycl::nd_range<3>(block_nums * block_dims, block_dims),
-                [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
-                    dequantize_mul_mat_vec_slm<QK4_1, QR4_1, dequantize_q4_1>(
-                        vx, y, dst, ncols, nrows, item_ct1, partial_sums);
-                });
-        });
-    }
-#else
-    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, WARP_SIZE);
-    {
-        dpct::has_capability_or_fail(stream->get_device(),
-                                     {sycl::aspect::fp16});
-
-        stream->parallel_for(
-            sycl::nd_range<3>(block_nums * block_dims, block_dims),
-            [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
-                dequantize_mul_mat_vec<QK4_1, QR4_1, dequantize_q4_1>(
-                    vx, y, dst, ncols, nrows, item_ct1);
-            });
-    }
-#endif
+    dequantize_mul_mat_vec_dispatch<QK4_1, QR4_1, dequantize_q4_1>(vx, y, dst, ncols, nrows, stream);
 }
 
 static void dequantize_mul_mat_vec_q5_0_sycl(const void *vx, const dfloat *y,
                                              float *dst, const int ncols,
                                              const int nrows,
                                              dpct::queue_ptr stream) {
-    GGML_ASSERT(ncols % GGML_SYCL_DMMV_X == 0);
-    const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
-    const sycl::range<3> block_nums(1, 1, block_num_y);
-#if GGML_SYCL_DMMV_USE_SLM
-    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, GGML_SYCL_DMMV_WG_SIZE);
-    {
-        dpct::has_capability_or_fail(stream->get_device(),
-                                     {sycl::aspect::fp16});
-
-        stream->submit([&](sycl::handler& cgh) {
-            sycl::local_accessor<float, 1> partial_sums(sycl::range<1>(DMMV_SUBGRP_CNT), cgh);
-
-            cgh.parallel_for(
-                sycl::nd_range<3>(block_nums * block_dims, block_dims),
-                [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
-                    dequantize_mul_mat_vec_slm<QK5_0, QR5_0, dequantize_q5_0>(
-                        vx, y, dst, ncols, nrows, item_ct1, partial_sums);
-                });
-        });
-    }
-#else
-    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, WARP_SIZE);
-    {
-        dpct::has_capability_or_fail(stream->get_device(),
-                                     {sycl::aspect::fp16});
-
-        stream->parallel_for(
-            sycl::nd_range<3>(block_nums * block_dims, block_dims),
-            [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
-                dequantize_mul_mat_vec<QK5_0, QR5_0, dequantize_q5_0>(
-                    vx, y, dst, ncols, nrows, item_ct1);
-            });
-    }
-#endif
+    dequantize_mul_mat_vec_dispatch<QK5_0, QR5_0, dequantize_q5_0>(vx, y, dst, ncols, nrows, stream);
 }
 
 static void dequantize_mul_mat_vec_q5_1_sycl(const void *vx, const dfloat *y,
                                              float *dst, const int ncols,
                                              const int nrows,
                                              dpct::queue_ptr stream) {
-    GGML_ASSERT(ncols % GGML_SYCL_DMMV_X == 0);
-    const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
-    const sycl::range<3> block_nums(1, 1, block_num_y);
-#if GGML_SYCL_DMMV_USE_SLM
-    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, GGML_SYCL_DMMV_WG_SIZE);
-    {
-        dpct::has_capability_or_fail(stream->get_device(),
-                                     {sycl::aspect::fp16});
-
-        stream->submit([&](sycl::handler& cgh) {
-            sycl::local_accessor<float, 1> partial_sums(sycl::range<1>(DMMV_SUBGRP_CNT), cgh);
-
-            cgh.parallel_for(
-                sycl::nd_range<3>(block_nums * block_dims, block_dims),
-                [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
-                    dequantize_mul_mat_vec_slm<QK5_1, QR5_1, dequantize_q5_1>(
-                        vx, y, dst, ncols, nrows, item_ct1, partial_sums);
-                });
-        });
-    }
-#else
-    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, WARP_SIZE);
-    {
-        dpct::has_capability_or_fail(stream->get_device(),
-                                     {sycl::aspect::fp16});
-
-        stream->parallel_for(
-            sycl::nd_range<3>(block_nums * block_dims, block_dims),
-            [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
-                dequantize_mul_mat_vec<QK5_1, QR5_1, dequantize_q5_1>(
-                    vx, y, dst, ncols, nrows, item_ct1);
-            });
-    }
-#endif
+    dequantize_mul_mat_vec_dispatch<QK5_1, QR5_1, dequantize_q5_1>(vx, y, dst, ncols, nrows, stream);
 }
 
 static void dequantize_mul_mat_vec_q8_0_sycl(const void *vx, const dfloat *y,
                                              float *dst, const int ncols,
                                              const int nrows,
                                              dpct::queue_ptr stream) {
-    GGML_ASSERT(ncols % GGML_SYCL_DMMV_X == 0);
-    const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
-    const sycl::range<3> block_nums(1, 1, block_num_y);
-#if GGML_SYCL_DMMV_USE_SLM
-    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, GGML_SYCL_DMMV_WG_SIZE);
-    {
-        dpct::has_capability_or_fail(stream->get_device(),
-                                     {sycl::aspect::fp16});
-
-        stream->submit([&](sycl::handler& cgh) {
-            sycl::local_accessor<float, 1> partial_sums(sycl::range<1>(DMMV_SUBGRP_CNT), cgh);
-
-            cgh.parallel_for(
-                sycl::nd_range<3>(block_nums * block_dims, block_dims),
-                [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
-                    dequantize_mul_mat_vec_slm<QK8_0, QR8_0, dequantize_q8_0>(
-                        vx, y, dst, ncols, nrows, item_ct1, partial_sums);
-                });
-        });
-    }
-#else
-    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, WARP_SIZE);
-    {
-        dpct::has_capability_or_fail(stream->get_device(),
-                                     {sycl::aspect::fp16});
-
-        stream->parallel_for(
-            sycl::nd_range<3>(block_nums * block_dims, block_dims),
-            [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
-                dequantize_mul_mat_vec<QK8_0, QR8_0, dequantize_q8_0>(
-                    vx, y, dst, ncols, nrows, item_ct1);
-            });
-    }
-#endif
+    dequantize_mul_mat_vec_dispatch<QK8_0, QR8_0, dequantize_q8_0>(vx, y, dst, ncols, nrows, stream);
 }
 
 static void dequantize_mul_mat_vec_q2_K_sycl(const void *vx, const float *y,

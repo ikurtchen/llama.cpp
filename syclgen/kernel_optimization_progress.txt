@@ -24,6 +24,15 @@
 - [x] sk_011: getrows SYCL kernels — medium potential (6 optimization opportunities)
 - [x] sk_012: wkv SYCL kernels — medium potential (5 optimization opportunities)
 - [x] sk_013: gla SYCL kernel — low potential (4 optimization opportunities)
+[2026-02-27] COMPLETED task_040: Consolidate dmmv basic quant dispatch functions into template.
+  - opt_010_005: Created dequantize_mul_mat_vec_dispatch<QK, QR, dequantize_kernel> template
+  - Consolidated 5 basic quant dispatch functions: q4_0, q4_1, q5_0, q5_1, q8_0
+  - Reduced ~125 lines of duplicated boilerplate code
+  - K-quants (q2_k-q6_k) kept separate due to different y-pointer types and ny values
+  - Build: SUCCESS
+  - Unit tests: MUL_MAT_VEC_Q tests PASSED
+  - Note: Code maintainability improvement, no performance impact
+
 ## Recent Activity
 
 [2026-02-26] COMPLETED task_042: Add missing feature gaps (acc_f32 4D support + DPCT cleanup).
