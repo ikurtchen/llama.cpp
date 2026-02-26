@@ -142,6 +142,17 @@
       "optimized_time_us": null,
       "speedup": 1.15,
       "notes": "opt_002_001: Replaced sycl::cos/sin with native::cos/sin. opt_002_002: Replaced sycl::pow(a,b) with native::exp2(native::log2(a) * b). Expected 15-30% speedup from faster transcendental functions. Build SUCCESS, 248/248 ROPE unit tests PASSED. Benchmark: 376 GB/s (f32), 200 GB/s (f16)."
+    },
+    {
+      "task_id": "task_030",
+      "kernel": "rope (RoPE)",
+      "optimization": "Add reqd_sub_group_size(16) to all 8 RoPE parallel_for lambdas",
+      "timestamp": "2026-02-26T22:30:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": 1.0,
+      "notes": "Added [[sycl::reqd_sub_group_size(WARP_SIZE)]] to all 8 parallel_for lambdas in rope.cpp: rope_norm (2), rope_neox (2), rope_multi (2), rope_vision (2). Ensures SIMD16 native width on Xe2, preventing compiler from potentially selecting SIMD32 which would halve occupancy. Build SUCCESS, 248/248 ROPE unit tests PASSED. Benchmark: 376 GB/s (f32), 204 GB/s (f16) - within noise margin."
     }
   ]
 }

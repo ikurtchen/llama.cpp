@@ -26,6 +26,14 @@
 - [x] sk_013: gla SYCL kernel — low potential (4 optimization opportunities)
 ## Recent Activity
 
+[2026-02-26] COMPLETED task_030: Add reqd_sub_group_size(16) to all RoPE launch paths.
+  - opt_002_003: Added [[sycl::reqd_sub_group_size(WARP_SIZE)]] to all 8 parallel_for lambdas
+  - Applied to: rope_norm (2), rope_neox (2), rope_multi (2), rope_vision (2)
+  - Expected 5-15% occupancy improvement from native SIMD16 width
+  - Build: SUCCESS
+  - Unit tests: 248/248 ROPE tests PASSED
+  - Benchmark: 376 GB/s (f32), 204 GB/s (f16) - within noise margin
+
 [2026-02-26] COMPLETED task_029: Use native sin/cos/pow for RoPE.
   - opt_002_001: Replaced sycl::cos/sin with native::cos/sin
   - opt_002_002: Replaced sycl::pow with native::exp2(native::log2()*...)
