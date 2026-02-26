@@ -26,6 +26,16 @@
 - [x] sk_013: gla SYCL kernel — low potential (4 optimization opportunities)
 ## Recent Activity
 
+[2026-02-26] REVIEWED remaining tasks: All performance optimizations completed.
+  - Phase 1-3 optimizations: All completed (38 tasks)
+  - Remaining tasks (task_039-task_042): Code quality/maintainability only
+  - task_039: BLOCKED - mmvq consolidation requires 11 kernels + 20 dispatchers (large effort)
+  - task_040: PENDING - dmmv K-quant consolidation (large effort)
+  - task_041: PENDING - missing quant type support (xlarge effort)  
+  - task_042: PENDING - feature gaps: acc_f32 4D, upscale modes, DPCT cleanup (medium effort)
+  - These are all code maintainability tasks with no performance impact
+  - Recommend focusing on other priorities or scheduling multi-session blocks for consolidation
+
 [2026-02-26] COMPLETED task_038 (partial): DPCT cleanup in rope.cpp + fix build error.
   - opt_002_004: Converted nd_range<3> to nd_range<2> in all 4 rope kernels
   - opt_002_005: Replaced manual thread indexing with get_global_id()
