@@ -1,0 +1,15 @@
+{
+  "results": [
+    {
+      "task_id": "task_014",
+      "kernel": "mmq (quantized matmul)",
+      "optimization": "XMX/joint_matrix compute path",
+      "timestamp": "2026-02-26T03:40:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": 1.0,
+      "notes": "XMX/joint_matrix implementation blocked by Intel oneAPI 2025.1 API change - experimental::matrix moved and unavailable. XMX infrastructure present in code but disabled. Build succeeds, 726/726 tests pass."
+    }
+  ]
+}

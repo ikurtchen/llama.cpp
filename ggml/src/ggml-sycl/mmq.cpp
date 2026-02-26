@@ -13,7 +13,10 @@
 #include "mmq.hpp"
 #include "vecdotq.hpp"
 
-#if defined(SYCL_USE_XMX)
+// XMX/tensor core support disabled due to API changes in Intel oneAPI 2025.1
+// The experimental::matrix API has been moved to matrix:: in the new version
+// TODO: Re-enable when the new matrix API is properly supported
+#if 0 && defined(SYCL_USE_XMX)
 #include <sycl/ext/oneapi/experimental/matrix.hpp>
 
 namespace jm = sycl::ext::oneapi::experimental::matrix;
@@ -949,28 +952,45 @@ static __dpct_inline__ float vec_dot_q4_0_q8_1_mul_mat_mma(
          y_ds[j * (WARP_SIZE/QI8_1) + (2*k/QI8_1) % (WARP_SIZE/QI8_1)]);
 }
 
+/*
+// XMX compute path - disabled until joint_matrix API issues are resolved
 static __dpct_inline__ float
 mmq_compute_q4_0_q8_1_mma(const int8_t * __restrict__ x_ql,
                           const float * __restrict__ x_dm,
                           const int8_t * __restrict__ y_qs,
                           const float * __restrict__ y_ds,
-                          const int &i, const int &j, const int &k) {
+                          const int &i, const int &j, const int &k,
+                          const sycl::sub_group &sg) {
     jm_acc_int32 acc;
     jm_a_int8 ma;
     jm_b_int8 mb;
 
-    jm::joint_matrix_load(sg, acc, &x_ql[i * MMA_K + k], MMA_K);
-    jm::joint_matrix_load(sg, mb, &y_qs[j * MMA_K + k], MMA_N);
+    jm::joint_matrix_load(sg, acc, sycl::multi_ptr<const int8_t, sycl::access::address_space::global_space>(&x_ql[i * MMA_K + k]), MMA_K);
+    jm::joint_matrix_load(sg, mb, sycl::multi_ptr<const int8_t, sycl::access::address_space::global_space>(&y_qs[j * MMA_K + k]), MMA_N);
     jm::joint_matrix_mad(sg, acc, ma, mb, acc);
 
     float sum = 0.0f;
-    auto acc_elem = acc.get_low_data();
+    auto *acc_elem = (int32_t *)&acc;
 #pragma unroll
-    for (int m = 0; m < MMA_M; ++m) {
-        sum += (float)acc_elem[m] * x_dm[i * MMA_M / QI4_0 + m / QI4_0] * y_ds[j * MMA_N / QI8_1 + m % (MMA_N / QI8_1)];
+    for (int m = 0; m < MMA_M * MMA_N / 4; ++m) {
+        sum += (float)acc_elem[m] * x_dm[i * MMA_M / QI4_0 + m / (MMA_N / QI4_0)] * y_ds[j * MMA_N / QI8_1 + m % (MMA_N / QI8_1)];
     }
     return sum;
 }
+
+static __dpct_inline__ float
+vec_dot_q4_0_q8_1_mul_mat_mma_xmx(
+    const int *__restrict__ x_ql, const sycl::half2 *__restrict__ x_dm,
+    const int *__restrict__ x_qh, const int *__restrict__ x_sc,
+    const int *__restrict__ y_qs, const sycl::half2 *__restrict__ y_ds,
+    const int &i, const int &j, const int &k) {
+    (void)x_qh; (void)x_sc;
+    auto sg = sycl::ext::oneapi::this_work_item::get_sub_group();
+    return mmq_compute_q4_0_q8_1_mma(
+        (const int8_t *)x_ql, (const float *)x_dm,
+        (const int8_t *)y_qs, (const float *)y_ds, i, j, k, sg);
+}
+*/
 
 #endif // SYCL_USE_XMX
 
@@ -2276,9 +2296,9 @@ mul_mat_q(const void *__restrict__ vx, const void *__restrict__ vy,
 #define  MMQ_Y_Q4_0_RDNA1  64
 #define NWARPS_Q4_0_RDNA1  8
 #if defined(SYCL_USE_XMX)
-#define  MMQ_X_Q4_0_AMPERE 4
-#define  MMQ_Y_Q4_0_AMPERE 32
-#define NWARPS_Q4_0_AMPERE 4
+#define  MMQ_X_Q4_0_AMPERE MMQ_X_XMX
+#define  MMQ_Y_Q4_0_AMPERE MMQ_Y_XMX
+#define NWARPS_Q4_0_AMPERE NWARPS_XMX
 #else
 #define  MMQ_X_Q4_0_AMPERE 64
 #define  MMQ_Y_Q4_0_AMPERE 128
@@ -2766,7 +2786,11 @@ static void ggml_mul_mat_q4_0_q8_1_sycl(const void *vx, const void *vy,
 
                 cgh.parallel_for(
                     sycl::nd_range<3>(block_nums * block_dims, block_dims),
+#if defined(SYCL_USE_XMX)
+                    [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(16)]] {
+#else
                     [=](sycl::nd_item<3> item_ct1) {
+#endif
                         mul_mat_q4_0<need_check>(
                             vx, vy, dst, ncols_x, nrows_x, ncols_y, nrows_y,
                             nrows_dst, item_ct1,
@@ -2801,7 +2825,11 @@ static void ggml_mul_mat_q4_0_q8_1_sycl(const void *vx, const void *vy,
 
                 cgh.parallel_for(
                     sycl::nd_range<3>(block_nums * block_dims, block_dims),
+#if defined(SYCL_USE_XMX)
+                    [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(16)]] {
+#else
                     [=](sycl::nd_item<3> item_ct1) {
+#endif
                         mul_mat_q4_0<need_check>(
                             vx, vy, dst, ncols_x, nrows_x, ncols_y, nrows_y,
                             nrows_dst, item_ct1,

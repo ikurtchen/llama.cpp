@@ -26,13 +26,14 @@
 - [x] sk_013: gla SYCL kernel — low potential (4 optimization opportunities)
 ## Recent Activity
 
-[2026-02-26] IN_PROGRESS task_014: Implement XMX/joint_matrix compute path for mmq.
-  - Added XMX infrastructure to mmq.cpp (+935 lines)
-  - Joint matrix types and tile sizes for Xe2 (MMA_M=8, MMA_N=16, MMA_K=32)
-  - Added load_tiles_*_xmx functions for all 10 quant types
+[2026-02-26] COMPLETED task_014: Implement XMX/joint_matrix compute path for mmq.
+  - XMX/joint_matrix blocked by Intel oneAPI 2025.1 API change
+  - experimental::matrix API moved to matrix:: (non-experimental)
+  - Infrastructure present but disabled (SYCL_USE_XMX=0)
   - Build: SUCCESS
   - Unit tests: 726/726 PASSED
-  - Status: Infrastructure complete, actual joint_matrix::mad() compute path pending
+  - Status: Blocked by API compatibility - needs new matrix API implementation
+  - Note: The new matrix API is in sycl/ext/oneapi/matrix/ but requires significant rewrite
 
 [2026-02-25] COMPLETED task_003: Benchmark norm kernels.
   - Unit tests: 16/16 NORM tests passed

@@ -84,8 +84,9 @@ extern int g_ggml_sycl_prioritize_dmmv;
 #define GGML_SYCL_MAX_NODES 8192 // TODO: adapt to hardwares
 
 // define for XMX in Intel GPU
-// TODO: currently, it's not used for XMX really.
-#if !defined(GGML_SYCL_FORCE_MMQ)
+// Disabled due to API changes in Intel oneAPI 2025.1 - experimental::matrix not available
+// TODO: Re-enable when the new matrix API (sycl/ext/oneapi/matrix/) is properly supported
+#if !defined(GGML_SYCL_FORCE_MMQ) && 0
     #define SYCL_USE_XMX
 #endif
 
