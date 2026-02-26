@@ -13,6 +13,791 @@
 #include "mmq.hpp"
 #include "vecdotq.hpp"
 
+#if defined(SYCL_USE_XMX)
+#include <sycl/ext/oneapi/experimental/matrix.hpp>
+
+namespace jm = sycl::ext::oneapi::experimental::matrix;
+
+constexpr int MMA_M = 8;
+constexpr int MMA_N = 16;
+constexpr int MMA_K = 32;
+
+template <typename T>
+struct mmq_mma_type;
+
+template <>
+struct mmq_mma_type<int8_t> {
+    using type = jm::joint_matrix<sub_group, int8_t, jm::use::a, MMA_M, MMA_K, jm::layout::row_major>;
+};
+
+template <>
+struct mmq_mma_type<uint8_t> {
+    using type = jm::joint_matrix<sub_group, uint8_t, jm::use::a, MMA_M, MMA_K, jm::layout::row_major>;
+};
+
+template <>
+struct mmq_mma_type<int32_t> {
+    using type = jm::joint_matrix<sub_group, int32_t, jm::use::accumulator, MMA_M, MMA_N>;
+};
+
+using jm_a_int8 = typename mmq_mma_type<int8_t>::type;
+using jm_b_int8 = jm::joint_matrix<sub_group, int8_t, jm::use::b, MMA_K, MMA_N, jm::layout::col_major>;
+using jm_acc_int32 = typename mmq_mma_type<int32_t>::type;
+
+#define MMQ_X_XMX  64
+#define MMQ_Y_XMX  32
+#define NWARPS_XMX 4
+
+template <int mmq_y>
+static __dpct_inline__ void
+allocate_tiles_q4_0_xmx(int **x_ql, sycl::half2 **x_dm, int **x_qh, int **x_sc,
+                    int8_t *tile_x_qs_q4_0, float *tile_x_d_q4_0) {
+    (void)x_qh; (void)x_sc;
+    *x_ql = (int *)tile_x_qs_q4_0;
+    *x_dm = (sycl::half2 *)tile_x_d_q4_0;
+}
+
+template <int mmq_y, int nwarps, bool need_check>
+static __dpct_inline__ void
+load_tiles_q4_0_xmx(const void *__restrict__ vx, int *__restrict__ x_ql,
+                sycl::half2 *__restrict__ x_dm, int *__restrict__ x_qh,
+                int *__restrict__ x_sc, const int &i_offset, const int &i_max,
+                const int &k, const int &blocks_per_row) {
+    (void)x_qh; (void)x_sc;
+    GGML_SYCL_ASSUME(i_offset >= 0);
+    GGML_SYCL_ASSUME(i_offset <  nwarps);
+    GGML_SYCL_ASSUME(k >= 0);
+    GGML_SYCL_ASSUME(k <  WARP_SIZE);
+
+    const int kbx  = k / QI4_0;
+    const int kqsx = k % QI4_0;
+
+    const block_q4_0 * bx0 = (const block_q4_0 *) vx;
+
+    float * x_dmf = (float *) x_dm;
+
+#pragma unroll
+    for (int i0 = 0; i0 < mmq_y; i0 += nwarps) {
+        int i = i0 + i_offset;
+
+        if (need_check) {
+            i = sycl::min(i, i_max);
+        }
+
+        const block_q4_0 * bxi = bx0 + i*blocks_per_row + kbx;
+
+        x_ql[i * (WARP_SIZE + 1) + k] = get_int_from_uint8(bxi->qs, kqsx);
+    }
+
+    const int blocks_per_tile_x_row = WARP_SIZE / QI4_0;
+    const int kbxd = k % blocks_per_tile_x_row;
+
+#pragma unroll
+    for (int i0 = 0; i0 < mmq_y; i0 += nwarps * QI4_0) {
+        int i = i0 + i_offset * QI4_0 + k / blocks_per_tile_x_row;
+
+        if (need_check) {
+            i = sycl::min(i, i_max);
+        }
+
+        const block_q4_0 * bxi = bx0 + i*blocks_per_row + kbxd;
+
+        x_dmf[i * (WARP_SIZE/QI4_0) + i / QI4_0 + kbxd] = bxi->d;
+    }
+}
+
+template <int mmq_y>
+static __dpct_inline__ void
+allocate_tiles_q8_0_xmx(int **x_ql, sycl::half2 **x_dm, int **x_qh, int **x_sc,
+                    int8_t *tile_x_qs_q8_0, float *tile_x_d_q8_0) {
+    (void)x_qh; (void)x_sc;
+    *x_ql = (int *)tile_x_qs_q8_0;
+    *x_dm = (sycl::half2 *)tile_x_d_q8_0;
+}
+
+template <int mmq_y, int nwarps, bool need_check>
+static __dpct_inline__ void
+load_tiles_q8_0_xmx(const void *__restrict__ vx, int *__restrict__ x_ql,
+                sycl::half2 *__restrict__ x_dm, int *__restrict__ x_qh,
+                int *__restrict__ x_sc, const int &i_offset, const int &i_max,
+                const int &k, const int &blocks_per_row) {
+    (void)x_qh; (void)x_sc;
+    GGML_SYCL_ASSUME(i_offset >= 0);
+    GGML_SYCL_ASSUME(i_offset <  nwarps);
+    GGML_SYCL_ASSUME(k >= 0);
+    GGML_SYCL_ASSUME(k <  WARP_SIZE);
+
+    const int kbx  = k / QI8_0;
+    const int kqsx = k % QI8_0;
+    float * x_dmf = (float *) x_dm;
+
+    const block_q8_0 * bx0 = (const block_q8_0 *) vx;
+
+#pragma unroll
+    for (int i0 = 0; i0 < mmq_y; i0 += nwarps) {
+        int i = i0 + i_offset;
+
+        if (need_check) {
+            i = sycl::min(i, i_max);
+        }
+
+        const block_q8_0 * bxi = bx0 + i*blocks_per_row + kbx;
+
+        x_ql[i * (WARP_SIZE + 1) + k] = get_int_from_int8(bxi->qs, kqsx);
+    }
+
+    const int blocks_per_tile_x_row = WARP_SIZE / QI8_0;
+    const int kbxd = k % blocks_per_tile_x_row;
+
+#pragma unroll
+    for (int i0 = 0; i0 < mmq_y; i0 += nwarps * QI8_0) {
+        int i = i0 + i_offset * QI8_0 + k / blocks_per_tile_x_row;
+
+        if (need_check) {
+            i = sycl::min(i, i_max);
+        }
+
+        const block_q8_0 * bxi = bx0 + i*blocks_per_row + kbxd;
+
+        x_dmf[i * (WARP_SIZE/QI8_0) + i / QI8_0 + kbxd] = bxi->d;
+    }
+}
+
+template <int mmq_y>
+static __dpct_inline__ void
+allocate_tiles_q4_1_xmx(int **x_ql, sycl::half2 **x_dm, int **x_qh, int **x_sc,
+                    int8_t *tile_x_qs_q4_1, sycl::half2 *tile_x_dm_q4_1) {
+    (void)x_qh; (void)x_sc;
+    *x_ql = (int *)tile_x_qs_q4_1;
+    *x_dm = tile_x_dm_q4_1;
+}
+
+template <int mmq_y, int nwarps, bool need_check>
+static __dpct_inline__ void
+load_tiles_q4_1_xmx(const void *__restrict__ vx, int *__restrict__ x_ql,
+                sycl::half2 *__restrict__ x_dm, int *__restrict__ x_qh,
+                int *__restrict__ x_sc, const int &i_offset, const int &i_max,
+                const int &k, const int &blocks_per_row) {
+    (void)x_qh; (void)x_sc;
+    GGML_SYCL_ASSUME(i_offset >= 0);
+    GGML_SYCL_ASSUME(i_offset <  nwarps);
+    GGML_SYCL_ASSUME(k >= 0);
+    GGML_SYCL_ASSUME(k <  WARP_SIZE);
+
+    const int kbx  = k / QI4_1;
+    const int kqsx = k % QI4_1;
+
+    const block_q4_1 * bx0 = (const block_q4_1 *) vx;
+
+#pragma unroll
+    for (int i0 = 0; i0 < mmq_y; i0 += nwarps) {
+        int i = i0 + i_offset;
+
+        if (need_check) {
+            i = sycl::min(i, i_max);
+        }
+
+        const block_q4_1 * bxi = bx0 + i*blocks_per_row + kbx;
+
+        x_ql[i * (WARP_SIZE + 1) + k] = get_int_from_uint8_aligned(bxi->qs, kqsx);
+    }
+
+    const int blocks_per_tile_x_row = WARP_SIZE / QI4_1;
+    const int kbxd = k % blocks_per_tile_x_row;
+
+#pragma unroll
+    for (int i0 = 0; i0 < mmq_y; i0 += nwarps * QI4_1) {
+        int i = i0 + i_offset * QI4_1 + k / blocks_per_tile_x_row;
+
+        if (need_check) {
+            i = sycl::min(i, i_max);
+        }
+
+        const block_q4_1 * bxi = bx0 + i*blocks_per_row + kbxd;
+
+        x_dm[i * (WARP_SIZE/QI4_1) + i / QI4_1 + kbxd] = bxi->dm;
+    }
+}
+
+template <int mmq_y>
+static __dpct_inline__ void
+allocate_tiles_q5_0_xmx(int **x_ql, sycl::half2 **x_dm, int **x_qh, int **x_sc,
+                    int8_t *tile_x_ql_q5_0, float *tile_x_d_q5_0) {
+    (void)x_qh; (void)x_sc;
+    *x_ql = (int *)tile_x_ql_q5_0;
+    *x_dm = (sycl::half2 *)tile_x_d_q5_0;
+}
+
+template <int mmq_y, int nwarps, bool need_check>
+static __dpct_inline__ void
+load_tiles_q5_0_xmx(const void *__restrict__ vx, int *__restrict__ x_ql,
+                sycl::half2 *__restrict__ x_dm, int *__restrict__ x_qh,
+                int *__restrict__ x_sc, const int &i_offset, const int &i_max,
+                const int &k, const int &blocks_per_row) {
+    (void)x_qh; (void)x_sc;
+    GGML_SYCL_ASSUME(i_offset >= 0);
+    GGML_SYCL_ASSUME(i_offset <  nwarps);
+    GGML_SYCL_ASSUME(k >= 0);
+    GGML_SYCL_ASSUME(k <  WARP_SIZE);
+
+    const int kbx  = k / QI5_0;
+    const int kqsx = k % QI5_0;
+
+    const block_q5_0 * bx0 = (const block_q5_0 *) vx;
+
+#pragma unroll
+    for (int i0 = 0; i0 < mmq_y; i0 += nwarps) {
+        int i = i0 + i_offset;
+
+        if (need_check) {
+            i = sycl::min(i, i_max);
+        }
+
+        const block_q5_0 * bxi = bx0 + i*blocks_per_row + kbx;
+
+        const int ql = get_int_from_uint8(bxi->qs, kqsx);
+        const int qh = get_int_from_uint8(bxi->qh, 0) >> (4 * (k % QI5_0));
+
+        int qs0 = (ql >>  0)   & 0x0F0F0F0F;
+        qs0    |= (qh <<  4)   & 0x00000010;
+        qs0    |= (qh << 11)   & 0x00001000;
+        qs0    |= (qh << 18)   & 0x00100000;
+        qs0    |= (qh << 25)   & 0x10000000;
+        qs0 = dpct::vectorized_binary<sycl::char4>(
+            qs0, 0x10101010, dpct::sub_sat());
+
+        x_ql[i * (2*WARP_SIZE + 1) + 2*k+0] = qs0;
+
+        int qs1 = (ql >>  4)   & 0x0F0F0F0F;
+        qs1    |= (qh >> 12)   & 0x00000010;
+        qs1    |= (qh >>  5)   & 0x00001000;
+        qs1    |= (qh <<  2)   & 0x00100000;
+        qs1    |= (qh <<  9)   & 0x10000000;
+        qs1 = dpct::vectorized_binary<sycl::char4>(
+            qs1, 0x10101010, dpct::sub_sat());
+
+        x_ql[i * (2*WARP_SIZE + 1) + 2*k+1] = qs1;
+    }
+
+    const int blocks_per_tile_x_row = WARP_SIZE / QI5_0;
+    const int kbxd = k % blocks_per_tile_x_row;
+    float * x_dmf = (float *) x_dm;
+
+#pragma unroll
+    for (int i0 = 0; i0 < mmq_y; i0 += nwarps * QI5_0) {
+        int i = i0 + i_offset * QI5_0 + k / blocks_per_tile_x_row;
+
+        if (need_check) {
+            i = sycl::min(i, i_max);
+        }
+
+        const block_q5_0 * bxi = bx0 + i*blocks_per_row + kbxd;
+
+        x_dmf[i * (WARP_SIZE/QI5_0) + i / QI5_0 + kbxd] = bxi->d;
+    }
+}
+
+template <int mmq_y>
+static __dpct_inline__ void
+allocate_tiles_q5_1_xmx(int **x_ql, sycl::half2 **x_dm, int **x_qh, int **x_sc,
+                    int8_t *tile_x_ql_q5_1, sycl::half2 *tile_x_dm_q5_1) {
+    (void)x_qh; (void)x_sc;
+    *x_ql = (int *)tile_x_ql_q5_1;
+    *x_dm = tile_x_dm_q5_1;
+}
+
+template <int mmq_y, int nwarps, bool need_check>
+static __dpct_inline__ void
+load_tiles_q5_1_xmx(const void *__restrict__ vx, int *__restrict__ x_ql,
+                sycl::half2 *__restrict__ x_dm, int *__restrict__ x_qh,
+                int *__restrict__ x_sc, const int &i_offset, const int &i_max,
+                const int &k, const int &blocks_per_row) {
+    (void)x_qh; (void)x_sc;
+    GGML_SYCL_ASSUME(i_offset >= 0);
+    GGML_SYCL_ASSUME(i_offset < nwarps);
+    GGML_SYCL_ASSUME(k >= 0);
+    GGML_SYCL_ASSUME(k <  WARP_SIZE);
+
+    const int kbx  = k / QI5_1;
+    const int kqsx = k % QI5_1;
+
+    const block_q5_1 * bx0 = (const block_q5_1 *) vx;
+
+#pragma unroll
+    for (int i0 = 0; i0 < mmq_y; i0 += nwarps) {
+        int i = i0 + i_offset;
+
+        if (need_check) {
+            i = sycl::min(i, i_max);
+        }
+
+        const block_q5_1 * bxi = bx0 + i*blocks_per_row + kbx;
+
+        const int ql = get_int_from_uint8_aligned(bxi->qs, kqsx);
+        const int qh = get_int_from_uint8_aligned(bxi->qh, 0) >> (4 * (k % QI5_1));
+
+        int qs0 = (ql >>  0) & 0x0F0F0F0F;
+        qs0    |= (qh <<  4) & 0x00000010;
+        qs0    |= (qh << 11) & 0x00001000;
+        qs0    |= (qh << 18) & 0x00100000;
+        qs0    |= (qh << 25) & 0x10000000;
+
+        x_ql[i * (2*WARP_SIZE + 1) + 2*k+0] = qs0;
+
+        int qs1 = (ql >>  4) & 0x0F0F0F0F;
+        qs1    |= (qh >> 12) & 0x00000010;
+        qs1    |= (qh >>  5) & 0x00001000;
+        qs1    |= (qh <<  2) & 0x00100000;
+        qs1    |= (qh <<  9) & 0x10000000;
+
+        x_ql[i * (2*WARP_SIZE + 1) + 2*k+1] = qs1;
+    }
+
+    const int blocks_per_tile_x_row = WARP_SIZE / QI5_1;
+    const int kbxd = k % blocks_per_tile_x_row;
+
+#pragma unroll
+    for (int i0 = 0; i0 < mmq_y; i0 += nwarps * QI5_1) {
+        int i = i0 + i_offset * QI5_1 + k / blocks_per_tile_x_row;
+
+        if (need_check) {
+            i = sycl::min(i, i_max);
+        }
+
+        const block_q5_1 * bxi = bx0 + i*blocks_per_row + kbxd;
+
+        x_dm[i * (WARP_SIZE/QI5_1) + i / QI5_1 + kbxd] = bxi->dm;
+    }
+}
+
+template <int mmq_y>
+static __dpct_inline__ void
+allocate_tiles_q2_K_xmx(int **x_ql, sycl::half2 **x_dm, int **x_qh, int **x_sc,
+                    int8_t *tile_x_ql_q2_K, sycl::half2 *tile_x_dm_q2_K,
+                    int *tile_x_sc_q2_K) {
+    (void)x_qh;
+    *x_ql = (int *)tile_x_ql_q2_K;
+    *x_dm = tile_x_dm_q2_K;
+    *x_sc = tile_x_sc_q2_K;
+}
+
+template <int mmq_y, int nwarps, bool need_check>
+static __dpct_inline__ void
+load_tiles_q2_K_xmx(const void *__restrict__ vx, int *__restrict__ x_ql,
+                sycl::half2 *__restrict__ x_dm, int *__restrict__ x_qh,
+                int *__restrict__ x_sc, const int &i_offset, const int &i_max,
+                const int &k, const int &blocks_per_row) {
+    (void)x_qh;
+    GGML_SYCL_ASSUME(i_offset >= 0);
+    GGML_SYCL_ASSUME(i_offset <  nwarps);
+    GGML_SYCL_ASSUME(k >= 0);
+    GGML_SYCL_ASSUME(k <  WARP_SIZE);
+
+    const int kbx  = k / QI2_K;
+    const int kqsx = k % QI2_K;
+
+    const block_q2_K * bx0 = (const block_q2_K *) vx;
+
+#pragma unroll
+    for (int i0 = 0; i0 < mmq_y; i0 += nwarps) {
+        int i = i0 + i_offset;
+
+        if (need_check) {
+            i = sycl::min(i, i_max);
+        }
+
+        const block_q2_K * bxi = bx0 + i*blocks_per_row + kbx;
+
+        x_ql[i * (WARP_SIZE + 1) + k] = get_int_from_uint8_aligned(bxi->qs, kqsx);
+    }
+
+    const int blocks_per_tile_x_row = WARP_SIZE / QI2_K;
+    const int kbxd = k % blocks_per_tile_x_row;
+
+#pragma unroll
+    for (int i0 = 0; i0 < mmq_y; i0 += nwarps * QI2_K) {
+        int i = (i0 + i_offset * QI2_K + k / blocks_per_tile_x_row) % mmq_y;
+
+        if (need_check) {
+            i = sycl::min(i, i_max);
+        }
+
+        const block_q2_K * bxi = bx0 + i*blocks_per_row + kbxd;
+
+        x_dm[i * (WARP_SIZE/QI2_K) + i / QI2_K + kbxd] = bxi->dm;
+    }
+
+#pragma unroll
+    for (int i0 = 0; i0 < mmq_y; i0 += nwarps * 4) {
+        int i = i0 + i_offset * 4 + k / (WARP_SIZE/4);
+
+        if (need_check) {
+            i = sycl::min(i, i_max);
+        }
+
+        const block_q2_K * bxi = bx0 + i*blocks_per_row + (k % (WARP_SIZE/4)) / (QI2_K/4);
+
+        x_sc[i * (WARP_SIZE/4) + i / 4 + k % (WARP_SIZE/4)] = get_int_from_uint8_aligned(bxi->scales, k % (QI2_K/4));
+    }
+}
+
+template <int mmq_y>
+static __dpct_inline__ void
+allocate_tiles_q3_K_xmx(int **x_ql, sycl::half2 **x_dm, int **x_qh, int **x_sc,
+                    int8_t *tile_x_ql_q3_K, sycl::half2 *tile_x_dm_q3_K,
+                    int *tile_x_qh_q3_K, int *tile_x_sc_q3_K) {
+    (void)x_qh; (void)x_sc;
+    *x_ql = (int *)tile_x_ql_q3_K;
+    *x_dm = tile_x_dm_q3_K;
+    *x_qh = tile_x_qh_q3_K;
+    *x_sc = tile_x_sc_q3_K;
+}
+
+template <int mmq_y, int nwarps, bool need_check>
+static __dpct_inline__ void
+load_tiles_q3_K_xmx(const void *__restrict__ vx, int *__restrict__ x_ql,
+                sycl::half2 *__restrict__ x_dm, int *__restrict__ x_qh,
+                int *__restrict__ x_sc, const int &i_offset, const int &i_max,
+                const int &k, const int &blocks_per_row) {
+    (void)x_qh; (void)x_sc;
+    GGML_SYCL_ASSUME(i_offset >= 0);
+    GGML_SYCL_ASSUME(i_offset <  nwarps);
+    GGML_SYCL_ASSUME(k >= 0);
+    GGML_SYCL_ASSUME(k <  WARP_SIZE);
+
+    const int kbx  = k / QI3_K;
+    const int kqsx = k % QI3_K;
+
+    const block_q3_K * bx0 = (const block_q3_K *) vx;
+
+#pragma unroll
+    for (int i0 = 0; i0 < mmq_y; i0 += nwarps) {
+        int i = i0 + i_offset;
+
+        if (need_check) {
+            i = sycl::min(i, i_max);
+        }
+
+        const block_q3_K * bxi = bx0 + i*blocks_per_row + kbx;
+
+        x_ql[i * (WARP_SIZE + 1) + k] = get_int_from_uint8(bxi->qs, kqsx);
+    }
+
+    const int blocks_per_tile_x_row = WARP_SIZE / QI3_K;
+    const int kbxd = k % blocks_per_tile_x_row;
+    float * x_dmf = (float *) x_dm;
+
+#pragma unroll
+    for (int i0 = 0; i0 < mmq_y; i0 += nwarps * QI3_K) {
+        int i = (i0 + i_offset * QI3_K + k / blocks_per_tile_x_row) % mmq_y;
+
+        if (need_check) {
+            i = sycl::min(i, i_max);
+        }
+
+        const block_q3_K * bxi = bx0 + i*blocks_per_row + kbxd;
+
+        x_dmf[i * (WARP_SIZE/QI3_K) + i / QI3_K + kbxd] = bxi->d;
+    }
+
+#pragma unroll
+    for (int i0 = 0; i0 < mmq_y; i0 += nwarps * 2) {
+        int i = i0 + i_offset * 2 + k / (WARP_SIZE/2);
+
+        if (need_check) {
+            i = sycl::min(i, i_max);
+        }
+
+        const block_q3_K * bxi = bx0 + i*blocks_per_row + (k % (WARP_SIZE/2)) / (QI3_K/2);
+
+        x_qh[i * (WARP_SIZE/2) + i / 2 + k % (WARP_SIZE/2)] = ~get_int_from_uint8(bxi->hmask, k % (QI3_K/2));
+    }
+
+#pragma unroll
+    for (int i0 = 0; i0 < mmq_y; i0 += nwarps * 4) {
+        int i = i0 + i_offset * 4 + k / (WARP_SIZE/4);
+
+        if (need_check) {
+            i = sycl::min(i, i_max);
+        }
+
+        const block_q3_K * bxi = bx0 + i*blocks_per_row + (k % (WARP_SIZE/4)) / (QI3_K/4);
+
+        const int ksc = k % (QI3_K/4);
+        const int ksc_low = ksc % (QI3_K/8);
+        const int shift_low = 4 * (ksc / (QI3_K/8));
+        const int sc_low = (get_int_from_uint8(bxi->scales, ksc_low) >> shift_low) & 0x0F0F0F0F;
+
+        const int ksc_high = QI3_K/8;
+        const int shift_high = 2 * ksc;
+        const int sc_high = ((get_int_from_uint8(bxi->scales, ksc_high) >> shift_high) << 4) & 0x30303030;
+
+        const int sc = dpct::vectorized_binary<sycl::char4>(
+            sc_low | sc_high, 0x20202020, dpct::sub_sat());
+
+        x_sc[i * (WARP_SIZE/4) + i / 4 + k % (WARP_SIZE/4)] = sc;
+    }
+}
+
+template <int mmq_y>
+static __dpct_inline__ void
+allocate_tiles_q4_K_xmx(int **x_ql, sycl::half2 **x_dm, int **x_qh, int **x_sc,
+                    int8_t *tile_x_ql_q4_K, sycl::half2 *tile_x_dm_q4_K,
+                    int *tile_x_sc_q4_K) {
+    (void)x_qh;
+    *x_ql = (int *)tile_x_ql_q4_K;
+    *x_dm = tile_x_dm_q4_K;
+    *x_sc = tile_x_sc_q4_K;
+}
+
+template <int mmq_y, int nwarps, bool need_check>
+static __dpct_inline__ void
+load_tiles_q4_K_xmx(const void *__restrict__ vx, int *__restrict__ x_ql,
+                sycl::half2 *__restrict__ x_dm, int *__restrict__ x_qh,
+                int *__restrict__ x_sc, const int &i_offset, const int &i_max,
+                const int &k, const int &blocks_per_row) {
+    (void)x_qh;
+    GGML_SYCL_ASSUME(i_offset >= 0);
+    GGML_SYCL_ASSUME(i_offset <  nwarps);
+    GGML_SYCL_ASSUME(k >= 0);
+    GGML_SYCL_ASSUME(k <  WARP_SIZE);
+
+    const int kbx  = k / QI4_K;
+    const int kqsx = k % QI4_K;
+
+    const block_q4_K * bx0 = (const block_q4_K *) vx;
+
+#pragma unroll
+    for (int i0 = 0; i0 < mmq_y; i0 += nwarps) {
+        int i = i0 + i_offset;
+
+        if (need_check) {
+            i = sycl::min(i, i_max);
+        }
+
+        const block_q4_K * bxi = bx0 + i*blocks_per_row + kbx;
+
+        x_ql[i * (WARP_SIZE + 1) + k] = get_int_from_uint8_aligned(bxi->qs, kqsx);
+    }
+
+    constexpr int blocks_per_tile_x_row = QI4_K > WARP_SIZE ? 1 : WARP_SIZE / QI4_K;
+    const int kbxd = k % blocks_per_tile_x_row;
+
+#pragma unroll
+    for (int i0 = 0; i0 < mmq_y; i0 += nwarps * QI4_K) {
+        int i = (i0 + i_offset * QI4_K + k / blocks_per_tile_x_row) % mmq_y;
+
+        if (need_check) {
+            i = sycl::min(i, i_max);
+        }
+
+        const block_q4_K * bxi = bx0 + i*blocks_per_row + kbxd;
+
+#if QK_K == 256
+        x_dm[i * (WARP_SIZE/QI4_K) + i / QI4_K + kbxd] = bxi->dm;
+#else
+        x_dm[i * (WARP_SIZE/QI4_K) + i / QI4_K + kbxd] = {bxi->dm[0], bxi->dm[1]};
+#endif
+    }
+
+#pragma unroll
+    for (int i0 = 0; i0 < mmq_y; i0 += nwarps * 8) {
+        int i = (i0 + i_offset * 8 + k / (WARP_SIZE/8)) % mmq_y;
+
+        if (need_check) {
+            i = sycl::min(i, i_max);
+        }
+
+        const block_q4_K * bxi = bx0 + i*blocks_per_row + (k % (WARP_SIZE/8)) / (QI4_K/8);
+
+        const int * scales = (const int *) bxi->scales;
+        const int ksc = k % (WARP_SIZE/8);
+        int scales8 = (scales[(ksc%2) + (ksc!=0)] >> (4 * (ksc & (ksc/2)))) & 0x0F0F0F0F;
+        scales8    |= (scales[ksc/2]              >> (2 * (ksc % 2)))       & 0x30303030;
+
+        x_sc[i * (WARP_SIZE/8) + i / 8 + ksc] = scales8;
+    }
+}
+
+template <int mmq_y>
+static __dpct_inline__ void
+allocate_tiles_q5_K_xmx(int **x_ql, sycl::half2 **x_dm, int **x_qh, int **x_sc,
+                    int8_t *tile_x_ql_q5_K, sycl::half2 *tile_x_dm_q5_K,
+                    int *tile_x_sc_q5_K) {
+    (void)x_qh;
+    *x_ql = (int *)tile_x_ql_q5_K;
+    *x_dm = tile_x_dm_q5_K;
+    *x_sc = tile_x_sc_q5_K;
+}
+
+template <int mmq_y, int nwarps, bool need_check>
+static __dpct_inline__ void
+load_tiles_q5_K_xmx(const void *__restrict__ vx, int *__restrict__ x_ql,
+                sycl::half2 *__restrict__ x_dm, int *__restrict__ x_qh,
+                int *__restrict__ x_sc, const int &i_offset, const int &i_max,
+                const int &k, const int &blocks_per_row) {
+    (void)x_qh;
+    GGML_SYCL_ASSUME(i_offset >= 0);
+    GGML_SYCL_ASSUME(i_offset <  nwarps);
+    GGML_SYCL_ASSUME(k >= 0);
+    GGML_SYCL_ASSUME(k <  WARP_SIZE);
+
+    const int kbx  = k / QI5_K;
+    const int kqsx = k % QI5_K;
+
+    const block_q5_K * bx0 = (const block_q5_K *) vx;
+
+#pragma unroll
+    for (int i0 = 0; i0 < mmq_y; i0 += nwarps) {
+        int i = i0 + i_offset;
+
+        if (need_check) {
+            i = sycl::min(i, i_max);
+        }
+
+        const block_q5_K * bxi = bx0 + i*blocks_per_row + kbx;
+        const int ky = QR5_K*kqsx;
+
+        const int ql = get_int_from_uint8_aligned(bxi->qs, kqsx);
+        const int ql0 = (ql >> 0) & 0x0F0F0F0F;
+        const int ql1 = (ql >> 4) & 0x0F0F0F0F;
+
+        const int qh = get_int_from_uint8_aligned(bxi->qh, kqsx % (QI5_K/4));
+        const int qh0 = ((qh >> (2 * (kqsx / (QI5_K/4)) + 0)) << 4) & 0x10101010;
+        const int qh1 = ((qh >> (2 * (kqsx / (QI5_K/4)) + 1)) << 4) & 0x10101010;
+
+        const int kq0 = ky - ky % (QI5_K/2) + k % (QI5_K/4) + 0;
+        const int kq1 = ky - ky % (QI5_K/2) + k % (QI5_K/4) + (QI5_K/4);
+
+        x_ql[i * (2*WARP_SIZE + 1) + kq0] = ql0 | qh0;
+        x_ql[i * (2*WARP_SIZE + 1) + kq1] = ql1 | qh1;
+    }
+
+    constexpr int blocks_per_tile_x_row = QI5_K > WARP_SIZE ? 1 : WARP_SIZE / QI5_K;
+    const int kbxd = k % blocks_per_tile_x_row;
+
+#pragma unroll
+    for (int i0 = 0; i0 < mmq_y; i0 += nwarps * QI5_K) {
+        int i = (i0 + i_offset * QI5_K + k / blocks_per_tile_x_row) % mmq_y;
+
+        if (need_check) {
+            i = sycl::min(i, i_max);
+        }
+
+        const block_q5_K * bxi = bx0 + i*blocks_per_row + kbxd;
+
+#if QK_K == 256
+        x_dm[i * (WARP_SIZE/QI5_K) + i / QI5_K + kbxd] = bxi->dm;
+#endif
+    }
+
+#pragma unroll
+    for (int i0 = 0; i0 < mmq_y; i0 += nwarps * 8) {
+        int i = (i0 + i_offset * 8 + k / (WARP_SIZE/8)) % mmq_y;
+
+        if (need_check) {
+            i = sycl::min(i, i_max);
+        }
+
+        const block_q5_K * bxi = bx0 + i*blocks_per_row + (k % (WARP_SIZE/8)) / (QI5_K/8);
+
+        const int * scales = (const int *) bxi->scales;
+        const int ksc = k % (WARP_SIZE/8);
+        int scales8 = (scales[(ksc%2) + (ksc!=0)] >> (4 * (ksc & (ksc/2)))) & 0x0F0F0F0F;
+        scales8    |= (scales[ksc/2]              >> (2 * (ksc % 2)))       & 0x30303030;
+
+        x_sc[i * (WARP_SIZE/8) + i / 8 + ksc] = scales8;
+    }
+}
+
+template <int mmq_y>
+static __dpct_inline__ void
+allocate_tiles_q6_K_xmx(int **x_ql, sycl::half2 **x_dm, int **x_qh, int **x_sc,
+                    int8_t *tile_x_ql, sycl::half2 *tile_x_dm, int *tile_x_sc) {
+    (void)x_qh;
+    *x_ql = (int *)tile_x_ql;
+    *x_dm = tile_x_dm;
+    *x_sc = tile_x_sc;
+}
+
+template <int mmq_y, int nwarps, bool need_check>
+static __dpct_inline__ void
+load_tiles_q6_K_xmx(const void *__restrict__ vx, int *__restrict__ x_ql,
+                sycl::half2 *__restrict__ x_dm, int *__restrict__ x_qh,
+                int *__restrict__ x_sc, const int &i_offset, const int &i_max,
+                const int &k, const int &blocks_per_row) {
+    (void)x_qh;
+    GGML_SYCL_ASSUME(i_offset >= 0);
+    GGML_SYCL_ASSUME(i_offset <  nwarps);
+    GGML_SYCL_ASSUME(k >= 0);
+    GGML_SYCL_ASSUME(k <  WARP_SIZE);
+
+    const int kbx  = k / QI6_K;
+    const int kqsx = k % QI6_K;
+
+    const block_q6_K * bx0 = (const block_q6_K *) vx;
+
+#pragma unroll
+    for (int i0 = 0; i0 < mmq_y; i0 += nwarps) {
+        int i = i0 + i_offset;
+
+        if (need_check) {
+            i = sycl::min(i, i_max);
+        }
+
+        const block_q6_K * bxi = bx0 + i*blocks_per_row + kbx;
+        const int ky = QR6_K*kqsx;
+
+        const int ql = get_int_from_uint8(bxi->ql, kqsx);
+        const int ql0 = (ql >> 0) & 0x0F0F0F0F;
+        const int ql1 = (ql >> 4) & 0x0F0F0F0F;
+
+        const int qh = get_int_from_uint8(bxi->qh, (QI6_K/4) * (kqsx / (QI6_K/2)) + kqsx % (QI6_K/4));
+        const int qh0 = ((qh >> (2 * ((kqsx % (QI6_K/2)) / (QI6_K/4)))) << 4) & 0x30303030;
+        const int qh1 =  (qh >> (2 * ((kqsx % (QI6_K/2)) / (QI6_K/4))))       & 0x30303030;
+
+        const int kq0 = ky - ky % QI6_K + k % (QI6_K/2) + 0;
+        const int kq1 = ky - ky % QI6_K + k % (QI6_K/2) + (QI6_K/2);
+
+        x_ql[i * (2 * WARP_SIZE + 1) + kq0] =
+            dpct::vectorized_binary<sycl::char4>(ql0 | qh0, 0x20202020, dpct::sub_sat());
+        x_ql[i * (2 * WARP_SIZE + 1) + kq1] =
+            dpct::vectorized_binary<sycl::char4>(ql1 | qh1, 0x20202020, dpct::sub_sat());
+    }
+
+    constexpr int blocks_per_tile_x_row = QI6_K > WARP_SIZE ? 1 : WARP_SIZE / QI6_K;
+    const int kbxd = k % blocks_per_tile_x_row;
+    float * x_dmf = (float *) x_dm;
+
+#pragma unroll
+    for (int i0 = 0; i0 < mmq_y; i0 += nwarps * QI6_K) {
+        int i = (i0 + i_offset * QI6_K + k / blocks_per_tile_x_row) % mmq_y;
+
+        if (need_check) {
+            i = sycl::min(i, i_max);
+        }
+
+        const block_q6_K * bxi = bx0 + i*blocks_per_row + kbxd;
+
+        x_dmf[i * (WARP_SIZE/QI6_K) + i / QI6_K + kbxd] = bxi->d;
+    }
+
+#pragma unroll
+    for (int i0 = 0; i0 < mmq_y; i0 += nwarps * 8) {
+        int i = (i0 + i_offset * 8 + k / (WARP_SIZE/8)) % mmq_y;
+
+        if (need_check) {
+            i = sycl::min(i, i_max);
+        }
+
+        const block_q6_K * bxi = bx0 + i*blocks_per_row + (k % (WARP_SIZE/8)) / 4;
+
+        x_sc[i * (WARP_SIZE/8) + i / 8 + k % (WARP_SIZE/8)] = get_int_from_int8(bxi->scales, k % (QI6_K/8));
+    }
+}
+
+#endif // SYCL_USE_XMX
+
 typedef void (*allocate_tiles_sycl_t)(
     int** x_ql,
     sycl::half2** x_dm,
@@ -38,6 +823,156 @@ typedef float (*vec_dot_q_mul_mat_sycl_t)(
     const int& i,
     const int& j,
     const int& k);
+
+#if defined(SYCL_USE_XMX)
+namespace jm = sycl::ext::oneapi::experimental::matrix;
+
+constexpr int MMA_M = 8;
+constexpr int MMA_N = 16;
+constexpr int MMA_K = 32;
+
+template <typename T>
+struct mmq_mma_type;
+
+template <>
+struct mmq_mma_type<int8_t> {
+    using type = jm::joint_matrix<sub_group, int8_t, jm::use::a, MMA_M, MMA_K, jm::layout::row_major>;
+};
+
+template <>
+struct mmq_mma_type<uint8_t> {
+    using type = jm::joint_matrix<sub_group, uint8_t, jm::use::a, MMA_M, MMA_K, jm::layout::row_major>;
+};
+
+template <>
+struct mmq_mma_type<int32_t> {
+    using type = jm::joint_matrix<sub_group, int32_t, jm::use::accumulator, MMA_M, MMA_N>;
+};
+
+using jm_a_int8 = typename mmq_mma_type<int8_t>::type;
+using jm_b_int8 = jm::joint_matrix<sub_group, int8_t, jm::use::b, MMA_K, MMA_N, jm::layout::col_major>;
+using jm_acc_int32 = typename mmq_mma_type<int32_t>::type;
+
+template <int mmq_y, int nwarps, bool need_check>
+struct load_tiles_mma_q4_0 {
+    static void apply(
+        const void* __restrict__ vx,
+        int8_t* __restrict__ x_ql,
+        sycl::half2* __restrict__ x_dm,
+        int* __restrict__ x_qh,
+        int* __restrict__ x_sc,
+        const int& i_offset,
+        const int& i_max,
+        const int& k,
+        const int& blocks_per_row);
+};
+
+template <int mmq_y>
+static __dpct_inline__ void
+allocate_tiles_q4_0_mma(int **x_ql, sycl::half2 **x_dm, int **x_qh, int **x_sc,
+                    int8_t *tile_x_qs_q4_0, float *tile_x_d_q4_0) {
+    (void)x_qh; (void)x_sc;
+    *x_ql = (int *)tile_x_qs_q4_0;
+    *x_dm = (sycl::half2 *)tile_x_d_q4_0;
+}
+
+template <int mmq_y, int nwarps, bool need_check>
+static __dpct_inline__ void
+load_tiles_q4_0_mma(const void *__restrict__ vx, int *__restrict__ x_ql,
+                sycl::half2 *__restrict__ x_dm, int *__restrict__ x_qh,
+                int *__restrict__ x_sc, const int &i_offset, const int &i_max,
+                const int &k, const int &blocks_per_row) {
+    (void)x_qh; (void)x_sc;
+    GGML_SYCL_ASSUME(i_offset >= 0);
+    GGML_SYCL_ASSUME(i_offset <  nwarps);
+    GGML_SYCL_ASSUME(k >= 0);
+    GGML_SYCL_ASSUME(k <  WARP_SIZE);
+
+    const int kbx  = k / QI4_0;
+    const int kqsx = k % QI4_0;
+
+    const block_q4_0 * bx0 = (const block_q4_0 *) vx;
+
+    float * x_dmf = (float *) x_dm;
+
+#pragma unroll
+    for (int i0 = 0; i0 < mmq_y; i0 += nwarps) {
+        int i = i0 + i_offset;
+
+        if (need_check) {
+            i = sycl::min(i, i_max);
+        }
+
+        const block_q4_0 * bxi = bx0 + i*blocks_per_row + kbx;
+
+        x_ql[i * (WARP_SIZE + 1) + k] = get_int_from_uint8(bxi->qs, kqsx);
+    }
+
+    const int blocks_per_tile_x_row = WARP_SIZE / QI4_0;
+    const int kbxd = k % blocks_per_tile_x_row;
+
+#pragma unroll
+    for (int i0 = 0; i0 < mmq_y; i0 += nwarps * QI4_0) {
+        int i = i0 + i_offset * QI4_0 + k / blocks_per_tile_x_row;
+
+        if (need_check) {
+            i = sycl::min(i, i_max);
+        }
+
+        const block_q4_0 * bxi = bx0 + i*blocks_per_row + kbxd;
+
+        x_dmf[i * (WARP_SIZE/QI4_0) + i / QI4_0 + kbxd] = bxi->d;
+    }
+}
+
+static __dpct_inline__ float vec_dot_q4_0_q8_1_mul_mat_mma(
+    const int *__restrict__ x_ql, const sycl::half2 *__restrict__ x_dm,
+    const int *__restrict__ x_qh, const int *__restrict__ x_sc,
+    const int *__restrict__ y_qs, const sycl::half2 *__restrict__ y_ds,
+    const int &i, const int &j, const int &k,
+    const sycl::sub_group &sg) {
+    (void)x_qh; (void)x_sc;
+
+    const int kyqs = k % (QI8_1/2) + QI8_1 * (k / (QI8_1/2));
+    const float * x_dmf = (const float *) x_dm;
+
+    int u[2*VDR_Q4_0_Q8_1_MMQ];
+
+#pragma unroll
+    for (int l = 0; l < VDR_Q4_0_Q8_1_MMQ; ++l) {
+        u[2*l+0] = y_qs[j * WARP_SIZE + (kyqs + l)         % WARP_SIZE];
+        u[2*l+1] = y_qs[j * WARP_SIZE + (kyqs + l + QI4_0) % WARP_SIZE];
+    }
+
+    return vec_dot_q4_0_q8_1_impl<VDR_Q4_0_Q8_1_MMQ>
+        (&x_ql[i * (WARP_SIZE + 1) + k], u, x_dmf[i * (WARP_SIZE/QI4_0) + i/QI4_0 + k/QI4_0],
+         y_ds[j * (WARP_SIZE/QI8_1) + (2*k/QI8_1) % (WARP_SIZE/QI8_1)]);
+}
+
+static __dpct_inline__ float
+mmq_compute_q4_0_q8_1_mma(const int8_t * __restrict__ x_ql,
+                          const float * __restrict__ x_dm,
+                          const int8_t * __restrict__ y_qs,
+                          const float * __restrict__ y_ds,
+                          const int &i, const int &j, const int &k) {
+    jm_acc_int32 acc;
+    jm_a_int8 ma;
+    jm_b_int8 mb;
+
+    jm::joint_matrix_load(sg, acc, &x_ql[i * MMA_K + k], MMA_K);
+    jm::joint_matrix_load(sg, mb, &y_qs[j * MMA_K + k], MMA_N);
+    jm::joint_matrix_mad(sg, acc, ma, mb, acc);
+
+    float sum = 0.0f;
+    auto acc_elem = acc.get_low_data();
+#pragma unroll
+    for (int m = 0; m < MMA_M; ++m) {
+        sum += (float)acc_elem[m] * x_dm[i * MMA_M / QI4_0 + m / QI4_0] * y_ds[j * MMA_N / QI8_1 + m % (MMA_N / QI8_1)];
+    }
+    return sum;
+}
+
+#endif // SYCL_USE_XMX
 
 
 template <int mmq_y>

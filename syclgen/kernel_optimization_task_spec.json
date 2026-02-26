@@ -218,6 +218,7 @@
           "task_id": "task_014",
           "kernel_id": "sk_008",
           "optimization_ids": ["opt_008_001"],
+          "status": "in_progress",
           "name": "Implement XMX/joint_matrix compute path for mmq",
           "description": "The mmq kernel has SYCL_USE_XMX but only uses it to change tile sizes — no actual joint_matrix code exists. Implement a true XMX compute path using sycl::joint_matrix for the inner matmul loop. This is the single highest-impact optimization across all 13 kernels.",
           "priority": "critical",
