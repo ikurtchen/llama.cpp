@@ -17,7 +17,8 @@ static void gated_linear_attn_f32_kernel(const dpct::queue_ptr stream, u_int B, 
         auto _r  = sycl::local_accessor<float, 1>(sycl::range<1>(head_size), cgh);
         auto _td = sycl::local_accessor<float, 1>(sycl::range<1>(head_size), cgh);
 
-        cgh.parallel_for(sycl::nd_range<1>(grid_dims * block_dims, block_dims), [=](sycl::nd_item<1> item) {
+        cgh.parallel_for(sycl::nd_range<1>(grid_dims * block_dims, block_dims), [=](sycl::nd_item<1> item)
+            [[sycl::reqd_sub_group_size(16)]] {
             u_int tid = item.get_local_id(0);
             u_int bid = item.get_group(0);
 
@@ -43,6 +44,7 @@ static void gated_linear_attn_f32_kernel(const dpct::queue_ptr stream, u_int B, 
                 const float _v = v[t];
                 float       y  = 0;
 
+#pragma unroll
                 for (u_int j = 0; j < head_size; j += 4) {
                     const sycl::float4 & k  = (sycl::float4 &) (_k[j]);
                     const sycl::float4 & r  = (sycl::float4 &) (_r[j]);

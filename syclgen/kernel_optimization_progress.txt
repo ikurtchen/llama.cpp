@@ -26,6 +26,14 @@
 - [x] sk_013: gla SYCL kernel — low potential (4 optimization opportunities)
 ## Recent Activity
 
+[2026-02-26] COMPLETED task_037: Add reqd_sub_group_size and loop unrolling to gla.
+  - opt_013_001: Added [[sycl::reqd_sub_group_size(16)]] to parallel_for lambda (line 20-21)
+  - opt_013_002: Added #pragma unroll to inner j-loop (line 47)
+  - Expected 5-15% improvement from native SIMD16 width and loop pipelining
+  - Build: SUCCESS
+  - Unit tests: PASS (GLA tested through integration)
+  - Note: GLA benchmark not available in test-backend-ops
+
 [2026-02-26] COMPLETED task_036: Add vector SLM loads for wkv inner loop.
   - opt_012_002: Replaced scalar float4 construction with true vector loads using reinterpret_cast
   - Applied to SLM arrays: _k, _r, _tf, _td in WKV6; _a, _r, _w, _k, _b in WKV7
