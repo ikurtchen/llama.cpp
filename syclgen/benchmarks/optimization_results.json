@@ -1,6 +1,17 @@
 {
   "results": [
     {
+      "task_id": "task_031",
+      "kernel": "cpy (copy kernels)",
+      "optimization": "Add contiguous fast-path - use simple linear indexing instead of 4D index decomposition",
+      "timestamp": "2026-02-26T23:00:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": 1.4,
+      "notes": "opt_007_003: Added cpy_contiguous kernel template using 1D nd_range + SIMD16. Uses simple linear indexing (i*nb_src, i*nb_dst) instead of 4D index decomposition with 12 integer divisions per element. Applied to f32->f16, f16->f32, f16->f16, i16->i16, i32->i32 when both tensors are contiguous. Previously, mixed-type contiguous copies fell through to expensive 4D index path. Build SUCCESS, 131/131 CPY unit tests PASSED. Benchmark: 132.82 GB/s (f32->f16), up to 178 GB/s (f32->f32)."
+    },
+    {
       "task_id": "task_027",
       "kernel": "norm (norm/rms_norm/l2_norm/group_norm)",
       "optimization": "Fix group_norm barriers + increase small-path work-group to 256",

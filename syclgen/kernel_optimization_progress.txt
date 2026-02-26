@@ -26,6 +26,15 @@
 - [x] sk_013: gla SYCL kernel — low potential (4 optimization opportunities)
 ## Recent Activity
 
+[2026-02-26] COMPLETED task_031: Add contiguous fast-path for cpy kernels.
+  - opt_007_003: Added cpy_contiguous kernel template with 1D nd_range + SIMD16
+  - New kernel uses simple linear indexing (i*nb_src, i*nb_dst) instead of 4D index decomposition
+  - Applied to: f32->f16, f16->f32, f16->f16, i16->i16, i32->i32 when both tensors are contiguous
+  - Mixed-type contiguous copies now avoid 12 integer divisions per element
+  - Build: SUCCESS
+  - Unit tests: 131/131 CPY tests PASSED
+  - Benchmark: 132.82 GB/s (f32->f16), up to 178 GB/s (f32->f32)
+
 [2026-02-26] COMPLETED task_030: Add reqd_sub_group_size(16) to all RoPE launch paths.
   - opt_002_003: Added [[sycl::reqd_sub_group_size(WARP_SIZE)]] to all 8 parallel_for lambdas
   - Applied to: rope_norm (2), rope_neox (2), rope_multi (2), rope_vision (2)
