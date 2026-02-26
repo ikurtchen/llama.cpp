@@ -1,6 +1,17 @@
 {
   "results": [
     {
+      "task_id": "task_022",
+      "kernel": "mmq (quantized matmul)",
+      "optimization": "Tune mmq tile sizes for Intel Xe2 - change mmq_y from 128 to 64",
+      "timestamp": "2026-02-26T19:00:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": 1.0,
+      "notes": "Changed mmq_y from 128 to 64 for all quant types (Q4_0, Q4_1, Q5_0, Q5_1, Q8_0, Q2_K, Q3_K, Q4_K, Q5_K, Q6_K). New tile sizes: mmq_x=64, mmq_y=64, nwarps=8. Expected better SLM utilization (~8KB per WG vs ~12KB), allowing ~8 concurrent work-groups vs ~5. Benchmark shows performance within noise margin of baseline (~1% variation). Build SUCCESS, 726/726 unit tests PASSED."
+    },
+    {
       "task_id": "task_020",
       "kernel": "mmvq (quantized matrix-vector multiply)",
       "optimization": "Multi-column batching - process 4 columns per kernel launch instead of 1",

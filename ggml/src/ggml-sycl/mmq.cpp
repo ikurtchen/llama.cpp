@@ -2293,7 +2293,7 @@ mul_mat_q(const void *__restrict__ vx, const void *__restrict__ vy,
 // For SYCL (non-XMX), use RDNA2 tile sizes as default for Intel GPUs.
 
 #define  MMQ_X_Q4_0_RDNA2  64
-#define  MMQ_Y_Q4_0_RDNA2  128
+#define  MMQ_Y_Q4_0_RDNA2  64
 #define NWARPS_Q4_0_RDNA2  8
 #define  MMQ_X_Q4_0_RDNA1  64
 #define  MMQ_Y_Q4_0_RDNA1  64
@@ -2335,7 +2335,7 @@ template <bool need_check> static void
 // For SYCL (non-XMX), use RDNA2 tile sizes as default for Intel GPUs.
 
 #define  MMQ_X_Q4_1_RDNA2  64
-#define  MMQ_Y_Q4_1_RDNA2  128
+#define  MMQ_Y_Q4_1_RDNA2  64
 #define NWARPS_Q4_1_RDNA2  8
 #define  MMQ_X_Q4_1_RDNA1  64
 #define  MMQ_Y_Q4_1_RDNA1  64
@@ -2376,7 +2376,7 @@ template <bool need_check> static void
 // For SYCL (non-XMX), use RDNA2 tile sizes as default for Intel GPUs.
 
 #define  MMQ_X_Q5_0_RDNA2  64
-#define  MMQ_Y_Q5_0_RDNA2  128
+#define  MMQ_Y_Q5_0_RDNA2  64
 #define NWARPS_Q5_0_RDNA2  8
 #define  MMQ_X_Q5_0_RDNA1  64
 #define  MMQ_Y_Q5_0_RDNA1  64
@@ -2417,7 +2417,7 @@ template <bool need_check> static void
 // For SYCL (non-XMX), use RDNA2 tile sizes as default for Intel GPUs.
 
 #define  MMQ_X_Q5_1_RDNA2  64
-#define  MMQ_Y_Q5_1_RDNA2  128
+#define  MMQ_Y_Q5_1_RDNA2  64
 #define NWARPS_Q5_1_RDNA2  8
 #define  MMQ_X_Q5_1_RDNA1  64
 #define  MMQ_Y_Q5_1_RDNA1  64
@@ -2458,7 +2458,7 @@ mul_mat_q5_1(
 // For SYCL (non-XMX), use RDNA2 tile sizes as default for Intel GPUs.
 
 #define  MMQ_X_Q8_0_RDNA2  64
-#define  MMQ_Y_Q8_0_RDNA2  128
+#define  MMQ_Y_Q8_0_RDNA2  64
 #define NWARPS_Q8_0_RDNA2  8
 #define  MMQ_X_Q8_0_RDNA1  64
 #define  MMQ_Y_Q8_0_RDNA1  64
@@ -2499,7 +2499,7 @@ template <bool need_check> static void
 // For SYCL (non-XMX), use RDNA2 tile sizes as default for Intel GPUs.
 
 #define  MMQ_X_Q2_K_RDNA2  64
-#define  MMQ_Y_Q2_K_RDNA2  128
+#define  MMQ_Y_Q2_K_RDNA2  64
 #define NWARPS_Q2_K_RDNA2  8
 #define  MMQ_X_Q2_K_RDNA1  128
 #define  MMQ_Y_Q2_K_RDNA1  32
@@ -2584,7 +2584,7 @@ mul_mat_q3_K(
 // For SYCL (non-XMX), use RDNA2 tile sizes as default for Intel GPUs.
 
 #define  MMQ_X_Q4_K_RDNA2  64
-#define  MMQ_Y_Q4_K_RDNA2  128
+#define  MMQ_Y_Q4_K_RDNA2  64
 #define NWARPS_Q4_K_RDNA2  8
 #define  MMQ_X_Q4_K_RDNA1  32
 #define  MMQ_Y_Q4_K_RDNA1  64
@@ -2626,7 +2626,7 @@ template <bool need_check> static void
 // For SYCL (non-XMX), use RDNA2 tile sizes as default for Intel GPUs.
 
 #define  MMQ_X_Q5_K_RDNA2  64
-#define  MMQ_Y_Q5_K_RDNA2  128
+#define  MMQ_Y_Q5_K_RDNA2  64
 #define NWARPS_Q5_K_RDNA2  8
 #define  MMQ_X_Q5_K_RDNA1  32
 #define  MMQ_Y_Q5_K_RDNA1  64
@@ -2668,7 +2668,7 @@ mul_mat_q5_K(
 // For SYCL (non-XMX), use RDNA2 tile sizes as default for Intel GPUs.
 
 #define  MMQ_X_Q6_K_RDNA2  64
-#define  MMQ_Y_Q6_K_RDNA2  128
+#define  MMQ_Y_Q6_K_RDNA2  64
 #define NWARPS_Q6_K_RDNA2  8
 #define  MMQ_X_Q6_K_RDNA1  32
 #define  MMQ_Y_Q6_K_RDNA1  64
