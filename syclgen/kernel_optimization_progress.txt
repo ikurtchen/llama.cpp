@@ -26,6 +26,13 @@
 - [x] sk_013: gla SYCL kernel — low potential (4 optimization opportunities)
 ## Recent Activity
 
+[2026-02-26] COMPLETED task_033: Fix binbcast fallback condition (y-dim check).
+  - opt_006_003: Changed fallback condition to check both y and z grid dimensions
+  - Changed 'if (block_nums[0] > 65535)' to 'if (block_nums[0] > 65535 || block_nums[1] > 65535)'
+  - This ensures the 1D fallback kernel is used when ne1 is large enough to exceed SYCL grid limits
+  - Build: SUCCESS
+  - Unit tests: ADD 65/65 tests PASSED
+
 [2026-02-26] COMPLETED task_031: Add contiguous fast-path for cpy kernels.
   - opt_007_003: Added cpy_contiguous kernel template with 1D nd_range + SIMD16
   - New kernel uses simple linear indexing (i*nb_src, i*nb_dst) instead of 4D index decomposition

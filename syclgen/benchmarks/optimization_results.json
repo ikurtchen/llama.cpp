@@ -1,6 +1,17 @@
 {
   "results": [
     {
+      "task_id": "task_033",
+      "kernel": "binbcast (binary broadcast)",
+      "optimization": "Fix fallback condition - add y-dim grid limit check",
+      "timestamp": "2026-02-26T23:45:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": 1.0,
+      "notes": "opt_006_003: Changed fallback condition from 'if (block_nums[0] > 65535)' to 'if (block_nums[0] > 65535 || block_nums[1] > 65535)'. This ensures the 1D fallback kernel is used whenever any grid dimension (z or y) exceeds SYCL limits, preventing potential failures or incorrect results with large ne1 dimensions. Build SUCCESS, 65/65 ADD unit tests PASSED."
+    },
+    {
       "task_id": "task_032",
       "kernel": "binbcast (binary broadcast)",
       "optimization": "Replace integer div/mod with fastdiv - multiplicative inverse division",
