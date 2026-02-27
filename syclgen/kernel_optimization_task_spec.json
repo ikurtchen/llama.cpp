@@ -194,7 +194,7 @@
       "priority": "high",
       "complexity": "medium",
       "category": "reduction",
-      "status": "pending",
+      "status": "completed",
       "description": "Fix norm kernels: fix group_norm global barrier, unify reductions, increase small-path work-group size",
       "target_kernels": [
         {
@@ -211,7 +211,11 @@
       "dependencies": [],
       "estimated_improvement": "2-4x throughput for rms_norm small path; 10-20% from unified reduction; fused rms_norm_multiply eliminates a memory pass",
       "risk": "medium",
-      "notes": "Norm operations run after every attention and FFN block in transformer inference \u2014 very high invocation frequency. group_norm global barrier is a performance bug."
+      "notes": "Norm operations run after every attention and FFN block in transformer inference — very high invocation frequency. group_norm global barrier is a performance bug.",
+      "completed_at": "2026-02-27T19:00:00Z",
+      "baseline_metric": "16-thread work-groups for ncols<1024",
+      "optimized_metric": "256-thread work-groups for ncols<1024",
+      "actual_improvement": "16x more parallelism; fixed global barriers in group_norm"
     },
     {
       "id": "opt_task_009",

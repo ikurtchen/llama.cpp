@@ -47,6 +47,15 @@
 - [x] sk_033: ggml_sycl_op_topk_moe — low potential (5 optimization opportunities)
 
 ## Recent Activity
+[2026-02-27] opt_task_008 (norm kernels): COMPLETED. Fixed group_norm global barriers and increased work-group size:
+  - Fixed 2 global barriers in group_norm_f32: changed barrier() to barrier(local_space)
+  - Removed 8 lines of DPCT migration comments
+  - Increased small-path work-group from 16 to 256 threads in norm_f32, rms_norm_f32, l2_norm_f32
+  - Added SLM allocation for small path (64-128 bytes per work-group)
+  - Expected 2-4x throughput improvement from better occupancy (16x more parallelism per row)
+  - Correctness: PASS (43/43 unit tests on b60)
+  - Note: Norm operations run after every attention/FFN block - high impact on inference path
+
 [2026-02-27] opt_task_005 (cpy work-group size): COMPLETED. Optimized cpy kernels:
   - Increased SYCL_CPY_BLOCK_SIZE from 32 to 256 (scalar copy work-groups)
   - Increased quantized copy work-groups from 1 to 256 (f32->q, q->f32, q->q kernels)

@@ -54,6 +54,17 @@
       "optimized_time_us": null,
       "speedup": null,
       "notes": "Added XE2-specific tile sizes: MMQ_X=64, MMQ_Y=64, NWARPS=8 (tuned for 64KB SLM, SIMD16). Updated mul_mat_q4_0 and mul_mat_q8_0 kernels. Full XMX joint_matrix implementation still pending - requires ~1000+ lines of new code."
+    },
+    {
+      "task_id": "opt_task_008",
+      "kernel": "norm",
+      "optimization": "Fix group_norm global barriers (local_space fence), increase small-path work-group size from 16 to 256",
+      "timestamp": "2026-02-27T19:00:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": null,
+      "notes": "Fixed 2 global barriers in group_norm_f32: changed item_ct1.barrier() to item_ct1.barrier(sycl::access::fence_space::local_space). Removed 8 lines of DPCT comments. Increased work-group size from 16 to 256 threads for small-path (ncols < 1024) in norm_f32_sycl, rms_norm_f32_sycl, and l2_norm_f32_sycl. Added SLM allocation for small path (64-128 bytes per work-group). Expected 2-4x throughput improvement from better occupancy - 16x more parallelism per row. Unit tests: 43/43 pass on b60."
     }
   ]
 }
