@@ -2183,14 +2183,108 @@
       ],
       "overall_optimization_potential": "low",
       "estimated_current_efficiency": "75-85% \u2014 The diag kernel is a simple element-wise operation (conditional copy or zero-fill) that is inherently memory-bound and write-dominated. The work-group size (256) and memory access patterns are reasonable. Main inefficiency is the redundant 4D index decomposition, but since most of the time is spent on memory writes, ALU savings have limited impact. This is a low-frequency operation (diag is rarely used in inference), so optimization priority is minimal."
+    },
+    {
+      "kernel_id": "sk_016",
+      "name": "ggml_sycl_expm1",
+      "file": "ggml/src/ggml-sycl/element_wise.cpp",
+      "source_cuda_ids": [],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": [256, 1, 1],
+          "sub_group_size": null,
+          "global_size_expression": "ceil_div(k_elements, 256) * 256 — one work-item per element",
+          "notes": "Uses ggml_sycl_op_unary framework with nd_range<1> and work-group size 256 (SYCL_ELEMENT_WISE_BLOCK_SIZE). No [[sycl::reqd_sub_group_size]] specified. The SYCL_GLOBAL_ID_LOOP macro implements a grid-stride loop, but since global_range >= k always holds, each work-item processes exactly 0 or 1 elements — the loop is effectively a single-iteration guard."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "strided_accesses": ["Generic path: always performs 4D index decomposition (3 int64 divisions + 3 modulos per element) via unary_op_generic_kernel, even for contiguous tensors. For contiguous tensors, adjacent work-items access adjacent memory (coalesced), but the index math is wasted overhead."],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "Each work-item reads 1 scalar float and writes 1 scalar float. No sycl::vec usage. The unary_op_generic_kernel performs byte-offset pointer arithmetic (i0*nb0 + i1*nb1 + i2*nb2 + i3*nb3) supporting non-contiguous tensors, but the CUDA equivalent asserts contiguity and uses simple dst[i] = f(src[i]) addressing. This is a shared issue with all ops that go through ggml_sycl_op_unary."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes": 0,
+          "potential_bank_conflicts": false,
+          "notes": "No SLM needed — purely element-wise operation with no data sharing between work-items."
+        },
+        "reduction_pattern": {
+          "has_reduction": false,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "No reductions — each work-item independently computes expm1 for one element."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "FP32 computation via dispatch_ggml_sycl_op_unary (GGML_TYPE_F32 path). When GGML_SYCL_F16 is defined, also supports sycl::half. Unlike CUDA which always casts to float before calling the op (dst[i] = (T)op((float)x[i])), the SYCL version calls sycl::expm1 directly on the template type T — for half this may give different precision characteristics."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": ["sycl::expm1 (standard precision, called at element_wise.cpp line 44)"],
+          "notes": "Uses standard sycl::expm1, not a native variant. CUDA uses expm1f() which is the single-precision C math function (equivalent to fast-math on GPU). There is no sycl::native::expm1 in the SYCL spec, so switching to native is not directly possible. Could be decomposed to sycl::native::exp(x) - 1.0f but this loses precision for small x values where expm1 is specifically designed to be accurate. Given the low frequency of this op, the standard function is appropriate."
+        },
+        "loop_analysis": {
+          "hot_loops": [],
+          "unrolled": false,
+          "notes": "No inner loops. The SYCL_GLOBAL_ID_LOOP macro is a grid-stride loop but effectively executes 0 or 1 times since global_range >= k. No unrolling opportunities."
+        },
+        "estimated_bottleneck": "memory",
+        "anti_patterns": [
+          "No contiguity fast-path: always performs expensive 4D index decomposition (3 int64 divisions + 3 modulos per element) via unary_op_generic_kernel even for contiguous tensors. CUDA asserts contiguity and uses simple dst[i] = op(src[i]) addressing. This is a shared issue across all ggml_sycl_op_unary ops.",
+          "Missing [[sycl::reqd_sub_group_size(16)]] — suboptimal SIMD width selection on Xe2 (shared with all unary ops)",
+          "__dpct_inline__ macro artifact on op_expm1 function (line 42)",
+          "Half-precision path calls sycl::expm1(half) directly instead of promoting to float first like CUDA does — potential precision divergence",
+          "Grid-stride loop (SYCL_GLOBAL_ID_LOOP) is unnecessary since global_range >= k always — a simple if (i >= k) return guard would suffice"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_016_001",
+          "category": "memory_coalescing",
+          "priority": "medium",
+          "description": "Add a contiguous fast-path to ggml_sycl_op_unary that bypasses the generic 4D index decomposition kernel. For contiguous tensors (the common case), use a simple kernel: dst[i] = func(src[i]). This eliminates 3 int64 divisions and 3 modulo operations per element. The CUDA version asserts contiguity and always uses direct addressing. Some other SYCL ops in element_wise.cpp (log, softplus, step, neg) already bypass ggml_sycl_op_unary and call dispatch_ggml_sycl_op_unary directly with simpler kernels — expm1 should follow the same pattern. NOTE: This optimization applies to ALL ~25 unary ops that go through ggml_sycl_op_unary, not just expm1.",
+          "expected_improvement": "10-25% throughput improvement for contiguous tensors. Integer division is expensive on GPU (20-30 cycles per div64 on Xe2). Eliminating 6 per element for a memory-bound kernel that only does ~10 cycles of useful work (expm1) is significant. The improvement scales with all unary ops, not just expm1.",
+          "implementation_notes": "Add an ggml_is_contiguous check in ggml_sycl_op_unary (line 562). If contiguous, dispatch to a simple kernel: SYCL_GLOBAL_ID_LOOP(k, item) { dst[i] = func(src[i]); }. If non-contiguous, fall through to the existing unary_op_generic_kernel. Alternatively, refactor expm1 to follow the pattern used by ggml_sycl_op_log (line 821) which calls dispatch_ggml_sycl_op_unary directly with a simple kernel lambda.",
+          "risk": "low",
+          "risk_notes": "The contiguous fast-path is a strict subset of the generic path. Adding an if-branch at dispatch level has zero runtime cost for the non-contiguous path. The contiguous kernel is trivially correct."
+        },
+        {
+          "id": "opt_016_002",
+          "category": "vectorization",
+          "priority": "low",
+          "description": "Add vectorized loads/stores (sycl::vec<float, 4>) to the contiguous fast-path kernel (contingent on opt_016_001). Process 4 elements per work-item using vec4 loads, apply expm1 to each component, and store with a vec4 write. This reduces memory transactions by 4x for aligned data. Element-wise ops like expm1 are trivially vectorizable since there are no inter-element dependencies.",
+          "expected_improvement": "20-40% additional throughput improvement over the contiguous fast-path. expm1 is memory-bound (arithmetic intensity ~1 transcendental per 8 bytes), so maximizing memory bandwidth utilization through vector loads is the primary lever. Combined with opt_016_001, total improvement could be 30-50% vs current implementation.",
+          "implementation_notes": "In the contiguous fast-path kernel, change from scalar to vec4: sycl::vec<float, 4> v = *reinterpret_cast<const sycl::vec<float, 4>*>(&src[i*4]); v[0] = sycl::expm1(v[0]); v[1] = sycl::expm1(v[1]); v[2] = sycl::expm1(v[2]); v[3] = sycl::expm1(v[3]); *reinterpret_cast<sycl::vec<float, 4>*>(&dst[i*4]) = v; Handle tail elements (k % 4 != 0) with scalar fallback. This applies to all unary ops, not just expm1. Ref: optimization_guide.md section 2.2.",
+          "risk": "medium",
+          "risk_notes": "Requires pointer alignment for reinterpret_cast (typically guaranteed for ggml tensor data). Need to handle k not divisible by 4 with a scalar tail loop. The function call overhead of 4x sycl::expm1 per iteration may reduce the benefit if the compiler doesn't pipeline them."
+        },
+        {
+          "id": "opt_016_003",
+          "category": "sub_group_ops",
+          "priority": "low",
+          "description": "Add [[sycl::reqd_sub_group_size(16)]] to the parallel_for lambda in ggml_sycl_op_unary (line 590). Without this attribute, the compiler may choose SIMD32 instead of the native SIMD16 for Xe2, which halves the number of hardware threads per XVE and reduces occupancy. This applies to all ~25 unary ops that go through this framework, not just expm1.",
+          "expected_improvement": "5-10% from better occupancy on Xe2. For memory-bound element-wise ops, higher occupancy improves latency hiding and memory bandwidth utilization.",
+          "implementation_notes": "Add [[sycl::reqd_sub_group_size(16)]] to the lambda at line 590: [=](sycl::nd_item<1> item_ct1) [[sycl::reqd_sub_group_size(16)]] { ... }. This is a one-line change that benefits all unary ops. Ref: optimization_guide.md section 1.2.",
+          "risk": "low",
+          "risk_notes": "No sub-group operations are used in the kernel, so this only affects occupancy and register allocation. No functional impact."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "65-75% — expm1 is a simple element-wise unary operation that is inherently memory-bound (1 transcendental op per 8 bytes of memory traffic). The work-group size (256) and nd_range<1> launch are appropriate. The main inefficiency is the generic 4D index decomposition overhead for contiguous tensors (~6 int64 div/mod operations per element that are unnecessary in the common case). However, expm1 is a rarely-used operation in LLM inference (not part of standard transformer architectures), so optimization priority is minimal. The identified optimizations apply to the shared ggml_sycl_op_unary framework and would benefit all ~25 unary ops collectively."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 15,
+    "total_kernels_analyzed": 16,
     "critical_potential": 1,
     "high_potential": 6,
     "medium_potential": 6,
-    "low_potential": 2,
+    "low_potential": 3,
     "no_optimization_needed": 1,
     "top_opportunities": [
       {
