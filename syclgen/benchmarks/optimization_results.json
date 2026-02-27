@@ -164,6 +164,17 @@
       "optimized_time_us": null,
       "speedup": null,
       "notes": "Added reqd_sub_group_size(WARP_SIZE) to 19 kernel launches across 7 files: rope.cpp (8 kernels), binbcast.cpp (2 kernels), getrows.cpp (3 kernels), gla.cpp (1 kernel), diag.cpp (2 kernels), im2col.cpp (2 kernels), conv2d-dw.cpp (1 kernel). Remaining kernels (softmax, convert, cpy, wkv, conv2d, top-k, mmvq, norm, cross-entropy, ssm_scan, topk-moe, solve_tri) already had this attribute from earlier tasks. This ensures native SIMD16 execution on Intel Xe2 (Arc Pro B60). Tests: ROPE 248/248, DIAG 3/3, IM2COL 88/88 PASS. Expected 5-15% occupancy improvement per kernel from guaranteed SIMD16."
+    },
+    {
+      "task_id": "opt_task_017",
+      "kernel": "ssm_scan (Mamba-1)",
+      "optimization": "Add L_template specialization (1..8) for compile-time loop unrolling in Mamba-1 SSM scan kernel",
+      "timestamp": "2026-02-27T23:59:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": null,
+      "notes": "Added L_template parameter to ssm_scan_f32 kernel template. Uses if constexpr to separate compile-time (L_template>0) and runtime (L_template=0) code paths. Switch statement in dispatch instantiates kernels with L=1..8 for common short sequence lengths (n_tok=1..8). For L>8, falls back to runtime L (no compile-time unrolling). L=1 is the dominant case in autoregressive Mamba inference - enables full outer loop unrolling with no loop overhead. Also added reqd_sub_group_size(WARP_SIZE) to Mamba-1 kernel launch. Correctness: PASS (SSM_SCAN 3/3 tests on b60). Expected 20-50% speedup for L=1 case."
     }
   ]
 }

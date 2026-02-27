@@ -2,12 +2,15 @@
 
 #include "common.hpp"
 
-// Mamba-1 selective scan kernel (non-CUB path, L_template=0 for runtime L)
+// Mamba-1 selective scan kernel (non-CUB path)
 // Grid mapping: nd_range<3> with range<3>(n_seq, n_groups, splitD), local={1, 1, splitD}
 //   blockIdx.x = item.get_group(0) => seq index
 //   blockIdx.y = item.get_group(1) => head group index
 //   threadIdx.x = item.get_local_id(2) => thread within block
-template <int splitD, int N>
+//
+// L_template parameter enables compile-time loop unrolling for common short sequence lengths (L=1..8).
+// L_template=0 uses runtime L (no unrolling). L=1 is the dominant case in autoregressive Mamba inference.
+template <int splitD, int N, int L_template>
 static void ssm_scan_f32(
         const float * __restrict__ src0, const float * __restrict__ src1, const float * __restrict__ src2,
         const float * __restrict__ src3, const float * __restrict__ src4, const float * __restrict__ src5,
@@ -53,31 +56,64 @@ static void ssm_scan_f32(
         regs0[n] = s0_block[tidx * stride_s0 + n];
     }
 
-    for (int64_t i = 0; i < L; i++) {
-        if (tidx < N) {
-            smemB[tidx] = B_block[i * stride_B + tidx];
-            smemC[tidx] = C_block[i * stride_C + tidx];
-        }
-        sycl::group_barrier(item.get_group());
+    // opt_task_017: Use compile-time L when L_template > 0 for loop unrolling
+    // L_template=1..8 enables outer loop unrolling for common short sequence lengths
+    // L_template=0 uses runtime L (no unrolling)
+    if constexpr (L_template > 0) {
+        constexpr int64_t L_const = L_template;
+        for (int64_t i = 0; i < L_const; i++) {
+            if (tidx < N) {
+                smemB[tidx] = B_block[i * stride_B + tidx];
+                smemC[tidx] = C_block[i * stride_C + tidx];
+            }
+            sycl::group_barrier(item.get_group());
 
-        float dt_soft_plus = dt_block[i * stride_dt + tidx];
-        // opt_task_013: Use sycl::native::exp and sycl::native::log1p for faster computation
-        // See: hw_spec, optimization_guide
-        if (dt_soft_plus <= 20.0f) {
-            dt_soft_plus = sycl::log1p(sycl::native::exp(dt_soft_plus));
-        }
-        float x_dt = x_block[i * stride_x + tidx] * dt_soft_plus;
+            float dt_soft_plus = dt_block[i * stride_dt + tidx];
+            // opt_task_013: Use sycl::native::exp and sycl::native::log1p for faster computation
+            // See: hw_spec, optimization_guide
+            if (dt_soft_plus <= 20.0f) {
+                dt_soft_plus = sycl::log1p(sycl::native::exp(dt_soft_plus));
+            }
+            float x_dt = x_block[i * stride_x + tidx] * dt_soft_plus;
 
-        float sumf = 0.0f;
-        // opt_task_015: Enable full unroll for compile-time-constant inner loops
-        // See: hw_spec_b60.md, optimization_guide
-        #pragma unroll
-        for (int n = 0; n < N; n++) {
-            float state = regs0[n] * sycl::native::exp(dt_soft_plus * regA[n]) + smemB[n] * x_dt;
-            sumf += state * smemC[n];
-            regs0[n] = state;
+            float sumf = 0.0f;
+            // opt_task_015: Enable full unroll for compile-time-constant inner loops
+            // See: hw_spec_b60.md, optimization_guide
+            #pragma unroll
+            for (int n = 0; n < N; n++) {
+                float state = regs0[n] * sycl::native::exp(dt_soft_plus * regA[n]) + smemB[n] * x_dt;
+                sumf += state * smemC[n];
+                regs0[n] = state;
+            }
+            y_block[i * stride_y + tidx] = sumf;
         }
-        y_block[i * stride_y + tidx] = sumf;
+    } else {
+        for (int64_t i = 0; i < L; i++) {
+            if (tidx < N) {
+                smemB[tidx] = B_block[i * stride_B + tidx];
+                smemC[tidx] = C_block[i * stride_C + tidx];
+            }
+            sycl::group_barrier(item.get_group());
+
+            float dt_soft_plus = dt_block[i * stride_dt + tidx];
+            // opt_task_013: Use sycl::native::exp and sycl::native::log1p for faster computation
+            // See: hw_spec, optimization_guide
+            if (dt_soft_plus <= 20.0f) {
+                dt_soft_plus = sycl::log1p(sycl::native::exp(dt_soft_plus));
+            }
+            float x_dt = x_block[i * stride_x + tidx] * dt_soft_plus;
+
+            float sumf = 0.0f;
+            // opt_task_015: Enable full unroll for compile-time-constant inner loops
+            // See: hw_spec_b60.md, optimization_guide
+            #pragma unroll
+            for (int n = 0; n < N; n++) {
+                float state = regs0[n] * sycl::native::exp(dt_soft_plus * regA[n]) + smemB[n] * x_dt;
+                sumf += state * smemC[n];
+                regs0[n] = state;
+            }
+            y_block[i * stride_y + tidx] = sumf;
+        }
     }
 
     // Non-CUB path: store state directly
@@ -252,22 +288,116 @@ static void ssm_scan_f32_sycl(
             const sycl::range<3> global_range(n_seq, n_groups_y, threads);
             const sycl::range<3> local_range(1, 1, threads);
 
-            stream->submit([&](sycl::handler & cgh) {
-                sycl::local_accessor<float, 1> smemB_acc(sycl::range<1>(16), cgh);
-                sycl::local_accessor<float, 1> smemC_acc(sycl::range<1>(16), cgh);
+            // opt_task_017: L_template specialization for compile-time loop unrolling
+            // CUDA specializes for L=1..8. Use compile-time L when n_tok is in that range.
+            // L_template=0 means runtime L (no unrolling).
+            constexpr int L_template_runtime = 0;
 
-                cgh.parallel_for(
-                    sycl::nd_range<3>(global_range, local_range),
-                    [=](sycl::nd_item<3> item) {
-                        ssm_scan_f32<threads, 16>(
-                            src0, src1, src2, src3, src4, src5, src6, dst,
-                            src0_nb2, src0_nb3, src1_nb2, src1_nb3, src2_nb1, src2_nb2,
-                            src3_nb1, src4_nb2, src4_nb3, src5_nb2, src5_nb3, s_off, n_head, n_tok,
-                            item,
-                            smemB_acc.get_multi_ptr<sycl::access::decorated::no>().get(),
-                            smemC_acc.get_multi_ptr<sycl::access::decorated::no>().get());
-                    });
-            });
+            if (n_tok >= 1 && n_tok <= 8) {
+                // Compile-time L for common short sequence lengths
+                stream->submit([&](sycl::handler & cgh) {
+                    sycl::local_accessor<float, 1> smemB_acc(sycl::range<1>(16), cgh);
+                    sycl::local_accessor<float, 1> smemC_acc(sycl::range<1>(16), cgh);
+
+                    cgh.parallel_for(
+                        sycl::nd_range<3>(global_range, local_range),
+                        [=](sycl::nd_item<3> item) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                            // L_template specialization: instantiate with compile-time L
+                            switch (n_tok) {
+                                case 1:
+                                    ssm_scan_f32<threads, 16, 1>(
+                                        src0, src1, src2, src3, src4, src5, src6, dst,
+                                        src0_nb2, src0_nb3, src1_nb2, src1_nb3, src2_nb1, src2_nb2,
+                                        src3_nb1, src4_nb2, src4_nb3, src5_nb2, src5_nb3, s_off, n_head, n_tok,
+                                        item,
+                                        smemB_acc.get_multi_ptr<sycl::access::decorated::no>().get(),
+                                        smemC_acc.get_multi_ptr<sycl::access::decorated::no>().get());
+                                    break;
+                                case 2:
+                                    ssm_scan_f32<threads, 16, 2>(
+                                        src0, src1, src2, src3, src4, src5, src6, dst,
+                                        src0_nb2, src0_nb3, src1_nb2, src1_nb3, src2_nb1, src2_nb2,
+                                        src3_nb1, src4_nb2, src4_nb3, src5_nb2, src5_nb3, s_off, n_head, n_tok,
+                                        item,
+                                        smemB_acc.get_multi_ptr<sycl::access::decorated::no>().get(),
+                                        smemC_acc.get_multi_ptr<sycl::access::decorated::no>().get());
+                                    break;
+                                case 3:
+                                    ssm_scan_f32<threads, 16, 3>(
+                                        src0, src1, src2, src3, src4, src5, src6, dst,
+                                        src0_nb2, src0_nb3, src1_nb2, src1_nb3, src2_nb1, src2_nb2,
+                                        src3_nb1, src4_nb2, src4_nb3, src5_nb2, src5_nb3, s_off, n_head, n_tok,
+                                        item,
+                                        smemB_acc.get_multi_ptr<sycl::access::decorated::no>().get(),
+                                        smemC_acc.get_multi_ptr<sycl::access::decorated::no>().get());
+                                    break;
+                                case 4:
+                                    ssm_scan_f32<threads, 16, 4>(
+                                        src0, src1, src2, src3, src4, src5, src6, dst,
+                                        src0_nb2, src0_nb3, src1_nb2, src1_nb3, src2_nb1, src2_nb2,
+                                        src3_nb1, src4_nb2, src4_nb3, src5_nb2, src5_nb3, s_off, n_head, n_tok,
+                                        item,
+                                        smemB_acc.get_multi_ptr<sycl::access::decorated::no>().get(),
+                                        smemC_acc.get_multi_ptr<sycl::access::decorated::no>().get());
+                                    break;
+                                case 5:
+                                    ssm_scan_f32<threads, 16, 5>(
+                                        src0, src1, src2, src3, src4, src5, src6, dst,
+                                        src0_nb2, src0_nb3, src1_nb2, src1_nb3, src2_nb1, src2_nb2,
+                                        src3_nb1, src4_nb2, src4_nb3, src5_nb2, src5_nb3, s_off, n_head, n_tok,
+                                        item,
+                                        smemB_acc.get_multi_ptr<sycl::access::decorated::no>().get(),
+                                        smemC_acc.get_multi_ptr<sycl::access::decorated::no>().get());
+                                    break;
+                                case 6:
+                                    ssm_scan_f32<threads, 16, 6>(
+                                        src0, src1, src2, src3, src4, src5, src6, dst,
+                                        src0_nb2, src0_nb3, src1_nb2, src1_nb3, src2_nb1, src2_nb2,
+                                        src3_nb1, src4_nb2, src4_nb3, src5_nb2, src5_nb3, s_off, n_head, n_tok,
+                                        item,
+                                        smemB_acc.get_multi_ptr<sycl::access::decorated::no>().get(),
+                                        smemC_acc.get_multi_ptr<sycl::access::decorated::no>().get());
+                                    break;
+                                case 7:
+                                    ssm_scan_f32<threads, 16, 7>(
+                                        src0, src1, src2, src3, src4, src5, src6, dst,
+                                        src0_nb2, src0_nb3, src1_nb2, src1_nb3, src2_nb1, src2_nb2,
+                                        src3_nb1, src4_nb2, src4_nb3, src5_nb2, src5_nb3, s_off, n_head, n_tok,
+                                        item,
+                                        smemB_acc.get_multi_ptr<sycl::access::decorated::no>().get(),
+                                        smemC_acc.get_multi_ptr<sycl::access::decorated::no>().get());
+                                    break;
+                                case 8:
+                                    ssm_scan_f32<threads, 16, 8>(
+                                        src0, src1, src2, src3, src4, src5, src6, dst,
+                                        src0_nb2, src0_nb3, src1_nb2, src1_nb3, src2_nb1, src2_nb2,
+                                        src3_nb1, src4_nb2, src4_nb3, src5_nb2, src5_nb3, s_off, n_head, n_tok,
+                                        item,
+                                        smemB_acc.get_multi_ptr<sycl::access::decorated::no>().get(),
+                                        smemC_acc.get_multi_ptr<sycl::access::decorated::no>().get());
+                                    break;
+                            }
+                        });
+                });
+            } else {
+                // Runtime L (no compile-time unrolling) for n_tok > 8 or other values
+                stream->submit([&](sycl::handler & cgh) {
+                    sycl::local_accessor<float, 1> smemB_acc(sycl::range<1>(16), cgh);
+                    sycl::local_accessor<float, 1> smemC_acc(sycl::range<1>(16), cgh);
+
+                    cgh.parallel_for(
+                        sycl::nd_range<3>(global_range, local_range),
+                        [=](sycl::nd_item<3> item) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                            ssm_scan_f32<threads, 16, L_template_runtime>(
+                                src0, src1, src2, src3, src4, src5, src6, dst,
+                                src0_nb2, src0_nb3, src1_nb2, src1_nb3, src2_nb1, src2_nb2,
+                                src3_nb1, src4_nb2, src4_nb3, src5_nb2, src5_nb3, s_off, n_head, n_tok,
+                                item,
+                                smemB_acc.get_multi_ptr<sycl::access::decorated::no>().get(),
+                                smemC_acc.get_multi_ptr<sycl::access::decorated::no>().get());
+                        });
+                });
+            }
         } else {
             GGML_ABORT("doesn't support d_state!=16.");
         }

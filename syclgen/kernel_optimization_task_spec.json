@@ -595,7 +595,8 @@
       "priority": "medium",
       "complexity": "medium",
       "category": "work_group_size",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-02-27T23:59:00Z",
       "description": "Add L_template specialization for Mamba-1 SSM scan kernel",
       "target_kernels": [
         {
@@ -609,7 +610,10 @@
       "dependencies": [],
       "estimated_improvement": "20-50% speedup for L=1 autoregressive decoding (the most common Mamba inference case)",
       "risk": "medium",
-      "notes": "CUDA specializes for L=1..8 enabling outer loop unrolling. L=1 is the dominant case in autoregressive Mamba inference."
+      "baseline_metric": "Runtime L loop (no compile-time unrolling)",
+      "optimized_metric": "Compile-time L_template=1..8 specialization",
+      "actual_improvement": "Enables compiler to fully unroll outer L-loop for n_tok=1..8; L=1 is dominant case in autoregressive Mamba inference",
+      "notes": "Added L_template parameter to ssm_scan_f32 kernel template. Uses if constexpr to separate compile-time (L_template>0) and runtime (L_template=0) paths. Switch statement in dispatch instantiates kernels with L=1..8 for common short sequence lengths. Also added reqd_sub_group_size(WARP_SIZE) to Mamba-1 kernel launch. Correctness: PASS (SSM_SCAN 3/3 tests)"
     },
     {
       "id": "opt_task_018",
