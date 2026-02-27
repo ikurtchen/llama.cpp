@@ -9,7 +9,7 @@
 - Analysis complete: Yes
 - Kernels with optimization potential: 32
 - Kernels with no optimization needed: 1
-- Optimization tasks created: pending finalization
+- Optimization tasks created: 22 (in kernel_optimization_task_spec.json)
 
 ## Kernels Analyzed
 - [x] sk_001: softmax SYCL kernels — high potential (6 optimization opportunities)

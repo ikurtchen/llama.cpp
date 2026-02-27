@@ -1,0 +1,736 @@
+{
+  "metadata": {
+    "created": "2026-02-27T00:00:00Z",
+    "target_hardware": "Intel Arc Pro B60 (Xe2, Battlemage)",
+    "source": "syclgen/kernel_optimization_spec.json",
+    "total_kernels_analyzed": 33,
+    "total_optimization_opportunities": 181,
+    "description": "Ordered optimization task plan for SYCL kernels targeting Intel Arc Pro B60. Tasks are ordered by priority (critical > high > medium > low) and estimated wall-clock impact. Each task groups related optimization opportunities that should be implemented together."
+  },
+  "tasks": [
+    {
+      "id": "opt_task_001",
+      "priority": "critical",
+      "complexity": "very_high",
+      "category": "compute_path",
+      "status": "pending",
+      "description": "Implement Intel XMX compute path for quantized matrix multiply (mmq) using SYCL joint_matrix",
+      "target_kernels": [
+        {
+          "kernel_id": "sk_008",
+          "file": "ggml/src/ggml-sycl/mmq.cpp"
+        }
+      ],
+      "optimization_ids": [
+        "opt_008_001"
+      ],
+      "dependencies": [],
+      "estimated_improvement": "3-5x throughput improvement for quantized matmul \u2014 the single highest-impact optimization",
+      "risk": "high",
+      "notes": "Requires deep understanding of joint_matrix API, quantized data layout (Q4_0, Q4_1, Q5_0, Q5_1, Q8_0, Q2_K, Q3_K, Q4_K, Q5_K, Q6_K), and Xe2 XMX hardware constraints. The current SYCL_USE_XMX flag only changes tile sizes but doesn't use joint_matrix at all. This is the most complex task but also the most impactful \u2014 matmul is typically 70-90% of inference time."
+    },
+    {
+      "id": "opt_task_002",
+      "priority": "critical",
+      "complexity": "high",
+      "category": "launch_config",
+      "status": "pending",
+      "description": "Fix dmmv work-group sizes: increase from 16-32 to 128-256 with multi-sub-group reduction",
+      "target_kernels": [
+        {
+          "kernel_id": "sk_010",
+          "file": "ggml/src/ggml-sycl/dequantize_mul_mat_vec.cpp"
+        }
+      ],
+      "optimization_ids": [
+        "opt_010_001",
+        "opt_010_002",
+        "opt_010_004"
+      ],
+      "dependencies": [],
+      "estimated_improvement": "4-8x throughput improvement for dequantized matrix-vector multiply",
+      "risk": "medium",
+      "notes": "Also fixes QK_WARP_SIZE=32 mismatch forcing SIMD32 on Intel (halves occupancy) and off-by-one boundary bug in K-quant kernels. Dmmv is the fallback for matvec when mmq/mmvq don't apply."
+    },
+    {
+      "id": "opt_task_003",
+      "priority": "high",
+      "complexity": "high",
+      "category": "correctness",
+      "status": "pending",
+      "description": "Fix top_k SLM overflow bug and replace O(n log^2 n) bitonic sort with O(n) radix-select",
+      "target_kernels": [
+        {
+          "kernel_id": "sk_029",
+          "file": "ggml/src/ggml-sycl/top-k.cpp"
+        }
+      ],
+      "optimization_ids": [
+        "opt_029_001",
+        "opt_029_002"
+      ],
+      "dependencies": [],
+      "estimated_improvement": "10-100x speedup for top-k with vocabulary sizes > 16K; fixes crash for vocab > 16384",
+      "risk": "high",
+      "notes": "CRITICAL CORRECTNESS: SLM overflow causes crash for typical LLM vocabularies (32K-128K tokens). The bitonic sort allocates ncols_pad*sizeof(int) in SLM which exceeds 64KB Xe-core limit. Must replace entire algorithm with radix-select or add k=1 fast-path (argmax)."
+    },
+    {
+      "id": "opt_task_004",
+      "priority": "high",
+      "complexity": "medium",
+      "category": "sub_group_ops",
+      "status": "pending",
+      "description": "Fix missing reqd_sub_group_size on softmax kernels \u2014 correctness risk",
+      "target_kernels": [
+        {
+          "kernel_id": "sk_001",
+          "file": "ggml/src/ggml-sycl/softmax.cpp"
+        }
+      ],
+      "optimization_ids": [
+        "opt_001_001",
+        "opt_001_002"
+      ],
+      "dependencies": [],
+      "estimated_improvement": "10-20% from replacing manual SLM reduction with sycl::reduce_over_group; correctness fix for sub-group size",
+      "risk": "low",
+      "notes": "Without reqd_sub_group_size, compiler may choose SIMD32 which silently produces incorrect results for warp-level operations coded for SIMD16. Softmax is on the critical inference path (every transformer attention layer)."
+    },
+    {
+      "id": "opt_task_005",
+      "priority": "high",
+      "complexity": "medium",
+      "category": "work_group_size",
+      "status": "pending",
+      "description": "Fix cpy (copy) kernels: increase quantized copy work-group from 1 to 256, add contiguous fast-path",
+      "target_kernels": [
+        {
+          "kernel_id": "sk_007",
+          "file": "ggml/src/ggml-sycl/cpy.cpp"
+        }
+      ],
+      "optimization_ids": [
+        "opt_007_001",
+        "opt_007_003"
+      ],
+      "dependencies": [],
+      "estimated_improvement": "4-8x throughput for quantized copies; 40-60% for scalar copies with contiguous tensors",
+      "risk": "medium",
+      "notes": "Quantized copy with work-group=1 wastes 15/16 SIMD lanes on Xe2. Copy operations are frequent during model loading, KV-cache management, and quantization."
+    },
+    {
+      "id": "opt_task_006",
+      "priority": "high",
+      "complexity": "medium",
+      "category": "work_group_size",
+      "status": "pending",
+      "description": "Fix mmq tile sizes: fix dispatch/kernel mismatch bug and tune for Xe2",
+      "target_kernels": [
+        {
+          "kernel_id": "sk_008",
+          "file": "ggml/src/ggml-sycl/mmq.cpp"
+        }
+      ],
+      "optimization_ids": [
+        "opt_008_002",
+        "opt_008_003",
+        "opt_008_004"
+      ],
+      "dependencies": [
+        "opt_task_001"
+      ],
+      "estimated_improvement": "15-40% improvement from correct tile sizes + stream-K work distribution",
+      "risk": "medium",
+      "notes": "Dispatch selects tile sizes by compute_capability but kernels use hardcoded AMPERE constants. Must be coordinated with XMX task (opt_task_001) or done independently as a pre-requisite."
+    },
+    {
+      "id": "opt_task_007",
+      "priority": "high",
+      "complexity": "medium",
+      "category": "multi_column_batching",
+      "status": "pending",
+      "description": "Implement multi-column batching for mmvq: batch up to 8 output columns per kernel launch",
+      "target_kernels": [
+        {
+          "kernel_id": "sk_009",
+          "file": "ggml/src/ggml-sycl/mmvq.cpp"
+        }
+      ],
+      "optimization_ids": [
+        "opt_009_001",
+        "opt_009_002",
+        "opt_009_003"
+      ],
+      "dependencies": [],
+      "estimated_improvement": "2-4x reduction in kernel launches and redundant weight reads; 2-3x throughput from larger work-groups",
+      "risk": "medium",
+      "notes": "Also increases non-reorder work-group size from 16 to 64+ and consolidates 31 duplicated functions into unified template. mmvq is the primary matvec path for quantized models."
+    },
+    {
+      "id": "opt_task_008",
+      "priority": "high",
+      "complexity": "medium",
+      "category": "reduction",
+      "status": "pending",
+      "description": "Fix norm kernels: fix group_norm global barrier, unify reductions, increase small-path work-group size",
+      "target_kernels": [
+        {
+          "kernel_id": "sk_003",
+          "file": "ggml/src/ggml-sycl/norm.cpp"
+        }
+      ],
+      "optimization_ids": [
+        "opt_003_001",
+        "opt_003_002",
+        "opt_003_003",
+        "opt_003_006"
+      ],
+      "dependencies": [],
+      "estimated_improvement": "2-4x throughput for rms_norm small path; 10-20% from unified reduction; fused rms_norm_multiply eliminates a memory pass",
+      "risk": "medium",
+      "notes": "Norm operations run after every attention and FFN block in transformer inference \u2014 very high invocation frequency. group_norm global barrier is a performance bug."
+    },
+    {
+      "id": "opt_task_009",
+      "priority": "high",
+      "complexity": "low",
+      "category": "work_group_size",
+      "status": "pending",
+      "description": "Fix wkv SLM over-allocation by 4x \u2014 local_accessor receives byte count instead of element count",
+      "target_kernels": [
+        {
+          "kernel_id": "sk_012",
+          "file": "ggml/src/ggml-sycl/wkv.cpp"
+        }
+      ],
+      "optimization_ids": [
+        "opt_012_001",
+        "opt_012_002"
+      ],
+      "dependencies": [],
+      "estimated_improvement": "25-50% occupancy improvement from freeing 3/4 of wasted SLM; 5-15% from vectorized float4 SLM loads",
+      "risk": "low",
+      "notes": "RWKV attention kernel. SLM over-allocation reduces occupancy by wasting 3x the needed SLM per work-group."
+    },
+    {
+      "id": "opt_task_010",
+      "priority": "high",
+      "complexity": "medium",
+      "category": "work_group_size",
+      "status": "pending",
+      "description": "Increase cross-entropy loss work-group size from 16 to 256+ and fix single-WG sum kernel",
+      "target_kernels": [
+        {
+          "kernel_id": "sk_027",
+          "file": "ggml/src/ggml-sycl/cross-entropy-loss.cpp"
+        },
+        {
+          "kernel_id": "sk_028",
+          "file": "ggml/src/ggml-sycl/cross-entropy-loss-back.cpp"
+        }
+      ],
+      "optimization_ids": [
+        "opt_027_001",
+        "opt_027_002",
+        "opt_028_001",
+        "opt_028_002"
+      ],
+      "dependencies": [],
+      "estimated_improvement": "4-8x kernel throughput for both forward and backward cross-entropy loss; 20-40% memory traffic reduction from online softmax",
+      "risk": "medium",
+      "notes": "Training-only kernels. 16-thread work-groups leave 87.5% of XVE capacity unused."
+    },
+    {
+      "id": "opt_task_011",
+      "priority": "high",
+      "complexity": "medium",
+      "category": "work_group_size",
+      "status": "pending",
+      "description": "Implement optimized Q8_0\u2192FP16 dequantize kernel with SLM and half2",
+      "target_kernels": [
+        {
+          "kernel_id": "sk_005",
+          "file": "ggml/src/ggml-sycl/convert.cpp"
+        }
+      ],
+      "optimization_ids": [
+        "opt_005_001",
+        "opt_005_002"
+      ],
+      "dependencies": [],
+      "estimated_improvement": "2-3x speedup for Q8_0 dequantization; 5-15% occupancy improvement from reqd_sub_group_size",
+      "risk": "medium",
+      "notes": "Q8_0 is the most common quantization format for activations and intermediate tensors."
+    },
+    {
+      "id": "opt_task_012",
+      "priority": "high",
+      "complexity": "medium",
+      "category": "work_group_size",
+      "status": "pending",
+      "description": "Add SLM tiling and kernel specialization for conv2d",
+      "target_kernels": [
+        {
+          "kernel_id": "sk_024",
+          "file": "ggml/src/ggml-sycl/conv2d.cpp"
+        }
+      ],
+      "optimization_ids": [
+        "opt_024_001",
+        "opt_024_002"
+      ],
+      "dependencies": [],
+      "estimated_improvement": "30-60% improvement for 3x3+ convolutions from SLM data reuse; 20-40% from compile-time loop unrolling",
+      "risk": "medium",
+      "notes": "Convolution is compute-intensive but less frequently used in LLM inference. Higher impact for vision models."
+    },
+    {
+      "id": "opt_task_013",
+      "priority": "medium",
+      "complexity": "low",
+      "category": "math_functions",
+      "status": "pending",
+      "description": "Replace standard math with sycl::native:: variants across all kernels",
+      "target_kernels": [
+        {
+          "kernel_id": "sk_002",
+          "file": "ggml/src/ggml-sycl/rope.cpp"
+        },
+        {
+          "kernel_id": "sk_004",
+          "file": "ggml/src/ggml-sycl/element_wise.cpp"
+        },
+        {
+          "kernel_id": "sk_027",
+          "file": "ggml/src/ggml-sycl/cross-entropy-loss.cpp"
+        },
+        {
+          "kernel_id": "sk_028",
+          "file": "ggml/src/ggml-sycl/cross-entropy-loss-back.cpp"
+        },
+        {
+          "kernel_id": "sk_032",
+          "file": "ggml/src/ggml-sycl/ssm_scan.cpp"
+        },
+        {
+          "kernel_id": "sk_033",
+          "file": "ggml/src/ggml-sycl/topk-moe.cpp"
+        }
+      ],
+      "optimization_ids": [
+        "opt_002_001",
+        "opt_002_002",
+        "opt_004_002",
+        "opt_027_004",
+        "opt_028_004",
+        "opt_032_003",
+        "opt_033_002"
+      ],
+      "dependencies": [],
+      "estimated_improvement": "5-30% per kernel depending on transcendental density. Largest impact on rope (sin/cos/pow), element_wise (exp/gelu), softmax/sigmoid (exp)",
+      "risk": "low",
+      "notes": "Batch task across all kernels using standard sycl::exp/sin/cos/pow where native:: equivalents exist. native:: provides ~1 ULP accuracy, matching CUDA's fast-math behavior."
+    },
+    {
+      "id": "opt_task_014",
+      "priority": "medium",
+      "complexity": "low",
+      "category": "vectorization",
+      "status": "pending",
+      "description": "Add vec4 vectorized loads/stores to memory-bound kernels",
+      "target_kernels": [
+        {
+          "kernel_id": "sk_001",
+          "file": "ggml/src/ggml-sycl/softmax.cpp"
+        },
+        {
+          "kernel_id": "sk_003",
+          "file": "ggml/src/ggml-sycl/norm.cpp"
+        },
+        {
+          "kernel_id": "sk_004",
+          "file": "ggml/src/ggml-sycl/element_wise.cpp"
+        },
+        {
+          "kernel_id": "sk_027",
+          "file": "ggml/src/ggml-sycl/cross-entropy-loss.cpp"
+        },
+        {
+          "kernel_id": "sk_028",
+          "file": "ggml/src/ggml-sycl/cross-entropy-loss-back.cpp"
+        }
+      ],
+      "optimization_ids": [
+        "opt_001_003",
+        "opt_003_004",
+        "opt_004_001",
+        "opt_027_003",
+        "opt_028_003"
+      ],
+      "dependencies": [],
+      "estimated_improvement": "20-40% memory throughput improvement for memory-bound kernels",
+      "risk": "low",
+      "notes": "Batch task: add sycl::vec<float,4> loads/stores to all scalar-only memory-bound kernels. Requires 16-byte alignment checks and handling of non-multiple-of-4 tail elements."
+    },
+    {
+      "id": "opt_task_015",
+      "priority": "medium",
+      "complexity": "low",
+      "category": "loop_unroll",
+      "status": "pending",
+      "description": "Add #pragma unroll to all compile-time-constant inner loops across kernels",
+      "target_kernels": [
+        {
+          "kernel_id": "sk_013",
+          "file": "ggml/src/ggml-sycl/gla.cpp"
+        },
+        {
+          "kernel_id": "sk_031",
+          "file": "ggml/src/ggml-sycl/solve_tri.cpp"
+        },
+        {
+          "kernel_id": "sk_032",
+          "file": "ggml/src/ggml-sycl/ssm_scan.cpp"
+        },
+        {
+          "kernel_id": "sk_033",
+          "file": "ggml/src/ggml-sycl/topk-moe.cpp"
+        },
+        {
+          "kernel_id": "sk_024",
+          "file": "ggml/src/ggml-sycl/conv2d.cpp"
+        },
+        {
+          "kernel_id": "sk_025",
+          "file": "ggml/src/ggml-sycl/conv2d-dw.cpp"
+        }
+      ],
+      "optimization_ids": [
+        "opt_013_002",
+        "opt_031_001",
+        "opt_032_001",
+        "opt_033_001",
+        "opt_024_006",
+        "opt_025_006"
+      ],
+      "dependencies": [],
+      "estimated_improvement": "5-30% per kernel depending on loop body complexity and trip count",
+      "risk": "low",
+      "notes": "Batch task: systematic addition of #pragma unroll to all loops with compile-time-constant trip counts. CUDA versions universally have these pragmas; SYCL versions universally lack them."
+    },
+    {
+      "id": "opt_task_016",
+      "priority": "medium",
+      "complexity": "low",
+      "category": "sub_group_ops",
+      "status": "pending",
+      "description": "Add [[sycl::reqd_sub_group_size(16)]] to all kernel launches missing it",
+      "target_kernels": [
+        {
+          "kernel_id": "sk_002",
+          "file": "ggml/src/ggml-sycl/rope.cpp"
+        },
+        {
+          "kernel_id": "sk_005",
+          "file": "ggml/src/ggml-sycl/convert.cpp"
+        },
+        {
+          "kernel_id": "sk_006",
+          "file": "ggml/src/ggml-sycl/binbcast.cpp"
+        },
+        {
+          "kernel_id": "sk_007",
+          "file": "ggml/src/ggml-sycl/cpy.cpp"
+        },
+        {
+          "kernel_id": "sk_011",
+          "file": "ggml/src/ggml-sycl/getrows.cpp"
+        },
+        {
+          "kernel_id": "sk_012",
+          "file": "ggml/src/ggml-sycl/wkv.cpp"
+        },
+        {
+          "kernel_id": "sk_013",
+          "file": "ggml/src/ggml-sycl/gla.cpp"
+        },
+        {
+          "kernel_id": "sk_015",
+          "file": "ggml/src/ggml-sycl/diag.cpp"
+        },
+        {
+          "kernel_id": "sk_016",
+          "file": "ggml/src/ggml-sycl/expm1.cpp"
+        },
+        {
+          "kernel_id": "sk_017",
+          "file": "ggml/src/ggml-sycl/xielu.cpp"
+        },
+        {
+          "kernel_id": "sk_020",
+          "file": "ggml/src/ggml-sycl/silu_back.cpp"
+        },
+        {
+          "kernel_id": "sk_021",
+          "file": "ggml/src/ggml-sycl/get_rows_back.cpp"
+        },
+        {
+          "kernel_id": "sk_022",
+          "file": "ggml/src/ggml-sycl/im2col.cpp"
+        },
+        {
+          "kernel_id": "sk_024",
+          "file": "ggml/src/ggml-sycl/conv2d.cpp"
+        },
+        {
+          "kernel_id": "sk_025",
+          "file": "ggml/src/ggml-sycl/conv2d-dw.cpp"
+        },
+        {
+          "kernel_id": "sk_029",
+          "file": "ggml/src/ggml-sycl/top-k.cpp"
+        },
+        {
+          "kernel_id": "sk_032",
+          "file": "ggml/src/ggml-sycl/ssm_scan.cpp"
+        }
+      ],
+      "optimization_ids": [
+        "opt_002_003",
+        "opt_005_002",
+        "opt_006_004",
+        "opt_007_004",
+        "opt_011_002",
+        "opt_012_003",
+        "opt_013_001",
+        "opt_015_002",
+        "opt_016_003",
+        "opt_017_002",
+        "opt_020_003",
+        "opt_021_003",
+        "opt_022_003",
+        "opt_024_004",
+        "opt_025_002",
+        "opt_029_005",
+        "opt_032_004"
+      ],
+      "dependencies": [],
+      "estimated_improvement": "5-15% occupancy improvement per kernel on Xe2 from guaranteed SIMD16 native width",
+      "risk": "low",
+      "notes": "Batch task: add [[sycl::reqd_sub_group_size(WARP_SIZE)]] attribute to all kernel lambda launches. This is the single most common missing attribute across the codebase (~17 kernels). Without it, the compiler may select SIMD32 which halves occupancy on Xe2."
+    },
+    {
+      "id": "opt_task_017",
+      "priority": "medium",
+      "complexity": "medium",
+      "category": "work_group_size",
+      "status": "pending",
+      "description": "Add L_template specialization for Mamba-1 SSM scan kernel",
+      "target_kernels": [
+        {
+          "kernel_id": "sk_032",
+          "file": "ggml/src/ggml-sycl/ssm_scan.cpp"
+        }
+      ],
+      "optimization_ids": [
+        "opt_032_002"
+      ],
+      "dependencies": [],
+      "estimated_improvement": "20-50% speedup for L=1 autoregressive decoding (the most common Mamba inference case)",
+      "risk": "medium",
+      "notes": "CUDA specializes for L=1..8 enabling outer loop unrolling. L=1 is the dominant case in autoregressive Mamba inference."
+    },
+    {
+      "id": "opt_task_018",
+      "priority": "medium",
+      "complexity": "medium",
+      "category": "integer_arithmetic",
+      "status": "pending",
+      "description": "Replace int64_t with int32_t for index arithmetic in conv2d/conv2d-dw and add fastdiv to binbcast",
+      "target_kernels": [
+        {
+          "kernel_id": "sk_006",
+          "file": "ggml/src/ggml-sycl/binbcast.cpp"
+        },
+        {
+          "kernel_id": "sk_024",
+          "file": "ggml/src/ggml-sycl/conv2d.cpp"
+        },
+        {
+          "kernel_id": "sk_025",
+          "file": "ggml/src/ggml-sycl/conv2d-dw.cpp"
+        }
+      ],
+      "optimization_ids": [
+        "opt_006_001",
+        "opt_024_003",
+        "opt_025_001"
+      ],
+      "dependencies": [],
+      "estimated_improvement": "10-40% from eliminating expensive GPU integer division (int64 div is 10-20x slower than int32 on Intel GPUs); fastdiv for broadcast indexing",
+      "risk": "low",
+      "notes": "CUDA uses int32 throughout; int64 division generates multi-instruction sequences on GPU. binbcast's fastdiv replaces generic integer division with multiply+shift."
+    },
+    {
+      "id": "opt_task_019",
+      "priority": "medium",
+      "complexity": "low",
+      "category": "work_group_size",
+      "status": "pending",
+      "description": "Add contiguous fast-path to unary op framework (expm1 and all ~25 unary ops)",
+      "target_kernels": [
+        {
+          "kernel_id": "sk_016",
+          "file": "ggml/src/ggml-sycl/unary.cpp"
+        }
+      ],
+      "optimization_ids": [
+        "opt_016_001",
+        "opt_016_002"
+      ],
+      "dependencies": [],
+      "estimated_improvement": "10-25% improvement for contiguous tensors by eliminating 6 int64 div/mod per element",
+      "risk": "low",
+      "notes": "Benefits all ~25 unary operations that use the common framework. Most tensors are contiguous in practice."
+    },
+    {
+      "id": "opt_task_020",
+      "priority": "low",
+      "complexity": "low",
+      "category": "dpct_cleanup",
+      "status": "pending",
+      "description": "Batch DPCT artifact cleanup across all kernels: dpct::queue_ptr, item_ct1 naming, 3D\u21922D nd_range",
+      "target_kernels": [
+        {
+          "kernel_id": "sk_001",
+          "file": "ggml/src/ggml-sycl/softmax.cpp"
+        },
+        {
+          "kernel_id": "sk_004",
+          "file": "ggml/src/ggml-sycl/element_wise.cpp"
+        },
+        {
+          "kernel_id": "sk_006",
+          "file": "ggml/src/ggml-sycl/binbcast.cpp"
+        },
+        {
+          "kernel_id": "sk_007",
+          "file": "ggml/src/ggml-sycl/cpy.cpp"
+        },
+        {
+          "kernel_id": "sk_011",
+          "file": "ggml/src/ggml-sycl/getrows.cpp"
+        },
+        {
+          "kernel_id": "sk_012",
+          "file": "ggml/src/ggml-sycl/wkv.cpp"
+        },
+        {
+          "kernel_id": "sk_013",
+          "file": "ggml/src/ggml-sycl/gla.cpp"
+        },
+        {
+          "kernel_id": "sk_033",
+          "file": "ggml/src/ggml-sycl/topk-moe.cpp"
+        }
+      ],
+      "optimization_ids": [
+        "opt_001_006",
+        "opt_004_005",
+        "opt_006_005",
+        "opt_007_005",
+        "opt_011_006",
+        "opt_012_005",
+        "opt_013_003",
+        "opt_033_003",
+        "opt_033_005"
+      ],
+      "dependencies": [],
+      "estimated_improvement": "0-2% performance. Primary benefit is code quality, maintainability, and debugging clarity",
+      "risk": "low",
+      "notes": "Mechanical refactoring: replace dpct:: types with standard SYCL types, rename item_ct1 to item, convert unnecessary 3D nd_range to 2D. Should be done as a single large PR for consistency."
+    },
+    {
+      "id": "opt_task_021",
+      "priority": "low",
+      "complexity": "medium",
+      "category": "feature_gap",
+      "status": "pending",
+      "description": "Add missing quantization type support: BF16, I32, IQ types, MXFP4",
+      "target_kernels": [
+        {
+          "kernel_id": "sk_005",
+          "file": "ggml/src/ggml-sycl/convert.cpp"
+        },
+        {
+          "kernel_id": "sk_008",
+          "file": "ggml/src/ggml-sycl/mmq.cpp"
+        },
+        {
+          "kernel_id": "sk_011",
+          "file": "ggml/src/ggml-sycl/getrows.cpp"
+        }
+      ],
+      "optimization_ids": [
+        "opt_005_003",
+        "opt_008_008",
+        "opt_011_001"
+      ],
+      "dependencies": [],
+      "estimated_improvement": "Feature parity with CUDA backend. No performance impact for existing types.",
+      "risk": "low",
+      "notes": "Adds support for quantization types that CUDA has but SYCL lacks: BF16 first-class support, I32 src0 for getrows, 8 IQ types for mmq, MXFP4 for future models."
+    },
+    {
+      "id": "opt_task_022",
+      "priority": "low",
+      "complexity": "low",
+      "category": "work_group_size",
+      "status": "pending",
+      "description": "Minor work-group and occupancy improvements for low-impact kernels",
+      "target_kernels": [
+        {
+          "kernel_id": "sk_018",
+          "file": "ggml/src/ggml-sycl/opt-step-sgd.cpp"
+        },
+        {
+          "kernel_id": "sk_019",
+          "file": "ggml/src/ggml-sycl/opt-step-adamw.cpp"
+        },
+        {
+          "kernel_id": "sk_020",
+          "file": "ggml/src/ggml-sycl/silu_back.cpp"
+        },
+        {
+          "kernel_id": "sk_021",
+          "file": "ggml/src/ggml-sycl/get_rows_back.cpp"
+        },
+        {
+          "kernel_id": "sk_026",
+          "file": "ggml/src/ggml-sycl/conv_transpose_2d.cpp"
+        },
+        {
+          "kernel_id": "sk_030",
+          "file": "ggml/src/ggml-sycl/cumsum.cpp"
+        },
+        {
+          "kernel_id": "sk_033",
+          "file": "ggml/src/ggml-sycl/topk-moe.cpp"
+        }
+      ],
+      "optimization_ids": [
+        "opt_018_001",
+        "opt_019_001",
+        "opt_020_001",
+        "opt_021_001",
+        "opt_026_001",
+        "opt_030_001",
+        "opt_033_004"
+      ],
+      "dependencies": [],
+      "estimated_improvement": "5-40% per kernel but near-zero wall-clock impact (training-only or infrequent kernels)",
+      "risk": "low",
+      "notes": "Batch of minor improvements for training-only and infrequently-called kernels. Low wall-clock impact during inference."
+    }
+  ]
+}
