@@ -25,13 +25,17 @@
 - [x] sk_012: wkv SYCL kernels — medium potential (5 optimization opportunities)
 - [x] sk_013: gla SYCL kernel — low potential (4 optimization opportunities)
 [2026-02-27] IN_PROGRESS task_041: Add missing quant type support (continued).
-  - opt_011_001: Completed previously (getrows I32/BF16)
+  - opt_011_001: Completed previously (getrows I32/BF16) - Build SUCCESS, 35/35 tests PASSED
   - opt_dmmv_bf16: Added BF16 support to dmmv
     * Added convert_bf16 function to convert BF16 weights to float2
     * Added convert_mul_mat_vec_bf16_sycl kernel with SLM and non-SLM paths
     * Added GGML_TYPE_BF16 case in dispatch
-    * Build could not be verified due to pre-existing build errors in fattn.hpp/cpy.hpp
+    * Build could not be verified due to pre-existing build errors
   - opt_010_007: Previously attempted but blocked (template visibility issues)
+  - Session attempt: Investigated build errors - fattn.cpp uses CUDA types (float2),
+    cpy.hpp has min() overload issues, dmmv.cpp has template visibility. These
+    are pre-existing SYCL API compatibility issues with Intel oneAPI 2025.1.
+    The code uses older SYCL patterns incompatible with current compiler.
   - Remaining: mmq IQ types (8 types), convert BF16 NC support
 
 
