@@ -5,9 +5,9 @@
 
 ## Summary
 - Total SYCL kernels to analyze: 33
-- Kernels analyzed so far: 18
+- Kernels analyzed so far: 19
 - Analysis complete: No
-- Kernels with optimization potential: 17
+- Kernels with optimization potential: 18
 - Kernels with no optimization needed: 1
 - Optimization tasks created: 0 (pending finalization)
 
@@ -30,7 +30,7 @@
 - [x] sk_016: ggml_sycl_expm1 — low potential (3 optimization opportunities)
 - [x] sk_017: ggml_sycl_xielu — low potential (3 optimization opportunities)
 - [x] sk_018: ggml_sycl_op_opt_step_sgd — low potential (3 optimization opportunities)
-- [ ] sk_019: ggml_sycl_op_opt_step_adamw — pending
+- [x] sk_019: ggml_sycl_op_opt_step_adamw — low potential (3 optimization opportunities)
 - [ ] sk_020: ggml_sycl_silu_back — pending
 - [ ] sk_021: ggml_sycl_op_get_rows_back — pending
 - [ ] sk_022: ggml_sycl_op_im2col_3d — pending
@@ -47,6 +47,11 @@
 - [ ] sk_033: ggml_sycl_op_topk_moe — pending
 
 ## Recent Activity
+[2026-02-27] Analyzed kernel ggml_sycl_op_opt_step_adamw (sk_019). Found 3 optimization opportunities (low potential).
+  - LOW: Add vectorized loads/stores (vec4) — 20-40% kernel throughput but near-zero wall-clock impact since AdamW runs once per training batch.
+  - LOW: Precompute pars[] (7 floats) as scalar kernel arguments instead of global memory pointer — 1-3% improvement.
+  - LOW: Add [[sycl::reqd_sub_group_size(16)]], replace manual thread indexing with get_global_id(0), clean DPCT artifacts.
+
 [2026-02-27] Analyzed kernel ggml_sycl_op_opt_step_sgd (sk_018). Found 3 optimization opportunities (low potential).
   - LOW: Add vectorized loads/stores (vec4) — 20-40% kernel throughput improvement but near-zero wall-clock impact since SGD step is called once per training batch.
   - LOW: Precompute lr/wd as scalar kernel arguments instead of global memory pointer — 1-3% from eliminating broadcast reads (L1 cache already handles this well).

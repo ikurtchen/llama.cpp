@@ -2467,14 +2467,111 @@
       ],
       "overall_optimization_potential": "low",
       "estimated_current_efficiency": "75-85% — The SGD step kernel is a well-implemented element-wise operation with correct work-group size (256), proper nd_range<1> dispatch, coalesced memory access, and a clean near-1:1 translation from CUDA. The kernel is purely memory-bound (~0.5 ops/byte) with trivial arithmetic (4 multiplies, 2 subtracts). Main inefficiency is scalar (non-vectorized) memory access, which leaves ~20-40% of memory bandwidth on the table. However, since SGD step is called only once per training batch (not per token or per layer), its contribution to total runtime is negligible — optimization effort should be directed at hot-path kernels (softmax, norm, matmul) instead."
+    },
+    {
+      "kernel_id": "sk_019",
+      "name": "ggml_sycl_op_opt_step_adamw",
+      "file": "ggml/src/ggml-sycl/opt-step-adamw.cpp",
+      "source_cuda_ids": ["ck_081"],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": [256, 1, 1],
+          "sub_group_size": null,
+          "global_size_expression": "ceil_div(ne, 256) * 256",
+          "notes": "Uses nd_range<1> with SYCL_OPT_STEP_ADAMW_BLOCK_SIZE=256. Correct pattern matching CUDA. Missing [[sycl::reqd_sub_group_size(16)]] on kernel lambda (line 76) but no functional impact since no sub-group operations are used."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "strided_accesses": [],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "All memory accesses are scalar float. Consecutive threads access consecutive elements (coalesced). Reads x[i], g[i], gm[i], gv[i] (16B), writes x[i], gm[i], gv[i] (12B) = 28 bytes per element. Also reads pars[] (7 floats) from global memory — broadcast read served from L1 cache after first sub-group access. No sycl::vec usage."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes": 0,
+          "potential_bank_conflicts": false,
+          "notes": "No SLM needed — purely element-wise operation with no data sharing between threads."
+        },
+        "reduction_pattern": {
+          "has_reduction": false,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "No reductions — each thread independently updates one element across 3 arrays (x, gm, gv)."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "FP32 throughout. Optimizer state (first/second moments gm, gv) must be FP32 for numerical stability — Adam accumulates statistics over many steps, and half-precision would cause significant drift. FP32 is the correct choice."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [
+            "sycl::sqrt (line 34)"
+          ],
+          "notes": "Uses standard sycl::sqrt for bias-corrected second moment normalization. Called once per element. Could use sycl::native::sqrt (~2x faster on Xe2) but the absolute impact is small since AdamW runs once per training batch. CUDA uses sqrtf() which is the fast-math equivalent."
+        },
+        "loop_analysis": {
+          "hot_loops": [],
+          "unrolled": false,
+          "notes": "No loops within the kernel. Each work-item processes exactly one element. The outer dispatch is the nd_range grid."
+        },
+        "estimated_bottleneck": "memory",
+        "anti_patterns": [
+          "Minor: dpct::queue_ptr instead of sycl::queue& (line 67) — DPCT migration artifact",
+          "Minor: Manual thread indexing (local_range*group+local_id) at line 12 instead of item_ct1.get_global_id(0)",
+          "Minor: _ct1 naming convention on item parameter — DPCT artifact",
+          "Minor: pars[] (7 floats) read from global memory by every thread — could be precomputed on host and passed as scalar kernel arguments",
+          "Minor: No [[sycl::reqd_sub_group_size(16)]] — compiler may choose non-native sub-group size",
+          "Minor: Uses standard sycl::sqrt instead of sycl::native::sqrt"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_019_001",
+          "category": "vectorization",
+          "priority": "low",
+          "description": "Add vectorized loads/stores (sycl::vec<float, 4>) to process 4 elements per work-item. The kernel is purely memory-bound (~0.3 ops/byte compute intensity vs 27 ops/byte threshold). Reads 4 arrays and writes 3 arrays per element (28 bytes/element), so vectorized access could improve throughput. However, AdamW step is called very infrequently (once per training step, not per token), so absolute time savings would be negligible in practice.",
+          "expected_improvement": "20-40% throughput improvement for the kernel itself, but near-zero wall-clock impact since AdamW step is not on the critical path.",
+          "implementation_notes": "Change each work-item to process 4 elements using sycl::vec<float,4> for x, g, gm, gv arrays. Precompute all 7 pars[] values as scalar kernel arguments. Handle tail (ne % 4 != 0) with scalar fallback. The computation (bias-corrected moment updates + weight decay) is trivially vectorizable since there are no inter-element dependencies. Ref: optimization_guide.md section 2.2.",
+          "risk": "low",
+          "risk_notes": "Simple element-wise vectorization with no inter-element dependencies. Need to handle non-multiple-of-4 tensor sizes. The 4 input reads + 3 output writes per element means 7 vector operations per iteration — ensure register pressure doesn't cause spills."
+        },
+        {
+          "id": "opt_019_002",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Precompute pars[] (7 floats: lr, beta1, beta2, eps, wd, beta1h, beta2h) on the host and pass as scalar kernel arguments instead of a global memory pointer. Currently all threads index into pars[0..6] from global memory. While L1 cache makes broadcast reads efficient, scalar arguments eliminate the indirection entirely and allow the compiler to treat them as constants.",
+          "expected_improvement": "1-3% — negligible since L1 cache handles broadcast reads efficiently. Primary benefit is code clarity.",
+          "implementation_notes": "In ggml_sycl_op_opt_step_adamw: read all 7 float values from host-accessible params tensor and pass as individual kernel arguments. The CUDA version also reads from device pointer, so this would be a SYCL-specific improvement. Need to ensure params data is host-accessible before kernel launch.",
+          "risk": "low",
+          "risk_notes": "Need to verify params tensor is host-accessible. If device-only, would need memcpy+wait which adds synchronization overhead."
+        },
+        {
+          "id": "opt_019_003",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Add [[sycl::reqd_sub_group_size(16)]] to the kernel lambda, replace manual thread indexing with get_global_id(0), and clean DPCT artifacts (dpct::queue_ptr, _ct1 naming).",
+          "expected_improvement": "1-5% from ensuring native SIMD16 width on Xe2. get_global_id(0) may enable minor compiler optimizations vs manual local_range*group+local_id arithmetic.",
+          "implementation_notes": "1. Add [[sycl::reqd_sub_group_size(16)]] to line 76 lambda. 2. Replace line 12: const int64_t i = item_ct1.get_global_id(0); 3. Replace dpct::queue_ptr with sycl::queue* at line 67. 4. Rename item_ct1 to item for clarity.",
+          "risk": "low",
+          "risk_notes": "Purely mechanical changes with no algorithmic impact."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "75-85% — The AdamW step kernel is a well-implemented element-wise operation with correct work-group size (256), proper nd_range<1> dispatch, coalesced memory access, and functionally equivalent to the CUDA counterpart. The kernel is purely memory-bound (~0.3 ops/byte with 28 bytes/element traffic) with straightforward arithmetic (moment updates, bias correction, weight decay). Main inefficiency is scalar (non-vectorized) memory access for 4 input + 3 output arrays. However, since AdamW step is called only once per training batch (not per token or per layer), its contribution to total runtime is negligible — optimization effort should be directed at hot-path inference kernels instead."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 18,
+    "total_kernels_analyzed": 19,
     "critical_potential": 1,
     "high_potential": 6,
     "medium_potential": 6,
-    "low_potential": 5,
+    "low_potential": 6,
     "no_optimization_needed": 1,
     "top_opportunities": [
       {
