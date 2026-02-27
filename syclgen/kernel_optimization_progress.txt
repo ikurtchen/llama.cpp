@@ -5,9 +5,9 @@
 
 ## Summary
 - Total SYCL kernels to analyze: 33
-- Kernels analyzed so far: 25
+- Kernels analyzed so far: 26
 - Analysis complete: No
-- Kernels with optimization potential: 24
+- Kernels with optimization potential: 25
 - Kernels with no optimization needed: 1
 - Optimization tasks created: 0 (pending finalization)
 
@@ -37,7 +37,7 @@
 - [x] sk_023: rope_back SYCL kernel — low potential (2 optimization opportunities, shares code with sk_002)
 - [x] sk_024: ggml_sycl_op_conv_2d — medium potential (7 optimization opportunities)
 - [x] sk_025: ggml_sycl_op_conv_2d_dw — medium potential (7 optimization opportunities)
-- [ ] sk_026: ggml_sycl_op_conv_transpose_2d — pending
+- [x] sk_026: ggml_sycl_op_conv_transpose_2d — low potential (5 optimization opportunities)
 - [ ] sk_027: ggml_sycl_cross_entropy_loss — pending
 - [ ] sk_028: ggml_sycl_cross_entropy_loss_back — pending
 - [ ] sk_029: ggml_sycl_op_top_k — pending
@@ -47,6 +47,13 @@
 - [ ] sk_033: ggml_sycl_op_topk_moe — pending
 
 ## Recent Activity
+[2026-02-27] Analyzed kernel ggml_sycl_op_conv_transpose_2d (sk_026). Found 5 optimization opportunities (low potential).
+  - MEDIUM: Eliminate stride-alignment divergence — restructure kh/kw loops to only iterate valid pairs (15-30% for stride > 1). Both CUDA and SYCL have this issue.
+  - LOW: Add [[sycl::reqd_sub_group_size(16)]] — 5-10% occupancy improvement on Xe2.
+  - LOW: Replace manual global_id computation with item.get_global_id(0).
+  - LOW: Clean queue_ptr DPCT artifact.
+  - LOW: Add #pragma unroll on small kh/kw loops.
+
 [2026-02-27] Analyzed kernel ggml_sycl_op_conv_2d_dw (sk_025). Found 7 optimization opportunities (medium potential).
   - HIGH: Replace int64_t with int32_t for all index arithmetic — CUDA uses int32 throughout; int64 division is 10-20x slower on Intel GPUs.
   - MEDIUM: Add [[sycl::reqd_sub_group_size(16)]] — 5-15% occupancy improvement on Xe2.

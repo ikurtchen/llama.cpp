@@ -3334,10 +3334,134 @@
       ],
       "overall_optimization_potential": "medium",
       "estimated_current_efficiency": "50-60% \u2014 Depthwise convolution is memory-bound with low arithmetic intensity (~2*KH*KW ops per 8 bytes). The primary bottleneck is the pervasive use of int64_t for all index arithmetic, causing 10-20x slower integer division/modulo in the critical unpack_indices path. Missing sub-group size attribute may cause suboptimal SIMD width. No loop unrolling prevents optimization of the small kernel window loops. The code is otherwise clean (proper 1D nd_range, no DPCT artifacts, correct coalescing for output writes) and functionally correct."
+    },
+    {
+      "kernel_id": "sk_026",
+      "name": "conv2d_transpose SYCL kernel",
+      "file": "ggml/src/ggml-sycl/conv2d-transpose.cpp",
+      "source_cuda_ids": [
+        "ck_018"
+      ],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": [
+            256,
+            1,
+            1
+          ],
+          "sub_group_size": null,
+          "global_size_expression": "ceil_div(out_w * out_h * c_out * batches, 256) * 256; one work-item per output element",
+          "notes": "Clean 1D nd_range with SYCL_CONV2D_TRANSPOSE_BLOCK_SIZE=256. Missing [[sycl::reqd_sub_group_size(16)]] on kernel lambda (line 93). Work-group size of 256 is appropriate for Xe2. Single template instantiation \u2014 no layout variants unlike conv2d_dw."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "strided_accesses": [
+            "Output writes are coalesced: adjacent threads differ in out_x_idx (global_idx % out_w), which is the fastest-varying dimension in the output layout",
+            "Input reads are scattered: in_y and in_x depend on stride alignment checks (in_y = (out_y - kh) / stride), so adjacent threads may read from unrelated input locations",
+            "Kernel weight reads are scattered: kernel_idx depends on c_in_idx, c_idx, kh, kw \u2014 adjacent threads have different c_idx values leading to large index strides"
+          ],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "Output writes are well-coalesced. Input and kernel weight reads are inherently scattered due to the transposed convolution access pattern (stride alignment filtering). This is the same scatter pattern in CUDA. Vectorization of inner-loop reads is impractical due to the conditional stride-alignment checks (continue statements at lines 32-34 and 38-40)."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes": 0,
+          "potential_bank_conflicts": false,
+          "notes": "No SLM used. For transposed convolution, SLM tiling is non-trivial because the input access pattern depends on stride alignment (not a regular rectangular tile). A reformulated approach using im2col or scatter-to-output could enable SLM tiling but would require a fundamentally different algorithm. Not a practical SLM candidate with the current direct-computation approach."
+        },
+        "reduction_pattern": {
+          "has_reduction": false,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "No cross-thread reduction. Each work-item independently accumulates over c_in \u00d7 kernel_h \u00d7 kernel_w iterations in a private register (accumulator at line 27). This is the correct approach \u2014 each output element is independent in transposed convolution."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "Mixed precision already used: input is FP32, kernel weights are FP16 (sycl::half at line 46), accumulation in FP32, output FP32. This matches CUDA exactly. F16 accumulation would lose precision for typical conv_transpose_2d use cases (upsampling). joint_matrix not applicable \u2014 transposed convolution with stride > 1 has irregular access patterns that don't map to systolic matrix operations."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [],
+          "notes": "No math functions used. Kernel performs only integer arithmetic (index computation, modulo for stride alignment) and FP32 multiply-accumulate (line 48: accumulator += input_val * static_cast<float>(kern_val)). No transcendentals."
+        },
+        "loop_analysis": {
+          "hot_loops": [
+            "Outer c_in loop (line 29): iterates c_in times (channels_in, typically 32-2048 for deep networks)",
+            "Middle kernel-h loop (line 30): iterates kernel_h times (typically 2-4 for transposed conv)",
+            "Inner kernel-w loop (line 36): iterates kernel_w times (typically 2-4 for transposed conv)",
+            "Effective iterations: c_in \u00d7 kernel_h \u00d7 kernel_w, but many skipped by stride alignment checks (lines 32-34, 38-40) \u2014 when stride=2, ~75% of kh\u00d7kw iterations are skipped"
+          ],
+          "unrolled": false,
+          "notes": "No #pragma unroll on any loop. The kh/kw loops have small trip counts (typically 2-4) but dynamic due to boundary effects. The c_in loop is the hot loop with potentially hundreds of iterations. Stride alignment checks (in_y % stride, in_x % stride) cause significant SIMD lane divergence \u2014 adjacent threads compute different output positions with different alignment, so some lanes continue while others skip. This divergence is the main performance concern."
+        },
+        "estimated_bottleneck": "memory",
+        "anti_patterns": [
+          "Manual global_id computation: item.get_group(0) * item.get_local_range(0) + item.get_local_id(0) at line 14 instead of item.get_global_id(0). Minor readability/maintenance issue.",
+          "Missing [[sycl::reqd_sub_group_size(16)]] on kernel lambda at line 93 \u2014 inconsistent with Xe2 best practices.",
+          "queue_ptr type alias (DPCT artifact) at line 84 instead of sycl::queue&.",
+          "Integer modulo for stride alignment (in_y % stride, in_x % stride at lines 32, 38) causes SIMD divergence \u2014 adjacent work-items process different output positions, and the stride check passes for different kh/kw values in each lane. For stride=2, this wastes ~75% of loop iterations."
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_026_001",
+          "category": "algorithm",
+          "priority": "medium",
+          "description": "Eliminate stride-alignment divergence by restructuring the loop to only iterate over valid (kh, kw) pairs",
+          "estimated_improvement": "15-30% for stride > 1",
+          "details": "Currently iterates all kh in [0, kernel_h) and kw in [0, kernel_w) with continue checks (in_y % stride != 0, in_x % stride != 0). For stride=2, 75% of iterations are no-ops that still cause SIMD lane divergence. Can restructure to only visit valid pairs: kh starts at (out_y % stride), steps by stride; kw starts at (out_x % stride), steps by stride. This eliminates dead iterations entirely and removes the divergent branches. CUDA has the same issue but NVIDIA GPUs handle divergence slightly differently (warp reconvergence).",
+          "cuda_reference": "CUDA has same pattern (ggml/src/ggml-cuda/conv2d-transpose.cu:27-37) \u2014 both could benefit from this optimization."
+        },
+        {
+          "id": "opt_026_002",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Add [[sycl::reqd_sub_group_size(16)]] to kernel lambda",
+          "estimated_improvement": "5-10%",
+          "details": "Missing on line 93 kernel lambda. Ensures Xe2 native SIMD16 width is used. Without this attribute, the compiler may select SIMD8 or SIMD32, both of which are suboptimal on Xe2. Standard fix applied across all SYCL kernels in this codebase.",
+          "cuda_reference": "N/A \u2014 CUDA implicitly uses warp size 32."
+        },
+        {
+          "id": "opt_026_003",
+          "category": "anti_pattern",
+          "priority": "low",
+          "description": "Replace manual global_id computation with item.get_global_id(0)",
+          "estimated_improvement": "0-1% (readability improvement)",
+          "details": "Line 14: item.get_group(0) * item.get_local_range(0) + item.get_local_id(0) should be item.get_global_id(0). This is a direct CUDA blockIdx.x * blockDim.x + threadIdx.x translation. The SYCL runtime provides get_global_id(0) which compiles to the same instruction but is cleaner and less error-prone.",
+          "cuda_reference": "CUDA uses blockIdx.x * blockDim.x + threadIdx.x (line 10) \u2014 idiomatic CUDA, but not idiomatic SYCL."
+        },
+        {
+          "id": "opt_026_004",
+          "category": "anti_pattern",
+          "priority": "low",
+          "description": "Replace queue_ptr with sycl::queue& \u2014 DPCT type alias cleanup",
+          "estimated_improvement": "0% (code hygiene)",
+          "details": "Line 84: queue_ptr is a DPCT migration artifact typedef. Should use sycl::queue& or sycl::queue* directly. Consistent with codebase-wide DPCT cleanup effort.",
+          "cuda_reference": "CUDA uses cudaStream_t (line 79) \u2014 native CUDA type."
+        },
+        {
+          "id": "opt_026_005",
+          "category": "loop_optimization",
+          "priority": "low",
+          "description": "Add #pragma unroll hints on kernel_h and kernel_w inner loops",
+          "estimated_improvement": "2-5% for small kernels (2\u00d72, 3\u00d73, 4\u00d74)",
+          "details": "The kernel_h loop (line 30) and kernel_w loop (line 36) have small trip counts (typically 2-4 for transposed convolution in upsampling). Adding #pragma unroll would allow the compiler to unroll these small loops. However, the dynamic boundary checks and stride-alignment continues limit the benefit of unrolling. Most effective when combined with opt_026_001 (stride-aligned iteration).",
+          "cuda_reference": "CUDA also lacks unroll hints (ggml/src/ggml-cuda/conv2d-transpose.cu:27-48)."
+        }
+      ],
+      "overall_potential": "low",
+      "notes": "Nearly identical 1:1 port from CUDA. The SYCL kernel is clean and correct \u2014 no major DPCT artifacts, proper nd_range with work-group size 256, mixed precision (FP16 kernel weights, FP32 compute). The only meaningful optimization is eliminating stride-alignment divergence (opt_026_001), which benefits both SYCL and CUDA. The remaining opportunities are minor cleanup items. Transposed convolution is rarely a bottleneck in LLM inference (primarily used in image generation models), so the wall-clock impact of these optimizations is minimal for llama.cpp's primary use case.",
+      "feature_parity_with_cuda": "complete"
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 25,
+    "total_kernels_analyzed": 26,
     "critical_potential": 1,
     "high_potential": 6,
     "medium_potential": 8,
