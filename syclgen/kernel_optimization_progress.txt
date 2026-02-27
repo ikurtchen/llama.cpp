@@ -5,9 +5,9 @@
 
 ## Summary
 - Total SYCL kernels to analyze: 33
-- Kernels analyzed so far: 16
+- Kernels analyzed so far: 17
 - Analysis complete: No
-- Kernels with optimization potential: 15
+- Kernels with optimization potential: 16
 - Kernels with no optimization needed: 1
 - Optimization tasks created: 0 (pending finalization)
 
@@ -28,7 +28,7 @@
 - [x] sk_014: fill SYCL kernel — none potential (2 minor optimization opportunities)
 - [x] sk_015: ggml_sycl_op_diag — low potential (3 optimization opportunities)
 - [x] sk_016: ggml_sycl_expm1 — low potential (3 optimization opportunities)
-- [ ] sk_017: ggml_sycl_xielu — pending
+- [x] sk_017: ggml_sycl_xielu — low potential (3 optimization opportunities)
 - [ ] sk_018: ggml_sycl_op_opt_step_sgd — pending
 - [ ] sk_019: ggml_sycl_op_opt_step_adamw — pending
 - [ ] sk_020: ggml_sycl_silu_back — pending
@@ -47,6 +47,11 @@
 - [ ] sk_033: ggml_sycl_op_topk_moe — pending
 
 ## Recent Activity
+[2026-02-27] Analyzed kernel ggml_sycl_xielu (sk_017). Found 3 optimization opportunities (low potential).
+  - MEDIUM: Add vectorized loads/stores (vec4) — 20-40% memory throughput improvement for this memory-bound element-wise kernel.
+  - LOW: Add [[sycl::reqd_sub_group_size(16)]] to both F16 and F32 launch paths — 5-10% occupancy improvement on Xe2.
+  - LOW: Consider native::exp decomposition for expm1 — 2-5% improvement but with precision trade-off for small negative values.
+
 [2026-02-27] Analyzed kernel ggml_sycl_expm1 (sk_016). Found 3 optimization opportunities (low potential).
   - MEDIUM: Add contiguous fast-path to ggml_sycl_op_unary — eliminates 6 int64 div/mod per element for contiguous tensors (10-25% improvement). Applies to all ~25 unary ops.
   - LOW: Add vectorized loads/stores (vec4) to contiguous path — 20-40% additional memory throughput improvement.
