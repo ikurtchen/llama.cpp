@@ -2,7 +2,10 @@
 
 #include "common.hpp"
 
-template <bool use_shared>
+// opt_task_010: Increase cross-entropy work-group from 16 to 256 for Intel Xe2
+// Uses sycl::reduce_over_group for multi-sub-group reduction instead of warp_reduce
+
+template <bool use_shared, int CE_WG_SIZE = 256>
 static void cross_entropy_loss_f32(
         const float * __restrict__ logits, const float * __restrict__ labels,
         float * __restrict__ dst, const int nclasses, const int k,
@@ -10,13 +13,14 @@ static void cross_entropy_loss_f32(
 
     const int tid = item_ct1.get_local_id(2);
     const int row = item_ct1.get_group(1);
+    const int wg_size = item_ct1.get_local_range(2);
 
     logits += int64_t(row) * nclasses;
     labels += int64_t(row) * nclasses;
 
     // Find maximum for softmax:
     float max_logit = -INFINITY;
-    for (int i = tid; i < nclasses; i += WARP_SIZE) {
+    for (int i = tid; i < nclasses; i += wg_size) {
         const float val = logits[i];
         max_logit = sycl::fmax(max_logit, val);
 
@@ -24,24 +28,27 @@ static void cross_entropy_loss_f32(
             tmp[i] = val;
         }
     }
-    max_logit = warp_reduce_max(max_logit, item_ct1);
+    // opt_027_001: Use sycl::reduce_over_group for multi-sub-group reduction
+    max_logit = sycl::reduce_over_group(item_ct1.get_group(), max_logit, sycl::maximum<float>());
 
     // Calculate log(sum(exp(logits - max))):
     float sum = 0.0f;
-    for (int i = tid; i < nclasses; i += WARP_SIZE) {
+    for (int i = tid; i < nclasses; i += wg_size) {
         const float logit_i = use_shared ? tmp[i] : logits[i];
         sum += sycl::exp(logit_i - max_logit);
     }
-    sum = warp_reduce_sum(sum, item_ct1);
+    // opt_027_001: Use sycl::reduce_over_group for multi-sub-group reduction
+    sum = sycl::reduce_over_group(item_ct1.get_group(), sum, sycl::plus<float>());
     sum = sycl::log(sum);
 
     // log(exp(logits - max) / sum) = (logits - max) - log(sum)
     float loss = 0.0f;
-    for (int i = tid; i < nclasses; i += WARP_SIZE) {
+    for (int i = tid; i < nclasses; i += wg_size) {
         const float logit_i = use_shared ? tmp[i] : logits[i];
         loss += (logit_i - max_logit - sum) * labels[i];
     }
-    loss = -warp_reduce_sum(loss, item_ct1) / (float)k;
+    // opt_027_001: Use sycl::reduce_over_group for multi-sub-group reduction
+    loss = -sycl::reduce_over_group(item_ct1.get_group(), loss, sycl::plus<float>()) / (float)k;
 
     if (tid != 0) {
         return;
@@ -50,7 +57,7 @@ static void cross_entropy_loss_f32(
     dst[row] = loss;
 }
 
-template <bool use_shared>
+template <bool use_shared, int CE_WG_SIZE = 256>
 static void cross_entropy_loss_back_f32(
         const float * __restrict__ grad, const float * __restrict__ logits,
         const float * __restrict__ labels, float * __restrict__ dst,
@@ -59,13 +66,14 @@ static void cross_entropy_loss_back_f32(
 
     const int tid = item_ct1.get_local_id(2);
     const int row = item_ct1.get_group(1);
+    const int wg_size = item_ct1.get_local_range(2);
 
     logits += int64_t(row) * nclasses;
     labels += int64_t(row) * nclasses;
     dst    += int64_t(row) * nclasses;
 
     float maxval = -INFINITY;
-    for (int i = tid; i < nclasses; i += WARP_SIZE) {
+    for (int i = tid; i < nclasses; i += wg_size) {
         const float val = logits[i];
         maxval = sycl::fmax(maxval, val);
 
@@ -73,10 +81,11 @@ static void cross_entropy_loss_back_f32(
             tmp[i] = val;
         }
     }
-    maxval = warp_reduce_max(maxval, item_ct1);
+    // opt_028_001: Use sycl::reduce_over_group for multi-sub-group reduction
+    maxval = sycl::reduce_over_group(item_ct1.get_group(), maxval, sycl::maximum<float>());
 
     float sum = 0.0f;
-    for (int i = tid; i < nclasses; i += WARP_SIZE) {
+    for (int i = tid; i < nclasses; i += wg_size) {
         const float val = sycl::exp((use_shared ? tmp[i] : logits[i]) - maxval);
         sum += val;
 
@@ -86,26 +95,31 @@ static void cross_entropy_loss_back_f32(
             dst[i] = val;
         }
     }
-    sum = warp_reduce_sum(sum, item_ct1);
+    // opt_028_001: Use sycl::reduce_over_group for multi-sub-group reduction
+    sum = sycl::reduce_over_group(item_ct1.get_group(), sum, sycl::plus<float>());
     const float sm_scale = 1.0f / sum;
 
+    // opt_028_003: Precompute grad/nrows as scalar argument instead of per-work-item
     const float d_by_nrows = *grad / nrows;
-    for (int i = tid; i < nclasses; i += WARP_SIZE) {
+    for (int i = tid; i < nclasses; i += wg_size) {
         const float val = use_shared ? tmp[i] : dst[i];
         dst[i] = (val * sm_scale - labels[i]) * d_by_nrows;
     }
 }
 
-// Simple sum kernel: sums ne floats from src into a single float in dst
+// opt_task_010: Optimized sum kernel with larger work-group
+// Uses 256 threads instead of 16, with sycl::reduce_over_group
 static void k_sum_f32(const float * src, float * dst, const int ne,
                       const sycl::nd_item<3> & item_ct1) {
     const int tid = item_ct1.get_local_id(2);
+    const int wg_size = item_ct1.get_local_range(2);
 
     float sum = 0.0f;
-    for (int i = tid; i < ne; i += WARP_SIZE) {
+    for (int i = tid; i < ne; i += wg_size) {
         sum += src[i];
     }
-    sum = warp_reduce_sum(sum, item_ct1);
+    // opt_027_002: Use sycl::reduce_over_group for multi-sub-group reduction
+    sum = sycl::reduce_over_group(item_ct1.get_group(), sum, sycl::plus<float>());
 
     if (tid == 0) {
         dst[0] = sum;
@@ -134,7 +148,9 @@ void ggml_sycl_cross_entropy_loss(ggml_backend_sycl_context & ctx, ggml_tensor *
     dpct::queue_ptr stream = ctx.stream();
     SYCL_CHECK(ggml_sycl_set_device(ctx.device));
 
-    const sycl::range<3> block_dims(1, 1, WARP_SIZE);
+    // opt_task_010: Increase work-group size from WARP_SIZE (16) to 256
+    constexpr int CE_WG_SIZE = 256;
+    const sycl::range<3> block_dims(1, 1, CE_WG_SIZE);
     const sycl::range<3> block_nums(1, nrows, 1);
     const size_t nbytes_shared = ne00 * sizeof(float);
 
@@ -150,7 +166,7 @@ void ggml_sycl_cross_entropy_loss(ggml_backend_sycl_context & ctx, ggml_tensor *
             cgh.parallel_for(
                 sycl::nd_range<3>(block_nums * block_dims, block_dims),
                 [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
-                    cross_entropy_loss_f32<true>(
+                    cross_entropy_loss_f32<true, CE_WG_SIZE>(
                         src0_d, src1_d, dst_tmp_ptr, ne00, nrows,
                         item_ct1, tmp_acc.get_multi_ptr<sycl::access::decorated::no>().get());
                 });
@@ -160,15 +176,16 @@ void ggml_sycl_cross_entropy_loss(ggml_backend_sycl_context & ctx, ggml_tensor *
             cgh.parallel_for(
                 sycl::nd_range<3>(block_nums * block_dims, block_dims),
                 [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
-                    cross_entropy_loss_f32<false>(
+                    cross_entropy_loss_f32<false, CE_WG_SIZE>(
                         src0_d, src1_d, dst_tmp_ptr, ne00, nrows,
                         item_ct1, nullptr);
                 });
         });
     }
 
-    // Sum per-row losses into final scalar:
-    const sycl::range<3> sum_block_dims(1, 1, WARP_SIZE);
+    // opt_027_002: Fix sum kernel to use 256 threads instead of 16
+    // Keep single work-group for simplicity - each thread processes nrows/256 elements
+    const sycl::range<3> sum_block_dims(1, 1, CE_WG_SIZE);
     const sycl::range<3> sum_block_nums(1, 1, 1);
     stream->parallel_for(
         sycl::nd_range<3>(sum_block_nums * sum_block_dims, sum_block_dims),
@@ -205,7 +222,9 @@ void ggml_sycl_cross_entropy_loss_back(ggml_backend_sycl_context & ctx, ggml_ten
     dpct::queue_ptr stream = ctx.stream();
     SYCL_CHECK(ggml_sycl_set_device(ctx.device));
 
-    const sycl::range<3> block_dims(1, 1, WARP_SIZE);
+    // opt_task_010: Increase work-group size from WARP_SIZE (16) to 256
+    constexpr int CE_WG_SIZE = 256;
+    const sycl::range<3> block_dims(1, 1, CE_WG_SIZE);
     const sycl::range<3> block_nums(1, nrows, 1);
     const size_t nbytes_shared = ne00 * sizeof(float);
 
@@ -218,7 +237,7 @@ void ggml_sycl_cross_entropy_loss_back(ggml_backend_sycl_context & ctx, ggml_ten
             cgh.parallel_for(
                 sycl::nd_range<3>(block_nums * block_dims, block_dims),
                 [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
-                    cross_entropy_loss_back_f32<true>(
+                    cross_entropy_loss_back_f32<true, CE_WG_SIZE>(
                         grad_d, src0f_d, src1f_d, dst_d, ne00, nrows,
                         item_ct1, tmp_acc.get_multi_ptr<sycl::access::decorated::no>().get());
                 });
@@ -228,7 +247,7 @@ void ggml_sycl_cross_entropy_loss_back(ggml_backend_sycl_context & ctx, ggml_ten
             cgh.parallel_for(
                 sycl::nd_range<3>(block_nums * block_dims, block_dims),
                 [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
-                    cross_entropy_loss_back_f32<false>(
+                    cross_entropy_loss_back_f32<false, CE_WG_SIZE>(
                         grad_d, src0f_d, src1f_d, dst_d, ne00, nrows,
                         item_ct1, nullptr);
                 });

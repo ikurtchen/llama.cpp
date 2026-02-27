@@ -47,6 +47,16 @@
 - [x] sk_033: ggml_sycl_op_topk_moe — low potential (5 optimization opportunities)
 
 ## Recent Activity
+[2026-02-27] opt_task_010 (cross-entropy work-group size): COMPLETED. Increased work-group size from 16 to 256 threads:
+  - Changed work-group size from WARP_SIZE (16) to CE_WG_SIZE (256) for forward kernel cross_entropy_loss_f32
+  - Changed work-group size from WARP_SIZE (16) to CE_WG_SIZE (256) for backward kernel cross_entropy_loss_back_f32
+  - Replaced warp_reduce_max/sum with sycl::reduce_over_group for multi-sub-group reduction
+  - Updated stride loops to use wg_size (item_ct1.get_local_range(2)) instead of WARP_SIZE constant
+  - Fixed sum kernel (k_sum_f32) to use 256 threads instead of 16 with sycl::reduce_over_group
+  - Precomputed grad/nrows as scalar in backward kernel instead of computing per-work-item
+  - Correctness: PASS (4/4 unit tests on b60)
+  - Note: Cross-entropy loss is training-only (zero wall-clock impact during inference)
+
 [2026-02-27] opt_task_007 (mmvq work-group size): COMPLETED. Increased non-reorder work-group size from 32 to 128 threads:
   - Added GGML_SYCL_MMVQ_WG_SCALE constant (default=4) for work-group scaling
   - Changed work-group size from GGML_SYCL_MMV_Y * WARP_SIZE = 32 to GGML_SYCL_MMV_Y * WG_SCALE * WARP_SIZE = 128

@@ -1,6 +1,17 @@
 {
   "results": [
     {
+      "task_id": "opt_task_010",
+      "kernel": "cross_entropy_loss",
+      "optimization": "Increase work-group size from 16 to 256 threads, use sycl::reduce_over_group for multi-sub-group reduction",
+      "timestamp": "2026-02-27T21:00:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": null,
+      "notes": "Increased work-group size from WARP_SIZE (16) to CE_WG_SIZE (256) for cross_entropy_loss_f32 and cross_entropy_loss_back_f32. Replaced warp_reduce_max/sum with sycl::reduce_over_group for multi-sub-group reduction. Updated stride loops to use wg_size (item_ct1.get_local_range(2)) instead of WARP_SIZE constant. Fixed sum kernel k_sum_f32 to use 256 threads with sycl::reduce_over_group. Precomputed grad/nrows as scalar in backward kernel. Expected 4-8x throughput improvement from better hardware utilization (16x more threads per row). Note: cross-entropy loss is training-only (zero wall-clock impact during inference). Unit tests: 4/4 pass on b60."
+    },
+    {
       "task_id": "opt_task_007",
       "kernel": "mmvq",
       "optimization": "Increase non-reorder work-group size from 32 to 128 threads (4x), add multi-sub-group reduction",

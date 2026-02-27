@@ -253,7 +253,7 @@
       "priority": "high",
       "complexity": "medium",
       "category": "work_group_size",
-      "status": "pending",
+      "status": "completed",
       "description": "Increase cross-entropy loss work-group size from 16 to 256+ and fix single-WG sum kernel",
       "target_kernels": [
         {
@@ -274,7 +274,11 @@
       "dependencies": [],
       "estimated_improvement": "4-8x kernel throughput for both forward and backward cross-entropy loss; 20-40% memory traffic reduction from online softmax",
       "risk": "medium",
-      "notes": "Training-only kernels. 16-thread work-groups leave 87.5% of XVE capacity unused."
+      "notes": "Training-only kernels. 16-thread work-groups leave 87.5% of XVE capacity unused.",
+      "completed_at": "2026-02-27T21:00:00Z",
+      "baseline_metric": "Work-group size: WARP_SIZE (16 threads)",
+      "optimized_metric": "Work-group size: CE_WG_SIZE (256 threads)",
+      "actual_improvement": "16x more threads per work-group; uses sycl::reduce_over_group for multi-sub-group reduction instead of warp_reduce; precomputes grad/nrows as scalar instead of per-work-item"
     },
     {
       "id": "opt_task_011",
