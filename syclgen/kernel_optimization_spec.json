@@ -3458,12 +3458,155 @@
       "overall_potential": "low",
       "notes": "Nearly identical 1:1 port from CUDA. The SYCL kernel is clean and correct \u2014 no major DPCT artifacts, proper nd_range with work-group size 256, mixed precision (FP16 kernel weights, FP32 compute). The only meaningful optimization is eliminating stride-alignment divergence (opt_026_001), which benefits both SYCL and CUDA. The remaining opportunities are minor cleanup items. Transposed convolution is rarely a bottleneck in LLM inference (primarily used in image generation models), so the wall-clock impact of these optimizations is minimal for llama.cpp's primary use case.",
       "feature_parity_with_cuda": "complete"
+    },
+    {
+      "kernel_id": "sk_027",
+      "name": "ggml_sycl_cross_entropy_loss",
+      "file": "ggml/src/ggml-sycl/cross-entropy-loss.cpp",
+      "related_files": [
+        "ggml/src/ggml-sycl/cross-entropy-loss.hpp"
+      ],
+      "source_cuda_ids": [
+        "ck_046"
+      ],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": "WARP_SIZE (16 on Intel Xe2)",
+          "sub_group_size": 16,
+          "global_size_expression": "nd_range<3>((1, nrows, 1) * (1, 1, WARP_SIZE), (1, 1, WARP_SIZE)) — one work-group of 16 threads per row for the main kernel; one work-group of 16 threads total for the sum kernel",
+          "notes": "CRITICALLY undersized work-groups. The main cross_entropy_loss_f32 kernel uses only WARP_SIZE (16) threads per work-group to process rows with nclasses elements (typically 32K-128K for LLM vocabularies). Each thread strides across nclasses/16 elements in 3 separate passes (find max, compute exp sum, compute loss). The sum kernel k_sum_f32 uses a SINGLE work-group of 16 threads to reduce all nrows per-row losses — CUDA uses CUB DeviceReduce::Sum for this. All 4 launch paths (forward SLM, forward no-SLM, sum) have [[sycl::reqd_sub_group_size(WARP_SIZE)]] which is good. Uses nd_range<3> with dims 0,2 always 1 — DPCT artifact."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "strided_accesses": [],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "All memory accesses are scalar float. Consecutive threads (tid 0-15) access consecutive elements within each stride iteration, so accesses are coalesced within the 16-thread sub-group. However, each thread strides nclasses/16 elements across 3 passes over the row — for vocab_size=32768, each thread reads 2048 floats per pass, totaling 6 passes (3 forward + 3 in SLM-miss path where logits are re-read). No sycl::vec usage for loads or stores. With only 16 threads per row, memory latency hiding is poor — CUDA has the same issue (warp_size=32 but similar stride pattern)."
+        },
+        "slm_usage": {
+          "uses_slm": true,
+          "slm_bytes": "ne00 * sizeof(float) = nclasses * 4 bytes (e.g., 128KB for vocab_size=32768)",
+          "potential_bank_conflicts": false,
+          "notes": "SLM is used to cache logits on the first pass so they don't need to be re-read from global memory on passes 2 and 3. The SLM path (use_shared=true) is gated by nbytes_shared <= smpbo (shared memory per block offset, typically 64KB on Xe2). For typical LLM vocab sizes: 32K classes = 128KB, 50K = 200KB, 128K = 512KB — ALL exceed the 64KB SLM limit. This means the SLM path is NEVER taken for typical LLM inference, and logits are re-read from global memory on every pass. The SLM path is only useful for small classification tasks (nclasses <= 16384)."
+        },
+        "reduction_pattern": {
+          "has_reduction": true,
+          "uses_sub_group_reduce": true,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "Uses warp_reduce_max and warp_reduce_sum for intra-row reductions — these use dpct::permute_sub_group_by_xor wrapper functions (defined in common.hpp) instead of sycl::reduce_over_group. Since the work-group IS the sub-group (16 threads), sub-group reduction = work-group reduction. The sum kernel k_sum_f32 also uses warp_reduce_sum with only 16 threads to sum all nrows losses — extremely inefficient for large nrows. CUDA uses CUB DeviceReduce::Sum which is a multi-pass hierarchical reduction."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "FP32 throughout, matching CUDA. Cross-entropy loss computation involves exp() and log() which are numerically sensitive — half precision would cause overflow/underflow for large logit ranges. joint_matrix is not applicable (no matrix multiplication)."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [
+            "sycl::exp (line 33) — standard precision exponential in the log-sum-exp computation",
+            "sycl::log (line 36) — standard precision logarithm for log(sum(exp(...)))",
+            "sycl::fmax (line 21) — max for numerical stability of softmax"
+          ],
+          "notes": "Uses standard sycl::exp and sycl::log instead of sycl::native::exp and sycl::native::log. CUDA uses expf() and logf() which are fast-math device functions. Native variants on Xe2 are 2-4x faster but have reduced precision (sycl::native::exp has ~11-bit mantissa). For cross-entropy loss, the exp is used in log-sum-exp which has built-in numerical stability from max subtraction, so native::exp precision should be acceptable. The log is applied to a positive sum, also safe for native."
+        },
+        "loop_analysis": {
+          "hot_loops": [
+            "Forward pass 1 (lines 19-26): stride loop over nclasses finding max logit, optionally caching to SLM. Trip count: nclasses/WARP_SIZE iterations per thread.",
+            "Forward pass 2 (lines 31-34): stride loop computing sum of exp(logit - max). Trip count: nclasses/WARP_SIZE.",
+            "Forward pass 3 (lines 40-43): stride loop computing weighted loss. Trip count: nclasses/WARP_SIZE.",
+            "Sum kernel (lines 105-107): stride loop summing nrows per-row losses. Trip count: nrows/WARP_SIZE."
+          ],
+          "unrolled": false,
+          "notes": "None of the 4 hot loops have #pragma unroll. The trip counts are dynamic (nclasses/16 or nrows/16) but typically large (2048+ iterations for vocab_size=32768). Partial unrolling (#pragma unroll 4 or 8) would help pipeline memory loads with arithmetic. The forward kernel makes 3 sequential passes over the data — these cannot be fused due to data dependencies (pass 2 needs max from pass 1, pass 3 needs log_sum from pass 2)."
+        },
+        "estimated_bottleneck": "memory",
+        "anti_patterns": [
+          "CRITICAL: Work-group size is only WARP_SIZE (16 threads on Intel) — severely underutilizes Xe2 hardware. For vocab_size=32768, each of the 16 threads must iterate 2048 times per pass. Increasing to 256 threads would reduce iterations to 128 per pass and improve memory latency hiding by 16x. CUDA also uses a single warp (32 threads) but CUDA warps have better memory latency hiding due to different scheduling model.",
+          "HIGH: Sum kernel (k_sum_f32) uses only 16 threads in a single work-group to sum all nrows losses (line 170-177). For batch_size=512, each thread sums 32 values. CUDA uses CUB DeviceReduce::Sum which is a multi-level hierarchical reduction launching thousands of threads. The SYCL sum kernel should use a two-level reduction: first reduce blocks of rows in parallel, then final reduction.",
+          "MEDIUM: No vectorized loads — scalar float only. With 3 passes over nclasses elements per row, vectorized vec4 loads would reduce memory transactions by 4x per pass. Especially impactful for the non-SLM path (large vocab) where all 3 passes read from global memory.",
+          "MEDIUM: Standard sycl::exp and sycl::log instead of sycl::native::exp and sycl::native::log — 2-4x faster transcendentals with acceptable precision for log-sum-exp computation.",
+          "MEDIUM: No #pragma unroll on any of the 4 hot loops — partial unrolling would help pipeline loads with arithmetic in the stride loops.",
+          "MEDIUM: 3D nd_range with dims 0,2 always 1 (lines 137-138, 171-172) — DPCT artifact. Should be nd_range<1> or nd_range<2>.",
+          "LOW: dpct::queue_ptr (lines 134, 205), item_ct1 naming convention — DPCT artifacts.",
+          "LOW: Sub-group reductions use dpct::permute_sub_group_by_xor wrappers (warp_reduce_max, warp_reduce_sum) instead of sycl::reduce_over_group. The dpct wrappers add function call overhead and are less readable.",
+          "SLM path unusable for typical LLM vocab sizes: 32K classes = 128KB >> 64KB SLM limit. The use_shared=true template path is dead code for standard LLM inference."
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_027_001",
+          "category": "work_group_size",
+          "priority": "high",
+          "description": "Increase cross_entropy_loss_f32 work-group size from WARP_SIZE (16) to 256 or 512, with multi-sub-group reduction. Currently each row is processed by only 16 threads striding across nclasses elements. For vocab_size=32768, each thread iterates 2048 times per pass (3 passes). Increasing to 256 threads reduces per-thread iterations to 128 per pass, dramatically improving memory latency hiding and hardware utilization. Requires replacing warp_reduce_max/sum with work-group-level reduction (sycl::reduce_over_group or SLM-based). CUDA also uses a single warp (32 threads) for this kernel — this is a chance to exceed CUDA performance on Intel hardware.",
+          "expected_improvement": "4-8x kernel throughput improvement from better hardware utilization. With 256 threads, 16 sub-groups can overlap memory loads, versus only 1 sub-group today. For a memory-bound kernel making 3 passes over large arrays, this is transformative.",
+          "implementation_notes": "1. Change block_dims from (1, 1, WARP_SIZE) to (1, 1, 256). 2. Replace warp_reduce_max with work-group reduce: can use sycl::reduce_over_group(item.get_group(), val, sycl::maximum<float>()) which handles multi-sub-group reduction automatically. 3. Similarly replace warp_reduce_sum with sycl::reduce_over_group(item.get_group(), val, sycl::plus<float>()). 4. The stride loop already uses WARP_SIZE — change to item.get_local_range(2) or a template parameter for work-group size. 5. The SLM path would need the local_accessor sized to ne00 (unchanged) plus any reduction scratch space. 6. Keep [[sycl::reqd_sub_group_size(16)]] for optimal SIMD width.",
+          "risk": "medium",
+          "risk_notes": "Changing the reduction from single-sub-group to multi-sub-group requires careful implementation. sycl::reduce_over_group with group barrier handles this correctly but verify on Xe2. The SLM path's local_accessor size (ne00 floats) is unchanged — but with 256 threads the occupancy trade-off changes. Test with both small (1K) and large (128K) nclasses."
+        },
+        {
+          "id": "opt_027_002",
+          "category": "work_group_size",
+          "priority": "high",
+          "description": "Replace the k_sum_f32 single-work-group sum kernel with a multi-level parallel reduction. Currently 16 threads in 1 work-group sum all nrows per-row losses (line 170-177). For batch_size=512, each thread processes 32 values — this is adequate. But for larger batch sizes or when nrows is large, this becomes a bottleneck. CUDA uses CUB DeviceReduce::Sum which launches a hierarchical two-pass reduction with thousands of threads. The SYCL version should at minimum use a larger work-group (256 threads) or a two-pass reduction for large nrows.",
+          "expected_improvement": "2-10x for the sum kernel, depending on nrows. For typical training batch sizes (32-512 rows), the sum kernel with 16 threads processes 2-32 values per thread which is already fast — the improvement is mainly for larger batches or fine-tuning scenarios with many rows. The sum kernel is likely <5% of total cross-entropy time, so wall-clock impact is moderate.",
+          "implementation_notes": "Option A (simple): Increase sum work-group to 256, use reduce_over_group for the final reduction. This handles up to ~65K rows efficiently with a single launch. Option B (scalable): Two-pass reduction — first pass reduces blocks of 256 rows each, second pass sums the block results. Option C: Use sycl::reduction with nd_range parallel_for: stream->parallel_for(nd_range, sycl::reduction(dst_d, sycl::plus<float>()), [=](nd_item, auto& sum) { sum += src[i]; }). Option C is the simplest and most idiomatic SYCL approach.",
+          "risk": "low",
+          "risk_notes": "The sum kernel is a simple parallel reduction — well-understood problem with many correct implementations. sycl::reduction is the SYCL 2020 built-in for this pattern and is well-tested on Intel GPUs."
+        },
+        {
+          "id": "opt_027_003",
+          "category": "vectorization",
+          "priority": "medium",
+          "description": "Add vectorized vec4 loads for the stride loops over nclasses. Each of the 3 forward passes reads logits[i] as scalar float. Using sycl::vec<float, 4> loads would reduce memory transactions by 4x. Especially impactful for the non-SLM path (large vocab, the common case for LLM inference) where all 3 passes read logits from global memory. The stride loop would process 4 elements per iteration: load vec4, compute max/exp/loss for each component, accumulate.",
+          "expected_improvement": "20-40% throughput improvement for the non-SLM path. The kernel is memory-bound (3 passes over logits + labels per row), so reducing memory transaction count directly improves performance. Combined with opt_027_001 (larger work-group), the total improvement could be 5-10x over current implementation.",
+          "implementation_notes": "Change stride loops from: for (int i = tid; i < nclasses; i += WG_SIZE) { val = logits[i]; } to: for (int i = tid*4; i < nclasses; i += WG_SIZE*4) { sycl::vec<float,4> v = *reinterpret_cast<const sycl::vec<float,4>*>(&logits[i]); for each component: max/exp/loss. } Handle tail (nclasses % (WG_SIZE*4) != 0) with scalar fallback. Must ensure logits pointer is 16-byte aligned (guaranteed for ggml tensor data). Apply to all 3 forward loops and the labels read in pass 3.",
+          "risk": "low",
+          "risk_notes": "Standard vectorization pattern. ggml tensors are aligned. Need tail handling for non-multiple-of-4 nclasses, but this is uncommon for LLM vocabularies (typically powers of 2 or multiples of 1024)."
+        },
+        {
+          "id": "opt_027_004",
+          "category": "native_math",
+          "priority": "medium",
+          "description": "Replace sycl::exp (line 33) with sycl::native::exp and sycl::log (line 36) with sycl::native::log. The log-sum-exp computation has built-in numerical stability from max subtraction, so native precision (~11-bit mantissa) is acceptable. Native transcendentals are 2-4x faster than standard on Xe2. CUDA uses expf/logf which map to fast-math device functions.",
+          "expected_improvement": "10-20% overall kernel speedup. The exp() is called once per element per pass 2, and log() once per row. For compute-limited scenarios (small nclasses where memory bandwidth isn't saturated), the improvement is larger. For large vocab sizes (memory-bound), the improvement is smaller since transcendental latency is hidden behind memory latency.",
+          "implementation_notes": "Line 33: change sycl::exp(logit_i - max_logit) to sycl::native::exp(logit_i - max_logit). Line 36: change sycl::log(sum) to sycl::native::log(sum). Also apply to the backward kernel cross_entropy_loss_back_f32 (line 80: exp, line 90: 1.0f/sum). Verify numerical accuracy: the max subtraction ensures exp() arguments are in [-range, 0] which is well within native::exp's accurate range.",
+          "risk": "low",
+          "risk_notes": "The log-sum-exp pattern with max subtraction ensures numerical stability regardless of exp precision. The loss value is used for training feedback (gradient computation) where ~3 digits of precision is sufficient. CUDA's expf/logf have similar precision characteristics to SYCL native variants."
+        },
+        {
+          "id": "opt_027_005",
+          "category": "loop_unroll",
+          "priority": "medium",
+          "description": "Add #pragma unroll 4 to the 3 hot stride loops in cross_entropy_loss_f32 (lines 19, 31, 40) and the 1 loop in k_sum_f32 (line 105). The trip counts are dynamic but typically large (nclasses/WG_SIZE). Partial unrolling by 4 helps the compiler pipeline memory loads with arithmetic operations, reducing stall cycles.",
+          "expected_improvement": "5-10% from better instruction scheduling and reduced loop overhead. The improvement is additive with vectorization (opt_027_003) — unrolling vec4 iterations by 4 gives 16 elements per unrolled iteration, maximizing instruction-level parallelism.",
+          "implementation_notes": "Add #pragma unroll 4 before each for loop. For the 3 forward loops: #pragma unroll 4 before lines 19, 31, 40. For the sum loop: #pragma unroll 4 before line 105. If combined with vec4 vectorization, use #pragma unroll 2 (processing 8 elements per unrolled iteration) to avoid excessive register pressure.",
+          "risk": "low",
+          "risk_notes": "Compiler hint only. Cannot cause incorrect behavior. Partial unroll (4) avoids excessive code size and register pressure while still providing pipeline benefits."
+        },
+        {
+          "id": "opt_027_006",
+          "category": "dpct_cleanup",
+          "priority": "low",
+          "description": "Clean up DPCT artifacts: (1) Replace nd_range<3> with nd_range<2> or nd_range<1> — dims 0 and 2 are always 1 for the main kernel, all 3 dims are trivial for the sum kernel. (2) Replace dpct::queue_ptr with sycl::queue& (lines 134, 205). (3) Replace item_ct1 naming with item. (4) Simplify tmp_acc.get_multi_ptr<sycl::access::decorated::no>().get() to simpler accessor pattern. (5) Replace warp_reduce_max/warp_reduce_sum (dpct wrappers using permute_sub_group_by_xor) with sycl::reduce_over_group — note this becomes automatic if opt_027_001 is implemented since that changes the reduction to work-group level.",
+          "expected_improvement": "Negligible performance improvement (<2%). Code readability and maintainability benefit. Removal of dpct dependency for this file.",
+          "implementation_notes": "1. nd_range<3> to nd_range<1>: change block_dims from (1,1,WARP_SIZE) to just WARP_SIZE, use nd_item<1>. 2. dpct::queue_ptr → sycl::queue&. 3. item_ct1 → item throughout. 4. For SLM accessor, use tmp_acc.get_pointer() or pass accessor directly. 5. If implementing opt_027_001, the reduction cleanup comes for free.",
+          "risk": "low",
+          "risk_notes": "Mechanical refactoring with no algorithmic changes."
+        }
+      ],
+      "overall_optimization_potential": "high",
+      "estimated_current_efficiency": "20-30% — The cross-entropy loss kernel is critically underutilizing Xe2 hardware. With only 16 threads per work-group (1 sub-group), 15 of 16 possible sub-groups per XVE are idle, memory latency hiding is minimal, and each thread must iterate thousands of times per pass for typical LLM vocabularies. The SLM caching path (use_shared=true) is dead code for vocab sizes > 16K since 64KB SLM cannot hold the logits. The sum kernel uses only 16 threads to reduce all per-row losses — CUDA uses CUB hierarchical reduction for this. The most impactful optimization is increasing work-group size to 256+ (opt_027_001) which alone could yield 4-8x improvement. Combined with vectorization and native math, the kernel could reach 70-80% efficiency. Note: cross-entropy loss is primarily a training operation — wall-clock impact during inference is zero, but for training/fine-tuning on Intel GPUs, this is a significant bottleneck.",
+      "feature_parity_with_cuda": "functionally complete but architecturally suboptimal — both SYCL and CUDA use single-warp kernels, but CUDA's larger warp (32 vs 16) and different scheduling model partially compensate. The sum reduction is the largest gap: CUDA uses CUB DeviceReduce::Sum vs a 16-thread single-warp sum."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 26,
+    "total_kernels_analyzed": 27,
     "critical_potential": 1,
-    "high_potential": 6,
+    "high_potential": 7,
     "medium_potential": 8,
     "low_potential": 10,
     "no_optimization_needed": 1,
@@ -3717,7 +3860,21 @@
         "kernel_id": "sk_024",
         "kernel_name": "ggml_sycl_op_conv_2d",
         "opportunity_id": "opt_024_002",
-        "description": "Add kernel size specialization (1\u00d71, 3\u00d73, 5\u00d75, 7\u00d77) \u2014 20-40% from compile-time loop unrolling",
+        "description": "Add kernel size specialization (1×1, 3×3, 5×5, 7×7) — 20-40% from compile-time loop unrolling",
+        "priority": "high"
+      },
+      {
+        "kernel_id": "sk_027",
+        "kernel_name": "ggml_sycl_cross_entropy_loss",
+        "opportunity_id": "opt_027_001",
+        "description": "Increase work-group size from 16 to 256+ with multi-sub-group reduction — 4-8x kernel throughput for cross-entropy loss",
+        "priority": "high"
+      },
+      {
+        "kernel_id": "sk_027",
+        "kernel_name": "ggml_sycl_cross_entropy_loss",
+        "opportunity_id": "opt_027_002",
+        "description": "Replace single-work-group sum kernel with multi-level parallel reduction — 2-10x for sum, CUDA uses CUB DeviceReduce",
         "priority": "high"
       }
     ]

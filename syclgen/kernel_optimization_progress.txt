@@ -5,9 +5,9 @@
 
 ## Summary
 - Total SYCL kernels to analyze: 33
-- Kernels analyzed so far: 26
+- Kernels analyzed so far: 27
 - Analysis complete: No
-- Kernels with optimization potential: 25
+- Kernels with optimization potential: 26
 - Kernels with no optimization needed: 1
 - Optimization tasks created: 0 (pending finalization)
 
@@ -38,7 +38,7 @@
 - [x] sk_024: ggml_sycl_op_conv_2d — medium potential (7 optimization opportunities)
 - [x] sk_025: ggml_sycl_op_conv_2d_dw — medium potential (7 optimization opportunities)
 - [x] sk_026: ggml_sycl_op_conv_transpose_2d — low potential (5 optimization opportunities)
-- [ ] sk_027: ggml_sycl_cross_entropy_loss — pending
+- [x] sk_027: ggml_sycl_cross_entropy_loss — high potential (6 optimization opportunities)
 - [ ] sk_028: ggml_sycl_cross_entropy_loss_back — pending
 - [ ] sk_029: ggml_sycl_op_top_k — pending
 - [ ] sk_030: ggml_sycl_op_cumsum — pending
@@ -47,6 +47,14 @@
 - [ ] sk_033: ggml_sycl_op_topk_moe — pending
 
 ## Recent Activity
+[2026-02-27] Analyzed kernel ggml_sycl_cross_entropy_loss (sk_027). Found 6 optimization opportunities (high potential).
+  - HIGH: Work-group size is only WARP_SIZE (16 threads) — 4-8x throughput gain possible by increasing to 256+ with multi-sub-group reduction.
+  - HIGH: Sum kernel k_sum_f32 uses only 16 threads in 1 work-group — CUDA uses CUB DeviceReduce::Sum. Replace with multi-level parallel reduction.
+  - MEDIUM: Scalar-only loads across 3 passes — vec4 vectorization would reduce memory transactions by 4x.
+  - MEDIUM: Standard sycl::exp/log instead of native variants — 10-20% from faster transcendentals.
+  - MEDIUM: No #pragma unroll on any of the 4 hot stride loops.
+  - LOW: DPCT artifacts — nd_range<3>, dpct::queue_ptr, item_ct1, dpct shuffle wrappers.
+
 [2026-02-27] Analyzed kernel ggml_sycl_op_conv_transpose_2d (sk_026). Found 5 optimization opportunities (low potential).
   - MEDIUM: Eliminate stride-alignment divergence — restructure kh/kw loops to only iterate valid pairs (15-30% for stride > 1). Both CUDA and SYCL have this issue.
   - LOW: Add [[sycl::reqd_sub_group_size(16)]] — 5-10% occupancy improvement on Xe2.
