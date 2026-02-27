@@ -2374,14 +2374,107 @@
       ],
       "overall_optimization_potential": "low",
       "estimated_current_efficiency": "70-80% — The xielu kernel is a well-structured element-wise operation with appropriate work-group size (256), proper nd_range<1> dispatch, and coalesced memory access. It avoids the generic unary framework overhead (no 4D index decomposition). The kernel is purely memory-bound (~1.25 ops/byte compute intensity vs 27 ops/byte threshold), so the primary optimization lever is vectorized loads/stores (vec4) which could improve throughput by 20-40%. The missing reqd_sub_group_size(16) and standard-precision expm1 are minor issues. XiELU is a relatively new activation function and not yet widely used in production LLM models, so optimization priority is low."
+    },
+    {
+      "kernel_id": "sk_018",
+      "name": "ggml_sycl_op_opt_step_sgd",
+      "file": "ggml/src/ggml-sycl/opt-step-sgd.cpp",
+      "source_cuda_ids": ["ck_080"],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": [256, 1, 1],
+          "sub_group_size": null,
+          "global_size_expression": "ceil_div(ne, 256) * 256",
+          "notes": "Uses nd_range<1> with SYCL_OPT_STEP_SGD_BLOCK_SIZE=256. This is the correct pattern — matches CUDA's CUDA_OPT_STEP_SGD_BLOCK_SIZE. Missing [[sycl::reqd_sub_group_size(16)]] but this has no functional impact since the kernel uses no sub-group operations."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "strided_accesses": [],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "All memory accesses are scalar float. Consecutive threads access consecutive elements (coalesced). Reads x[i] (4B), g[i] (4B), writes x[i] (4B) = 12 bytes per element. Also reads pars[0] and pars[1] from global memory — these are broadcast reads of 2 floats by all threads (L1 cache will handle this efficiently after first access within a sub-group). No sycl::vec usage."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes": 0,
+          "potential_bank_conflicts": false,
+          "notes": "No SLM needed — purely element-wise operation with no data sharing."
+        },
+        "reduction_pattern": {
+          "has_reduction": false,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "No reductions — each thread independently updates one element."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "FP32 throughout. Optimizer updates should be FP32 for numerical stability — weight updates accumulate over many steps and half-precision would lose significant bits. FP32 is the correct choice here."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [],
+          "notes": "No transcendental math functions. Only FMA-like operations: multiply and subtract. The computation x[i] * (1.0f - pars[0] * pars[1]) - pars[0] * g[i] involves 4 multiplies and 2 subtracts — trivial compute."
+        },
+        "loop_analysis": {
+          "hot_loops": [],
+          "unrolled": false,
+          "notes": "No loops within the kernel. Each work-item processes exactly one element. The outer dispatch is the nd_range grid."
+        },
+        "estimated_bottleneck": "memory",
+        "anti_patterns": [
+          "Minor: dpct::queue_ptr instead of sycl::queue& (line 41) — DPCT migration artifact",
+          "Minor: Manual thread indexing (local_range*group+local_id) at line 12 instead of item_ct1.get_global_id(0)",
+          "Minor: pars[0] and pars[1] read from global memory by every thread — could be precomputed on host and passed as scalar kernel arguments to eliminate broadcast global reads (though L1 cache makes this negligible)",
+          "Minor: No [[sycl::reqd_sub_group_size(16)]] — compiler may choose non-native sub-group size, slightly affecting occupancy"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_018_001",
+          "category": "vectorization",
+          "priority": "low",
+          "description": "Add vectorized loads/stores (sycl::vec<float, 4>) to process 4 elements per work-item. The kernel is purely memory-bound (~0.5 ops/byte compute intensity vs 27 ops/byte threshold), so vectorized memory access could improve throughput. However, SGD step is called very infrequently (once per training step, not per token), so absolute time savings would be negligible in practice.",
+          "expected_improvement": "20-40% throughput improvement for the kernel itself, but near-zero wall-clock impact since SGD step is not on the critical path and is called at most once per training batch.",
+          "implementation_notes": "Change each work-item to process 4 elements: int64_t i = item.get_global_id(0) * 4; sycl::vec<float,4> xv = *(sycl::vec<float,4>*)&x[i]; sycl::vec<float,4> gv = *(sycl::vec<float,4>*)&g[i]; xv = xv * decay - lr * gv; *(sycl::vec<float,4>*)&x[i] = xv; Handle tail elements (ne % 4 != 0) with scalar fallback. Precompute decay = 1.0f - pars[0]*pars[1] and lr = pars[0] on host. Ref: optimization_guide.md section 2.2.",
+          "risk": "low",
+          "risk_notes": "Simple element-wise vectorization with no inter-element dependencies. Need to handle non-multiple-of-4 tensor sizes correctly."
+        },
+        {
+          "id": "opt_018_002",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Precompute pars[0] (learning rate) and pars[1] (weight decay) on the host and pass as scalar kernel arguments instead of pointer to global memory. Currently all threads read pars[0] and pars[1] from global memory. While L1 cache makes this efficient after the first sub-group access, passing as scalar arguments eliminates the global memory dependency entirely and allows the compiler to treat them as compile-time constants within the kernel.",
+          "expected_improvement": "1-3% — negligible since L1 cache handles broadcast reads efficiently. Primary benefit is code clarity: making lr and wd explicit kernel parameters instead of indexing into a pointer.",
+          "implementation_notes": "In ggml_sycl_op_opt_step_sgd: float lr, wd; ctx.stream()->memcpy(&lr, &params_d[0], sizeof(float)); ctx.stream()->memcpy(&wd, &params_d[1], sizeof(float)); ctx.stream()->wait(); // need sync to read host values. Then pass lr, wd as scalar args. Alternatively, since params is host-accessible memory, read directly: const float lr = ((float*)params->data)[0]; const float wd = ((float*)params->data)[1]; (the memcpy path is safer for device-only allocations). The CUDA version also reads pars from device pointer, so both are equivalent.",
+          "risk": "low",
+          "risk_notes": "Need to ensure params data is accessible on the host before kernel launch. If params is a device-only allocation, the host read won't work and memcpy+wait is needed (adding a sync point). May not be worth the synchronization overhead."
+        },
+        {
+          "id": "opt_018_003",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Add [[sycl::reqd_sub_group_size(16)]] to the kernel lambda and replace manual thread indexing with get_global_id(0). Minor DPCT artifact cleanup: replace dpct::queue_ptr with sycl::queue&.",
+          "expected_improvement": "1-5% from ensuring native SIMD16 width on Xe2. get_global_id(0) may enable minor compiler optimizations vs manual local_range*group+local_id arithmetic.",
+          "implementation_notes": "1. Add [[sycl::reqd_sub_group_size(16)]] to line 50 lambda. 2. Replace line 12: const int64_t i = item_ct1.get_global_id(0); 3. Replace line 41: dpct::queue_ptr → sycl::queue* or pass by reference.",
+          "risk": "low",
+          "risk_notes": "Purely mechanical changes with no algorithmic impact."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "75-85% — The SGD step kernel is a well-implemented element-wise operation with correct work-group size (256), proper nd_range<1> dispatch, coalesced memory access, and a clean near-1:1 translation from CUDA. The kernel is purely memory-bound (~0.5 ops/byte) with trivial arithmetic (4 multiplies, 2 subtracts). Main inefficiency is scalar (non-vectorized) memory access, which leaves ~20-40% of memory bandwidth on the table. However, since SGD step is called only once per training batch (not per token or per layer), its contribution to total runtime is negligible — optimization effort should be directed at hot-path kernels (softmax, norm, matmul) instead."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 17,
+    "total_kernels_analyzed": 18,
     "critical_potential": 1,
     "high_potential": 6,
     "medium_potential": 6,
-    "low_potential": 4,
+    "low_potential": 5,
     "no_optimization_needed": 1,
     "top_opportunities": [
       {
