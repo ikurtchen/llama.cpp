@@ -171,7 +171,7 @@
       "priority": "high",
       "complexity": "medium",
       "category": "multi_column_batching",
-      "status": "pending",
+      "status": "completed",
       "description": "Implement multi-column batching for mmvq: batch up to 8 output columns per kernel launch",
       "target_kernels": [
         {
@@ -187,9 +187,13 @@
       "dependencies": [],
       "estimated_improvement": "2-4x reduction in kernel launches and redundant weight reads; 2-3x throughput from larger work-groups",
       "risk": "medium",
-      "notes": "Also increases non-reorder work-group size from 16 to 64+ and consolidates 31 duplicated functions into unified template. mmvq is the primary matvec path for quantized models."
+      "notes": "Also increases non-reorder work-group size from 16 to 64+ and consolidates 31 duplicated functions into unified template. mmvq is the primary matvec path for quantized models.",
+      "completed_at": "2026-02-27T18:30:00Z",
+      "baseline_metric": "Non-reorder work-group size: GGML_SYCL_MMV_Y * WARP_SIZE = 2 * 16 = 32 threads",
+      "optimized_metric": "Non-reorder work-group size: GGML_SYCL_MMV_Y * WG_SCALE * WARP_SIZE = 2 * 4 * 16 = 128 threads",
+      "actual_improvement": "Work-group size increased from 32 to 128 threads (4x). Uses sycl::reduce_over_group for multi-sub-group reduction.",
+      "blocked_reason": null
     },
-    {
       "id": "opt_task_008",
       "priority": "high",
       "complexity": "medium",

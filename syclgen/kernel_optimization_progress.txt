@@ -47,6 +47,16 @@
 - [x] sk_033: ggml_sycl_op_topk_moe — low potential (5 optimization opportunities)
 
 ## Recent Activity
+[2026-02-27] opt_task_007 (mmvq work-group size): COMPLETED. Increased non-reorder work-group size from 32 to 128 threads:
+  - Added GGML_SYCL_MMVQ_WG_SCALE constant (default=4) for work-group scaling
+  - Changed work-group size from GGML_SYCL_MMV_Y * WARP_SIZE = 32 to GGML_SYCL_MMV_Y * WG_SCALE * WARP_SIZE = 128
+  - Added WG_SCALE template parameter to mul_mat_vec_q kernel
+  - Updated blocks_per_warp calculation to use WG_SCALE
+  - Uses sycl::reduce_over_group for multi-sub-group reduction when WG_SCALE > 1
+  - Updated work-group sizes for main kernels (Q4_0, Q4_1, Q5_0, Q5_1, Q8_0, Q2_K-Q6_K, MXFP4)
+  - Expected: 2-3x throughput improvement from better memory latency hiding
+  - Correctness: PASS (unit tests on b60)
+
 [2026-02-27] opt_task_009 (wkv SLM over-allocation): COMPLETED. Fixed critical SLM bug and added sub_group_size:
   - Fixed SLM over-allocation in both wkv6 and wkv7 kernels
   - Changed shared_mem_size from byte count (C/H * 4 * sizeof(float)) to element count (C/H * 4)

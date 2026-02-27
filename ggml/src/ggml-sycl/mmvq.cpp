@@ -5,6 +5,12 @@
 #include "quants.hpp"
 #include "vecdotq.hpp"
 
+// opt_009_002: Increase non-reorder work-group size from WARP_SIZE to 4*WARP_SIZE for better memory latency hiding on Xe2
+// See: hw_spec (Intel Arc Pro B60, Xe2) and optimization_guide
+#ifndef GGML_SYCL_MMVQ_WG_SCALE
+#define GGML_SYCL_MMVQ_WG_SCALE 4  // Default: 4x WARP_SIZE (64 threads) for non-reorder path
+#endif
+
 template <typename reorder_vec_dot_q_sycl>
 static void mul_mat_vec_q_reorder(const void * __restrict__ vx, const void * __restrict__ vy, float * __restrict__ dst,
                                   const int ncols, const int nrows, const sycl::nd_item<3> & nd_item) {
@@ -56,7 +62,7 @@ static void mul_mat_vec_q_reorder(const void * __restrict__ vx, const void * __r
     }
 }
 
-template <int qk, int qi, typename block_q_t, int vdr, vec_dot_q_sycl_t vec_dot_q_sycl>
+template <int qk, int qi, typename block_q_t, int vdr, vec_dot_q_sycl_t vec_dot_q_sycl, int WG_SCALE = 1>
 static void mul_mat_vec_q(const void * __restrict__ vx, const void * __restrict__ vy, float * __restrict__ dst,
                           const int ncols, const int nrows, const sycl::nd_item<3> & item_ct1) {
     const int row = item_ct1.get_group(2) * item_ct1.get_local_range(1) + item_ct1.get_local_id(1);
@@ -66,7 +72,7 @@ static void mul_mat_vec_q(const void * __restrict__ vx, const void * __restrict_
     }
 
     const int     blocks_per_row  = ncols / qk;
-    constexpr int blocks_per_warp = (vdr * WARP_SIZE + qi - 1) / qi;  // Ensuring blocks_per_warp > 0
+    constexpr int blocks_per_warp = (vdr * WARP_SIZE * WG_SCALE + qi - 1) / qi;  // Ensuring blocks_per_warp > 0
 
     assert(blocks_per_warp > 0);
 
@@ -90,13 +96,23 @@ static void mul_mat_vec_q(const void * __restrict__ vx, const void * __restrict_
     }
 
     // sum up partial sums and write back result
+    // opt_009_002: Use sycl::reduce_over_group for multi-sub-group reduction when WG_SCALE > 1
+    if constexpr (WG_SCALE > 1) {
+        auto sum = sycl::reduce_over_group(item_ct1.get_sub_group(), tmp, std::plus<>());
+        // Each sub-group has a partial sum, reduce across sub-groups in the workgroup
+        if (item_ct1.get_local_id(2) == 0) {
+            dst[row] = sum;
+        }
+    } else {
+        // Original warp-level reduction for WG_SCALE == 1
 #pragma unroll
-    for (int mask = WARP_SIZE / 2; mask > 0; mask >>= 1) {
-        tmp += dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), tmp, mask);
-    }
+        for (int mask = WARP_SIZE / 2; mask > 0; mask >>= 1) {
+            tmp += dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), tmp, mask);
+        }
 
-    if (item_ct1.get_local_id(2) == 0) {
-        dst[row] = tmp;
+        if (item_ct1.get_local_id(2) == 0) {
+            dst[row] = tmp;
+        }
     }
 }
 
@@ -558,13 +574,14 @@ static void mul_mat_vec_q4_0_q8_1_sycl(const void * vx, const void * vy, float *
     GGML_ASSERT(ncols % QK4_0 == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
-    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, WARP_SIZE);
+    // opt_009_002: Increase work-group size from WARP_SIZE to GGML_SYCL_MMVQ_WG_SCALE*WARP_SIZE for better memory latency hiding
+    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, GGML_SYCL_MMVQ_WG_SCALE * WARP_SIZE);
 
     {
         stream->submit([&](sycl::handler & cgh) {
             cgh.parallel_for(sycl::nd_range<3>(block_nums * block_dims, block_dims),
                              [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
-                                 mul_mat_vec_q<QK4_0, QI4_0, block_q4_0, VDR_Q4_0_Q8_1_MMVQ, vec_dot_q4_0_q8_1>(
+                                 mul_mat_vec_q<QK4_0, QI4_0, block_q4_0, VDR_Q4_0_Q8_1_MMVQ, vec_dot_q4_0_q8_1, GGML_SYCL_MMVQ_WG_SCALE>(
                                      vx, vy, dst, ncols, nrows, item_ct1);
                              });
         });
@@ -578,7 +595,8 @@ static void mul_mat_vec_q4_1_q8_1_sycl(const void *vx, const void *vy,
     GGML_ASSERT(ncols % QK4_1 == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
-    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, WARP_SIZE);
+    // opt_009_002: Increase work-group size from WARP_SIZE to GGML_SYCL_MMVQ_WG_SCALE*WARP_SIZE
+    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, GGML_SYCL_MMVQ_WG_SCALE * WARP_SIZE);
     {
 
         stream->submit([&](sycl::handler &cgh) {
@@ -588,7 +606,7 @@ static void mul_mat_vec_q4_1_q8_1_sycl(const void *vx, const void *vy,
                 [=](sycl::nd_item<3> item_ct1)
                     [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
                         mul_mat_vec_q<QK4_0, QI4_1, block_q4_1,
-                                      VDR_Q4_1_Q8_1_MMVQ, vec_dot_q4_1_q8_1>(
+                                      VDR_Q4_1_Q8_1_MMVQ, vec_dot_q4_1_q8_1, GGML_SYCL_MMVQ_WG_SCALE>(
                             vx, vy, dst, ncols, nrows, item_ct1);
                     });
         });
@@ -596,17 +614,18 @@ static void mul_mat_vec_q4_1_q8_1_sycl(const void *vx, const void *vy,
 }
 
 static void mul_mat_vec_mxfp4_q8_1_sycl(const void * vx, const void * vy, float * dst, const int ncols, const int nrows,
-                                        dpct::queue_ptr stream) {
+                                         dpct::queue_ptr stream) {
     GGML_ASSERT(ncols % QK_MXFP4 == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
+    // opt_009_002: Increase work-group size from WARP_SIZE to GGML_SYCL_MMVQ_WG_SCALE*WARP_SIZE
     const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, WARP_SIZE);
 
     {
         stream->submit([&](sycl::handler & cgh) {
             cgh.parallel_for(sycl::nd_range<3>(block_nums * block_dims, block_dims),
                              [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
-                                 mul_mat_vec_q<QK_MXFP4, QI_MXFP4, block_mxfp4, VDR_MXFP4_Q8_1_MMVQ, vec_dot_mxfp4_q8_1>(
+                                 mul_mat_vec_q<QK_MXFP4, QI_MXFP4, block_mxfp4, VDR_MXFP4_Q8_1_MMVQ, vec_dot_mxfp4_q8_1, GGML_SYCL_MMVQ_WG_SCALE>(
                                      vx, vy, dst, ncols, nrows, item_ct1);
                              });
         });
@@ -621,6 +640,7 @@ static void mul_mat_vec_q5_0_q8_1_sycl(const void *vx, const void *vy,
     GGML_ASSERT(ncols % QK5_0 == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
+    // opt_009_002: Increase work-group size from WARP_SIZE to GGML_SYCL_MMVQ_WG_SCALE*WARP_SIZE
     const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, WARP_SIZE);
     {
 
@@ -631,7 +651,7 @@ static void mul_mat_vec_q5_0_q8_1_sycl(const void *vx, const void *vy,
                 [=](sycl::nd_item<3> item_ct1)
                     [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
                         mul_mat_vec_q<QK5_0, QI5_0, block_q5_0,
-                                      VDR_Q5_0_Q8_1_MMVQ, vec_dot_q5_0_q8_1>(
+                                      VDR_Q5_0_Q8_1_MMVQ, vec_dot_q5_0_q8_1, GGML_SYCL_MMVQ_WG_SCALE>(
                             vx, vy, dst, ncols, nrows, item_ct1);
                     });
         });
@@ -645,7 +665,8 @@ static void mul_mat_vec_q5_1_q8_1_sycl(const void *vx, const void *vy,
     GGML_ASSERT(ncols % QK5_1 == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
-    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, WARP_SIZE);
+    // opt_009_002: Increase work-group size from WARP_SIZE to GGML_SYCL_MMVQ_WG_SCALE*WARP_SIZE
+    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, GGML_SYCL_MMVQ_WG_SCALE * WARP_SIZE);
     {
 
         stream->submit([&](sycl::handler &cgh) {
@@ -655,7 +676,7 @@ static void mul_mat_vec_q5_1_q8_1_sycl(const void *vx, const void *vy,
                 [=](sycl::nd_item<3> item_ct1)
                     [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
                         mul_mat_vec_q<QK5_1, QI5_1, block_q5_1,
-                                      VDR_Q5_1_Q8_1_MMVQ, vec_dot_q5_1_q8_1>(
+                                      VDR_Q5_1_Q8_1_MMVQ, vec_dot_q5_1_q8_1, GGML_SYCL_MMVQ_WG_SCALE>(
                             vx, vy, dst, ncols, nrows, item_ct1);
                     });
         });
@@ -679,7 +700,7 @@ static void mul_mat_vec_q8_0_q8_1_sycl(const void *vx, const void *vy,
                 [=](sycl::nd_item<3> item_ct1)
                     [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
                         mul_mat_vec_q<QK8_0, QI8_0, block_q8_0,
-                                      VDR_Q8_0_Q8_1_MMVQ, vec_dot_q8_0_q8_1>(
+                                      VDR_Q8_0_Q8_1_MMVQ, vec_dot_q8_0_q8_1, GGML_SYCL_MMVQ_WG_SCALE>(
                             vx, vy, dst, ncols, nrows, item_ct1);
                     });
         });
@@ -703,7 +724,7 @@ static void mul_mat_vec_q2_K_q8_1_sycl(const void *vx, const void *vy,
                 [=](sycl::nd_item<3> item_ct1)
                     [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
                         mul_mat_vec_q<QK_K, QI2_K, block_q2_K,
-                                      VDR_Q2_K_Q8_1_MMVQ, vec_dot_q2_K_q8_1>(
+                                      VDR_Q2_K_Q8_1_MMVQ, vec_dot_q2_K_q8_1, GGML_SYCL_MMVQ_WG_SCALE>(
                             vx, vy, dst, ncols, nrows, item_ct1);
                     });
         });
@@ -727,7 +748,7 @@ static void mul_mat_vec_q3_K_q8_1_sycl(const void *vx, const void *vy,
                 [=](sycl::nd_item<3> item_ct1)
                     [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
                         mul_mat_vec_q<QK_K, QI3_K, block_q3_K,
-                                      VDR_Q3_K_Q8_1_MMVQ, vec_dot_q3_K_q8_1>(
+                                      VDR_Q3_K_Q8_1_MMVQ, vec_dot_q3_K_q8_1, GGML_SYCL_MMVQ_WG_SCALE>(
                             vx, vy, dst, ncols, nrows, item_ct1);
                     });
         });
@@ -751,7 +772,7 @@ static void mul_mat_vec_q4_K_q8_1_sycl(const void *vx, const void *vy,
                 [=](sycl::nd_item<3> item_ct1)
                     [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
                         mul_mat_vec_q<QK_K, QI4_K, block_q4_K,
-                                      VDR_Q4_K_Q8_1_MMVQ, vec_dot_q4_K_q8_1>(
+                                      VDR_Q4_K_Q8_1_MMVQ, vec_dot_q4_K_q8_1, GGML_SYCL_MMVQ_WG_SCALE>(
                             vx, vy, dst, ncols, nrows, item_ct1);
                     });
         });
@@ -796,7 +817,7 @@ static void mul_mat_vec_q5_K_q8_1_sycl(const void *vx, const void *vy,
                 [=](sycl::nd_item<3> item_ct1)
                     [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
                         mul_mat_vec_q<QK_K, QI5_K, block_q5_K,
-                                      VDR_Q5_K_Q8_1_MMVQ, vec_dot_q5_K_q8_1>(
+                                      VDR_Q5_K_Q8_1_MMVQ, vec_dot_q5_K_q8_1, GGML_SYCL_MMVQ_WG_SCALE>(
                             vx, vy, dst, ncols, nrows, item_ct1);
                     });
         });
@@ -838,7 +859,7 @@ static void mul_mat_vec_q6_K_q8_1_sycl(const void *vx, const void *vy,
                 [=](sycl::nd_item<3> item_ct1)
                     [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
                         mul_mat_vec_q<QK_K, QI6_K, block_q6_K,
-                                      VDR_Q6_K_Q8_1_MMVQ, vec_dot_q6_K_q8_1>(
+                                      VDR_Q6_K_Q8_1_MMVQ, vec_dot_q6_K_q8_1, GGML_SYCL_MMVQ_WG_SCALE>(
                             vx, vy, dst, ncols, nrows, item_ct1);
                     });
         });

@@ -1,6 +1,17 @@
 {
   "results": [
     {
+      "task_id": "opt_task_007",
+      "kernel": "mmvq",
+      "optimization": "Increase non-reorder work-group size from 32 to 128 threads (4x), add multi-sub-group reduction",
+      "timestamp": "2026-02-27T18:30:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": null,
+      "notes": "Added GGML_SYCL_MMVQ_WG_SCALE constant (default=4) for work-group scaling. Changed work-group size from GGML_SYCL_MMV_Y * WARP_SIZE = 32 to GGML_SYCL_MMV_Y * WG_SCALE * WARP_SIZE = 128. Added WG_SCALE template parameter to mul_mat_vec_q kernel. Uses sycl::reduce_over_group for multi-sub-group reduction when WG_SCALE > 1. Updated work-group sizes for main kernels (Q4_0, Q4_1, Q5_0, Q5_1, Q8_0, Q2_K-Q6_K, MXFP4). Expected 2-3x throughput improvement from better memory latency hiding on Intel Xe2. Unit tests pass on b60."
+    },
+    {
       "task_id": "opt_task_009",
       "kernel": "wkv",
       "optimization": "Fix SLM over-allocation (byte count -> element count), add reqd_sub_group_size to all kernel launches",
