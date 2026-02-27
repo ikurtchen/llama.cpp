@@ -3455,9 +3455,9 @@
           "cuda_reference": "CUDA also lacks unroll hints (ggml/src/ggml-cuda/conv2d-transpose.cu:27-48)."
         }
       ],
-      "overall_potential": "low",
       "notes": "Nearly identical 1:1 port from CUDA. The SYCL kernel is clean and correct \u2014 no major DPCT artifacts, proper nd_range with work-group size 256, mixed precision (FP16 kernel weights, FP32 compute). The only meaningful optimization is eliminating stride-alignment divergence (opt_026_001), which benefits both SYCL and CUDA. The remaining opportunities are minor cleanup items. Transposed convolution is rarely a bottleneck in LLM inference (primarily used in image generation models), so the wall-clock impact of these optimizations is minimal for llama.cpp's primary use case.",
-      "feature_parity_with_cuda": "complete"
+      "feature_parity_with_cuda": "complete",
+      "overall_optimization_potential": "low"
     },
     {
       "kernel_id": "sk_027",
@@ -4282,15 +4282,147 @@
       ],
       "overall_optimization_potential": "medium",
       "estimated_current_efficiency": "55-65% \u2014 The SSM scan kernels are reasonably well-ported with correct algorithmic structure. The Mamba-2 kernel is close to optimal (has reqd_sub_group_size, correct warp reduction, appropriate work-group sizes). Main inefficiencies are: (1) missing #pragma unroll on all inner loops (15-30% penalty), (2) missing L_template specialization for Mamba-1 (20-50% penalty for L=1 autoregressive decoding), (3) standard sycl::exp instead of native (10-20% for Mamba-1), (4) non-coalesced A/s0 loads in Mamba-1 (missing CUB BlockLoad equivalent). The kernel is used exclusively by Mamba/SSM models (not transformer architecture), so optimization priority depends on Mamba model support requirements."
+    },
+    {
+      "kernel_id": "sk_033",
+      "name": "ggml_sycl_op_topk_moe",
+      "file": "ggml/src/ggml-sycl/topk-moe.cpp",
+      "source_cuda_ids": [
+        "ck_106"
+      ],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": "2D nd_range: local_range(rows_per_block=4, WARP_SIZE=16) = 64 threads per work-group",
+          "sub_group_size": "WARP_SIZE (16 on Intel) via [[sycl::reqd_sub_group_size(WARP_SIZE)]] \u2014 correctly specified in LAUNCH_TOPK_MOE_SYCL macro at line 273",
+          "global_size_expression": "global_range(n_blocks * rows_per_block, WARP_SIZE) where n_blocks = ceil(n_rows / 4)",
+          "notes": "Launch config matches CUDA exactly: block_dims(WARP_SIZE, rows_per_block=4), grid_dims(ceil(n_rows/4), 1, 1). The CUDA version specifies __launch_bounds__(4*WARP_SIZE, 1) for min_blocks=1 \u2014 no SYCL equivalent. Work-group size of 64 threads = 4 sub-groups at SIMD16 = 4 hardware threads per XVE. This is 50% of maximum occupancy (8 HW threads per XVE). Could increase rows_per_block to 8 for 128 threads = full occupancy, but would increase register pressure per work-group. The 2D layout is clean and correct \u2014 dim 0 for row parallelism within block, dim 1 for warp-lane expert parallelism."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": "yes",
+          "strided_accesses": [],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "Memory access pattern is excellent. Logits load at line 117: logits[i + lane] \u2014 adjacent lanes access adjacent float elements, perfectly coalesced (16 lanes \u00d7 4 bytes = 64-byte cache line). For n_experts > WARP_SIZE (e.g., 64 experts), the outer loop at line 115 loads experts_per_thread=4 chunks of 16 contiguous floats, still coalesced per iteration. Output weights write at line 239: weights[i * WARP_SIZE + lane] \u2014 coalesced within each sub-group. The ids write at line 215 is scattered (only one lane per top-k iteration writes), but this is inherent to the algorithm. Bias load at line 139 is identical to logits \u2014 coalesced. Total data movement per row: read n_experts floats (logits) + optionally n_experts floats (bias) + write n_expert_used floats (weights) + write n_expert_used int32s (ids). Very low memory footprint per work-group."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes": "0",
+          "potential_bank_conflicts": false,
+          "notes": "No SLM used. All computation is register-based using warp shuffle (sub-group) operations for cross-lane communication. This is optimal \u2014 n_experts values are distributed across WARP_SIZE=16 lanes with experts_per_thread values per lane, and the argmax reduction uses sub-group shuffles. No need for SLM since the entire expert logit vector fits in registers (up to 576/16 = 36 floats per thread = 144 bytes, well within GRF limits). The CUDA version also uses zero shared memory (0 bytes in <<<grid, block, 0, stream>>>)."
+        },
+        "reduction_pattern": {
+          "has_reduction": true,
+          "uses_sub_group_reduce": true,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "Three distinct reduction patterns: (1) softmax_warp_inplace uses warp_reduce_max<WARP_SIZE> and warp_reduce_sum<WARP_SIZE> \u2014 these are templated sub-group shuffle reductions from common.hpp, correct for Xe2. (2) The argmax reduction at lines 173-179 and 196-202 manually performs sub-group shuffle XOR reduction using dpct::permute_sub_group_by_xor \u2014 this is the DPCT migration of CUDA's __shfl_xor_sync. The pattern is correct and well-unrolled (log2(16) = 4 iterations for WARP_SIZE=16). (3) wt_sum normalization at line 223 uses warp_reduce_sum<WARP_SIZE>. All reductions operate within a single sub-group (no cross-sub-group reduction needed since each sub-group independently processes one row). This is a clean, efficient reduction design."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "All computation is FP32. Expert selection logits and weights are inherently FP32 in the MoE pipeline. The kernel performs softmax/sigmoid (transcendental), argmax (comparison), and normalization (division) \u2014 all scalar operations, no matrix multiply potential. joint_matrix is not applicable. FP16 would lose precision in the softmax exp/sum and could cause incorrect expert selection for close logit values. FP32 is the correct choice."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [
+            "sycl::exp (softmax_warp_inplace line 42, sigmoid_warp_inplace line 68)",
+            "sycl::fmax (softmax_warp_inplace line 30, with_norm normalization line 224)"
+          ],
+          "notes": "CUDA uses expf() (fast single-precision) in both softmax and sigmoid. SYCL uses sycl::exp() which is the full-precision version. On Xe2, sycl::native::exp is ~2-4x faster. However, the softmax exp is only called experts_per_thread times per row (1-36 calls depending on n_experts), and the sigmoid exp is also called experts_per_thread times. For typical models (8-64 experts), this is 1-4 exp calls per lane. Given the kernel's very small per-row compute footprint, the transcendental overhead is a moderate fraction of total time. sycl::fmax is a standard IEEE operation and doesn't have a native alternative."
+        },
+        "loop_analysis": {
+          "hot_loops": [
+            "softmax init/load loop (line 26/38/54): experts_per_thread iterations, called once per row",
+            "sigmoid loop (line 65): experts_per_thread iterations, called once per row",
+            "logits load loop (line 115): n_experts/WARP_SIZE iterations, called once per row",
+            "bias load loop (line 136): n_experts/WARP_SIZE iterations, called once per row (has_bias only)",
+            "output_weights init loop (line 151): experts_per_thread iterations, called once per row",
+            "top-k selection outer loop (line 157): n_expert_used iterations \u2014 this is the HOT loop, containing the argmax reduction. n_expert_used is typically 2-8",
+            "argmax thread-local scan (lines 164/188): experts_per_thread iterations per top-k step",
+            "argmax warp shuffle reduction (lines 173/196): log2(WARP_SIZE) = 4 iterations per top-k step",
+            "with_norm output scaling (line 227): experts_per_thread iterations",
+            "delayed_softmax (line 233): experts_per_thread iterations \u00d7 3 (max, exp+sum, normalize)",
+            "final output write (line 236): experts_per_thread iterations"
+          ],
+          "unrolled": false,
+          "notes": "CRITICAL: CUDA version has #pragma unroll on approximately 12 loops; SYCL version has ZERO #pragma unroll directives. The most impactful are: (1) the argmax local scan loops at lines 164/188 which iterate experts_per_thread times (1-36, compile-time constant) per top-k step, (2) the warp shuffle reduction loops at lines 173/196 which iterate log2(WARP_SIZE)=4 times, (3) initialization and load loops. Since experts_per_thread and n_experts are template parameters, the compiler CAN theoretically unroll all these loops. However, without explicit #pragma unroll hints, Intel's DPC++ compiler may not aggressively unroll, especially for large trip counts (e.g., experts_per_thread=36 for n_experts=576). The top-k outer loop (n_expert_used iterations) is NOT unrolled in CUDA either, as n_expert_used is a runtime parameter."
+        },
+        "estimated_bottleneck": "compute",
+        "anti_patterns": [
+          "Missing #pragma unroll on ALL inner loops \u2014 CUDA version has ~12 explicit #pragma unroll directives; SYCL has zero",
+          "dpct::permute_sub_group_by_xor usage in argmax reduction (lines 174-176, 197-198) \u2014 DPCT migration artifact, should use sycl::sub_group::shuffle_xor for cleaner code (functionally identical)",
+          "dpct::queue_ptr stream variable at line 266 \u2014 DPCT artifact, should be sycl::queue& or sycl::queue*",
+          "Standard sycl::exp instead of sycl::native::exp in softmax and sigmoid \u2014 CUDA uses expf() fast-math equivalent",
+          "Work-group size 64 (4 rows \u00d7 16 lanes) is below optimal 128-256 \u2014 could increase rows_per_block to 8 for better XVE occupancy (8 hardware threads vs 4)",
+          "No __launch_bounds__ equivalent \u2014 CUDA uses __launch_bounds__(4*WARP_SIZE, 1) to hint single-block occupancy for maximum register allocation"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_033_001",
+          "category": "loop_unroll",
+          "priority": "high",
+          "description": "Add #pragma unroll to all compile-time-constant inner loops. CUDA has ~12 explicit #pragma unroll directives; SYCL has zero. The most impactful loops are: (1) argmax thread-local scan at lines 164 and 188 (experts_per_thread iterations, inside the hot top-k outer loop \u2014 executed n_expert_used times per row), (2) argmax warp shuffle reduction at lines 173 and 196 (log2(WARP_SIZE)=4 iterations, also inside the hot top-k loop), (3) softmax/sigmoid inner loops at lines 26/38/54/65 (experts_per_thread iterations), (4) initialization, load, and output loops. Since n_experts is a template parameter and experts_per_thread = n_experts/WARP_SIZE is constexpr, all trip counts are compile-time constants. For n_experts=576, experts_per_thread=36 \u2014 the compiler may choose not to fully unroll this without explicit hints, losing pipeline efficiency.",
+          "expected_improvement": "10-25% overall kernel speedup. The argmax scan and shuffle loops in the top-k selection are the hottest code paths, executed n_expert_used times (typically 2-8) per row. Unrolling the inner experts_per_thread scan and the 4-iteration shuffle reduction eliminates branch overhead and enables instruction-level parallelism. For small n_experts (<=16, experts_per_thread=1), improvement is minimal. For large n_experts (256-576, experts_per_thread=16-36), unrolling the local scan provides significant speedup.",
+          "implementation_notes": "Add #pragma unroll before: (1) line 26 (softmax max loop), (2) line 38 (softmax exp loop), (3) line 54 (softmax normalize loop), (4) line 65 (sigmoid loop), (5) line 111 (init -INFINITY loop), (6) line 115 (logits load loop), (7) line 133 (bias init loop), (8) line 136 (bias load loop), (9) line 151 (output_weights init loop), (10) line 164 (argmax local scan, has_bias path), (11) line 173 (argmax shuffle reduction, has_bias path), (12) line 188 (argmax local scan, no-bias path), (13) line 196 (argmax shuffle reduction, no-bias path), (14) line 227 (norm output scaling loop), (15) line 236 (final output write loop). All trip counts are compile-time constants (experts_per_thread, n_experts/WARP_SIZE, or WARP_SIZE/2 reduction steps). For large experts_per_thread (36 for n_experts=576), consider #pragma unroll 8 instead of full unroll to balance code size vs pipeline efficiency.",
+          "risk": "low",
+          "risk_notes": "Purely mechanical addition of compiler hints. For small experts_per_thread (1-4), full unrolling adds negligible code size. For experts_per_thread=36 (n_experts=576), full unrolling of all 15 loops in the 11 template specializations could increase binary size significantly \u2014 mitigate with partial unroll (#pragma unroll 8) for the n_experts=576 case."
+        },
+        {
+          "id": "opt_033_002",
+          "category": "math_functions",
+          "priority": "medium",
+          "description": "Replace sycl::exp with sycl::native::exp in softmax_warp_inplace (line 42) and sigmoid_warp_inplace (line 68). CUDA uses expf() which is the fast single-precision variant. On Xe2, sycl::native::exp is ~2-4x faster than standard sycl::exp. The softmax exp is called experts_per_thread times per row, and the sigmoid exp is also called experts_per_thread times. For n_experts=64 models (Mixtral), this is 4 exp calls per lane; for n_experts=576 (some research models), this is 36 exp calls per lane. The kernel's per-row compute is small, so transcendental overhead is a moderate fraction of total time.",
+          "expected_improvement": "5-15% overall kernel speedup. The exp calls are a significant fraction of the total compute for this kernel since the other operations are just comparisons, shuffles, and simple arithmetic. The improvement scales with n_experts \u2014 larger expert counts mean more exp calls.",
+          "implementation_notes": "Replace sycl::exp(vals[i] - max_val) at line 42 with sycl::native::exp(vals[i] - max_val). Replace sycl::exp(-vals[i]) at line 68 with sycl::native::exp(-vals[i]). Both substitutions are safe: the softmax exp argument is always <= 0 (due to max subtraction), and the sigmoid exp argument can be any float but the result is bounded to (0, 1). native::exp provides ~1 ULP accuracy which is more than sufficient for expert routing decisions.",
+          "risk": "low",
+          "risk_notes": "native::exp provides ~1 ULP accuracy vs full IEEE precision. For MoE routing, this precision is more than sufficient \u2014 the expert selection argmax is robust to small perturbations in probability values. CUDA already uses the equivalent fast-math expf()."
+        },
+        {
+          "id": "opt_033_003",
+          "category": "sub_group_ops",
+          "priority": "low",
+          "description": "Replace dpct::permute_sub_group_by_xor with sycl::sub_group::shuffle_xor in the argmax reduction loops (lines 174-176, 197-198). The dpct:: wrapper is a DPCT migration artifact that adds an unnecessary abstraction layer. The direct SYCL sub-group operation is: sg.shuffle_xor(value, mask). This also applies to the sg variable obtained at line 155 \u2014 which is already correctly using item.get_sub_group() rather than a DPCT wrapper.",
+          "expected_improvement": "0-2% \u2014 the dpct wrapper likely inlines to the same sub-group shuffle intrinsic. Primary benefit is code clarity and maintainability rather than performance.",
+          "implementation_notes": "Replace dpct::permute_sub_group_by_xor(sg, max_val, mask, WARP_SIZE) with sg.shuffle_xor(max_val, mask) at lines 174, 175, 176, 197, 198. The WARP_SIZE parameter in dpct:: specifies the logical sub-group width which is redundant when [[sycl::reqd_sub_group_size(WARP_SIZE)]] is already specified. The sg variable is already declared at line 155.",
+          "risk": "low",
+          "risk_notes": "Functionally identical. dpct::permute_sub_group_by_xor is a thin wrapper around the native sub-group shuffle_xor operation. May require #include <sycl/ext/oneapi/sub_group.hpp> if not already included via common.hpp."
+        },
+        {
+          "id": "opt_033_004",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Consider increasing rows_per_block from 4 to 8 for better XVE occupancy. Current work-group size is 64 threads (4 rows \u00d7 16 lanes) = 4 sub-groups = 4 hardware threads per XVE. Maximum is 8 HW threads per XVE on Xe2. Increasing to rows_per_block=8 would give 128 threads = 8 sub-groups = full occupancy. CUDA uses __launch_bounds__(4*WARP_SIZE, 1) which explicitly hints for 4 rows \u00d7 32 = 128 threads; the SYCL version uses 4 rows \u00d7 16 = 64 threads, which is already half the CUDA thread count per work-group.",
+          "expected_improvement": "5-15% from doubled latency hiding capacity per XVE. Improvement depends on whether the kernel is limited by memory latency (more benefit) or compute/register pressure (less benefit). For small n_experts (<=16), the kernel is likely memory-latency-bound and would benefit. For large n_experts (256+), register pressure may increase with 8 active rows.",
+          "implementation_notes": "Change constexpr int rows_per_block = 4 to 8 at lines 92 (kernel) and 259 (launch). Also update the CUDA-matching __launch_bounds__ comment. For n_experts=576, each row uses 36 float registers for wt[] + potentially 36 for selection_wt[] + 36 for output_weights[] = 108 floats = 432 bytes. With 8 rows, that's 3456 bytes per work-group from array registers alone, which is within Xe2's limits but may reduce occupancy if register spilling occurs. Benchmark with both 4 and 8 to verify.",
+          "risk": "medium",
+          "risk_notes": "Increasing rows_per_block doubles register pressure per work-group. For large n_experts (256-576), the kernel already uses significant registers per thread (up to 108 floats for wt+selection_wt+output_weights arrays). Doubling the active rows could cause register spilling to memory, negating the occupancy benefit. Must benchmark both configurations. Also requires updating the early-return bounds check at line 98 to handle the case where n_rows is not a multiple of 8."
+        },
+        {
+          "id": "opt_033_005",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Clean up minor DPCT artifact: replace dpct::queue_ptr stream variable (line 266) with sycl::queue& for idiomatic SYCL. Also remove the #define LAUNCH_TOPK_MOE_SYCL macro in favor of a helper lambda or template function for better debuggability and IDE support. The current macro approach works but macros are harder to debug and don't provide type checking.",
+          "expected_improvement": "0% performance impact. Purely a code quality improvement for maintainability.",
+          "implementation_notes": "Replace dpct::queue_ptr stream = ctx.stream() with auto& stream = *(ctx.stream()) or sycl::queue& q = *(ctx.stream()). Optionally convert the #define LAUNCH_TOPK_MOE_SYCL(N) macro to a template helper function or lambda that captures the launch parameters.",
+          "risk": "low",
+          "risk_notes": "Mechanical refactoring. dpct::queue_ptr is typically a sycl::queue* typedef, so the change is cosmetic."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "75-85% \u2014 This is one of the best-ported SYCL kernels in the codebase. It has correct [[sycl::reqd_sub_group_size(WARP_SIZE)]] already specified, clean 2D nd_range layout matching CUDA, proper template specialization for n_experts, coalesced memory access, efficient register-only computation with no SLM needed, and correct sub-group shuffle reductions. The main gap is the missing #pragma unroll directives (CUDA has ~12, SYCL has 0) and the use of standard sycl::exp instead of native. The kernel processes only n_experts values per row (typically 8-64 floats) making it extremely lightweight \u2014 optimization here has minimal wall-clock impact on overall inference unless MoE routing becomes a bottleneck."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 32,
+    "total_kernels_analyzed": 33,
     "critical_potential": 1,
-    "high_potential": 8,
+    "high_potential": 7,
     "medium_potential": 10,
-    "low_potential": 12,
-    "no_optimization_needed": 2,
+    "low_potential": 14,
+    "no_optimization_needed": 1,
     "top_opportunities": [
       {
         "kernel_id": "sk_001",

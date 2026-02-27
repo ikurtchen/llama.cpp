@@ -5,11 +5,11 @@
 
 ## Summary
 - Total SYCL kernels to analyze: 33
-- Kernels analyzed so far: 32
-- Analysis complete: No
-- Kernels with optimization potential: 31
+- Kernels analyzed so far: 33
+- Analysis complete: Yes
+- Kernels with optimization potential: 32
 - Kernels with no optimization needed: 1
-- Optimization tasks created: 0 (pending finalization)
+- Optimization tasks created: pending finalization
 
 ## Kernels Analyzed
 - [x] sk_001: softmax SYCL kernels — high potential (6 optimization opportunities)
@@ -43,10 +43,28 @@
 - [x] sk_029: ggml_sycl_op_top_k — high potential (6 optimization opportunities)
 - [x] sk_030: ggml_sycl_op_cumsum — low potential (5 optimization opportunities)
 - [x] sk_031: ggml_sycl_op_solve_tri — low potential (5 optimization opportunities)
-- [ ] sk_032: ggml_sycl_op_ssm_scan — pending
-- [ ] sk_033: ggml_sycl_op_topk_moe — pending
+- [x] sk_032: ggml_sycl_op_ssm_scan — medium potential (6 optimization opportunities)
+- [x] sk_033: ggml_sycl_op_topk_moe — low potential (5 optimization opportunities)
 
 ## Recent Activity
+[2026-02-27] Analyzed kernel ggml_sycl_op_topk_moe (sk_033). Found 5 optimization opportunities (low potential).
+  - HIGH: Missing #pragma unroll on ALL inner loops — CUDA has ~12 explicit unroll directives; SYCL has zero. 10-25% speedup, especially for large n_experts (256-576) where experts_per_thread is large.
+  - MEDIUM: Standard sycl::exp instead of sycl::native::exp in softmax and sigmoid — CUDA uses fast-math expf(). 5-15% from faster transcendentals.
+  - LOW: Replace dpct::permute_sub_group_by_xor with sycl::sub_group::shuffle_xor — DPCT migration artifact, functionally identical, 0-2%.
+  - LOW: Consider rows_per_block=8 for better XVE occupancy — current 64 threads = 50% occupancy; 128 threads = 100%.
+  - LOW: Clean dpct::queue_ptr artifact, consider replacing macro with template helper.
+  - Note: One of the best-ported SYCL kernels (75-85% efficiency). Already has reqd_sub_group_size, clean 2D nd_range, proper template specialization, coalesced memory access, efficient register-only computation. Used for MoE expert routing — lightweight per-invocation.
+
+[2026-02-27] ALL 33 SYCL KERNELS ANALYZED. Analysis phase complete. Finalization pending.
+
+[2026-02-27] Analyzed kernel ggml_sycl_op_ssm_scan (sk_032). Found 6 optimization opportunities (medium potential).
+  - HIGH: Missing #pragma unroll on all inner loops — CUDA explicitly unrolls every inner loop. 15-30% overall kernel speedup.
+  - HIGH: Missing L_template specialization for Mamba-1 — CUDA specializes for L=1..8. 20-50% speedup for L=1 autoregressive decoding.
+  - MEDIUM: Standard sycl::exp instead of native — 10-20% for Mamba-1 (exp in hot inner loop).
+  - MEDIUM: Missing reqd_sub_group_size on Mamba-1 kernel launch — 5-15% occupancy improvement.
+  - MEDIUM: Non-coalesced A/s0 loads in Mamba-1 — missing CUB BlockLoad WARP_TRANSPOSE equivalent.
+  - LOW: DPCT artifacts — dpct::queue_ptr, nd_range<3> vs <2> inconsistency, no launch_bounds equivalent.
+
 [2026-02-27] Analyzed kernel ggml_sycl_op_solve_tri (sk_031). Found 5 optimization opportunities (low potential).
   - MEDIUM: Missing #pragma unroll on hot inner loops — CUDA version explicitly unrolls all 6 loops in forward substitution. 5-15% for template-specialized n=64 paths.
   - LOW: Replace dpct-migrated warp_reduce_sum with sycl::reduce_over_group — idiomatic SYCL, 0-2% performance difference.
