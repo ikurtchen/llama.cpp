@@ -2564,14 +2564,120 @@
       ],
       "overall_optimization_potential": "low",
       "estimated_current_efficiency": "75-85% — The AdamW step kernel is a well-implemented element-wise operation with correct work-group size (256), proper nd_range<1> dispatch, coalesced memory access, and functionally equivalent to the CUDA counterpart. The kernel is purely memory-bound (~0.3 ops/byte with 28 bytes/element traffic) with straightforward arithmetic (moment updates, bias correction, weight decay). Main inefficiency is scalar (non-vectorized) memory access for 4 input + 3 output arrays. However, since AdamW step is called only once per training batch (not per token or per layer), its contribution to total runtime is negligible — optimization effort should be directed at hot-path inference kernels instead."
+    },
+    {
+      "kernel_id": "sk_020",
+      "name": "ggml_sycl_silu_back",
+      "file": "ggml/src/ggml-sycl/element_wise.cpp",
+      "source_cuda_ids": ["ck_113"],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": [256, 1, 1],
+          "sub_group_size": null,
+          "global_size_expression": "ceil_div(k, 256) * 256 where k = ggml_nelements(src0)",
+          "notes": "Uses nd_range<1> with work-group size 256 — matches CUDA's CUDA_SILU_BACK_BLOCK_SIZE=256. No [[sycl::reqd_sub_group_size(16)]] specified. Two launch paths: F16 and F32, both with identical nd_range configuration. Global size is properly rounded up to multiple of 256 with bounds check in kernel."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "strided_accesses": [],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "Three arrays accessed: grad[i], x[i], dst[i] — all scalar loads/stores. Adjacent work-items access adjacent elements (coalesced). Each work-item reads 2 floats (8 bytes) and writes 1 float (4 bytes) = 12 bytes total traffic per element. No sycl::vec usage. The kernel only asserts src0 (grad) is contiguous but does NOT assert src1 (x) is contiguous — potential correctness concern if src1 is non-contiguous, though in practice the backward pass input should be contiguous."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes": 0,
+          "potential_bank_conflicts": false,
+          "notes": "No SLM needed — purely element-wise operation with no data sharing between work-items."
+        },
+        "reduction_pattern": {
+          "has_reduction": false,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "No reductions — each work-item independently computes one output element."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "All computation in FP32 regardless of input type T (sycl::half or float). Input values are cast to float for computation, result cast back to T. FP32 is appropriate — the sigmoid computation 1/(1+exp(-x)) and the derivative formula require FP32 precision to avoid overflow/underflow in the exponential for large |x| values."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [
+            "sycl::exp (line 653 — sigmoid computation: 1.0f / (1.0f + sycl::exp(-xf)))"
+          ],
+          "notes": "Uses standard sycl::exp instead of sycl::native::exp. The CUDA version uses expf() which is the fast-math single-precision variant. sycl::native::exp on Xe2 is ~2-4x faster than standard sycl::exp. The forward silu kernel in the same file (element_wise.cpp) already uses sycl::native::exp for the sigmoid computation — this is an inconsistency. The division 1.0f/(1.0f+exp(-x)) could also be replaced with sycl::native::recip but precision trade-off may not be worthwhile."
+        },
+        "loop_analysis": {
+          "hot_loops": [],
+          "unrolled": false,
+          "notes": "No loops — each work-item processes exactly one element. The outer dispatch is the nd_range grid."
+        },
+        "estimated_bottleneck": "memory",
+        "anti_patterns": [
+          "Uses standard sycl::exp instead of sycl::native::exp — inconsistent with forward silu which uses native::exp",
+          "Missing [[sycl::reqd_sub_group_size(16)]] on both F16 and F32 launch paths — compiler may choose suboptimal SIMD width on Xe2",
+          "Uses dpct::queue_ptr instead of standard sycl::queue* or sycl::queue& — DPCT migration artifact",
+          "Scalar loads/stores only — no vectorization despite trivially vectorizable element-wise pattern",
+          "Only asserts src0 contiguous, not src1 — potential correctness gap if src1 (forward input) is non-contiguous"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_020_001",
+          "category": "math_functions",
+          "priority": "medium",
+          "description": "Replace sycl::exp with sycl::native::exp in the sigmoid computation at line 653 of element_wise.cpp. The forward silu kernel in the same file already uses sycl::native::exp for the identical sigmoid formula. The CUDA version uses expf() which is the fast-math equivalent. On Xe2, native::exp is ~2-4x faster than standard sycl::exp. Since silu_back is compute-bound around the exp call (the rest is multiply/add), this directly impacts kernel throughput.",
+          "expected_improvement": "10-25% kernel speedup. The exp call dominates compute time. However, silu_back is only used during training (backward pass), not inference, so wall-clock impact depends on training workload frequency.",
+          "implementation_notes": "At line 653 of element_wise.cpp, change: const float s = 1.0f / (1.0f + sycl::exp(-xf)); to: const float s = 1.0f / (1.0f + sycl::native::exp(-xf)); This makes it consistent with the forward silu kernel which already uses native::exp. Ref: optimization_guide.md section 3.2.",
+          "risk": "low",
+          "risk_notes": "sycl::native::exp provides ~1 ULP accuracy which is more than sufficient for gradient computation. The forward silu already uses native::exp, so using standard exp in backward is inconsistent and provides no accuracy benefit."
+        },
+        {
+          "id": "opt_020_002",
+          "category": "vectorization",
+          "priority": "medium",
+          "description": "Add vectorized loads/stores (sycl::vec<float, 4>) to the silu_back kernel. Currently processes 1 element per work-item with scalar loads. The kernel reads 2 arrays and writes 1 array — 12 bytes per element. With vec4, each work-item processes 4 elements using 48 bytes per vec4 iteration, reducing memory transaction count by 4x. The kernel is memory-bound (compute intensity ~4 ops/byte, well below the 27 ops/byte threshold).",
+          "expected_improvement": "20-40% memory throughput improvement. However, silu_back is training-only, so practical wall-clock impact is limited compared to inference-hot kernels.",
+          "implementation_notes": "Change the kernel to process 4 elements per work-item: (1) Adjust global size to k/4 work-items. (2) Load grad and x as sycl::vec<float,4>. (3) Compute sigmoid and derivative for each component. (4) Store result as sycl::vec<float,4>. (5) Handle tail elements (k%4 != 0) with scalar fallback. For F16 path, use sycl::vec<sycl::half,4> for loads/stores but still compute in FP32. Ref: optimization_guide.md section 2.2.",
+          "risk": "low",
+          "risk_notes": "Element-wise operations are the simplest case for vectorization — no inter-element dependencies. Tail handling adds minor complexity. For typical tensor sizes in training (millions of elements), the tail is negligible."
+        },
+        {
+          "id": "opt_020_003",
+          "category": "sub_group_ops",
+          "priority": "low",
+          "description": "Add [[sycl::reqd_sub_group_size(16)]] to both F16 and F32 parallel_for lambdas (lines 686 and 694 of element_wise.cpp). Without this attribute, the compiler may choose SIMD32 on Xe2 which halves occupancy (fewer hardware threads per XVE). While the kernel has no sub-group operations, specifying SIMD16 ensures native-width execution.",
+          "expected_improvement": "5-10% from better occupancy. The kernel is memory-bound and benefits from more concurrent threads for latency hiding.",
+          "implementation_notes": "Add [[sycl::reqd_sub_group_size(16)]] to both lambda declarations. Example: stream->parallel_for(nd_range, [=](sycl::nd_item<1> item_ct1) [[sycl::reqd_sub_group_size(16)]] { ... }); Ref: optimization_guide.md section 1.2.",
+          "risk": "low",
+          "risk_notes": "No sub-group operations are used, so this only affects register allocation and thread scheduling. No functional impact."
+        },
+        {
+          "id": "opt_020_004",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Clean up DPCT migration artifacts: (1) Replace dpct::queue_ptr with sycl::queue* or sycl::queue& in ggml_sycl_op_silu_back. (2) Consider adding a contiguity assertion for src1 (forward input x) in addition to the existing src0 (grad) assertion — the kernel accesses src1[i] directly which requires contiguity. The CUDA version also only asserts src0 contiguity, but this is likely a latent bug in both backends.",
+          "expected_improvement": "No performance improvement. Correctness/maintainability fix.",
+          "implementation_notes": "1. At line 667: change dpct::queue_ptr stream = ctx.stream(); to sycl::queue* stream = ctx.stream(); or auto stream = ctx.stream(); — ctx.stream() already returns a sycl::queue*. 2. Add GGML_ASSERT(ggml_is_contiguous(src1)); after line 671.",
+          "risk": "low",
+          "risk_notes": "Mechanical cleanup. The contiguity assertion for src1 may trigger on edge cases that currently produce silent wrong results, which would be a correctness improvement."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "70-80% — The silu_back kernel is a well-structured element-wise operation with correct nd_range<1> dispatch, appropriate work-group size (256), and coalesced memory access. The main inefficiency is using standard sycl::exp instead of native::exp (inconsistent with forward silu which uses native), and scalar-only memory access. The kernel is memory-bound with only ~4 ops/byte compute intensity. Since silu_back is training-only (backward pass), its contribution to inference latency is zero and its training wall-clock impact is modest — optimization effort should be directed at hot-path inference kernels (softmax, norm, mmq, mmvq, dmmv) first."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 19,
+    "total_kernels_analyzed": 20,
     "critical_potential": 1,
     "high_potential": 6,
     "medium_potential": 6,
-    "low_potential": 6,
+    "low_potential": 7,
     "no_optimization_needed": 1,
     "top_opportunities": [
       {
