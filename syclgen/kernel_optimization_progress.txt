@@ -5,9 +5,9 @@
 
 ## Summary
 - Total SYCL kernels to analyze: 33
-- Kernels analyzed so far: 27
+- Kernels analyzed so far: 28
 - Analysis complete: No
-- Kernels with optimization potential: 26
+- Kernels with optimization potential: 27
 - Kernels with no optimization needed: 1
 - Optimization tasks created: 0 (pending finalization)
 
@@ -39,7 +39,7 @@
 - [x] sk_025: ggml_sycl_op_conv_2d_dw — medium potential (7 optimization opportunities)
 - [x] sk_026: ggml_sycl_op_conv_transpose_2d — low potential (5 optimization opportunities)
 - [x] sk_027: ggml_sycl_cross_entropy_loss — high potential (6 optimization opportunities)
-- [ ] sk_028: ggml_sycl_cross_entropy_loss_back — pending
+- [x] sk_028: ggml_sycl_cross_entropy_loss_back — medium potential (7 optimization opportunities)
 - [ ] sk_029: ggml_sycl_op_top_k — pending
 - [ ] sk_030: ggml_sycl_op_cumsum — pending
 - [ ] sk_031: ggml_sycl_op_solve_tri — pending
@@ -47,6 +47,15 @@
 - [ ] sk_033: ggml_sycl_op_topk_moe — pending
 
 ## Recent Activity
+[2026-02-27] Analyzed kernel ggml_sycl_cross_entropy_loss_back (sk_028). Found 7 optimization opportunities (medium potential).
+  - HIGH: Work-group size is only WARP_SIZE (16 threads) — 4-8x throughput gain possible by increasing to 256+ with multi-sub-group reduction. Identical to forward kernel (sk_027).
+  - HIGH: Redundant logits read from global memory in non-SLM path — online softmax could eliminate extra write+read (20-40% memory traffic reduction).
+  - MEDIUM: Scalar-only loads across 2 passes — vec4 vectorization would reduce memory transactions by 4x.
+  - MEDIUM: Standard sycl::exp instead of sycl::native::exp — 10-20% from faster transcendentals.
+  - MEDIUM: *grad/nrows computed by every work-item instead of precomputed as kernel argument.
+  - LOW: No #pragma unroll on hot stride loops.
+  - LOW: DPCT artifacts — nd_range<3>, dpct::queue_ptr, item_ct1, dpct shuffle wrappers.
+
 [2026-02-27] Analyzed kernel ggml_sycl_cross_entropy_loss (sk_027). Found 6 optimization opportunities (high potential).
   - HIGH: Work-group size is only WARP_SIZE (16 threads) — 4-8x throughput gain possible by increasing to 256+ with multi-sub-group reduction.
   - HIGH: Sum kernel k_sum_f32 uses only 16 threads in 1 work-group — CUDA uses CUB DeviceReduce::Sum. Replace with multi-level parallel reduction.
