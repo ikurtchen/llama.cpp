@@ -23,6 +23,9 @@ template <int experts_per_thread, bool use_limit>
 static void softmax_warp_inplace(float (&vals)[experts_per_thread], const int limit, const int lane) {
     float max_val = -INFINITY;
 
+    // opt_task_015: Enable full unroll for compile-time-constant inner loops
+    // See: hw_spec_b60.md, optimization_guide
+    #pragma unroll
     for (int i = 0; i < experts_per_thread; i++) {
         const int  idx    = lane + i * WARP_SIZE;
         const bool active = !use_limit || (idx < limit);
@@ -37,6 +40,9 @@ static void softmax_warp_inplace(float (&vals)[experts_per_thread], const int li
     // See: hw_spec, optimization_guide
     float sum = 0.0f;
 
+    // opt_task_015: Enable full unroll for compile-time-constant inner loops
+    // See: hw_spec_b60.md, optimization_guide
+    #pragma unroll
     for (int i = 0; i < experts_per_thread; i++) {
         const int  idx    = lane + i * WARP_SIZE;
         const bool active = !use_limit || (idx < limit);
@@ -53,6 +59,9 @@ static void softmax_warp_inplace(float (&vals)[experts_per_thread], const int li
 
     const float inv_sum = 1.0f / sum;
 
+    // opt_task_015: Enable full unroll for compile-time-constant inner loops
+    // See: hw_spec_b60.md, optimization_guide
+    #pragma unroll
     for (int i = 0; i < experts_per_thread; i++) {
         const int  idx    = lane + i * WARP_SIZE;
         const bool active = !use_limit || (idx < limit);
@@ -66,6 +75,9 @@ template <int experts_per_thread, bool use_limit>
 static void sigmoid_warp_inplace(float (&vals)[experts_per_thread], const int limit, const int lane) {
     // opt_task_013: Use sycl::native::exp for faster computation
     // See: hw_spec, optimization_guide
+    // opt_task_015: Enable full unroll for compile-time-constant inner loops
+    // See: hw_spec_b60.md, optimization_guide
+    #pragma unroll
     for (int i = 0; i < experts_per_thread; i++) {
         const int  idx    = lane + i * WARP_SIZE;
         const bool active = !use_limit || (idx < limit);
@@ -112,6 +124,9 @@ static void topk_moe_sycl(const float *         logits,
     float wt[experts_per_thread];
 
     // Initialize all slots to -INFINITY
+    // opt_task_015: Enable full unroll for compile-time-constant inner loops
+    // See: hw_spec_b60.md, optimization_guide
+    #pragma unroll
     for (int i = 0; i < experts_per_thread; i++) {
         wt[i] = -INFINITY;
     }
@@ -134,6 +149,9 @@ static void topk_moe_sycl(const float *         logits,
     float selection_wt[has_bias ? experts_per_thread : 1];
 
     if constexpr (has_bias) {
+        // opt_task_015: Enable full unroll for compile-time-constant inner loops
+        // See: hw_spec_b60.md, optimization_guide
+        #pragma unroll
         for (int i = 0; i < experts_per_thread; i++) {
             selection_wt[i] = -INFINITY;
         }
@@ -152,6 +170,9 @@ static void topk_moe_sycl(const float *         logits,
 
     float output_weights[experts_per_thread];
 
+    // opt_task_015: Enable full unroll for compile-time-constant inner loops
+    // See: hw_spec_b60.md, optimization_guide
+    #pragma unroll
     for (int i = 0; i < experts_per_thread; i++) {
         output_weights[i] = 0.0f;
     }
@@ -165,6 +186,9 @@ static void topk_moe_sycl(const float *         logits,
         if constexpr (has_bias) {
             float max_val_s = selection_wt[0];
 
+            // opt_task_015: Enable full unroll for compile-time-constant inner loops
+            // See: hw_spec_b60.md, optimization_guide
+            #pragma unroll
             for (int i = 1; i < experts_per_thread; i++) {
                 const int expert = lane + i * WARP_SIZE;
                 if ((n_experts % WARP_SIZE == 0 || expert < n_experts) && selection_wt[i] > max_val_s) {
@@ -174,6 +198,9 @@ static void topk_moe_sycl(const float *         logits,
                 }
             }
 
+            // opt_task_015: Enable full unroll for compile-time-constant warp shuffle reduction
+            // See: hw_spec_b60.md, optimization_guide
+            #pragma unroll
             for (int mask = WARP_SIZE / 2; mask > 0; mask /= 2) {
                 const float val    = dpct::permute_sub_group_by_xor(sg, max_val,    mask, WARP_SIZE);
                 const float val_s  = dpct::permute_sub_group_by_xor(sg, max_val_s,  mask, WARP_SIZE);
@@ -189,6 +216,9 @@ static void topk_moe_sycl(const float *         logits,
                 selection_wt[max_expert / WARP_SIZE] = -INFINITY;
             }
         } else {
+            // opt_task_015: Enable full unroll for compile-time-constant inner loops
+            // See: hw_spec_b60.md, optimization_guide
+            #pragma unroll
             for (int i = 1; i < experts_per_thread; i++) {
                 const int expert = lane + i * WARP_SIZE;
                 if ((n_experts % WARP_SIZE == 0 || expert < n_experts) && wt[i] > max_val) {
@@ -197,6 +227,9 @@ static void topk_moe_sycl(const float *         logits,
                 }
             }
 
+            // opt_task_015: Enable full unroll for compile-time-constant warp shuffle reduction
+            // See: hw_spec_b60.md, optimization_guide
+            #pragma unroll
             for (int mask = WARP_SIZE / 2; mask > 0; mask /= 2) {
                 const float val    = dpct::permute_sub_group_by_xor(sg, max_val,    mask, WARP_SIZE);
                 const int   expert = dpct::permute_sub_group_by_xor(sg, max_expert, mask, WARP_SIZE);
@@ -228,6 +261,9 @@ static void topk_moe_sycl(const float *         logits,
         wt_sum              = sycl::fmax(wt_sum, clamp_val);
         const float inv_sum = 1.0f / wt_sum;
 
+        // opt_task_015: Enable full unroll for compile-time-constant inner loops
+        // See: hw_spec_b60.md, optimization_guide
+        #pragma unroll
         for (int i = 0; i < experts_per_thread; i++) {
             output_weights[i] *= inv_sum;
         }
@@ -237,6 +273,9 @@ static void topk_moe_sycl(const float *         logits,
         softmax_warp_inplace<experts_per_thread, true>(output_weights, n_expert_used, lane);
     }
 
+    // opt_task_015: Enable full unroll for compile-time-constant inner loops
+    // See: hw_spec_b60.md, optimization_guide
+    #pragma unroll
     for (int i = 0; i < experts_per_thread; i++) {
         const int idx = i * WARP_SIZE + lane;
         if (idx < n_expert_used) {

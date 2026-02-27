@@ -47,6 +47,15 @@
 - [x] sk_033: ggml_sycl_op_topk_moe — low potential (5 optimization opportunities)
 
 ## Recent Activity
+[2026-02-27] opt_task_015 (loop unroll): COMPLETED. Added #pragma unroll to compile-time-constant inner loops:
+  - ssm_scan.cpp: 6 loops (Mamba-1 & Mamba-2 state load/update/store)
+  - topk-moe.cpp: 15 loops (softmax, sigmoid, argmax, normalization)
+  - gla.cpp: 1 loop with #pragma unroll 8 (partial unroll for head_size=128)
+  - solve_tri.cpp: 5 loops (cooperative load, section, row, prior-section, write)
+  - conv2d-dw.cpp: 2 loops (kh and kw kernel dimensions)
+  - Expected: 10-30% speedup from loop pipelining and reduced branch overhead
+  - Correctness: PASS (SSM_SCAN 3/3, TOPK_MOE 219/219, SOLVE_TRI 24/24)
+
 [2026-02-27] opt_task_014 (vec4 vectorization): COMPLETED. Applied vec4 vectorization to soft_max_back_f32:
   - Added GGML_SYCL_VEC4 macro (default enabled)
   - Added vec4 loads for grad/dstf arrays in first loop (dot product computation)

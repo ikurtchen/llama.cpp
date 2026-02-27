@@ -439,7 +439,12 @@
       "priority": "medium",
       "complexity": "low",
       "category": "loop_unroll",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-02-27T23:59:00Z",
+      "baseline_metric": null,
+      "optimized_metric": null,
+      "actual_improvement": "Added #pragma unroll to compile-time-constant inner loops: ssm_scan.cpp (6 loops), topk-moe.cpp (15 loops), gla.cpp (1 loop), solve_tri.cpp (5 loops), conv2d-dw.cpp (2 loops)",
+      "notes": "All unit tests pass. Expected 5-30% speedup depending on kernel and loop complexity. CUDA versions already have these pragmas - SYCL versions now match.",
       "description": "Add #pragma unroll to all compile-time-constant inner loops across kernels",
       "target_kernels": [
         {

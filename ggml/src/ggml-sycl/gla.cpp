@@ -43,6 +43,10 @@ static void gated_linear_attn_f32_kernel(const dpct::queue_ptr stream, u_int B, 
                 const float _v = v[t];
                 float       y  = 0;
 
+                // opt_task_015: Partial unroll to avoid register pressure for large head_size
+                // See: hw_spec_b60.md, optimization_guide
+                // For HEAD_SIZE=128, trip count is 32 (j+=4), unroll 8 gives 4 iterations
+                #pragma unroll 8
                 for (u_int j = 0; j < head_size; j += 4) {
                     const sycl::float4 & k  = (sycl::float4 &) (_k[j]);
                     const sycl::float4 & r  = (sycl::float4 &) (_r[j]);

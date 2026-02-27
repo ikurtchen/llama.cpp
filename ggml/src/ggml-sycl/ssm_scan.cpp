@@ -45,6 +45,9 @@ static void ssm_scan_f32(
     float regA[N];
     float regs0[N];
 
+    // opt_task_015: Enable full unroll for compile-time-constant inner loops
+    // See: hw_spec_b60.md, optimization_guide
+    #pragma unroll
     for (int n = 0; n < N; ++n) {
         regA[n]  = A_block[tidx * stride_A + n];
         regs0[n] = s0_block[tidx * stride_s0 + n];
@@ -66,8 +69,9 @@ static void ssm_scan_f32(
         float x_dt = x_block[i * stride_x + tidx] * dt_soft_plus;
 
         float sumf = 0.0f;
-        // opt_task_013: Use sycl::native::exp for faster computation
-        // See: hw_spec, optimization_guide
+        // opt_task_015: Enable full unroll for compile-time-constant inner loops
+        // See: hw_spec_b60.md, optimization_guide
+        #pragma unroll
         for (int n = 0; n < N; n++) {
             float state = regs0[n] * sycl::native::exp(dt_soft_plus * regA[n]) + smemB[n] * x_dt;
             sumf += state * smemC[n];
@@ -78,6 +82,9 @@ static void ssm_scan_f32(
 
     // Non-CUB path: store state directly
     const int stride_s = stride_s0;
+    // opt_task_015: Enable full unroll for compile-time-constant inner loops
+    // See: hw_spec_b60.md, optimization_guide
+    #pragma unroll
     for (int n = 0; n < N; ++n) {
         s_block[tidx * stride_s + n] = regs0[n];
     }
@@ -135,6 +142,9 @@ static void ssm_scan_f32_group(
     float state[c_factor];
     float state_sum = 0.0f;
 
+    // opt_task_015: Enable full unroll for compile-time-constant inner loops
+    // See: hw_spec_b60.md, optimization_guide
+    #pragma unroll
     for (int j = 0; j < c_factor; j++) {
         state[j] = s0_warp[WARP_SIZE * j + lane];
     }
@@ -147,6 +157,9 @@ static void ssm_scan_f32_group(
         state_sum = 0.0f;
         const float dA   = sycl::native::exp(dt_soft_plus * A_warp[0]);
         const float x_dt = x_warp[i * stride_x] * dt_soft_plus;
+        // opt_task_015: Enable full unroll for compile-time-constant inner loops
+        // See: hw_spec_b60.md, optimization_guide
+        #pragma unroll
         for (int j = 0; j < c_factor; j++) {
             const float B_val = B_warp[i * stride_B + WARP_SIZE * j + lane];
             const float C_val = C_warp[i * stride_C + WARP_SIZE * j + lane];
@@ -163,6 +176,9 @@ static void ssm_scan_f32_group(
     }
 
     // write back the state
+    // opt_task_015: Enable full unroll for compile-time-constant inner loops
+    // See: hw_spec_b60.md, optimization_guide
+    #pragma unroll
     for (int j = 0; j < c_factor; j++) {
         s_warp[WARP_SIZE * j + lane] = state[j];
     }

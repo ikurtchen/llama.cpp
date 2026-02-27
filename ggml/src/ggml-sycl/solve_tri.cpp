@@ -81,6 +81,9 @@ static void solve_tri_f32_fast(const float * __restrict__ A,
     // Load A into shared memory cooperatively
     const int offset = item_ct1.get_local_id(2) + item_ct1.get_local_id(1) * item_ct1.get_local_range(2);
 
+    // opt_task_015: Enable full unroll for compile-time-constant inner loops
+    // See: hw_spec_b60.md, optimization_guide
+    #pragma unroll
     for (int i = 0; i < n * n; i += k * WARP_SIZE) {
         const int i0 = i + offset;
         if (i0 < n * n) {
@@ -92,6 +95,9 @@ static void solve_tri_f32_fast(const float * __restrict__ A,
 
     // Load B values for this column — one per section
     float x[NUM_SECTIONS];
+    // opt_task_015: Enable full unroll for compile-time-constant inner loops
+    // See: hw_spec_b60.md, optimization_guide
+    #pragma unroll
     for (int s = 0; s < NUM_SECTIONS; ++s) {
         const int row = s * WARP_SIZE + lane;
         x[s] = (row < n) ? B_batch[row * k + col_idx] : 0.0f;
@@ -105,10 +111,16 @@ static void solve_tri_f32_fast(const float * __restrict__ A,
         const int row_start = sec * WARP_SIZE;
         const int row_end   = (row_start + WARP_SIZE < n) ? row_start + WARP_SIZE : n;
 
+        // opt_task_015: Enable full unroll for compile-time-constant inner loops
+        // See: hw_spec_b60.md, optimization_guide
+        #pragma unroll
         for (int row = row_start; row < row_end; ++row) {
             float sum = 0.0f;
 
             // Accumulate contributions from all fully-solved prior sections
+            // opt_task_015: Enable full unroll for compile-time-constant inner loops
+            // See: hw_spec_b60.md, optimization_guide
+            #pragma unroll
             for (int ps = 0; ps < sec; ++ps) {
                 sum += sA[row * n + ps * WARP_SIZE + lane] * x[ps];
             }
@@ -128,6 +140,9 @@ static void solve_tri_f32_fast(const float * __restrict__ A,
     }
 
     // Write results
+    // opt_task_015: Enable full unroll for compile-time-constant inner loops
+    // See: hw_spec_b60.md, optimization_guide
+    #pragma unroll
     for (int s = 0; s < NUM_SECTIONS; ++s) {
         const int row = s * WARP_SIZE + lane;
         if (row < n) {

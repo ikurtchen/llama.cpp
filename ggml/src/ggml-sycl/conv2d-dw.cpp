@@ -103,9 +103,15 @@ static void conv2d_dw_kernel(const float * __restrict__ input,
     float acc = 0.0f;
     dw_kernel_bounds bounds = calculate_dw_kernel_bounds(out_x, out_y, P);
 
+    // opt_task_015: Enable unroll for kernel height loop
+    // See: hw_spec_b60.md, optimization_guide
+    #pragma unroll
     for (int64_t ky = bounds.y_min; ky < bounds.y_max; ++ky) {
         const int64_t in_y = calculate_dw_input_coord(out_y, ky, P.ST_Y, P.DL_Y, P.PD_Y);
 
+        // opt_task_015: Enable unroll for kernel width loop
+        // See: hw_spec_b60.md, optimization_guide
+        #pragma unroll
         for (int64_t kx = bounds.x_min; kx < bounds.x_max; ++kx) {
             const int64_t in_x = calculate_dw_input_coord(out_x, kx, P.ST_X, P.DL_X, P.PD_X);
 
