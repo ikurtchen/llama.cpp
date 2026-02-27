@@ -47,6 +47,16 @@
 - [x] sk_033: ggml_sycl_op_topk_moe — low potential (5 optimization opportunities)
 
 ## Recent Activity
+[2026-02-27] opt_task_009 (wkv SLM over-allocation): COMPLETED. Fixed critical SLM bug and added sub_group_size:
+  - Fixed SLM over-allocation in both wkv6 and wkv7 kernels
+  - Changed shared_mem_size from byte count (C/H * 4 * sizeof(float)) to element count (C/H * 4)
+  - wkv6: 4x SLM reduction (256 -> 1024 bytes for head_size=64)
+  - wkv7: 4x SLM reduction (320 -> 1280 bytes for head_size=64)
+  - Added [[sycl::reqd_sub_group_size(WARP_SIZE)]] to all 4 kernel launches
+  - Expected: 25-50% occupancy improvement from freeing 3/4 of wasted SLM per work-group
+  - Correctness: PASS (4/4 tests passed on b60)
+  - Note: WKV is used by RWKV attention in state-space models, not transformer inference
+
 [2026-02-27] opt_task_008 (norm kernels): COMPLETED. Fixed group_norm global barriers and increased work-group size:
   - Fixed 2 global barriers in group_norm_f32: changed barrier() to barrier(local_space)
   - Removed 8 lines of DPCT migration comments

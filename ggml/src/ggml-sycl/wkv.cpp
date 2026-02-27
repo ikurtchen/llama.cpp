@@ -201,7 +201,7 @@ void ggml_sycl_op_rwkv_wkv6(ggml_backend_sycl_context& ctx, ggml_tensor* dst) {
     dpct::queue_ptr stream = ctx.stream();
 
     // Calculate execution configuration
-    const size_t shared_mem_size = C / H * 4 * sizeof(float); // For k, r, tf, td
+    const size_t shared_mem_size = C / H * 4; // For k, r, tf, td
     sycl::range<3> block_dims(1, 1, C / H);
     sycl::range<3> grid_dims(1, 1, B * H);
 
@@ -212,7 +212,7 @@ void ggml_sycl_op_rwkv_wkv6(ggml_backend_sycl_context& ctx, ggml_tensor* dst) {
 
             cgh.parallel_for(
                 sycl::nd_range<3>(grid_dims * block_dims, block_dims),
-                [=](sycl::nd_item<3> item_ct1) {
+                [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
                     rwkv_wkv6_f32_kernel<WKV_BLOCK_SIZE>(
                         B, T, C, H, k_d, v_d, r_d, tf_d, td_d, s_d, dst_d,
                         item_ct1, (float*)shared_mem_acc.get_multi_ptr<sycl::access::decorated::no>().get()
@@ -225,7 +225,7 @@ void ggml_sycl_op_rwkv_wkv6(ggml_backend_sycl_context& ctx, ggml_tensor* dst) {
 
             cgh.parallel_for(
                 sycl::nd_range<3>(grid_dims * block_dims, block_dims),
-                [=](sycl::nd_item<3> item_ct1) {
+                [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
                     rwkv_wkv6_f32_kernel<WKV_BLOCK_SIZE * 2>(
                         B, T, C, H, k_d, v_d, r_d, tf_d, td_d, s_d, dst_d,
                         item_ct1, (float*)shared_mem_acc.get_multi_ptr<sycl::access::decorated::no>().get()
@@ -258,7 +258,7 @@ void ggml_sycl_op_rwkv_wkv7(ggml_backend_sycl_context& ctx, ggml_tensor* dst) {
     dpct::queue_ptr stream = ctx.stream();
 
     // Calculate execution configuration
-    const size_t shared_mem_size = C / H * 5 * sizeof(float); // For r, w, k, a, b
+    const size_t shared_mem_size = C / H * 5; // For r, w, k, a, b
     sycl::range<3> block_dims(1, 1, C / H);
     sycl::range<3> grid_dims(1, 1, B * H);
 
@@ -269,7 +269,7 @@ void ggml_sycl_op_rwkv_wkv7(ggml_backend_sycl_context& ctx, ggml_tensor* dst) {
 
             cgh.parallel_for(
                 sycl::nd_range<3>(grid_dims * block_dims, block_dims),
-                [=](sycl::nd_item<3> item_ct1) {
+                [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
                     rwkv_wkv7_f32_kernel<WKV_BLOCK_SIZE>(
                         B, T, C, H, r_d, w_d, k_d, v_d, a_d, b_d, s_d, dst_d,
                         item_ct1, (float*)shared_mem_acc.get_multi_ptr<sycl::access::decorated::no>().get()
@@ -282,7 +282,7 @@ void ggml_sycl_op_rwkv_wkv7(ggml_backend_sycl_context& ctx, ggml_tensor* dst) {
 
             cgh.parallel_for(
                 sycl::nd_range<3>(grid_dims * block_dims, block_dims),
-                [=](sycl::nd_item<3> item_ct1) {
+                [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
                     rwkv_wkv7_f32_kernel<WKV_BLOCK_SIZE * 2>(
                         B, T, C, H, r_d, w_d, k_d, v_d, a_d, b_d, s_d, dst_d,
                         item_ct1, (float*)shared_mem_acc.get_multi_ptr<sycl::access::decorated::no>().get()

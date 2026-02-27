@@ -1,6 +1,17 @@
 {
   "results": [
     {
+      "task_id": "opt_task_009",
+      "kernel": "wkv",
+      "optimization": "Fix SLM over-allocation (byte count -> element count), add reqd_sub_group_size to all kernel launches",
+      "timestamp": "2026-02-27T20:00:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": null,
+      "notes": "Fixed SLM over-allocation bug in both wkv6 and wkv7 kernels: Changed local_accessor size from byte count to element count. OLD: C/H * 4 * sizeof(float) passed as element count = head_size * 16 elements (4x too many). NEW: C/H * 4 = head_size * 4 elements (correct). For head_size=64: wkv6 1024->256 elements (4x reduction), wkv7 1280->320 elements (4x reduction). Added [[sycl::reqd_sub_group_size(WARP_SIZE)]] to all 4 kernel launches. Expected 25-50% occupancy improvement from freeing 3/4 of wasted SLM per work-group. Correctness: 4/4 tests passed on b60."
+    },
+    {
       "task_id": "opt_task_005",
       "kernel": "cpy",
       "optimization": "Increase quantized copy work-group from 1 to 256, add reqd_sub_group_size(WARP_SIZE)",

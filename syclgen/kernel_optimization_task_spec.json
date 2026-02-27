@@ -222,8 +222,8 @@
       "priority": "high",
       "complexity": "low",
       "category": "work_group_size",
-      "status": "pending",
-      "description": "Fix wkv SLM over-allocation by 4x \u2014 local_accessor receives byte count instead of element count",
+      "status": "completed",
+      "description": "Fix wkv SLM over-allocation by 4x — local_accessor receives byte count instead of element count",
       "target_kernels": [
         {
           "kernel_id": "sk_012",
@@ -232,12 +232,17 @@
       ],
       "optimization_ids": [
         "opt_012_001",
-        "opt_012_002"
+        "opt_012_002",
+        "opt_012_003"
       ],
       "dependencies": [],
       "estimated_improvement": "25-50% occupancy improvement from freeing 3/4 of wasted SLM; 5-15% from vectorized float4 SLM loads",
       "risk": "low",
-      "notes": "RWKV attention kernel. SLM over-allocation reduces occupancy by wasting 3x the needed SLM per work-group."
+      "notes": "RWKV attention kernel. SLM over-allocation reduces occupancy by wasting 3x the needed SLM per work-group. Fixed both wkv6 and wkv7 kernels.",
+      "completed_at": "2026-02-27T20:00:00Z",
+      "baseline_metric": "SLM size = C/H * 4 * sizeof(float) = element_count * 4 bytes (4x over-allocation)",
+      "optimized_metric": "SLM size = C/H * 4 elements (correct)",
+      "actual_improvement": "4x SLM reduction (from byte count to element count = head_size*16 -> head_size*4 elements); added reqd_sub_group_size(WARP_SIZE) to all 4 kernel launches"
     },
     {
       "id": "opt_task_010",
