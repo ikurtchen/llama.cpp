@@ -4005,14 +4005,134 @@
       ],
       "overall_optimization_potential": "low",
       "estimated_current_efficiency": "60-75% — The kernel correctly implements a two-level parallel prefix scan using idiomatic SYCL sub-group collectives (sycl::inclusive_scan_over_group). Work-group size is reasonable (up to 256), sub-group size is correctly enforced at 16 for Intel. SLM usage is minimal (~1KB). The main gap vs CUDA is the missing CUB DeviceScan/BlockScan equivalents for long rows (ne00 > 1024), where the current approach's serial carry chain between chunks becomes the bottleneck. For short rows (ne00 <= 1024, single chunk), the kernel is already near-optimal. The cumsum operation is rarely in the hot path for LLM inference (primarily used by Mamba SSM models), so the overall wall-clock impact of optimization is low."
+    },
+    {
+      "kernel_id": "sk_031",
+      "name": "ggml_sycl_op_solve_tri",
+      "file": "ggml/src/ggml-sycl/solve_tri.cpp",
+      "source_cuda_ids": ["ck_100", "ck_101"],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": "Fast path: (1, k, WARP_SIZE) where k in [1..32] and WARP_SIZE=16, so 16 to 512 threads. oneMKL pointer setup: 256 (block_size=256).",
+          "sub_group_size": 16,
+          "global_size_expression": "Fast path: 3D (ne02*ne03, k, WARP_SIZE) — one work-group per batch element. oneMKL pointer setup: 1D (ceil(total_batches/256)*256).",
+          "notes": "Fast path uses 3D nd_range with block_dims=(1, k, WARP_SIZE). The k dimension maps threads to output columns, WARP_SIZE dimension provides sub-group lanes for reduction. Has [[sycl::reqd_sub_group_size(WARP_SIZE)]] on the fast kernel (line 174). The oneMKL pointer setup kernel does NOT have reqd_sub_group_size. Template dispatch specializes n=64 with k in {1,2,4,6,8,10,12,14,16,32}; all other (n,k) use the generic <0,0> template. This is a good SYCL adaptation — CUDA hardcodes 2 halves (WARP_SIZE=32), SYCL generalizes to NUM_SECTIONS = 64/WARP_SIZE = 4 sections for SIMD16."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "strided_accesses": ["B_batch[row * k + col_idx] — stride-k access across columns, but each thread handles one fixed col_idx so this is a row-major gather per thread, not a cross-thread stride issue"],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "A matrix cooperative load from global memory to SLM uses thread-linear offset (line 82-89) — coalesced. B reads are per-thread per-section, accessing B_batch[row * k + col_idx]. Across threads in a sub-group, lane varies while col_idx is fixed (col_idx = threadIdx.y), so adjacent lanes read consecutive B elements only when k=1. For k>1, threads in dim-2 (lane) read same column — no coalescing concern since these are independent reductions. All loads/stores are scalar float."
+        },
+        "slm_usage": {
+          "uses_slm": true,
+          "slm_bytes": "16384 bytes (MAX_N_FAST * MAX_N_FAST * sizeof(float) = 64*64*4 = 16384). Always allocated at maximum size regardless of actual n.",
+          "potential_bank_conflicts": false,
+          "notes": "SLM stores the full A matrix (n×n) for the fast path. At n=64, uses 16KB of 64KB available per Xe-core. For small n (e.g. n=8), still allocates 16KB — wasteful but harmless since it's well under the Xe-core limit. Access pattern sA[row * n + lane] has stride-n between sub-group lanes; for n=64 this is stride-64 (=stride-0 mod 16 banks) — potential bank broadcast, but since row is constant across the sub-group this is a broadcast read (all lanes read same bank at different offsets), which is handled efficiently. The cooperative load at lines 82-89 uses consecutive thread offsets — no conflicts."
+        },
+        "reduction_pattern": {
+          "has_reduction": true,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "Uses warp_reduce_sum() at line 122 for the forward substitution inner product. This is a dpct-migrated shuffle-based XOR reduction (from common.hpp line 417+), NOT sycl::reduce_over_group. The reduction is correct and efficient for a single sub-group, but could be replaced with the idiomatic sycl::reduce_over_group(sub_group, sum, sycl::plus<float>()) for clarity. Performance difference is negligible since both use sub-group shuffles underneath."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "Float-only (F32 asserted at lines 293-295). Triangular solve requires full F32 precision for numerical stability — division by diagonal element at line 125 amplifies any half-precision error. joint_matrix is not applicable to triangular solve (it's designed for dense matmul, not the sequential row dependency of forward substitution). The oneMKL trsm_batch path may internally use lower precision where safe."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": ["standard float division (line 125: x[sec] = (x[sec] - sum) / sA[row * n + row])"],
+          "notes": "Only arithmetic operations: multiply-add for inner products, subtraction and division for the forward substitution update. No transcendental functions. The division is on the hot path (once per row per section) but is required for correctness and cannot use native approximation since it divides by the diagonal element of A."
+        },
+        "loop_analysis": {
+          "hot_loops": [
+            "Section loop (line 104): iterates n_sections = ceil(n/WARP_SIZE) times (up to 4 for n=64, WARP_SIZE=16)",
+            "Row loop (line 108): iterates WARP_SIZE times per section (up to 16 rows per section)",
+            "Prior-section accumulation loop (line 112): iterates sec times (0 to 3)",
+            "Cooperative A-load loop (line 84): iterates ceil(n*n / (k*WARP_SIZE)) times"
+          ],
+          "unrolled": false,
+          "notes": "No explicit #pragma unroll on any loops. CUDA version has #pragma unroll on all hot loops (lines 127, 128, 143, 144, 156, 170). For the template-specialized cases (n=64, k=fixed), the loop bounds are compile-time constants and the DPC++ compiler likely auto-unrolls. For the generic <0,0> template, loop bounds are runtime values and cannot be unrolled. Adding #pragma unroll to the specialized template paths would guarantee unrolling."
+        },
+        "estimated_bottleneck": "compute",
+        "anti_patterns": [
+          "3D nd_range with block_dims=(1, k, WARP_SIZE) — the batch dimension is in grid dim-0, slightly unusual but functionally correct. Minor DPCT-style artifact.",
+          "item_ct1 parameter naming — DPCT naming convention artifact (line 59)",
+          "get_local_id(2) / get_local_id(1) indexing — DPCT convention mapping threadIdx.x→dim2, threadIdx.y→dim1 (lines 65-66)",
+          "Missing #pragma unroll on hot inner loops (sections, rows, prior-section accumulation) — CUDA version explicitly unrolls all of these",
+          "Missing [[sycl::reqd_sub_group_size(16)]] on the batch pointer setup kernel (line 247)",
+          "SLM always allocated at MAX_N_FAST*MAX_N_FAST regardless of actual n — 16KB for n=8 when 256 bytes would suffice"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_031_001",
+          "category": "loop_unroll",
+          "priority": "medium",
+          "description": "Add explicit #pragma unroll on the hot inner loops of solve_tri_f32_fast: (1) the section loop at line 104, (2) the row loop at line 108, (3) the prior-section accumulation loop at line 112, and (4) the cooperative A-load loop at line 84. The CUDA version has #pragma unroll on all four equivalent loops. For the template-specialized paths (n=64, k=fixed), all loop bounds are compile-time constants and unrolling enables the compiler to fully pipeline the forward substitution. For the generic <0,0> path, #pragma unroll serves as a hint that the compiler can ignore if bounds are runtime-variable.",
+          "expected_improvement": "5-15% for the n=64 template-specialized paths. 0% for the generic <0,0> path where loop bounds are runtime. The forward substitution is inherently serial across rows (each row depends on prior rows), so the benefit comes from pipelining the inner product accumulation within each row, not from parallelizing across rows.",
+          "implementation_notes": "Add '#pragma unroll' before lines 84, 95, 104, 108, 112, and 131. For the section loop (line 104) in the <64, K> specializations, NUM_SECTIONS=4 is a compile-time constant so the compiler can fully unroll. For the row loop, WARP_SIZE=16 is compile-time constant. Match the CUDA version's #pragma unroll placement at lines 127, 128, 143, 144, 156, 170 of solve_tri.cu.",
+          "risk": "low",
+          "risk_notes": "Standard optimization hint. No correctness risk. The compiler is free to ignore #pragma unroll if it determines unrolling is counterproductive."
+        },
+        {
+          "id": "opt_031_002",
+          "category": "reduction",
+          "priority": "low",
+          "description": "Replace warp_reduce_sum(sum, item_ct1) at line 122 with sycl::reduce_over_group(item_ct1.get_sub_group(), sum, sycl::plus<float>()). The current warp_reduce_sum is a dpct-migrated shuffle-based XOR reduction that works correctly but is not idiomatic SYCL. Using the SYCL collective gives the compiler and runtime more flexibility to choose the optimal reduction strategy for the target hardware. On Xe2 hardware, both approaches ultimately use sub-group shuffles, so the performance difference is negligible — this is primarily a code quality improvement.",
+          "expected_improvement": "0-2% performance. Primary benefit is idiomatic SYCL code that is more portable and maintainable.",
+          "implementation_notes": "Replace line 122: 'sum = warp_reduce_sum(sum, item_ct1);' with 'sum = sycl::reduce_over_group(item_ct1.get_sub_group(), sum, sycl::plus<float>());'. Verify that the sub_group is the correct scope — the reduction should be across all lanes in dim-2 (WARP_SIZE lanes), which is the sub-group. Remove the item_ct1-accepting overload dependency from common.hpp if no other kernel uses it (it is used by many other kernels, so likely keep it).",
+          "risk": "low",
+          "risk_notes": "Direct API replacement. The sycl::reduce_over_group collective requires that all lanes in the sub-group participate or that the sum is well-defined for inactive lanes (they contribute 0). The early return at line 68-70 (if col_idx >= k) means some lanes may be inactive. Need to verify that the sub-group size matches WARP_SIZE and that inactive lanes don't participate in the reduction — the reqd_sub_group_size(WARP_SIZE) attribute ensures all WARP_SIZE lanes in dim-2 are in the same sub-group. Since col_idx varies in dim-1 (not dim-2), all lanes within a sub-group have the same col_idx, so the early return affects entire sub-groups, not individual lanes. Safe to use reduce_over_group."
+        },
+        {
+          "id": "opt_031_003",
+          "category": "sub_group_size",
+          "priority": "low",
+          "description": "Add [[sycl::reqd_sub_group_size(16)]] to the batch pointer setup kernel (get_batch_pointers, launched at line 247). This trivial pointer-computation kernel lacks the sub-group size attribute, which means the compiler may choose SIMD32 on Intel, potentially reducing occupancy. The fast triangular solve kernel already has the attribute (line 174).",
+          "expected_improvement": "0-2%. The batch pointer kernel is trivially fast (one global write per thread) and never a bottleneck. This is a correctness/consistency improvement.",
+          "implementation_notes": "Add [[sycl::reqd_sub_group_size(WARP_SIZE)]] to the lambda at line 247: stream->parallel_for(sycl::nd_range<1>(...), [=](sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(WARP_SIZE)]] { ... });",
+          "risk": "low",
+          "risk_notes": "Standard attribute addition. No correctness risk."
+        },
+        {
+          "id": "opt_031_004",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Clean up DPCT artifacts: (1) Rename item_ct1 to item throughout solve_tri_f32_fast. (2) Rename get_local_id(2)/get_local_id(1) access with comments explaining the mapping (lane = dim-2, col = dim-1, batch = dim-0). (3) Consider simplifying to 2D nd_range since batch dimension uses grid-level get_group(0) only. The current code is functionally correct but carries DPCT migration naming conventions that reduce readability.",
+          "expected_improvement": "0% performance. Code quality and maintainability improvement only.",
+          "implementation_notes": "Mechanical rename: item_ct1 → item in function signature and all uses. Add comment: // dim-2 = lane (sub-group), dim-1 = column, dim-0 = batch. Optional: collapse to 2D nd_range where dim-0 = batch (grid only), dim-1 = col*WARP_SIZE + lane — but this loses the clean separation of col_idx and lane, so the 3D layout is actually justified here.",
+          "risk": "low",
+          "risk_notes": "Mechanical refactoring. No correctness risk."
+        },
+        {
+          "id": "opt_031_005",
+          "category": "memory_access",
+          "priority": "low",
+          "description": "Dynamically size SLM allocation based on actual n instead of always allocating MAX_N_FAST * MAX_N_FAST = 16384 bytes. For small n (e.g. n=8), the current allocation wastes 16128 bytes of SLM (8*8*4 = 256 bytes needed vs 16384 allocated). This reduces the number of concurrent work-groups that can share an Xe-core's 64KB SLM budget. For n=8, the waste factor is 64x.",
+          "expected_improvement": "0-5% for small n values due to better occupancy from reduced SLM pressure. 0% for n=64 (the common case) since 16KB is already what's needed. In practice, solve_tri typically runs with n=64 in Mamba/SSM models, so this optimization has minimal real-world impact.",
+          "implementation_notes": "Change the local_accessor allocation from MAX_N_FAST * MAX_N_FAST to n * n: sycl::local_accessor<float, 1> sA_acc(n * n, cgh). This works for both template-specialized and generic paths since n is a kernel argument captured by the lambda. For the template-specialized path, replace with n_template * n_template to keep it compile-time constant.",
+          "risk": "low",
+          "risk_notes": "Simple size change. Need to ensure n*n doesn't exceed SLM limit — already guaranteed by the MAX_N_FAST=64 guard (64*64*4 = 16KB < 64KB)."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "70-85% — This is a well-ported kernel that correctly adapts CUDA's warp-size-dependent algorithm to SYCL's variable sub-group sizes using a generalized NUM_SECTIONS approach. The fast path (n<=64, k<=32) uses appropriate SLM caching, template specialization for common dimensions, and sub-group reduction. The large-matrix path delegates to oneMKL trsm_batch, which is the optimal library solution. The forward substitution algorithm has an inherent serial dependency across rows that limits parallelism regardless of implementation quality. Main gaps are missing #pragma unroll (CUDA has it), dpct-migrated warp_reduce_sum instead of sycl::reduce_over_group, and DPCT naming artifacts. The solve_tri operation is used exclusively by Mamba/SSM sequence models and is not in the critical path for transformer-based LLM inference, so the overall wall-clock impact of any optimization is low."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 30,
+    "total_kernels_analyzed": 31,
     "critical_potential": 1,
     "high_potential": 8,
     "medium_potential": 9,
-    "low_potential": 11,
+    "low_potential": 12,
     "no_optimization_needed": 1,
     "top_opportunities": [
       {
