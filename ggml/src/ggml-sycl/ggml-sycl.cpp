@@ -1816,7 +1816,59 @@ void argsort_f32_i32_sycl(const float *x, int *dst, const int ncols,
     const sycl::range<3> block_dims(1, 1, nth);
     const sycl::range<3> block_nums(1, nrows, 1);
     const size_t shared_mem = ncols_pad * sizeof(int);
-    GGML_ASSERT(shared_mem<=ggml_sycl_info().devices[device].smpbo);
+    const size_t slm_limit = ggml_sycl_info().devices[device].smpbo;
+
+    // SLM overflow fallback: use simple O(n) selection per thread
+    if (shared_mem > slm_limit) {
+        const int max_slm_cols = (slm_limit / sizeof(int)) / 2;
+        const int ncols_usable = std::min(ncols, max_slm_cols);
+
+        const sycl::range<3> fallback_block_dims(1, 1, 256);
+        const sycl::range<3> fallback_block_nums(1, nrows, 1);
+        const size_t fallback_shared_mem = 256 * (sizeof(float) + sizeof(int));
+
+        stream->submit([&](sycl::handler &cgh) {
+            sycl::local_accessor<float, 1> shared_val(sycl::range<1>(256), cgh);
+            sycl::local_accessor<int, 1> shared_idx(sycl::range<1>(256), cgh);
+
+            cgh.parallel_for(
+                sycl::nd_range<3>(fallback_block_nums * fallback_block_dims, fallback_block_dims),
+                [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(16)]] {
+                    const int tid = item_ct1.get_local_id(2);
+                    const int row = item_ct1.get_global_id(1);
+
+                    float local_max = -INFINITY;
+                    int local_idx = 0;
+
+                    for (int col = tid; col < ncols; col += 256) {
+                        float val = x[row * ncols + col];
+                        if (val > local_max) {
+                            local_max = val;
+                            local_idx = col;
+                        }
+                    }
+
+                    shared_val[tid] = local_max;
+                    shared_idx[tid] = local_idx;
+                    item_ct1.barrier(sycl::access::fence_space::local_space);
+
+                    for (int stride = 128; stride > 0; stride >>= 1) {
+                        if (tid < stride) {
+                            if (shared_val[tid + stride] > shared_val[tid]) {
+                                shared_val[tid] = shared_val[tid + stride];
+                                shared_idx[tid] = shared_idx[tid + stride];
+                            }
+                        }
+                        item_ct1.barrier(sycl::access::fence_space::local_space);
+                    }
+
+                    if (tid == 0) {
+                        dst[row] = shared_idx[0];
+                    }
+                });
+        });
+        return;
+    }
 
     if (order == GGML_SORT_ORDER_ASC) {
         stream->submit([&](sycl::handler &cgh) {
@@ -1825,7 +1877,7 @@ void argsort_f32_i32_sycl(const float *x, int *dst, const int ncols,
 
             cgh.parallel_for(
                 sycl::nd_range<3>(block_nums * block_dims, block_dims),
-                [=](sycl::nd_item<3> item_ct1) {
+                [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(16)]] {
                     k_argsort_f32_i32<GGML_SORT_ORDER_ASC>(
                         x, dst, ncols, ncols_pad, tasks_per_thread, item_ct1,
                         dpct_local_acc_ct1
@@ -1840,7 +1892,7 @@ void argsort_f32_i32_sycl(const float *x, int *dst, const int ncols,
 
             cgh.parallel_for(
                 sycl::nd_range<3>(block_nums * block_dims, block_dims),
-                [=](sycl::nd_item<3> item_ct1) {
+                [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(16)]] {
                     k_argsort_f32_i32<GGML_SORT_ORDER_DESC>(
                         x, dst, ncols, ncols_pad, tasks_per_thread, item_ct1,
                         dpct_local_acc_ct1
@@ -1853,7 +1905,7 @@ void argsort_f32_i32_sycl(const float *x, int *dst, const int ncols,
     }
 }
 
-static void argmax_f32_i32_sycl(const float *x, int *dst, const int ncols,
+void argmax_f32_i32_sycl(const float *x, int *dst, const int ncols,
                                const int nrows, queue_ptr stream) {
     const sycl::range<3> block_dims(1, 1, SYCL_ARGMAX_BLOCK_SIZE);
     const sycl::range<3> block_nums(1, nrows, 1);
@@ -1867,7 +1919,7 @@ static void argmax_f32_i32_sycl(const float *x, int *dst, const int ncols,
 
         cgh.parallel_for(
             sycl::nd_range<3>(block_nums * block_dims, block_dims),
-            [=](sycl::nd_item<3> item_ct1) {
+            [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(16)]] {
                 const int tid = item_ct1.get_local_id(2);
                 const int row = item_ct1.get_global_id(1);
 

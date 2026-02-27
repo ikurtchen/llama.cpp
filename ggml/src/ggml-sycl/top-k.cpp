@@ -7,6 +7,10 @@ void argsort_f32_i32_sycl(const float *x, int *dst, const int ncols,
                            const int nrows, ggml_sort_order order,
                            queue_ptr stream, int device);
 
+// Declared in ggml-sycl.cpp — argmax for F32->I32 (k=1 fast path)
+void argmax_f32_i32_sycl(const float *x, int *dst, const int ncols,
+                          const int nrows, queue_ptr stream);
+
 void ggml_sycl_op_top_k(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
     const ggml_tensor * src0 = dst->src[0];
     GGML_ASSERT(src0->type == GGML_TYPE_F32);
@@ -23,12 +27,19 @@ void ggml_sycl_op_top_k(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
     const int64_t nrows = ggml_nrows(src0);
     const int64_t k     = dst->ne[0];
 
+    // Fast path for k=1 (greedy decoding - most common case)
+    if (k == 1) {
+        argmax_f32_i32_sycl(src0_dd, dst_dd, static_cast<int>(ncols),
+                            static_cast<int>(nrows), main_stream);
+        return;
+    }
+
     // Allocate temp buffer for full argsort result (ncols per row)
     ggml_sycl_pool_alloc<int> tmp_alloc(ctx.pool(), ncols * nrows);
     int * tmp_dst = tmp_alloc.get();
 
     // Argsort in descending order — first k indices will be the top-k
-    argsort_f32_i32_sycl(src0_dd, tmp_dst, ncols, nrows, GGML_SORT_ORDER_DESC,
+    argsort_f32_i32_sycl(src0_dd, tmp_dst, static_cast<int>(ncols), static_cast<int>(nrows), GGML_SORT_ORDER_DESC,
                          main_stream, ctx.device);
 
     // Copy first k indices per row from tmp_dst to dst_dd

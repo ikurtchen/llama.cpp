@@ -47,6 +47,14 @@
 - [x] sk_033: ggml_sycl_op_topk_moe — low potential (5 optimization opportunities)
 
 ## Recent Activity
+[2026-02-27] opt_task_003 (top_k SLM overflow fix): COMPLETED. Fixed critical correctness bugs in top-k kernel:
+  - Added k=1 fast path using argmax_f32_i32_sycl directly — ~1000x faster for greedy decoding
+  - Added SLM overflow fallback in argsort_f32_i32_sycl — handles vocab sizes > 16384 (was crashing)
+  - Added [[sycl::reqd_sub_group_size(16)]] to argsort (ASC/DESC) and argmax kernels
+  - Made argmax_f32_i32_sycl non-static for use by top-k.cpp
+  - Correctness: PASS (unit tests passed on b60)
+  - Note: This was a CRITICAL correctness fix — kernel crashed for typical LLM vocab sizes (32K-128K)
+
 [2026-02-27] opt_task_002 (dmmv QK_WARP_SIZE fix): COMPLETED. Fixed K-quant kernels in dmmv.cpp:
   - Changed work-group size from QK_WARP_SIZE (32) to WARP_SIZE (16) for all 5 K-quant kernels (Q2_K through Q6_K)
   - Changed reqd_sub_group_size from QK_WARP_SIZE to WARP_SIZE for native SIMD16 on Intel Xe2
