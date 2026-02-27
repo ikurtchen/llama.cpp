@@ -1,6 +1,17 @@
 {
   "results": [
     {
+      "task_id": "opt_task_012",
+      "kernel": "conv2d",
+      "optimization": "Apply 5 optimizations: kernel specialization (1x1, 3x3, 5x5, 7x7), reqd_sub_group_size(16), int32 index arithmetic, sycl::fma, hoisted kernel bounds",
+      "timestamp": "2026-02-27T23:00:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": null,
+      "notes": "Applied 5 optimizations to conv2d.cpp: (1) Template specialization for 1x1, 3x3, 5x5, 7x7 kernel sizes - enables compile-time loop unrolling, 20-40% expected. (2) Added [[sycl::reqd_sub_group_size(16)]] for native SIMD16 on Xe2 - 5-15% expected. (3) Changed int64_t to int32_t for index arithmetic - 10-20% expected from faster integer ops. (4) Replaced acc += x*y with sycl::fma(x,y,acc) - 1-5% expected. (5) Hoisted calculate_kernel_bounds outside c_in loop - 2-5% expected. Added overflow assertions. Correctness: 480+ unit tests pass on b60. SLM tiling (opt_024_001) deferred due to complexity."
+    },
+    {
       "task_id": "opt_task_011",
       "kernel": "convert (dequantize)",
       "optimization": "Add reqd_sub_group_size(WARP_SIZE) to all dequantize kernel launches",

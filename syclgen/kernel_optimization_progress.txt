@@ -47,6 +47,16 @@
 - [x] sk_033: ggml_sycl_op_topk_moe — low potential (5 optimization opportunities)
 
 ## Recent Activity
+[2026-02-27] opt_task_012 (conv2d optimizations): COMPLETED. Applied 5 optimizations to conv2d.cpp:
+  - Added kernel size specialization (1x1, 3x3, 5x5, 7x7 templates) — 20-40% expected improvement
+  - Added [[sycl::reqd_sub_group_size(16)]] for native SIMD16 on Xe2 — 5-15% expected improvement
+  - Changed int64_t to int32_t for all index arithmetic — 10-20% from faster integer ops
+  - Replaced acc += x*y with sycl::fma(x, y, acc) — 1-5% expected improvement
+  - Hoisted calculate_kernel_bounds outside c_in loop — 2-5% expected improvement
+  - Correctness: PASS (480+ unit tests on b60)
+  - Note: SLM tiling (opt_024_001) deferred — requires cooperative loading, complex restructuring
+  - Benchmark: 38-194 GFLOPS depending on configuration (no baseline available)
+
 [2026-02-27] opt_task_011 (convert reqd_sub_group_size): COMPLETED. Added [[sycl::reqd_sub_group_size(WARP_SIZE)]] to all ~25 kernel launch sites in convert.cpp:
   - Added attribute to dequantize_block_sycl (generic path)
   - Added to all Q2_K, Q3_K, Q4_0, Q4_1, Q5_K, Q6_K kernels (both 32 and 64 thread variants)
