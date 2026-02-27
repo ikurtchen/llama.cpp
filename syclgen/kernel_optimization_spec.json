@@ -3184,13 +3184,163 @@
       ],
       "overall_optimization_potential": "medium",
       "estimated_current_efficiency": "30-45%. Clean manual port with correct functionality but zero GPU-specific optimizations. No SLM tiling (the single most impactful optimization for conv2d), no kernel size specialization, all 64-bit index arithmetic, no sub-group size control. Both SYCL and CUDA originals are naive implementations. For llama.cpp's built-in conv2d (used in vision encoders), these optimizations would provide 2-3x speedup."
+    },
+    {
+      "kernel_id": "sk_025",
+      "name": "conv2d_dw SYCL kernel",
+      "file": "ggml/src/ggml-sycl/conv2d-dw.cpp",
+      "source_cuda_ids": [
+        "ck_017"
+      ],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": [
+            256,
+            1,
+            1
+          ],
+          "sub_group_size": null,
+          "global_size_expression": "ceil_div(B * C * OH * OW, 256) * 256; one work-item per output element",
+          "notes": "Clean 1D nd_range with SYCL_CONV2D_DW_BLOCK_SIZE=256. Missing [[sycl::reqd_sub_group_size(16)]] on kernel lambda (line 141). Two template instantiations: is_cwhn=false (WHCN) and is_cwhn=true (CWHN). 1D nd_range is correct and appropriate for element-wise output mapping \u2014 no unnecessary 3D DPCT artifact."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "strided_accesses": [
+            "WHCN input reads: adjacent threads differ in out_x, input offset differs by stride_x (strided when stride > 1)",
+            "WHCN kernel weight reads: adjacent threads read from different kx offsets due to different bounds \u2014 not coalesced",
+            "CWHN input reads: adjacent threads differ in channel c, cwhn_input_index has c in lowest dimension \u2014 coalesced",
+            "CWHN kernel weight reads: cwhn_kernel_index has c in lowest dimension \u2014 coalesced"
+          ],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "Output writes are coalesced for both layouts (WHCN: out_x varies fastest; CWHN: c varies fastest). CWHN layout has better overall memory access patterns because channel is the fastest-varying dimension and adjacent threads differ in channel. No sycl::vec usage anywhere \u2014 all scalar float loads/stores."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes": 0,
+          "potential_bank_conflicts": false,
+          "notes": "No SLM used. For depthwise convolution with larger kernels (5x5, 7x7), SLM tiling of the input feature map could reduce redundant global memory reads since neighboring output elements share overlapping input regions. However, for typical 3x3 depthwise convolutions, the L1/L2 cache may be sufficient."
+        },
+        "reduction_pattern": {
+          "has_reduction": false,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "No cross-thread reduction. Each work-item independently accumulates over the kernel window (KH*KW iterations) in a private register. This is correct \u2014 depthwise convolution output elements are independent."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "could_use_half": true,
+          "could_use_joint_matrix": false,
+          "notes": "FP32 only \u2014 hardcoded float* in kernel signature (lines 85-87) and asserted at line 150. CUDA version uses template typename T which could support half/bfloat16. For inference with FP16 models, a half-precision path would avoid F16\u2192F32 conversion overhead. joint_matrix not applicable \u2014 depthwise conv has no matrix multiply (1 filter per channel)."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [],
+          "notes": "No math functions used. The kernel only performs integer arithmetic (index computation) and FP32 multiply-accumulate (acc += input_val * kernel_val at line 122). No transcendentals."
+        },
+        "loop_analysis": {
+          "hot_loops": [
+            "Outer kernel-y loop (line 106): iterates bounds.y_max - bounds.y_min times (typically KH=3 for 3x3, up to 7 for 7x7)",
+            "Inner kernel-x loop (line 109): iterates bounds.x_max - bounds.x_min times (typically KW=3 for 3x3, up to 7 for 7x7)",
+            "Combined: up to KH*KW iterations (9 for 3x3, 25 for 5x5, 49 for 7x7)"
+          ],
+          "unrolled": false,
+          "notes": "No #pragma unroll on either loop. Loop trip counts are dynamic (depend on boundary clipping from calculate_dw_kernel_bounds), so the compiler cannot easily unroll. For interior output elements (no boundary effects), trip counts are fixed at KH*KW. Loop variables use int64_t (unnecessarily wide for small kernel dimensions). Kernel size specialization (compile-time KH/KW template parameters) would enable guaranteed unrolling."
+        },
+        "estimated_bottleneck": "memory",
+        "anti_patterns": [
+          "CRITICAL: All parameters, loop variables, and index computations use int64_t (64-bit) while CUDA uses int (32-bit). The unpack_indices functions perform 4 divisions and 3 modulo operations in 64-bit at lines 57-60 and 78-81. On Intel GPUs, 64-bit integer division is 10-20x slower than 32-bit, emulated with dozens of instructions.",
+          "All index helper functions (whcn_input_index, cwhn_output_index, etc.) compute products and sums of int64_t values \u2014 unnecessary for typical tensor dimensions that fit in int32.",
+          "Loop variables ky, kx (lines 106, 109) and bounds struct (lines 21-24) use int64_t for values that are at most 7-11 (kernel sizes).",
+          "Manual global_id computation: item.get_group(0) * item.get_local_range(0) + item.get_local_id(0) at line 90 instead of item.get_global_id(0).",
+          "Missing [[sycl::reqd_sub_group_size(16)]] \u2014 inconsistent with nearly all other SYCL kernels in the codebase.",
+          "Params struct is 120 bytes (15 * int64_t) passed by value \u2014 could be 60 bytes with int32_t."
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_025_001",
+          "category": "work_group_size",
+          "priority": "high",
+          "description": "Replace int64_t with int32_t for all kernel parameters, loop variables, bounds, and index computations. The conv2d_dw_params struct (lines 9-19), dw_kernel_bounds struct (lines 21-24), all indexing helper functions, and all loop variables currently use 64-bit integers. The CUDA version uses 32-bit int throughout. This causes the 4 divisions and 3 modulo operations in unpack_indices (lines 57-60, 78-81) to be emulated 64-bit operations on GPU \u2014 each one 10-20x slower than the 32-bit equivalent. The total output size (P.TOTAL) can remain int64_t for the bounds check, but all per-element index arithmetic should be int32.",
+          "expected_improvement": "15-30% overall kernel speedup. The unpack_indices function is called once per work-item and dominates execution time for small kernels (3x3) where the actual convolution loop body is short. Each 64-bit div/mod saves ~20 instructions by switching to 32-bit. With 7 div/mod operations per work-item, this is ~140 fewer instructions per thread.",
+          "implementation_notes": "1. Change conv2d_dw_params fields to int32_t (keep TOTAL as int64_t for overflow safety). 2. Change dw_kernel_bounds to int32_t. 3. Change all helper function parameters and return types to int32_t (except global_idx which can be int64_t for TOTAL > 2^31). 4. Change loop variables ky, kx to int32_t. 5. In unpack_indices, cast global_idx to int once after the bounds check: int gid = (int)global_idx; then use 32-bit div/mod. 6. The host dispatch (lines 159-177) already reads op_params as int32_t \u2014 the conversion to int64_t is unnecessary. The CUDA conv_params struct is a direct reference for the target state.",
+          "risk": "low",
+          "risk_notes": "Tensor dimensions in LLM inference and CNN models are well within int32 range (max 2^31 - 1 \u2248 2.1 billion elements per dimension). The total output count can exceed int32 for very large batch*channel*height*width, so TOTAL should remain int64_t for the bounds check. All intermediate index products (e.g., n * C * IW * IH) should be verified to fit in int32 for expected use cases."
+        },
+        {
+          "id": "opt_025_002",
+          "category": "sub_group_ops",
+          "priority": "medium",
+          "description": "Add [[sycl::reqd_sub_group_size(16)]] to the kernel lambda at line 141. Nearly all other SYCL kernels in the codebase specify this attribute. Without it, the Intel DPC++ compiler may select a different sub-group size (e.g., SIMD32), which halves occupancy on Xe2 (fewer hardware threads per XVE). While this kernel does not use sub-group operations, the attribute ensures optimal SIMD width selection for the target hardware.",
+          "expected_improvement": "5-15% improvement from better occupancy. SIMD16 allows 8 hardware threads per XVE (maximum), whereas SIMD32 allows only 4, reducing latency hiding for this memory-bound kernel.",
+          "implementation_notes": "At line 141, change: [=](sycl::nd_item<1> item) { to: [=](sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(16)]] { Apply to both template instantiations (is_cwhn=true and is_cwhn=false). Ref: optimization_guide.md section 1.2.",
+          "risk": "low",
+          "risk_notes": "No sub-group operations are used, so this only affects SIMD width and occupancy. No functional impact."
+        },
+        {
+          "id": "opt_025_003",
+          "category": "loop_unroll",
+          "priority": "medium",
+          "description": "Add kernel size specialization via template parameters for common kernel sizes (1x1, 3x3, 5x5, 7x7). The inner loops at lines 106-123 iterate KH*KW times but use dynamic bounds, preventing compiler unrolling. By adding compile-time KH/KW template parameters for common sizes, the compiler can fully unroll the nested loop (e.g., 9 iterations for 3x3) and optimize away the bounds check for interior elements. The dispatch function would select the specialized template at runtime.",
+          "expected_improvement": "10-25% speedup for small kernels (3x3, 5x5). Loop overhead (branch prediction, increment, compare) is significant when the loop body is small (2 loads + 1 FMA per iteration). Full unrolling eliminates this overhead. The compiler can also schedule the unrolled loads/FMAs more efficiently with software pipelining.",
+          "implementation_notes": "1. Add template parameters: template <bool is_cwhn, int KH_T = 0, int KW_T = 0> where 0 means dynamic. 2. In the inner loop, use constexpr if to select static loop bounds when KH_T > 0 and KW_T > 0. 3. Add #pragma unroll for the specialized paths. 4. In conv2d_dw_sycl, add dispatch: if (P.KH == 3 && P.KW == 3) launch<is_cwhn, 3, 3>; else if (P.KH == 1 && P.KW == 1) launch<is_cwhn, 1, 1>; else launch<is_cwhn, 0, 0>. 5. For the 1x1 case, the entire loop body can be eliminated (single multiply). Ref: This mirrors the CUDA approach in conv2d.cu where kernel size specialization is used.",
+          "risk": "low",
+          "risk_notes": "Template specialization is a safe pattern. The fallback path (KH_T=0, KW_T=0) preserves the current dynamic behavior. Binary size increases slightly with each specialization."
+        },
+        {
+          "id": "opt_025_004",
+          "category": "vectorization",
+          "priority": "low",
+          "description": "Add vectorized loads for the CWHN layout path where adjacent threads access adjacent channels. In CWHN layout, consecutive threads read consecutive channel values from both input and kernel arrays. Using sycl::vec<float, 4> loads would reduce memory transactions by 4x for the common case where C is a multiple of 4 (which is nearly always true for CNN models: 64, 128, 256, 512 channels).",
+          "expected_improvement": "10-20% throughput improvement for CWHN layout. Depthwise convolution is memory-bound (compute intensity ~2*KH*KW ops per 8 bytes loaded \u2248 2-12 ops/byte, well below the 27 threshold), so memory throughput directly limits performance. However, the L1 cache likely captures much of the benefit already for small spatial dimensions.",
+          "implementation_notes": "For CWHN layout: 1. Process 4 channels per work-item instead of 1. 2. Load input as sycl::vec<float, 4> from cwhn_input_index (which has c as lowest dim). 3. Load kernel weights similarly. 4. Accumulate 4 results in parallel. 5. Store as vec4. 6. Adjust global grid size: total_elements / 4. 7. Handle tail (C % 4 != 0) with scalar fallback. Not applicable to WHCN layout where the fastest-varying dimension is spatial width.",
+          "risk": "medium",
+          "risk_notes": "Requires C % 4 == 0 for the vectorized path (true for nearly all CNN architectures). Need to handle edge cases for unusual channel counts. The WHCN layout cannot benefit from this optimization since adjacent threads differ in spatial position, not channel."
+        },
+        {
+          "id": "opt_025_005",
+          "category": "slm_tuning",
+          "priority": "low",
+          "description": "Add SLM tiling for input data reuse with larger kernel sizes (5x5, 7x7). For a 3x3 depthwise convolution, each input pixel is read by up to 9 output pixels. For 5x5, up to 25 output pixels read the same input. SLM tiling loads input tiles into shared memory once, then all threads in the work-group read from SLM. This eliminates redundant global memory reads. However, for depthwise convolution the data reuse is lower than standard convolution (no channel-to-channel reuse), so the benefit is smaller.",
+          "expected_improvement": "5-15% for 5x5+ kernels, negligible for 3x3 where L1 cache is effective. Depthwise conv has lower arithmetic intensity than standard conv, so the kernel is strongly memory-bound. SLM tiling can help when the working set exceeds L1 cache capacity.",
+          "implementation_notes": "1. Each work-group covers a spatial tile of output elements (e.g., 16x16 output = 256 threads). 2. Cooperatively load the corresponding input tile (including halo for kernel window) into SLM. 3. Synchronize with group_barrier. 4. Each thread reads from SLM instead of global memory. 5. SLM size per work-group: (tile_h + KH - 1) * (tile_w + KW - 1) * sizeof(float). For 16x16 tile + 3x3 kernel: 18*18*4 = 1296 bytes \u2014 well within 64 KB limit. Ref: optimization_guide.md section 2.3.",
+          "risk": "medium",
+          "risk_notes": "Increases code complexity significantly. The two-layout (WHCN/CWHN) support complicates the tiling logic. For the common 3x3 case with small feature maps, L1 cache may already capture most of the benefit, making the SLM overhead (barrier, cooperative load) counterproductive."
+        },
+        {
+          "id": "opt_025_006",
+          "category": "data_type",
+          "priority": "low",
+          "description": "Add FP16 (sycl::half) template support to match the CUDA version's typename T template parameter. The CUDA kernel uses template<typename T, typename Layout> allowing potential half-precision operation. For inference with FP16 models, this avoids F16\u2192F32\u2192F16 conversion at the SYCL backend boundary, halves memory traffic, and doubles compute throughput on Xe2.",
+          "expected_improvement": "40-60% throughput improvement when FP16 input is available. Memory bandwidth doubles (16-bit vs 32-bit), and Xe2 FP16 ALU throughput is 2x FP32. However, this is a feature addition rather than optimization of existing code, and the CUDA version also only instantiates with float currently.",
+          "implementation_notes": "1. Template the kernel function: template <typename T, bool is_cwhn>. 2. Change float* to T* in function signatures. 3. Keep accumulator as float for numerical stability (FP16 accumulation can overflow for large kernel sizes). 4. Add dispatch in ggml_sycl_op_conv_2d_dw for input->type == GGML_TYPE_F16. 5. Remove the F32-only assertion at line 150 (keep it as a fallback).",
+          "risk": "medium",
+          "risk_notes": "FP16 accumulation for depthwise conv can cause precision loss for large kernel sizes (7x7+) or large input values. Using float accumulator with half inputs/outputs is the standard approach. Need to verify ggml_op infrastructure supports F16 conv2d_dw dispatch."
+        },
+        {
+          "id": "opt_025_007",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Minor cleanup: replace manual global_id computation (line 90) with item.get_global_id(0). The current code uses item.get_group(0) * item.get_local_range(0) + item.get_local_id(0) which is functionally identical but less idiomatic and may prevent compiler optimizations that recognize the get_global_id() pattern.",
+          "expected_improvement": "Negligible performance impact (<1%). Primary benefit is code readability and consistency with SYCL best practices.",
+          "implementation_notes": "At line 90, change: const int64_t global_idx = item.get_group(0) * item.get_local_range(0) + item.get_local_id(0); to: const int64_t global_idx = item.get_global_id(0);",
+          "risk": "low",
+          "risk_notes": "Purely mechanical change. get_global_id(0) is guaranteed to return the same value."
+        }
+      ],
+      "overall_optimization_potential": "medium",
+      "estimated_current_efficiency": "50-60% \u2014 Depthwise convolution is memory-bound with low arithmetic intensity (~2*KH*KW ops per 8 bytes). The primary bottleneck is the pervasive use of int64_t for all index arithmetic, causing 10-20x slower integer division/modulo in the critical unpack_indices path. Missing sub-group size attribute may cause suboptimal SIMD width. No loop unrolling prevents optimization of the small kernel window loops. The code is otherwise clean (proper 1D nd_range, no DPCT artifacts, correct coalescing for output writes) and functionally correct."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 24,
+    "total_kernels_analyzed": 25,
     "critical_potential": 1,
     "high_potential": 6,
-    "medium_potential": 7,
+    "medium_potential": 8,
     "low_potential": 10,
     "no_optimization_needed": 1,
     "top_opportunities": [
