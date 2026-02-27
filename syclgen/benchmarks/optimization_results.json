@@ -1,6 +1,17 @@
 {
   "results": [
     {
+      "task_id": "opt_task_011",
+      "kernel": "convert (dequantize)",
+      "optimization": "Add reqd_sub_group_size(WARP_SIZE) to all dequantize kernel launches",
+      "timestamp": "2026-02-27T22:00:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": null,
+      "notes": "Added [[sycl::reqd_sub_group_size(WARP_SIZE)]] to all ~25 kernel launch sites in convert.cpp. Previously only q4_0_reorder had this attribute. Without it, compiler may select SIMD32 which halves occupancy on Xe2 (since SIMD32 means half as many hardware threads per XVE). Expected 5-15% throughput improvement from better occupancy on memory-bound dequantize kernels. Unit tests pass on b60."
+    },
+    {
       "task_id": "opt_task_010",
       "kernel": "cross_entropy_loss",
       "optimization": "Increase work-group size from 16 to 256 threads, use sycl::reduce_over_group for multi-sub-group reduction",

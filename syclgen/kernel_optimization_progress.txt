@@ -47,6 +47,16 @@
 - [x] sk_033: ggml_sycl_op_topk_moe — low potential (5 optimization opportunities)
 
 ## Recent Activity
+[2026-02-27] opt_task_011 (convert reqd_sub_group_size): COMPLETED. Added [[sycl::reqd_sub_group_size(WARP_SIZE)]] to all ~25 kernel launch sites in convert.cpp:
+  - Added attribute to dequantize_block_sycl (generic path)
+  - Added to all Q2_K, Q3_K, Q4_0, Q4_1, Q5_K, Q6_K kernels (both 32 and 64 thread variants)
+  - Added to all IQ types (iq1_s, iq1_m, iq2_xxs, iq2_xs, iq2_s, iq3_xxs, iq3_s, iq4_xs, iq4_nl, mxfp4)
+  - Added to q4_K_reorder, q6_K_reorder kernels
+  - Added to convert_unary_nc_sycl
+  - Previously only q4_0_reorder had this attribute
+  - Expected: 5-15% occupancy improvement from guaranteed SIMD16 on Xe2
+  - Correctness: PASS (unit tests on b60)
+
 [2026-02-27] opt_task_010 (cross-entropy work-group size): COMPLETED. Increased work-group size from 16 to 256 threads:
   - Changed work-group size from WARP_SIZE (16) to CE_WG_SIZE (256) for forward kernel cross_entropy_loss_f32
   - Changed work-group size from WARP_SIZE (16) to CE_WG_SIZE (256) for backward kernel cross_entropy_loss_back_f32
