@@ -9,6 +9,9 @@
 
 set -e  # Exit on error
 
+# WA
+ENABLE_BUILD_HACK=1
+
 # Color codes for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -85,9 +88,10 @@ declare -A PROFILE_COMMANDS
 # lama.cpp:
 #   cuda: https://github.com/ggml-org/llama.cpp/blob/master/docs/build.md#cuda
 #   sycl: https://github.com/ggml-org/llama.cpp/blob/master/docs/backend/SYCL.md#ii-build-llamacpp
+#         ["b60"]="./examples/sycl/build.sh"
 BUILD_COMMANDS=(
     ["h20"]="cmake -B build -DGGML_CUDA=ON && cmake --build build --config Release -j8"
-    ["b60"]="./examples/sycl/build.sh"
+    ["b60"]="source /opt/intel/oneapi/setvars.sh && cmake -B build -DGGML_SYCL=ON -DCMAKE_C_COMPILER=icx -DCMAKE_CXX_COMPILER=icpx -DGGML_SYCL_F16=ON -DLLAMA_OPENSSL=OFF && cmake --build build --config Release -j -v"
 )
 
 # Unit test commands
@@ -299,6 +303,7 @@ execute_ssh_with_log() {
     local log_file="$3"
     local ssh_cmd=$(get_ssh_prefix "$server")
 
+    print_info "Running command: $command on server: $server"
     print_info "Logging output to: $log_file"
 
     $ssh_cmd "$command" 2>&1 | tee "$log_file"
@@ -765,6 +770,29 @@ main() {
     local auth_method="Password"
     if [[ -n "${SERVER_SSH_KEYS[$SERVER]}" ]]; then
         auth_method="SSH Key (${SERVER_SSH_KEYS[$SERVER]})"
+    fi
+
+    # Hack for build task: we need to always upload and clean before build,
+    # so we need to add upload and clean tasks before build.
+    if [[ ${ENABLE_BUILD_HACK} -eq 1 ]]; then
+        if [[ "$TASK" == "build" ]]; then
+            TASK="upload,clean,build"
+            print_info "Build hack enabled: automatically adding upload and clean tasks before build"
+
+            # since we add upload task, we need to add local and remote args
+            if [[ -z "$LOCAL_PATH" ]]; then
+                # since the remote_run.sh is under project_root/syclgen,
+                # we can get the parent directory of this script as the default local path.
+                # We need to get the absolution path of the parent directory to avoid rsync error.
+                LOCAL_PATH="$(dirname $(dirname "$(readlink -f "$0")"))"
+                print_info "Using default local path: $LOCAL_PATH"
+            fi
+            if [[ -z "$REMOTE_PATH" ]]; then
+                # the remote directory should be the parent of workdir
+                REMOTE_PATH="$(dirname "$WORKDIR")"
+                print_info "Using default remote path: $REMOTE_PATH"
+            fi
+        fi
     fi
 
     print_info "=========================================="
