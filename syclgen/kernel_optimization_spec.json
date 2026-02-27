@@ -2934,14 +2934,112 @@
       ],
       "overall_optimization_potential": "low",
       "estimated_current_efficiency": "70-80% \u2014 im2col 3D is a straightforward data rearrangement kernel that is inherently memory-bound with scattered source reads (inherent to the algorithm). The SYCL implementation closely matches CUDA with the same grid structure and algorithm. Main inefficiencies are the missing sub-group size attribute, expensive integer divisions for index decomposition, and scalar-only memory access. However, im2col 3D is not a hot kernel in typical LLM inference (it's used for 3D convolution which is rare in transformer models), so the absolute wall-clock impact of optimization is limited."
+    },
+    {
+      "kernel_id": "sk_023",
+      "name": "ggml_sycl_rope_back",
+      "file": "ggml/src/ggml-sycl/rope.cpp",
+      "source_cuda_ids": [],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": [
+            256,
+            1,
+            1
+          ],
+          "sub_group_size": null,
+          "global_size_expression": "Same as rope forward (sk_002): ceil_div(ne0, 2*256) work-groups \u00d7 nr rows. Each thread handles one (x0, x1) rotation pair.",
+          "notes": "rope_back is ggml_sycl_op_rope_impl<false> \u2014 the exact same template instantiation as rope forward (sk_002) but with forward=false. The only behavioral difference is sin_theta *= -1.0f in rope_yarn(). All 4 kernel variants (rope_norm, rope_neox, rope_multi, rope_vision) are shared. Same 3D nd_range with SYCL_ROPE_BLOCK_SIZE=256 in dimension 1. Same missing [[sycl::reqd_sub_group_size(16)]] on all 8 launch paths."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "strided_accesses": [
+            "Identical to sk_002: rope_neox/multi read x[i2+0] and x[i2+n_dims/2] (strided by n_dims/2)",
+            "rope_vision reads x[ix+0] and x[ix+n_dims] (strided by n_dims)"
+          ],
+          "vectorized_loads": true,
+          "vector_width": 2,
+          "notes": "Identical to sk_002 analysis. sycl::vec<T,2> used only for passthrough path (i0 >= n_dims). Hot rotation path uses scalar loads/stores."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes": 0,
+          "potential_bank_conflicts": false,
+          "notes": "No SLM usage. RoPE backward is purely element-wise."
+        },
+        "reduction_pattern": {
+          "has_reduction": false,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "No reductions \u2014 each thread independently computes one rotation pair with negated sin."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "Same as sk_002. All computation in FP32, template supports float and sycl::half inputs."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [
+            "sycl::cos (rope_yarn line 34)",
+            "sycl::sin (rope_yarn line 35)",
+            "sycl::pow (theta_base computation in all 4 kernel variants)",
+            "sycl::log (rope_yarn line 32, YaRN ext_factor path)",
+            "sycl::max/sycl::min (rope_yarn_ramp lines 14-15)"
+          ],
+          "notes": "Identical to sk_002. All standard precision, no native variants. Same opportunity to switch to native::cos/sin/exp2/log2."
+        },
+        "loop_analysis": {
+          "hot_loops": [],
+          "unrolled": false,
+          "notes": "No loops. Each thread computes one rotation pair and returns. Identical to sk_002."
+        },
+        "estimated_bottleneck": "compute",
+        "anti_patterns": [
+          "Shares all anti-patterns with sk_002 (same code path, only forward template param differs)",
+          "Missing [[sycl::reqd_sub_group_size(16)]] on all 8 kernel launch paths",
+          "3D nd_range with dimension 0 always 1 \u2014 DPCT artifact",
+          "Manual thread indexing instead of get_global_id()",
+          "Unconditional dpct::has_capability_or_fail(fp16) in rope_norm_sycl and rope_neox_sycl even when T=float",
+          "Standard sycl::cos/sin/pow instead of native equivalents"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_023_001",
+          "category": "shared_code",
+          "priority": "medium",
+          "description": "rope_back shares 100% of its code with rope forward (sk_002) via ggml_sycl_op_rope_impl<forward> template. All 5 optimization opportunities from sk_002 (opt_002_001 through opt_002_005) apply identically. The only difference is forward=false which negates sin_theta in rope_yarn(). Optimizations should be applied once in the shared code path \u2014 no separate implementation needed.",
+          "expected_improvement": "Same as sk_002: 15-30% from native sin/cos (opt_002_001), 10-20% from pow replacement (opt_002_002), 5-15% from reqd_sub_group_size (opt_002_003). Total ~30-45% improvement. However, rope_back is training-only, so wall-clock impact during inference is zero.",
+          "implementation_notes": "All changes are in the shared template code: rope_yarn() (lines 20-39), rope_norm/neox/multi/vision kernels (lines 41-229), and launcher functions (lines 231-359). Fixing sk_002 automatically fixes sk_023. No separate work needed.",
+          "risk": "low",
+          "risk_notes": "Same risk assessment as sk_002. No additional risk from the forward=false path \u2014 the negation of sin_theta is a trivial constant-time operation."
+        },
+        {
+          "id": "opt_023_002",
+          "category": "feature_gap",
+          "priority": "low",
+          "description": "CUDA rope_back supports ROPE+VIEW+SET_ROWS fusion (row_indices and set_rows_stride parameters in rope_norm and rope_neox kernels) when forward=true. While this fusion is forward-only (guarded by GGML_ASSERT(forward) at CUDA line 427), the SYCL rope_norm and rope_neox kernels are missing the row_indices/set_rows_stride parameters entirely. If this fusion is ever extended to backward pass, the SYCL implementation would need updating. Additionally, CUDA supports mixed src/dst types (F32\u2192F16) with separate T and D template parameters for norm/neox kernels, while SYCL constrains src and dst to the same type.",
+          "expected_improvement": "Zero for rope_back specifically (fusion is forward-only). The mixed-type F32\u2192F16 gap affects rope forward (sk_002) not rope_back.",
+          "implementation_notes": "For future-proofing: add row_indices/set_rows_stride parameters to SYCL rope_norm and rope_neox kernels to match CUDA signature. Add separate D template parameter for output type. This enables ROPE+VIEW+SET_ROWS fusion when the graph optimizer discovers it.",
+          "risk": "low",
+          "risk_notes": "Feature parity gap, not a bug. No current functionality is broken."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "55-65% (same as sk_002 \u2014 shared code). However, rope_back is training-only and rarely on the hot path. All optimizations should be applied via sk_002's shared template code. No separate optimization work needed for rope_back."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 22,
+    "total_kernels_analyzed": 23,
     "critical_potential": 1,
     "high_potential": 6,
     "medium_potential": 6,
-    "low_potential": 9,
+    "low_potential": 10,
     "no_optimization_needed": 1,
     "top_opportunities": [
       {
