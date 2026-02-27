@@ -5,9 +5,9 @@
 
 ## Summary
 - Total SYCL kernels to analyze: 33
-- Kernels analyzed so far: 21
+- Kernels analyzed so far: 22
 - Analysis complete: No
-- Kernels with optimization potential: 20
+- Kernels with optimization potential: 21
 - Kernels with no optimization needed: 1
 - Optimization tasks created: 0 (pending finalization)
 
@@ -33,7 +33,7 @@
 - [x] sk_019: ggml_sycl_op_opt_step_adamw — low potential (3 optimization opportunities)
 - [x] sk_020: ggml_sycl_silu_back — low potential (4 optimization opportunities)
 - [x] sk_021: ggml_sycl_op_get_rows_back — low potential (4 optimization opportunities)
-- [ ] sk_022: ggml_sycl_op_im2col_3d — pending
+- [x] sk_022: im2col_3d SYCL kernel — low potential (5 optimization opportunities)
 - [ ] sk_023: ggml_sycl_rope_back — pending
 - [ ] sk_024: ggml_sycl_op_conv_2d — pending
 - [ ] sk_025: ggml_sycl_op_conv_2d_dw — pending
@@ -47,6 +47,13 @@
 - [ ] sk_033: ggml_sycl_op_topk_moe — pending
 
 ## Recent Activity
+[2026-02-27] Analyzed kernel ggml_sycl_op_im2col_3d (sk_022). Found 5 optimization opportunities (low potential).
+  - MEDIUM: Missing downsample_sycl_global_range — im2col_2d uses this for int overflow protection but im2col_3d does not.
+  - LOW: Scalar-only memory access — vec4 stores would improve write throughput 20-40%.
+  - LOW: Missing [[sycl::reqd_sub_group_size(16)]] — 5-10% occupancy improvement on Xe2.
+  - LOW: DPCT artifacts — dpct::queue_ptr, manual thread indexing instead of get_global_id(0).
+  - LOW: No F16 output path — CUDA supports both F16 and F32 dst, SYCL only F32.
+
 [2026-02-27] Analyzed kernel ggml_sycl_op_get_rows_back (sk_021). Found 4 optimization opportunities (low potential).
   - MEDIUM: Replace brute-force O(nrows_grad*nrows_dst) serial scan with atomic scatter-add O(nrows_grad) — 10-25x speedup for typical training workloads where nrows_dst >> nrows_grad.
   - LOW: Add vectorized loads/stores (vec4) — 20-40% throughput improvement for memory-bound portion.
