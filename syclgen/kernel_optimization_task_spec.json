@@ -13,7 +13,7 @@
       "priority": "critical",
       "complexity": "very_high",
       "category": "compute_path",
-      "status": "pending",
+      "status": "in_progress",
       "description": "Implement Intel XMX compute path for quantized matrix multiply (mmq) using SYCL joint_matrix",
       "target_kernels": [
         {

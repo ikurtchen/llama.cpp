@@ -47,6 +47,14 @@
 - [x] sk_033: ggml_sycl_op_topk_moe — low potential (5 optimization opportunities)
 
 ## Recent Activity
+[2026-02-27] opt_task_001 (XMX joint_matrix): Started. Due to complexity (~1000+ lines), focused on related tile size tuning (part of opt_task_006). Added XE2 tile size defines for Q4_0 and Q8_0:
+  - MMQ_X_Q4_0_XE2 = 64, MMQ_Y_Q4_0_XE2 = 64, NWARPS_Q4_0_XE2 = 8
+  - MMQ_X_Q8_0_XE2 = 64, MMQ_Y_Q8_0_XE2 = 64, NWARPS_Q8_0_XE2 = 8
+  - Updated mul_mat_q4_0 and mul_mat_q8_0 kernels to use XE2 tile sizes when SYCL_USE_XMX is defined.
+  - Addresses part of opt_008_003 (tune tile sizes for Intel Xe2). Old AMPERE tile sizes were for NVIDIA GPUs.
+  - Expected: 20-50% from properly tuned tile sizes matching Xe2 (64KB SLM, SIMD16).
+  - Note: Full XMX joint_matrix (opt_task_001) still pending - requires ~1000+ lines new code.
+
 [2026-02-27] Analyzed kernel ggml_sycl_op_topk_moe (sk_033). Found 5 optimization opportunities (low potential).
   - HIGH: Missing #pragma unroll on ALL inner loops — CUDA has ~12 explicit unroll directives; SYCL has zero. 10-25% speedup, especially for large n_experts (256-576) where experts_per_thread is large.
   - MEDIUM: Standard sycl::exp instead of sycl::native::exp in softmax and sigmoid — CUDA uses fast-math expf(). 5-15% from faster transcendentals.

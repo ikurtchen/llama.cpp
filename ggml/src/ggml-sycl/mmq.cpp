@@ -1353,6 +1353,10 @@ mul_mat_q(const void *__restrict__ vx, const void *__restrict__ vy,
 #define  MMQ_Y_Q4_0_PASCAL 64
 #define NWARPS_Q4_0_PASCAL 8
 
+#define  MMQ_X_Q4_0_XE2  64
+#define  MMQ_Y_Q4_0_XE2  64
+#define NWARPS_Q4_0_XE2  8
+
 template <bool need_check> static void
     mul_mat_q4_0(
     const void * __restrict__ vx, const void * __restrict__ vy, float * __restrict__ dst,
@@ -1364,11 +1368,16 @@ template <bool need_check> static void
     int   * tile_x_qh = nullptr;
     int   * tile_x_sc = nullptr;
 
-//sycl_todo: change according to hardware
-
+#if defined(SYCL_USE_XMX)
+    const int mmq_x  =  MMQ_X_Q4_0_XE2;
+    const int mmq_y  =  MMQ_Y_Q4_0_XE2;
+    const int nwarps = NWARPS_Q4_0_XE2;
+#else
     const int mmq_x  =  MMQ_X_Q4_0_AMPERE;
     const int mmq_y  =  MMQ_Y_Q4_0_AMPERE;
     const int nwarps = NWARPS_Q4_0_AMPERE;
+#endif
+
     allocate_tiles_q4_0<mmq_y>(&tile_x_ql, &tile_x_dm, &tile_x_qh, &tile_x_sc,
                                tile_x_qs_q4_0, tile_x_d_q4_0);
     mul_mat_q<QK4_0, QR4_0, QI4_0, true, block_q4_0, mmq_x, mmq_y, nwarps,
@@ -1526,6 +1535,10 @@ mul_mat_q5_1(
 #define  MMQ_Y_Q8_0_PASCAL 64
 #define NWARPS_Q8_0_PASCAL 8
 
+#define  MMQ_X_Q8_0_XE2  64
+#define  MMQ_Y_Q8_0_XE2  64
+#define NWARPS_Q8_0_XE2  8
+
 template <bool need_check> static void
     mul_mat_q8_0(
     const void * __restrict__ vx, const void * __restrict__ vy, float * __restrict__ dst,
@@ -1537,10 +1550,16 @@ template <bool need_check> static void
     int   * tile_x_qh = nullptr;
     int   * tile_x_sc = nullptr;
 
-//sycl_todo: change according to hardware
+#if defined(SYCL_USE_XMX)
+    const int mmq_x  =  MMQ_X_Q8_0_XE2;
+    const int mmq_y  =  MMQ_Y_Q8_0_XE2;
+    const int nwarps = NWARPS_Q8_0_XE2;
+#else
     const int mmq_x  =  MMQ_X_Q8_0_AMPERE;
     const int mmq_y  =  MMQ_Y_Q8_0_AMPERE;
     const int nwarps = NWARPS_Q8_0_AMPERE;
+#endif
+
     allocate_tiles_q8_0<mmq_y>(&tile_x_ql, &tile_x_dm, &tile_x_qh, &tile_x_sc,
                                tile_x_qs_q8_0, tile_x_d_q8_0);
     mul_mat_q<QK8_0, QR8_0, QI8_0, false, block_q8_0, mmq_x, mmq_y, nwarps,
