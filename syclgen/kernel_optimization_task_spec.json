@@ -8,7 +8,7 @@
     "description": "Ordered optimization task plan for SYCL kernels targeting Intel Arc Pro B60. Tasks are ordered by priority (critical > high > medium > low) and estimated wall-clock impact. Each task groups related optimization opportunities that should be implemented together."
   },
   "tasks": [
-    {
+{
       "id": "opt_task_001",
       "priority": "critical",
       "complexity": "very_high",
@@ -25,9 +25,13 @@
         "opt_008_001"
       ],
       "dependencies": [],
-      "estimated_improvement": "3-5x throughput improvement for quantized matmul \u2014 the single highest-impact optimization",
+      "estimated_improvement": "3-5x throughput improvement for quantized matmul — the single highest-impact optimization",
       "risk": "high",
-      "notes": "Requires deep understanding of joint_matrix API, quantized data layout (Q4_0, Q4_1, Q5_0, Q5_1, Q8_0, Q2_K, Q3_K, Q4_K, Q5_K, Q6_K), and Xe2 XMX hardware constraints. The current SYCL_USE_XMX flag only changes tile sizes but doesn't use joint_matrix at all. This is the most complex task but also the most impactful \u2014 matmul is typically 70-90% of inference time."
+      "notes": "Requires deep understanding of joint_matrix API, quantized data layout (Q4_0, Q4_1, Q5_0, Q5_1, Q8_0, Q2_K, Q3_K, Q4_K, Q5_K, Q6_K), and Xe2 XMX hardware constraints. The current SYCL_USE_XMX flag only changes tile sizes but doesn't use joint_matrix at all. This is the most complex task but also the most impactful — matmul is typically 70-90% of inference time. Progress: Added XE2 tile size defines (partial work on related opt_task_006).",
+      "completed_at": null,
+      "baseline_metric": null,
+      "optimized_metric": null,
+      "actual_improvement": null
     },
     {
       "id": "opt_task_002",
