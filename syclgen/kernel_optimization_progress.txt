@@ -5,9 +5,9 @@
 
 ## Summary
 - Total SYCL kernels to analyze: 33
-- Kernels analyzed so far: 31
+- Kernels analyzed so far: 32
 - Analysis complete: No
-- Kernels with optimization potential: 30
+- Kernels with optimization potential: 31
 - Kernels with no optimization needed: 1
 - Optimization tasks created: 0 (pending finalization)
 
