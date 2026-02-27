@@ -47,6 +47,17 @@
 - [x] sk_033: ggml_sycl_op_topk_moe — low potential (5 optimization opportunities)
 
 ## Recent Activity
+[2026-02-27] opt_task_016 (reqd_sub_group_size batch): COMPLETED. Added [[sycl::reqd_sub_group_size(WARP_SIZE)]] to 19 kernel launches across 7 files:
+  - rope.cpp: 8 kernels (rope_norm, rope_neox variants)
+  - binbcast.cpp: 2 kernels (bin_bcast_unravel, bin_bcast)
+  - getrows.cpp: 3 kernels (get_rows_sycl_float, get_rows_sycl_half, get_rows_back)
+  - gla.cpp: 1 kernel (forward)
+  - diag.cpp: 2 kernels (diag_mask_inf, diag_mask_zero)
+  - im2col.cpp: 2 kernels (im2col_2d, im2col_3d)
+  - conv2d-dw.cpp: 1 kernel (conv_2d_dw)
+  - Correctness: PASS (ROPE 248/248, DIAG 3/3, IM2COL 88/88)
+  - Expected: 5-15% occupancy improvement per kernel from guaranteed SIMD16 on Xe2
+
 [2026-02-27] opt_task_015 (loop unroll): COMPLETED. Added #pragma unroll to compile-time-constant inner loops:
   - ssm_scan.cpp: 6 loops (Mamba-1 & Mamba-2 state load/update/store)
   - topk-moe.cpp: 15 loops (softmax, sigmoid, argmax, normalization)

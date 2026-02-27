@@ -74,7 +74,7 @@ void ggml_sycl_op_diag(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
                 stream->parallel_for(
                     sycl::nd_range<1>(sycl::range<1>(num_blocks) * sycl::range<1>(SYCL_DIAG_BLOCK_SIZE),
                                       sycl::range<1>(SYCL_DIAG_BLOCK_SIZE)),
-                    [=](sycl::nd_item<1> item_ct1) {
+                    [=](sycl::nd_item<1> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
                         diag_kernel(dst_f, src0_f, ne0, ne1, ne2, ne3, n_elems, item_ct1);
                     });
             }
@@ -86,7 +86,7 @@ void ggml_sycl_op_diag(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
                 stream->parallel_for(
                     sycl::nd_range<1>(sycl::range<1>(num_blocks) * sycl::range<1>(SYCL_DIAG_BLOCK_SIZE),
                                       sycl::range<1>(SYCL_DIAG_BLOCK_SIZE)),
-                    [=](sycl::nd_item<1> item_ct1) {
+                    [=](sycl::nd_item<1> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
                         diag_kernel(dst_f16, src0_f16, ne0, ne1, ne2, ne3, n_elems, item_ct1);
                     });
             }

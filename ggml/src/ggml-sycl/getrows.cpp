@@ -119,7 +119,7 @@ static void get_rows_sycl(ggml_backend_sycl_context & ctx, const ggml_tensor *sr
     GGML_ASSERT(ne00 % 2 == 0);
 
     stream->parallel_for(sycl::nd_range<3>(block_nums * block_dims, block_dims),
-                         [=](sycl::nd_item<3> item_ct1) {
+                         [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
                              k_get_rows<qk, qr, dq>(
                                  src0_dd, src1_dd, dst_dd, ne00, ne12, s1, s2,
                                  s3, nb01, nb02, nb03, s10, s11, s12, item_ct1);
@@ -158,7 +158,7 @@ static void get_rows_sycl_float(ggml_backend_sycl_context & ctx, const ggml_tens
 
         stream->parallel_for(
             sycl::nd_range<3>(block_nums * block_dims, block_dims),
-            [=](sycl::nd_item<3> item_ct1) {
+            [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
                 k_get_rows_float(src0_dd, src1_dd, dst_dd, ne00, ne12, s1, s2,
                                  s3, nb01, nb02, nb03, s10, s11, s12, item_ct1);
             });
@@ -222,7 +222,7 @@ void ggml_sycl_op_get_rows_back(ggml_backend_sycl_context & ctx, ggml_tensor * d
 
     stream->parallel_for(
         sycl::nd_range<3>(block_nums * block_dims, block_dims),
-        [=](sycl::nd_item<3> item_ct1) {
+        [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
             k_get_rows_back_float(src0_d, src1_d, dst_d, ne00, ne10, item_ct1);
         });
 }

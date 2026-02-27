@@ -490,7 +490,8 @@
       "priority": "medium",
       "complexity": "low",
       "category": "sub_group_ops",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-02-27T23:59:00Z",
       "description": "Add [[sycl::reqd_sub_group_size(16)]] to all kernel launches missing it",
       "target_kernels": [
         {
@@ -584,7 +585,10 @@
       "dependencies": [],
       "estimated_improvement": "5-15% occupancy improvement per kernel on Xe2 from guaranteed SIMD16 native width",
       "risk": "low",
-      "notes": "Batch task: add [[sycl::reqd_sub_group_size(WARP_SIZE)]] attribute to all kernel lambda launches. This is the single most common missing attribute across the codebase (~17 kernels). Without it, the compiler may select SIMD32 which halves occupancy on Xe2."
+      "baseline_metric": null,
+      "optimized_metric": null,
+      "actual_improvement": "Added reqd_sub_group_size(WARP_SIZE) to 19 kernel launches across 7 files: rope.cpp (8), binbcast.cpp (2), getrows.cpp (3), gla.cpp (1), diag.cpp (2), im2col.cpp (2), conv2d-dw.cpp (1). Remaining kernels already had this attribute from earlier tasks.",
+      "notes": "Batch task: added [[sycl::reqd_sub_group_size(WARP_SIZE)]] attribute to kernel lambda launches. This ensures native SIMD16 execution on Intel Xe2 (Arc Pro B60). Tests: ROPE 248/248, DIAG 3/3, IM2COL 88/88 PASS."
     },
     {
       "id": "opt_task_017",

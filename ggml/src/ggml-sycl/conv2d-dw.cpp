@@ -144,7 +144,7 @@ static void conv2d_dw_sycl(const float * input, const float * kernel_data, float
     stream->parallel_for(
         sycl::nd_range<1>(sycl::range<1>(num_blocks) * sycl::range<1>(SYCL_CONV2D_DW_BLOCK_SIZE),
                           sycl::range<1>(SYCL_CONV2D_DW_BLOCK_SIZE)),
-        [=](sycl::nd_item<1> item) {
+        [=](sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
             conv2d_dw_kernel<is_cwhn>(input, kernel_data, output, P, item);
         });
 }

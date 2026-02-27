@@ -229,7 +229,7 @@ struct bin_bcast_sycl {
                         sycl::nd_range<3>(sycl::range<3>(1, 1, block_num) *
                                               sycl::range<3>(1, 1, block_size),
                                           sycl::range<3>(1, 1, block_size)),
-                        [=](sycl::nd_item<3> item_ct1) {
+                        [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
                             k_bin_bcast_unravel<bin_op>(
                                 src0_dd, src1_dd, dst_dd, ne0, ne1, ne2, ne3,
                                 ne10, ne11, ne12, ne13, s1, s2, s3, s01, s02,
@@ -248,7 +248,7 @@ struct bin_bcast_sycl {
 
                 stream->parallel_for(
                     sycl::nd_range<3>(block_nums * block_dims, block_dims),
-                    [=](sycl::nd_item<3> item_ct1) {
+                    [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
                         k_bin_bcast<bin_op>(src0_dd, src1_dd, dst_dd, ne0, ne1,
                                             ne2, ne3, ne10, ne11, ne12, ne13,
                                             s1, s2, s3, s01, s02, s03, s11, s12, s13,
