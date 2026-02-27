@@ -1,6 +1,17 @@
 {
   "results": [
     {
+      "task_id": "opt_task_002",
+      "kernel": "dmmv",
+      "optimization": "Fix QK_WARP_SIZE mismatch - use native SIMD16 (WARP_SIZE=16) instead of forced SIMD32 (QK_WARP_SIZE=32)",
+      "timestamp": "2026-02-27T16:00:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": null,
+      "notes": "Fixed 5 K-quant kernels (Q2_K through Q6_K) in dmmv.cpp: Changed block_dims and reqd_sub_group_size from QK_WARP_SIZE (32) to WARP_SIZE (16). Changed reduction loop mask from QK_WARP_SIZE/2 (16) to WARP_SIZE/2 (8). Also fixed off-by-one boundary bug: 'row > nrows' -> 'row >= nrows' in q2_k, q3_k, q4_k, q6_k. Expected 15-40% occupancy improvement from native SIMD16. Unit tests pass on b60."
+    },
+    {
       "task_id": "opt_task_004",
       "kernel": "softmax",
       "optimization": "Add reqd_sub_group_size to fallback and backward kernels",

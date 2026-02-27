@@ -47,6 +47,15 @@
 - [x] sk_033: ggml_sycl_op_topk_moe — low potential (5 optimization opportunities)
 
 ## Recent Activity
+[2026-02-27] opt_task_002 (dmmv QK_WARP_SIZE fix): COMPLETED. Fixed K-quant kernels in dmmv.cpp:
+  - Changed work-group size from QK_WARP_SIZE (32) to WARP_SIZE (16) for all 5 K-quant kernels (Q2_K through Q6_K)
+  - Changed reqd_sub_group_size from QK_WARP_SIZE to WARP_SIZE for native SIMD16 on Intel Xe2
+  - Changed reduction loop mask from QK_WARP_SIZE/2 to WARP_SIZE/2 for correct 16-thread reduction
+  - Fixed off-by-one boundary bug: changed 'row > nrows' to 'row >= nrows' in all 4 affected kernels
+  - Expected: 15-40% occupancy improvement from using native SIMD16 instead of forced SIMD32
+  - Correctness: PASS (unit tests passed on b60)
+  - Note: Full multi-sub-group reduction (opt_010_001) with larger work-groups (128-256) pending
+
 [2026-02-27] opt_task_004 (softmax reqd_sub_group_size): COMPLETED. Added [[sycl::reqd_sub_group_size(WARP_SIZE)]] to:
   - Fallback forward kernel (line 293-294 in softmax.cpp)
   - Backward kernel (line 317-318 in softmax.cpp)
