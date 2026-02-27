@@ -52,7 +52,7 @@ static inline sycl::half2 make_half2(float x, float y) {
     return result;
 }
 
-static inline float2 make_float2(float x, float y) {
+static inline sycl::float2 make_float2(float x, float y) {
     return {x, y};
 }
 

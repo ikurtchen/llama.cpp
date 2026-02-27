@@ -3,6 +3,7 @@
 
 #include "common.hpp"
 #include <float.h>
+#include <algorithm>
 
 typedef void (*cpy_kernel_t)(const char * cx, char * cdst);
 
@@ -72,8 +73,8 @@ inline void cpy_blck_f32_q4_0(const char * cxi, char * cdsti) {
         const float x0 = xi[0 + j] * id;
         const float x1 = xi[QK4_0 / 2 + j] * id;
 
-        const uint8_t xi0 = std::min(15, (int8_t) (x0 + 8.5f));
-        const uint8_t xi1 = std::min(15, (int8_t) (x1 + 8.5f));
+        const uint8_t xi0 = std::min<uint8_t>(15, static_cast<uint8_t>(x0 + 8.5f));
+        const uint8_t xi1 = std::min<uint8_t>(15, static_cast<uint8_t>(x1 + 8.5f));
 
         dsti->qs[j] = xi0;
         dsti->qs[j] |= xi1 << 4;
@@ -104,8 +105,8 @@ inline void cpy_blck_f32_q4_1(const char * cxi, char * cdsti) {
         const float x0 = (xi[0 + j] - vmin) * id;
         const float x1 = (xi[QK4_1 / 2 + j] - vmin) * id;
 
-        const uint8_t xi0 = std::min(15, (int8_t) (x0 + 0.5f));
-        const uint8_t xi1 = std::min(15, (int8_t) (x1 + 0.5f));
+        const uint8_t xi0 = std::min<uint8_t>(15, static_cast<uint8_t>(x0 + 0.5f));
+        const uint8_t xi1 = std::min<uint8_t>(15, static_cast<uint8_t>(x1 + 0.5f));
 
         dsti->qs[j] = xi0;
         dsti->qs[j] |= xi1 << 4;
@@ -137,8 +138,8 @@ inline void cpy_blck_f32_q5_0(const char * cxi, char * cdsti) {
         const float x0 = xi[0 + j] * id;
         const float x1 = xi[QK5_0 / 2 + j] * id;
 
-        const uint8_t xi0 = std::min(31, (int8_t) (x0 + 16.5f));
-        const uint8_t xi1 = std::min(31, (int8_t) (x1 + 16.5f));
+        const uint8_t xi0 = std::min<uint8_t>(31, static_cast<uint8_t>(x0 + 16.5f));
+        const uint8_t xi1 = std::min<uint8_t>(31, static_cast<uint8_t>(x1 + 16.5f));
 
         dsti->qs[j] = (xi0 & 0xf) | ((xi1 & 0xf) << 4);
         qh |= ((xi0 & 0x10u) >> 4) << (j + 0);

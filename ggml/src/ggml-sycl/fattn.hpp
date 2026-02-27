@@ -15,6 +15,7 @@
 
 #include "ggml-sycl.h"
 #include "ggml-backend-impl.h"
+#include "ggml-sycl/common.hpp"
 
 void ggml_sycl_op_flash_attn_ext(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
 bool ggml_sycl_flash_attn_ext_supported(const ggml_tensor * dst);

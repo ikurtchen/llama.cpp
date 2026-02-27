@@ -26,6 +26,13 @@
 #define DMMV_SUBGRP_CNT (GGML_SYCL_DMMV_WG_SIZE / WARP_SIZE)
 #define DMMV_K_SUBGRP_CNT (GGML_SYCL_DMMV_K_WG_SIZE / GGML_SYCL_DMMV_K_SUBGRP_SIZE)
 
+#if GGML_SYCL_DMMV_USE_SLM
+template <int qk, int qr, dequantize_kernel_t dequantize_kernel>
+static void dequantize_mul_mat_vec_slm(const void * __restrict__ vx, const dfloat * __restrict__ y, float * __restrict__ dst, const int ncols, const int nrows,
+                                   const sycl::nd_item<3> &item_ct1,
+                                   const sycl::local_accessor<float, 1> & partial_sums);
+#endif
+
 template <int QK, int QR, dequantize_kernel_t dequantize_kernel>
 static void dequantize_mul_mat_vec_dispatch(const void *vx, const dfloat *y,
                                              float *dst, const int ncols,

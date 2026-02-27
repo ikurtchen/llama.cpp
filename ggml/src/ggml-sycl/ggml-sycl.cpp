@@ -66,7 +66,8 @@
 #include "ggml-sycl/solve_tri.hpp"
 #include "ggml-sycl/ssm_scan.hpp"
 #include "ggml-sycl/topk-moe.hpp"
-#include "ggml-sycl/fattn.hpp"
+// TEMPORARILY DISABLED: fattn.cpp has SYCL compatibility issues with Intel oneAPI 2025.1
+// #include "ggml-sycl/fattn.hpp"
 #include "ggml.h"
 
 static bool g_sycl_loaded = false;
