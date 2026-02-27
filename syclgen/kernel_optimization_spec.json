@@ -2084,14 +2084,113 @@
       ],
       "overall_optimization_potential": "none",
       "estimated_current_efficiency": "90-95% \u2014 Fill is a trivially simple kernel (one store per thread) that is already close to optimal. The launch configuration (256 work-group, 1D nd_range) is correct for Xe2. Memory writes are perfectly coalesced. The only issues are cosmetic DPCT artifacts. This kernel is not a performance bottleneck in any LLM inference workload."
+    },
+    {
+      "kernel_id": "sk_015",
+      "name": "ggml_sycl_op_diag",
+      "file": "ggml/src/ggml-sycl/diag.cpp",
+      "source_cuda_ids": [
+        "ck_050"
+      ],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": [
+            256,
+            1,
+            1
+          ],
+          "sub_group_size": null,
+          "global_size_expression": "ceil_div(total_elements, 256) * 256 \u2014 one thread per output element",
+          "notes": "Uses nd_range<1> with SYCL_DIAG_BLOCK_SIZE=256 \u2014 good. Missing [[sycl::reqd_sub_group_size(16)]]. Nearly 1:1 translation from CUDA with identical block size (256)."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "strided_accesses": [],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "Consecutive threads write to consecutive dst elements (coalesced). Diagonal reads from src are sparse \u2014 only 1/ne0 fraction of threads perform a src read (i0 == i1 condition). Most threads write zero. Write-dominated access pattern. No sycl::vec usage."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes": 0,
+          "potential_bank_conflicts": false,
+          "notes": "No SLM needed \u2014 purely element-wise kernel with no inter-thread data sharing."
+        },
+        "reduction_pattern": {
+          "has_reduction": false,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "No reductions \u2014 each thread independently writes one output element."
+        },
+        "data_types": {
+          "compute_type": "float|half",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "Supports F32 and F16 via template parameter \u2014 matches CUDA exactly. No computation beyond conditional copy/zero, so data type optimization is not applicable."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [],
+          "notes": "No math functions used \u2014 kernel is purely data movement (copy or zero-fill)."
+        },
+        "loop_analysis": {
+          "hot_loops": [],
+          "unrolled": false,
+          "notes": "No loops \u2014 each thread processes exactly one output element. The outer nd_range grid is the only parallelism."
+        },
+        "estimated_bottleneck": "memory",
+        "anti_patterns": [
+          "Missing [[sycl::reqd_sub_group_size(16)]] \u2014 compiler may choose suboptimal SIMD width on Xe2",
+          "Manual thread indexing (local_range*group+local_id at line 16) instead of item_ct1.get_global_id(0)",
+          "Expensive 4D index decomposition (3 divisions, 3 modulos) per thread \u2014 the dst_idx computation at line 27 is redundant since it equals global_idx for contiguous row-major output",
+          "dpct::queue_ptr parameter type instead of sycl::queue& (DPCT artifact, line 66)"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_015_001",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Eliminate redundant 4D index decomposition. The dst_idx computed at line 27 as ((i3*ne2+i2)*ne1+i1)*ne0+i0 is mathematically identical to global_idx for row-major contiguous storage. The 3 expensive int64 divisions and 3 modulos per thread can be avoided: simply use global_idx as dst_idx. Only compute i0 (= global_idx % ne0) and i1 (= (global_idx / ne0) % ne1) for the diagonal condition check. i2 and i3 are only needed for src_idx when i0==i1, so compute them lazily inside the if-branch. This eliminates 2 of 3 divisions for the common case (off-diagonal, ~(N-1)/N of all threads).",
+          "expected_improvement": "5-10% ALU reduction per thread. Since the kernel is memory-bound, the actual throughput improvement is likely <5% unless ne0 is small (where the kernel becomes compute-bound from index arithmetic). Still worthwhile as it simplifies the code.",
+          "implementation_notes": "Replace lines 16-34 with: int64_t global_idx = item_ct1.get_global_id(0); if (global_idx >= total_elements) return; int64_t i0 = global_idx % ne0; int64_t i1 = (global_idx / ne0) % ne1; if (i0 == i1) { int64_t remaining = global_idx / (ne0 * ne1); dst[global_idx] = src[remaining * ne0 + i0]; } else { dst[global_idx] = static_cast<T>(0); }",
+          "risk": "low",
+          "risk_notes": "Pure simplification \u2014 mathematically equivalent. The CUDA version has the same redundancy."
+        },
+        {
+          "id": "opt_015_002",
+          "category": "sub_group_ops",
+          "priority": "low",
+          "description": "Add [[sycl::reqd_sub_group_size(16)]] to both kernel launch lambdas (lines 77 and 89). While this kernel has no sub-group operations, specifying SIMD16 ensures the native Xe2 width is used, preventing the compiler from choosing SIMD32 which would halve the number of hardware threads per XVE and reduce occupancy.",
+          "expected_improvement": "0-5% from potentially better occupancy. Impact is minimal for this kernel since it's a rarely-used operation.",
+          "implementation_notes": "Add [[sycl::reqd_sub_group_size(16)]] to the lambda at lines 77 and 89. Example: [=](sycl::nd_item<1> item_ct1) [[sycl::reqd_sub_group_size(16)]] { ... }",
+          "risk": "low",
+          "risk_notes": "No functional impact \u2014 only affects SIMD width selection."
+        },
+        {
+          "id": "opt_015_003",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Clean up DPCT artifact: replace dpct::queue_ptr with sycl::queue& or sycl::queue* in the dispatch function (line 66). Replace manual thread indexing at line 16 with item_ct1.get_global_id(0). Minor code quality improvement.",
+          "expected_improvement": "Negligible performance improvement. Code maintainability and consistency benefit.",
+          "implementation_notes": "1. Line 66: dpct::queue_ptr stream = ctx.stream() \u2014 this is likely already returning the correct queue type from the context, so the change may only be in the type annotation. 2. Line 16: Replace (int64_t)item_ct1.get_local_range(0) * item_ct1.get_group(0) + item_ct1.get_local_id(0) with item_ct1.get_global_id(0).",
+          "risk": "low",
+          "risk_notes": "Mechanical cleanup with no algorithmic changes."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "75-85% \u2014 The diag kernel is a simple element-wise operation (conditional copy or zero-fill) that is inherently memory-bound and write-dominated. The work-group size (256) and memory access patterns are reasonable. Main inefficiency is the redundant 4D index decomposition, but since most of the time is spent on memory writes, ALU savings have limited impact. This is a low-frequency operation (diag is rarely used in inference), so optimization priority is minimal."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 14,
+    "total_kernels_analyzed": 15,
     "critical_potential": 1,
-    "high_potential": 5,
+    "high_potential": 6,
     "medium_potential": 6,
-    "low_potential": 1,
+    "low_potential": 2,
     "no_optimization_needed": 1,
     "top_opportunities": [
       {

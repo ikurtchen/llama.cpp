@@ -5,9 +5,9 @@
 
 ## Summary
 - Total SYCL kernels to analyze: 33
-- Kernels analyzed so far: 14
+- Kernels analyzed so far: 15
 - Analysis complete: No
-- Kernels with optimization potential: 13
+- Kernels with optimization potential: 14
 - Kernels with no optimization needed: 1
 - Optimization tasks created: 0 (pending finalization)
 
@@ -26,8 +26,32 @@
 - [x] sk_012: wkv SYCL kernels — medium potential (5 optimization opportunities)
 - [x] sk_013: gla SYCL kernel — low potential (4 optimization opportunities)
 - [x] sk_014: fill SYCL kernel — none potential (2 minor optimization opportunities)
+- [x] sk_015: ggml_sycl_op_diag — low potential (3 optimization opportunities)
+- [ ] sk_016: ggml_sycl_expm1 — pending
+- [ ] sk_017: ggml_sycl_xielu — pending
+- [ ] sk_018: ggml_sycl_op_opt_step_sgd — pending
+- [ ] sk_019: ggml_sycl_op_opt_step_adamw — pending
+- [ ] sk_020: ggml_sycl_silu_back — pending
+- [ ] sk_021: ggml_sycl_op_get_rows_back — pending
+- [ ] sk_022: ggml_sycl_op_im2col_3d — pending
+- [ ] sk_023: ggml_sycl_rope_back — pending
+- [ ] sk_024: ggml_sycl_op_conv_2d — pending
+- [ ] sk_025: ggml_sycl_op_conv_2d_dw — pending
+- [ ] sk_026: ggml_sycl_op_conv_transpose_2d — pending
+- [ ] sk_027: ggml_sycl_cross_entropy_loss — pending
+- [ ] sk_028: ggml_sycl_cross_entropy_loss_back — pending
+- [ ] sk_029: ggml_sycl_op_top_k — pending
+- [ ] sk_030: ggml_sycl_op_cumsum — pending
+- [ ] sk_031: ggml_sycl_op_solve_tri — pending
+- [ ] sk_032: ggml_sycl_op_ssm_scan — pending
+- [ ] sk_033: ggml_sycl_op_topk_moe — pending
 
 ## Recent Activity
+[2026-02-27] Analyzed kernel ggml_sycl_op_diag (sk_015). Found 3 optimization opportunities (low potential).
+  - LOW: Redundant 4D index decomposition — dst_idx equals global_idx for contiguous output; can eliminate 2 of 3 int64 divisions.
+  - LOW: Missing [[sycl::reqd_sub_group_size(16)]] on both kernel launch paths.
+  - LOW: DPCT artifacts — dpct::queue_ptr, manual thread indexing instead of get_global_id(0).
+
 [2026-02-27] Analyzed kernel fill (ggml_sycl_op_fill) SYCL kernel (sk_014). Found 2 optimization opportunities (none/near-optimal potential).
   - LOW: DPCT artifact — dpct::queue_ptr parameter type instead of sycl::queue&.
   - LOW: Verbose F16 conversion — ggml_fp32_to_fp16 followed by reinterpret_cast instead of sycl::half(value).
