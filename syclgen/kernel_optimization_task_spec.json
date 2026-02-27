@@ -786,7 +786,7 @@
             "ggml/src/ggml-sycl/dmmv.cpp",
             "ggml/src/ggml-sycl/getrows.cpp"
           ],
-          "notes": "opt_011_001 COMPLETED: Added I32 and BF16 src0 types + I32, F16, BF16 dst types to getrows. Implemented two-level dispatch matching CUDA pattern. Build SUCCESS, 35/35 GET_ROWS tests PASSED. Remaining components: mmq IQ types, convert BF16, dmmv BF16."
+          "notes": "opt_011_001 COMPLETED: Added I32 and BF16 src0 types + I32, F16, BF16 dst types to getrows. Implemented two-level dispatch matching CUDA pattern. Build SUCCESS, 35/35 GET_ROWS tests PASSED. opt_010_007 ATTEMPTED: Tried vectorized Y loads for dmmv using sycl::vec<float,2>, but code has pre-existing template visibility issues that prevent adding if constexpr. The dmmv.cpp functions require forward declarations to use with if constexpr, which would require significant refactoring. Remaining components: mmq IQ types, convert BF16, dmmv BF16."
         },
         {
           "task_id": "task_042",
