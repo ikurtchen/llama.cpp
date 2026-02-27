@@ -1,6 +1,17 @@
 {
   "results": [
     {
+      "task_id": "opt_task_004",
+      "kernel": "softmax",
+      "optimization": "Add reqd_sub_group_size to fallback and backward kernels",
+      "timestamp": "2026-02-27T15:30:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": null,
+      "notes": "Added [[sycl::reqd_sub_group_size(WARP_SIZE)]] to 2 kernel launches in softmax.cpp (lines 293-294, 317-318). Fixes correctness risk where compiler may choose SIMD32 instead of SIMD16 for warp-level operations. Unit tests pass on b60."
+    },
+    {
       "task_id": "opt_task_001",
       "kernel": "mmq",
       "optimization": "Xe2 tile size tuning (partial - added XE2 defines for Q4_0, Q8_0)",

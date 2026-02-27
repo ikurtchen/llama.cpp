@@ -290,7 +290,8 @@ static void soft_max_f32_sycl(const float *x, const T *mask,
 
             cgh.parallel_for(
                 sycl::nd_range<3>(block_nums * block_dims, block_dims),
-                [=](sycl::nd_item<3> item_ct1) {
+                [=](sycl::nd_item<3> item_ct1)
+                    [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
                     soft_max_f32<false, 0, 0>(
                         x, mask, sinks, dst, params,
                         dpct_local_acc_ct1
@@ -313,7 +314,8 @@ static void soft_max_back_f32_sycl(const float *   grad,
     const dpct::dim3 block_nums(nrows, 1, 1);
 
     stream->parallel_for(sycl::nd_range<3>(block_nums * block_dims, block_dims),
-                         [=](sycl::nd_item<3> item_ct1) {
+                         [=](sycl::nd_item<3> item_ct1)
+                             [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
                              soft_max_back_f32(grad, dstf, dst, ncols, scale);
                              GGML_UNUSED(item_ct1);
                          });

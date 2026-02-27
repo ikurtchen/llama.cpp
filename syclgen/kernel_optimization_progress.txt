@@ -47,6 +47,15 @@
 - [x] sk_033: ggml_sycl_op_topk_moe — low potential (5 optimization opportunities)
 
 ## Recent Activity
+[2026-02-27] opt_task_004 (softmax reqd_sub_group_size): COMPLETED. Added [[sycl::reqd_sub_group_size(WARP_SIZE)]] to:
+  - Fallback forward kernel (line 293-294 in softmax.cpp)
+  - Backward kernel (line 317-318 in softmax.cpp)
+  - This fixes a correctness risk where the compiler may choose SIMD32 instead of SIMD16, causing incorrect results for warp-level operations.
+  - Correctness: PASS (unit tests passed on b60)
+  - Risk: low - this is a compiler hint that ensures proper sub-group size for warp-level primitives
+
+[2026-02-27] opt_task_001 status changed to pending: XMX joint_matrix implementation is too complex (~1000+ lines) for single session. Partial work done: XE2 tile sizes for Q4_0/Q8_0.
+
 [2026-02-27] opt_task_001 (XMX joint_matrix): Started. Due to complexity (~1000+ lines), focused on related tile size tuning (part of opt_task_006). Added XE2 tile size defines for Q4_0 and Q8_0:
   - MMQ_X_Q4_0_XE2 = 64, MMQ_Y_Q4_0_XE2 = 64, NWARPS_Q4_0_XE2 = 8
   - MMQ_X_Q8_0_XE2 = 64, MMQ_Y_Q8_0_XE2 = 64, NWARPS_Q8_0_XE2 = 8
