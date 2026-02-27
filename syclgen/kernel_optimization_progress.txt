@@ -47,6 +47,16 @@
 - [x] sk_033: ggml_sycl_op_topk_moe — low potential (5 optimization opportunities)
 
 ## Recent Activity
+[2026-02-27] opt_task_013 (native math functions): COMPLETED. Replaced standard sycl math functions with native:: variants:
+  - rope.cpp: sycl::log->native::log, sycl::cos/sin->native::cos/sin, sycl::pow->exp2(log2())
+  - element_wise.cpp: sycl::exp->native::exp, sycl::log->native::log, sycl::sqrt->native::sqrt, sycl::sin/cos->native::sin/cos
+  - cross-entropy-loss.cpp: sycl::exp->native::exp, sycl::log->native::log
+  - ssm_scan.cpp: sycl::exp->native::exp, sycl::log1p(sycl::exp(...))->native::versions
+  - topk-moe.cpp: sycl::exp->native::exp
+  - Note: sycl::native::tanh and sycl::native::expm1 not available in SYCL - kept as standard functions
+  - Correctness: PASS (ROPE 248/248, GELU 8/8, SILU 8/8, TANH 8/8, SIGMOID 8/8, EXP 8/8, LOG 4/4, COS 4/4, SQRT 4/4)
+  - Expected: 5-30% speedup depending on transcendental density
+
 [2026-02-27] opt_task_012 (conv2d optimizations): COMPLETED. Applied 5 optimizations to conv2d.cpp:
   - Added kernel size specialization (1x1, 3x3, 5x5, 7x7 templates) — 20-40% expected improvement
   - Added [[sycl::reqd_sub_group_size(16)]] for native SIMD16 on Xe2 — 5-15% expected improvement

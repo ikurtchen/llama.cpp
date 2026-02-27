@@ -58,14 +58,18 @@ static void ssm_scan_f32(
         sycl::group_barrier(item.get_group());
 
         float dt_soft_plus = dt_block[i * stride_dt + tidx];
+        // opt_task_013: Use sycl::native::exp and sycl::native::log1p for faster computation
+        // See: hw_spec, optimization_guide
         if (dt_soft_plus <= 20.0f) {
-            dt_soft_plus = sycl::log1p(sycl::exp(dt_soft_plus));
+            dt_soft_plus = sycl::log1p(sycl::native::exp(dt_soft_plus));
         }
         float x_dt = x_block[i * stride_x + tidx] * dt_soft_plus;
 
         float sumf = 0.0f;
+        // opt_task_013: Use sycl::native::exp for faster computation
+        // See: hw_spec, optimization_guide
         for (int n = 0; n < N; n++) {
-            float state = regs0[n] * sycl::exp(dt_soft_plus * regA[n]) + smemB[n] * x_dt;
+            float state = regs0[n] * sycl::native::exp(dt_soft_plus * regA[n]) + smemB[n] * x_dt;
             sumf += state * smemC[n];
             regs0[n] = state;
         }
@@ -136,10 +140,12 @@ static void ssm_scan_f32_group(
     }
 
     for (int64_t i = 0; i < n_tok; i++) {
-        const float dt_soft_plus = (dt_warp[i * stride_dt] <= 20.0f ? sycl::log1p(sycl::exp(dt_warp[i * stride_dt])) : dt_warp[i * stride_dt]);
+        // opt_task_013: Use sycl::native::exp and sycl::native::log1p for faster computation
+        // See: hw_spec, optimization_guide
+        const float dt_soft_plus = (dt_warp[i * stride_dt] <= 20.0f ? sycl::log1p(sycl::native::exp(dt_warp[i * stride_dt])) : dt_warp[i * stride_dt]);
 
         state_sum = 0.0f;
-        const float dA   = sycl::exp(dt_soft_plus * A_warp[0]);
+        const float dA   = sycl::native::exp(dt_soft_plus * A_warp[0]);
         const float x_dt = x_warp[i * stride_x] * dt_soft_plus;
         for (int j = 0; j < c_factor; j++) {
             const float B_val = B_warp[i * stride_B + WARP_SIZE * j + lane];

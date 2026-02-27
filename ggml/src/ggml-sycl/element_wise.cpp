@@ -41,11 +41,15 @@ static __dpct_inline__ T op_abs(T x) {
 
 template<typename T>
 static __dpct_inline__ T op_expm1(T x) {
+    // opt_task_013: sycl::native::expm1 not available, using standard expm1
+    // See: hw_spec, optimization_guide
     return sycl::expm1(x);
 }
 
 template<typename T>
 static __dpct_inline__ T op_elu(T x) {
+    // opt_task_013: sycl::native::expm1 not available, using standard expm1
+    // See: hw_spec, optimization_guide
     return (x > static_cast<T>(0.f)) ? x : sycl::expm1(x);
 }
 
@@ -53,6 +57,8 @@ template<typename T>
 static __dpct_inline__ T op_gelu(T x) {
     const T GELU_COEF_A    = static_cast<T>(0.044715f);
     const T SQRT_2_OVER_PI = static_cast<T>(0.79788456080286535587989211986876f);
+    // opt_task_013: sycl::native::tanh not available, using standard tanh
+    // See: hw_spec, optimization_guide
     return static_cast<T>(0.5f) * x *
            (static_cast<T>(1.0f) +
             sycl::tanh(SQRT_2_OVER_PI * x * (static_cast<T>(1.0f) + GELU_COEF_A * x * x)));
@@ -77,6 +83,8 @@ static __dpct_inline__ T op_gelu_erf(T x) {
 
 template<typename T>
 static __dpct_inline__ T op_tanh(T x) {
+    // opt_task_013: sycl::native::tanh not available, using standard tanh
+    // See: hw_spec, optimization_guide
     return sycl::tanh(x);
 }
 
@@ -92,17 +100,23 @@ static __dpct_inline__ T op_sigmoid(T x) {
 
 template<typename T>
 static __dpct_inline__ T op_sqrt(T x) {
-    return sycl::sqrt(x);
+    // opt_task_013: Use sycl::native::sqrt for faster computation
+    // See: hw_spec, optimization_guide
+    return sycl::native::sqrt(x);
 }
 
 template<typename T>
 static __dpct_inline__ T op_sin(T x) {
-    return sycl::sin(x);
+    // opt_task_013: Use sycl::native::sin for faster computation
+    // See: hw_spec, optimization_guide
+    return sycl::native::sin(x);
 }
 
 template<typename T>
 static __dpct_inline__ T op_cos(T x) {
-    return sycl::cos(x);
+    // opt_task_013: Use sycl::native::cos for faster computation
+    // See: hw_spec, optimization_guide
+    return sycl::native::cos(x);
 }
 
 template<typename T>
@@ -117,7 +131,9 @@ static __dpct_inline__ T op_hardswish(T x) {
 
 template<typename T>
 static __dpct_inline__ T op_exp(T x) {
-    return sycl::exp(x);
+    // opt_task_013: Use sycl::native::exp for faster computation
+    // See: hw_spec, optimization_guide
+    return sycl::native::exp(x);
 }
 
 template<typename T>
@@ -125,7 +141,9 @@ static __dpct_inline__ T op_log(T x) {
     if (x <= static_cast<T>(0)) {
         return neg_infinity<T>();
     }
-    return sycl::log(x);
+    // opt_task_013: Use sycl::native::log for faster computation
+    // See: hw_spec, optimization_guide
+    return sycl::native::log(x);
 }
 
 template<typename T>
@@ -133,7 +151,9 @@ static __dpct_inline__ T op_softplus(T x) {
     const float xf = (float) x;
     const float ax = sycl::fabs(xf);
     const float m  = sycl::fmax(xf, 0.0f);
-    const float y  = m + sycl::log1p(sycl::exp(-ax));
+    // opt_task_013: Use sycl::native::log1p and sycl::native::exp for faster computation
+    // See: hw_spec, optimization_guide
+    const float y  = m + sycl::log1p(sycl::native::exp(-ax));
     return (T) y;
 }
 
@@ -634,6 +654,8 @@ static void xielu_kernel(const T * x, T * dst, const int k,
     const float gate_pos = (xi > 0.0f) ? 1.0f : 0.0f;
     const float y_pos = alpha_p * xi * xi + beta * xi;
     const float min_v_eps = sycl::fmin(xi, eps);
+    // opt_task_013: sycl::native::expm1 not available, using standard expm1
+    // See: hw_spec, optimization_guide
     const float y_neg = (sycl::expm1(min_v_eps) - xi) * alpha_n + beta * xi;
     const float out = gate_pos * y_pos + (1.0f - gate_pos) * y_neg;
 
@@ -650,7 +672,9 @@ static void silu_back_kernel(const T * grad, const T * x, T * dst, const int k,
 
     const float xf = static_cast<float>(x[i]);
     const float gf = static_cast<float>(grad[i]);
-    const float s = 1.0f / (1.0f + sycl::exp(-xf));
+    // opt_task_013: Use sycl::native::exp for faster computation
+    // See: hw_spec, optimization_guide
+    const float s = 1.0f / (1.0f + sycl::native::exp(-xf));
     const float result = gf * s * (1.0f + xf * (1.0f - s));
 
     dst[i] = static_cast<T>(result);

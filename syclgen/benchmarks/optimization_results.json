@@ -1,6 +1,17 @@
 {
   "results": [
     {
+      "task_id": "opt_task_013",
+      "kernel": "multiple (rope, element_wise, cross_entropy, ssm_scan, topk_moe)",
+      "optimization": "Replace standard sycl math functions with native:: variants (exp, sin, cos, log, sqrt, exp2+log2 for pow)",
+      "timestamp": "2026-02-27T23:30:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": null,
+      "notes": "Applied native math optimizations to 6 files: rope.cpp (sin/cos/pow), element_wise.cpp (exp/log/sqrt/sin/cos), cross-entropy-loss.cpp (exp/log), ssm_scan.cpp (exp/log1p), topk-moe.cpp (exp). Note: sycl::native::tanh and sycl::native::expm1 not available in SYCL - kept as standard functions. Unit tests: ROPE 248/248, GELU 8/8, SILU 8/8, TANH 8/8, SIGMOID 8/8, EXP 8/8, LOG 4/4, COS 4/4, SQRT 4/4. Expected 5-30% speedup depending on transcendental density per kernel."
+    },
+    {
       "task_id": "opt_task_012",
       "kernel": "conv2d",
       "optimization": "Apply 5 optimizations: kernel specialization (1x1, 3x3, 5x5, 7x7), reqd_sub_group_size(16), int32 index arithmetic, sycl::fma, hoisted kernel bounds",

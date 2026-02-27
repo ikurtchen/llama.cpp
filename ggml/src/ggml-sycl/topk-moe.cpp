@@ -33,13 +33,15 @@ static void softmax_warp_inplace(float (&vals)[experts_per_thread], const int li
 
     max_val = warp_reduce_max<WARP_SIZE>(max_val);
 
+    // opt_task_013: Use sycl::native::exp for faster computation
+    // See: hw_spec, optimization_guide
     float sum = 0.0f;
 
     for (int i = 0; i < experts_per_thread; i++) {
         const int  idx    = lane + i * WARP_SIZE;
         const bool active = !use_limit || (idx < limit);
         if (active) {
-            const float val = sycl::exp(vals[i] - max_val);
+            const float val = sycl::native::exp(vals[i] - max_val);
             vals[i]         = val;
             sum += val;
         } else {
@@ -62,10 +64,12 @@ static void softmax_warp_inplace(float (&vals)[experts_per_thread], const int li
 
 template <int experts_per_thread, bool use_limit>
 static void sigmoid_warp_inplace(float (&vals)[experts_per_thread], const int limit, const int lane) {
+    // opt_task_013: Use sycl::native::exp for faster computation
+    // See: hw_spec, optimization_guide
     for (int i = 0; i < experts_per_thread; i++) {
         const int  idx    = lane + i * WARP_SIZE;
         const bool active = !use_limit || (idx < limit);
-        vals[i]           = active ? 1.0f / (1.0f + sycl::exp(-vals[i])) : -INFINITY;
+        vals[i]           = active ? 1.0f / (1.0f + sycl::native::exp(-vals[i])) : -INFINITY;
     }
 }
 

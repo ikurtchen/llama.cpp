@@ -32,14 +32,17 @@ static void cross_entropy_loss_f32(
     max_logit = sycl::reduce_over_group(item_ct1.get_group(), max_logit, sycl::maximum<float>());
 
     // Calculate log(sum(exp(logits - max))):
+    // opt_task_013: Use sycl::native::exp for faster computation
+    // See: hw_spec, optimization_guide
     float sum = 0.0f;
     for (int i = tid; i < nclasses; i += wg_size) {
         const float logit_i = use_shared ? tmp[i] : logits[i];
-        sum += sycl::exp(logit_i - max_logit);
+        sum += sycl::native::exp(logit_i - max_logit);
     }
-    // opt_027_001: Use sycl::reduce_over_group for multi-sub-group reduction
+    // opt_task_013: Use sycl::native::log for faster computation
+    // See: hw_spec, optimization_guide
     sum = sycl::reduce_over_group(item_ct1.get_group(), sum, sycl::plus<float>());
-    sum = sycl::log(sum);
+    sum = sycl::native::log(sum);
 
     // log(exp(logits - max) / sum) = (logits - max) - log(sum)
     float loss = 0.0f;
@@ -85,8 +88,10 @@ static void cross_entropy_loss_back_f32(
     maxval = sycl::reduce_over_group(item_ct1.get_group(), maxval, sycl::maximum<float>());
 
     float sum = 0.0f;
+    // opt_task_013: Use sycl::native::exp for faster computation
+    // See: hw_spec, optimization_guide
     for (int i = tid; i < nclasses; i += wg_size) {
-        const float val = sycl::exp((use_shared ? tmp[i] : logits[i]) - maxval);
+        const float val = sycl::native::exp((use_shared ? tmp[i] : logits[i]) - maxval);
         sum += val;
 
         if (use_shared) {

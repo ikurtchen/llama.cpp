@@ -111,11 +111,12 @@ static inline void whcn_unpack_indices(int64_t global_idx, const conv_params & P
 // opt_024_005: calculate_kernel_bounds hoisted outside c_in loop
 // opt_024_006: Using sycl::fma for fused multiply-add
 template <typename T, int32_t KW, int32_t KH>
+[[sycl::reqd_sub_group_size(16)]]
 static void conv2d_kernel(const float * __restrict__ input,
                           const T * __restrict__ kernel_data,
                           float * __restrict__ output,
                           const conv_params P,
-                          const sycl::nd_item<1> & item) [[sycl::reqd_sub_group_size(16)]] {
+                          const sycl::nd_item<1> & item) {
     const int64_t global_idx = item.get_group(0) * item.get_local_range(0) + item.get_local_id(0);
 
     if (global_idx >= P.TOTAL) {

@@ -340,13 +340,53 @@
       "priority": "medium",
       "complexity": "low",
       "category": "math_functions",
-      "status": "pending",
+      "status": "completed",
       "description": "Replace standard math with sycl::native:: variants across all kernels",
       "target_kernels": [
         {
           "kernel_id": "sk_002",
           "file": "ggml/src/ggml-sycl/rope.cpp"
         },
+        {
+          "kernel_id": "sk_004",
+          "file": "ggml/src/ggml-sycl/element_wise.cpp"
+        },
+        {
+          "kernel_id": "sk_027",
+          "file": "ggml/src/ggml-sycl/cross-entropy-loss.cpp"
+        },
+        {
+          "kernel_id": "sk_028",
+          "file": "ggml/src/ggml-sycl/cross-entropy-loss-back.cpp"
+        },
+        {
+          "kernel_id": "sk_032",
+          "file": "ggml/src/ggml-sycl/ssm_scan.cpp"
+        },
+        {
+          "kernel_id": "sk_033",
+          "file": "ggml/src/ggml-sycl/topk-moe.cpp"
+        }
+      ],
+      "optimization_ids": [
+        "opt_002_001",
+        "opt_002_002",
+        "opt_004_002",
+        "opt_027_004",
+        "opt_028_004",
+        "opt_032_003",
+        "opt_033_002"
+      ],
+      "dependencies": [],
+      "estimated_improvement": "5-30% per kernel depending on transcendental density. Largest impact on rope (sin/cos/pow), element_wise (exp/gelu), softmax/sigmoid (exp)",
+      "risk": "low",
+      "notes": "Replaced sycl::exp->native::exp, sycl::sin->native::sin, sycl::cos->native::cos, sycl::log->native::log, sycl::sqrt->native::sqrt, sycl::pow->exp2(log2()) in applicable kernels. Note: sycl::native::tanh and sycl::native::expm1 are not available in SYCL so those remain as standard functions.",
+      "completed_at": "2026-02-27T23:30:00Z",
+      "baseline_metric": null,
+      "optimized_metric": null,
+      "actual_improvement": "Expected 5-30% speedup from faster transcendental functions; correctness verified by unit tests (ROPE 248/248, GELU 8/8, SILU 8/8, TANH 8/8, SIGMOID 8/8, EXP 8/8, LOG 4/4, COS 4/4, SQRT 4/4)",
+      "blocked_reason": null
+    },
         {
           "kernel_id": "sk_004",
           "file": "ggml/src/ggml-sycl/element_wise.cpp"
