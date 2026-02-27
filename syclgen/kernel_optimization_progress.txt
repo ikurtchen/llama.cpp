@@ -5,9 +5,9 @@
 
 ## Summary
 - Total SYCL kernels to analyze: 33
-- Kernels analyzed so far: 23
+- Kernels analyzed so far: 24
 - Analysis complete: No
-- Kernels with optimization potential: 22
+- Kernels with optimization potential: 23
 - Kernels with no optimization needed: 1
 - Optimization tasks created: 0 (pending finalization)
 
@@ -35,7 +35,7 @@
 - [x] sk_021: ggml_sycl_op_get_rows_back — low potential (4 optimization opportunities)
 - [x] sk_022: im2col_3d SYCL kernel — low potential (5 optimization opportunities)
 - [x] sk_023: rope_back SYCL kernel — low potential (2 optimization opportunities, shares code with sk_002)
-- [ ] sk_024: ggml_sycl_op_conv_2d — pending
+- [x] sk_024: ggml_sycl_op_conv_2d — medium potential (7 optimization opportunities)
 - [ ] sk_025: ggml_sycl_op_conv_2d_dw — pending
 - [ ] sk_026: ggml_sycl_op_conv_transpose_2d — pending
 - [ ] sk_027: ggml_sycl_cross_entropy_loss — pending
@@ -47,6 +47,15 @@
 - [ ] sk_033: ggml_sycl_op_topk_moe — pending
 
 ## Recent Activity
+[2026-02-27] Analyzed kernel ggml_sycl_op_conv_2d (sk_024). Found 7 optimization opportunities (medium potential).
+  - HIGH: Add SLM tiling for input data reuse — 30-60% improvement for 3×3+ convolutions from eliminating redundant global memory reads. Conv2d has highest data reuse ratio of common NN ops.
+  - HIGH: Add kernel size specialization (1×1, 3×3, 5×5, 7×7) — 20-40% from compile-time loop unrolling of inner ky/kx loops.
+  - MEDIUM: Replace int64_t with int32_t for all index arithmetic — 10-20% from faster GPU integer division/modulo.
+  - MEDIUM: Add [[sycl::reqd_sub_group_size(16)]] — 5-15% from optimal SIMD width on Xe2.
+  - LOW: Hoist calculate_kernel_bounds outside c_in loop — 2-5% from eliminating redundant invariant computation.
+  - LOW: Use explicit sycl::fma — 1-5% from guaranteed fused multiply-add.
+  - LOW: Missing CWHN layout support — feature parity gap with CUDA backend.
+
 [2026-02-27] Analyzed kernel ggml_sycl_rope_back (sk_023). Found 2 optimization opportunities (low potential).
   - MEDIUM: Shares 100% code with rope forward (sk_002) via template<forward>. All 5 sk_002 optimizations (native sin/cos, pow→exp2/log2, reqd_sub_group_size, 2D nd_range, DPCT cleanup) apply automatically. Training-only kernel — zero wall-clock impact during inference.
   - LOW: Missing ROPE+VIEW+SET_ROWS fusion and mixed F32→F16 type support that CUDA has (currently forward-only in CUDA, but feature parity gap).

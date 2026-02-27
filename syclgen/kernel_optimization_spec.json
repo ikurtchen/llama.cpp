@@ -3032,13 +3032,165 @@
       ],
       "overall_optimization_potential": "low",
       "estimated_current_efficiency": "55-65% (same as sk_002 \u2014 shared code). However, rope_back is training-only and rarely on the hot path. All optimizations should be applied via sk_002's shared template code. No separate optimization work needed for rope_back."
+    },
+    {
+      "kernel_id": "sk_024",
+      "name": "ggml_sycl_op_conv_2d",
+      "file": "ggml/src/ggml-sycl/conv2d.cpp",
+      "source_cuda_ids": [
+        "ck_016"
+      ],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": [
+            256,
+            1,
+            1
+          ],
+          "sub_group_size": null,
+          "global_size_expression": "ceil_div(B*OC*OH*OW, 256) work-groups \u00d7 256 work-items. Each work-item computes one output element.",
+          "notes": "1D nd_range with SYCL_CONV2D_BLOCK_SIZE=256 (line 7). Clean manual port \u2014 no DPCT artifacts. No [[sycl::reqd_sub_group_size]] attribute on any launch path. Two template instantiations: conv2d_sycl_f16 (T=sycl::half) and conv2d_sycl_f32 (T=float). Launched via stream->parallel_for with lambda wrapping conv2d_kernel<T> (lines 104-109)."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "strided_accesses": [
+            "Input reads: when stride > 1, consecutive work-items read input positions separated by stride*dilation, causing strided access in the innermost (width) dimension",
+            "Kernel weight reads: each work-item reads weights indexed by (c_out, c_in, ky, kx) where c_out varies across work-items \u2014 scattered access across output channel dimension",
+            "Input reads across c_in loop: each iteration jumps by IW*IH elements in the input tensor \u2014 fully strided across channel dimension"
+          ],
+          "vectorized_loads": false,
+          "vector_width": 1,
+          "notes": "Output writes are coalesced since consecutive global_idx maps to consecutive out_x positions within the same row (whcn_output_index with out_x = global_idx % OW). All input and kernel reads are scalar (no sycl::vec usage). For 3\u00d73 convolutions with stride=1, neighboring output elements share ~67% of their input data \u2014 high reuse opportunity completely missed."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes": 0,
+          "potential_bank_conflicts": false,
+          "notes": "Zero SLM usage. This is the single largest optimization opportunity \u2014 conv2d has extremely high data reuse (neighboring outputs share input tiles, all output channels read the same input). Standard GPU conv2d implementations tile input patches and/or weight slices into SLM. The current implementation re-reads all input data from global memory for every output element."
+        },
+        "reduction_pattern": {
+          "has_reduction": false,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "No cross-work-item reduction. Each work-item computes one full output element independently via a triply-nested loop over (c_in, ky, kx). The accumulation (acc += input_val * kernel_val) is entirely private to each work-item."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "could_use_half": false,
+          "could_use_joint_matrix": true,
+          "notes": "Input is always float. Kernel weights are templated: float or sycl::half, cast to float before multiply (line 91). Accumulator is float. No bfloat16 support. The inner multiply-accumulate pattern maps directly to matrix multiply for standard kernel sizes \u2014 could theoretically use joint_matrix/XMX but implementation complexity is very high."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [],
+          "notes": "No math functions used \u2014 purely multiply-accumulate (line 91: acc += input_val * static_cast<float>(kernel_val)). No explicit sycl::fma call. The compiler may or may not fuse the multiply and add into FMA depending on optimization flags and the static_cast barrier."
+        },
+        "loop_analysis": {
+          "hot_loops": [
+            {
+              "location": "conv2d.cpp:80-94",
+              "description": "Triple-nested hot loop: outer over c_in (input channels, line 80), middle over ky (kernel height, line 83), inner over kx (kernel width, line 86). Each iteration: 1 input load + 1 kernel load + 1 FMA. For 3\u00d73 conv with 64 input channels: 576 iterations per output element.",
+              "trip_count": "IC \u00d7 (ky_max - ky_min) \u00d7 (kx_max - kx_min). Typically IC \u00d7 KH \u00d7 KW for non-border elements.",
+              "unrolled": false
+            }
+          ],
+          "unrolled": false,
+          "notes": "No #pragma unroll on any loop. All trip counts are dynamic (from conv_params), preventing automatic compiler unrolling. calculate_kernel_bounds (line 81) is inside the c_in loop but invariant to c_in \u2014 wastes ~10 integer ops per c_in iteration. Kernel size specialization would enable full unrolling of inner two loops for common sizes (1\u00d71, 3\u00d73, 5\u00d75, 7\u00d77)."
+        },
+        "estimated_bottleneck": "memory",
+        "anti_patterns": [
+          "All index arithmetic uses int64_t (lines 9-61) \u2014 GPU integer division/modulo for 64-bit is 10-20x slower than 32-bit. whcn_unpack_indices does 3 int64 divisions and 3 int64 modulos per work-item.",
+          "calculate_kernel_bounds called inside c_in loop (line 81) but result is invariant to c_in \u2014 wastes ~10 integer ops \u00d7 IC iterations.",
+          "No SLM tiling \u2014 conv2d has highest data reuse ratio of any common neural network operation. For 3\u00d73 conv with stride=1, neighboring outputs share 67% of input data.",
+          "No kernel size specialization \u2014 all sizes use dynamic-trip-count code path. Common sizes (1\u00d71, 3\u00d73, 5\u00d75, 7\u00d77) could use compile-time constants for full unrolling.",
+          "Hardcoded WHCN layout only \u2014 CUDA conv2d.cu has template<Layout> supporting both WHCN and CWHN.",
+          "No explicit sycl::fma \u2014 multiply-accumulate (line 91) relies on compiler to fuse through static_cast barrier."
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_024_001",
+          "category": "memory_optimization",
+          "priority": "high",
+          "description": "Add SLM tiling for input data reuse. For 3\u00d73 conv with stride=1, neighboring outputs share 67% of input data. Currently every work-item reads all input from global memory independently. Tiling input patches into SLM eliminates redundant reads proportional to kernel area.",
+          "expected_improvement": "30-60% for 3\u00d73 and larger kernels. Each input element reused up to 9 times \u2014 SLM converts 9 global reads to 1 global + 9 SLM reads. With 64KB SLM per Xe core on B60, tiles of ~128\u00d74 pixels \u00d7 4 channels fit comfortably.",
+          "implementation_notes": "Partition work-groups to compute 2D output tiles (e.g., 16\u00d716). Cooperatively load input region into local_accessor<float>. Use group_barrier after load. The c_in loop remains outer \u2014 reload SLM tile per channel block.",
+          "risk": "medium",
+          "risk_notes": "Significant restructuring. Must handle boundary conditions and padding during SLM load. Performance depends on tile size tuning. Risk of SLM bank conflicts if tile width is multiple of 16."
+        },
+        {
+          "id": "opt_024_002",
+          "category": "kernel_specialization",
+          "priority": "high",
+          "description": "Add compile-time kernel size specialization for 1\u00d71, 3\u00d73, 5\u00d75, 7\u00d77. Currently all sizes use dynamic trip counts preventing compiler unrolling. With compile-time KW/KH template parameters, the compiler can fully unroll inner ky/kx loops.",
+          "expected_improvement": "20-40% for 3\u00d73 kernels. For 1\u00d71, inner loops collapse to single FMA per c_in. For 3\u00d73, 9 iterations become 9 straight-line FMAs with no branch overhead.",
+          "implementation_notes": "Add template<int KW_CONST, int KH_CONST> to conv2d_kernel. Dispatch switch in launcher: 1\u00d71, 3\u00d73, 5\u00d75, 7\u00d77 specializations + dynamic fallback (0,0). Inside kernel, use constexpr bounds when KW_CONST > 0.",
+          "risk": "low",
+          "risk_notes": "Purely additive \u2014 dynamic fallback preserves correctness for all sizes. Each specialization is a separate kernel binary, slightly increasing compile time."
+        },
+        {
+          "id": "opt_024_003",
+          "category": "integer_arithmetic",
+          "priority": "medium",
+          "description": "Replace int64_t with int32_t for all index arithmetic in conv_params and helper functions. GPU int64 division/modulo is 10-20x slower than int32. whcn_unpack_indices does 3 int64 divisions and 3 modulos per work-item.",
+          "expected_improvement": "10-20% overall kernel speedup from faster index decomposition. Benefits all output elements.",
+          "implementation_notes": "Change conv_params fields to int32_t. Update helpers. Add runtime assertion B*OC*OH*OW < INT32_MAX.",
+          "risk": "low",
+          "risk_notes": "Straightforward type change. All practical conv2d workloads fit in int32 range."
+        },
+        {
+          "id": "opt_024_004",
+          "category": "launch_config",
+          "priority": "medium",
+          "description": "Add [[sycl::reqd_sub_group_size(16)]] to conv2d_kernel lambda. Without it, runtime may select SIMD8 (wastes ALU) or SIMD32 (halves occupancy). B60's native SIMD width is 16.",
+          "expected_improvement": "5-15% from guaranteed optimal SIMD width on Xe2.",
+          "implementation_notes": "Add attribute to lambda at line 107. Applies to both F16 and F32 instantiations automatically.",
+          "risk": "low",
+          "risk_notes": "Standard best practice for Intel GPU targets."
+        },
+        {
+          "id": "opt_024_005",
+          "category": "loop_optimization",
+          "priority": "low",
+          "description": "Hoist calculate_kernel_bounds outside c_in loop. Called at line 81 inside c_in loop but result depends only on (out_x, out_y, stride, dilation, padding) \u2014 invariant to c_in. Wastes ~10 integer ops \u00d7 IC iterations.",
+          "expected_improvement": "2-5% for large IC. Savings proportional to input channel count.",
+          "implementation_notes": "Move line 81 to before the c_in loop (after line 79). One-line move, no semantic change.",
+          "risk": "low",
+          "risk_notes": "Zero risk. GPU compilers are less aggressive at loop-invariant code motion than CPU compilers."
+        },
+        {
+          "id": "opt_024_006",
+          "category": "compute_optimization",
+          "priority": "low",
+          "description": "Use explicit sycl::fma(input_val, static_cast<float>(kernel_val), acc) instead of acc += input_val * static_cast<float>(kernel_val). The static_cast may prevent compiler FMA fusion.",
+          "expected_improvement": "1-5% in inner loop. FMA vs separate mul+add is 2x ALU throughput for accumulation, but kernel is likely memory-bound.",
+          "implementation_notes": "Replace line 91 with: acc = sycl::fma(input_val, static_cast<float>(kernel_val), acc);",
+          "risk": "low",
+          "risk_notes": "FMA has single-rounding vs double-rounding \u2014 always acceptable for neural network conv2d."
+        },
+        {
+          "id": "opt_024_007",
+          "category": "feature_gap",
+          "priority": "low",
+          "description": "Missing CWHN layout support. CUDA conv2d.cu has template<Layout> for both WHCN and CWHN. SYCL asserts WHCN only (p[6]==false at line 147).",
+          "expected_improvement": "No direct perf improvement for existing workloads. Feature parity with CUDA backend.",
+          "implementation_notes": "Add CWHN indexing helpers and template kernel on layout type. Dispatch based on p[6].",
+          "risk": "low",
+          "risk_notes": "Purely additive feature, no impact on existing WHCN path."
+        }
+      ],
+      "overall_optimization_potential": "medium",
+      "estimated_current_efficiency": "30-45%. Clean manual port with correct functionality but zero GPU-specific optimizations. No SLM tiling (the single most impactful optimization for conv2d), no kernel size specialization, all 64-bit index arithmetic, no sub-group size control. Both SYCL and CUDA originals are naive implementations. For llama.cpp's built-in conv2d (used in vision encoders), these optimizations would provide 2-3x speedup."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 23,
+    "total_kernels_analyzed": 24,
     "critical_potential": 1,
     "high_potential": 6,
-    "medium_potential": 6,
+    "medium_potential": 7,
     "low_potential": 10,
     "no_optimization_needed": 1,
     "top_opportunities": [
@@ -3279,6 +3431,20 @@
         "opportunity_id": "opt_013_002",
         "description": "Add #pragma unroll to hot inner j-loop \u2014 5-15% from pipelined FMA operations",
         "priority": "medium"
+      },
+      {
+        "kernel_id": "sk_024",
+        "kernel_name": "ggml_sycl_op_conv_2d",
+        "opportunity_id": "opt_024_001",
+        "description": "Add SLM tiling for input data reuse \u2014 30-60% improvement for 3\u00d73+ convolutions from eliminating redundant global reads",
+        "priority": "high"
+      },
+      {
+        "kernel_id": "sk_024",
+        "kernel_name": "ggml_sycl_op_conv_2d",
+        "opportunity_id": "opt_024_002",
+        "description": "Add kernel size specialization (1\u00d71, 3\u00d73, 5\u00d75, 7\u00d77) \u2014 20-40% from compile-time loop unrolling",
+        "priority": "high"
       }
     ]
   }
