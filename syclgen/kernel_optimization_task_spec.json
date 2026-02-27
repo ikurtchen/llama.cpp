@@ -119,7 +119,7 @@
       "priority": "high",
       "complexity": "medium",
       "category": "work_group_size",
-      "status": "pending",
+      "status": "completed",
       "description": "Fix cpy (copy) kernels: increase quantized copy work-group from 1 to 256, add contiguous fast-path",
       "target_kernels": [
         {
@@ -129,12 +129,17 @@
       ],
       "optimization_ids": [
         "opt_007_001",
-        "opt_007_003"
+        "opt_007_003",
+        "opt_007_006"
       ],
       "dependencies": [],
       "estimated_improvement": "4-8x throughput for quantized copies; 40-60% for scalar copies with contiguous tensors",
       "risk": "medium",
-      "notes": "Quantized copy with work-group=1 wastes 15/16 SIMD lanes on Xe2. Copy operations are frequent during model loading, KV-cache management, and quantization."
+      "notes": "Quantized copy with work-group=1 wastes 15/16 SIMD lanes on Xe2. Copy operations are frequent during model loading, KV-cache management, and quantization.",
+      "completed_at": "2026-02-27T18:00:00Z",
+      "baseline_metric": "f32->q4_0: 804.77us (44.33 GB/s), q4_0->f32: 3946.24us (9.03 GB/s)",
+      "optimized_metric": "f32->q4_0: 119.69us (298.10 GB/s), q4_0->f32: 453.45us (78.62 GB/s)",
+      "actual_improvement": "f32->q4_0: 6.72x speedup, q4_0->f32: 8.71x speedup"
     },
     {
       "id": "opt_task_006",

@@ -1,6 +1,17 @@
 {
   "results": [
     {
+      "task_id": "opt_task_005",
+      "kernel": "cpy",
+      "optimization": "Increase quantized copy work-group from 1 to 256, add reqd_sub_group_size(WARP_SIZE)",
+      "timestamp": "2026-02-27T18:00:00Z",
+      "correctness": "pass",
+      "baseline_time_us": 804.77,
+      "optimized_time_us": 119.69,
+      "speedup": 6.72,
+      "notes": "f32->q4_0: 6.72x speedup (804.77 us -> 119.69 us). q4_0->f32: 8.71x speedup (3946.24 us -> 453.45 us). Changed SYCL_CPY_BLOCK_SIZE from 32 to 256. Changed all 11 quantized copy kernels from work-group size 1 to 256. Added reqd_sub_group_size(WARP_SIZE) to all 20+ kernel launches. Quantized copy with work-group=1 was catastrophically bad - 15/16 SIMD lanes wasted on Xe2. Unit tests: 131/131 pass on b60."
+    },
+    {
       "task_id": "opt_task_003",
       "kernel": "top_k",
       "optimization": "Fix SLM overflow bug and add k=1 fast path (argmax)",

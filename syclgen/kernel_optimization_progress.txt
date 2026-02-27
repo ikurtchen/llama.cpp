@@ -47,6 +47,15 @@
 - [x] sk_033: ggml_sycl_op_topk_moe — low potential (5 optimization opportunities)
 
 ## Recent Activity
+[2026-02-27] opt_task_005 (cpy work-group size): COMPLETED. Optimized cpy kernels:
+  - Increased SYCL_CPY_BLOCK_SIZE from 32 to 256 (scalar copy work-groups)
+  - Increased quantized copy work-groups from 1 to 256 (f32->q, q->f32, q->q kernels)
+  - Added [[sycl::reqd_sub_group_size(WARP_SIZE)]] to all 20+ kernel launches
+  - f32->q4_0: 6.72x speedup (804.77 us -> 119.69 us)
+  - q4_0->f32: 8.71x speedup (3946.24 us -> 453.45 us)
+  - Correctness: PASS (131/131 unit tests on b60)
+  - Note: Quantized copy with work-group=1 was catastrophically bad - 15/16 SIMD lanes wasted on Xe2
+
 [2026-02-27] opt_task_003 (top_k SLM overflow fix): COMPLETED. Fixed critical correctness bugs in top-k kernel:
   - Added k=1 fast path using argmax_f32_i32_sycl directly — ~1000x faster for greedy decoding
   - Added SLM overflow fallback in argsort_f32_i32_sycl — handles vocab sizes > 16384 (was crashing)
