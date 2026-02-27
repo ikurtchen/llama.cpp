@@ -3752,12 +3752,147 @@
       "overall_optimization_potential": "medium",
       "estimated_current_efficiency": "20-30% — The backward kernel has identical structural problems to the forward kernel (sk_027): critically undersized work-groups (16 threads), no vectorization, standard transcendentals. The additional anti-pattern of redundant global memory logits read (non-SLM path) makes the backward kernel slightly less efficient than the forward. However, the overall potential is rated 'medium' rather than 'high' because this is a training-only backward pass kernel — it has zero wall-clock impact during inference, which is the primary use case for llama.cpp. For training/fine-tuning workloads on Intel GPUs, the combined forward+backward cross-entropy optimization would yield 4-8x improvement.",
       "feature_parity_with_cuda": "functionally complete but architecturally suboptimal — both SYCL and CUDA use single-warp kernels. The SYCL backward kernel closely mirrors the CUDA cross_entropy_loss_back_f32 kernel structure. The key difference is the global scratch buffer fallback path (dst_tmp) which CUDA does not need since CUDA shared memory limits are higher (48-164KB vs 64KB on Xe2). Both backends share the fundamental limitation of small work-group size."
+    },
+    {
+      "kernel_id": "sk_029",
+      "name": "ggml_sycl_op_top_k",
+      "file": "ggml/src/ggml-sycl/top-k.cpp",
+      "source_cuda_ids": [],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": [256, 1, 1],
+          "sub_group_size": null,
+          "global_size_expression": "nrows * 256 for the copy kernel; argsort uses dynamic work-group size up to max_work_group_size with ncols_pad elements in SLM",
+          "notes": "Two kernels launched: (1) argsort_f32_i32_sycl with nd_range<3>((1, nrows, nth), (1, 1, nth)) where nth = min(ncols_pad, max_work_group_size), (2) inline copy kernel with nd_range<1>(nrows*256, 256). The argsort kernel has no [[sycl::reqd_sub_group_size]] attribute. The copy kernel also lacks the attribute. The argsort kernel uses 3D nd_range with dimensions 0 and 1 being trivial (DPCT artifact)."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "strided_accesses": [
+            "Bitonic sort compare-and-swap accesses dst_row[col ^ j] — inherently strided by power-of-2 distance j, causing SLM bank conflicts when j is a multiple of 16",
+            "Copy kernel reads tmp_dst[row * ncols_int + j] but writes dst_dd[row * k_int + j] — different strides, though both coalesced within a work-group"
+          ],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "Copy kernel uses scalar int32 loads/stores. The argsort kernel operates entirely in SLM after initial load and final write-back. Initial x_row reads and final dst writes are coalesced. The SLM bitonic compare-swap pattern has inherent stride-j accesses that cause bank conflicts for certain j values."
+        },
+        "slm_usage": {
+          "uses_slm": true,
+          "slm_bytes": "ncols_pad * sizeof(int) — can be very large: for ncols=32000 (typical LLM vocab), ncols_pad=32768, requiring 128 KB SLM which EXCEEDS the 64 KB Xe-core limit",
+          "potential_bank_conflicts": true,
+          "notes": "CRITICAL: For typical LLM vocabulary sizes (32000-128000), the SLM allocation exceeds 64 KB per Xe-core. The SYCL code asserts shared_mem <= smpbo (shared memory per block/occupancy) but this may silently spill to global memory or fail on Intel GPUs where SLM is 64 KB per Xe-core. The CUDA version detects this case (shared_mem > max_shared_mem || ncols > 1024) and falls back to CUB DeviceSegmentedSort, but the SYCL version has NO fallback — it always uses the bitonic sort regardless of ncols. Bank conflicts occur at j = 16, 32, 48, ... in the bitonic sort due to 16-bank SLM."
+        },
+        "reduction_pattern": {
+          "has_reduction": false,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "No reductions. The bitonic sort uses compare-and-swap operations with SLM barriers."
+        },
+        "data_types": {
+          "compute_type": "float (comparisons) + int32 (indices)",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "Data types are appropriate — float comparisons for sort order, int32 for indices."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [],
+          "notes": "No math functions — only comparisons and integer operations."
+        },
+        "loop_analysis": {
+          "hot_loops": [
+            "Outer bitonic sort loop: O(log²(ncols_pad)) iterations — for ncols_pad=32768, that's 15*15/2 ≈ 120 barrier-synchronized passes (line 1591-1620 of ggml-sycl.cpp)",
+            "Inner tasks_per_thread loop: each thread processes multiple columns when ncols_pad > max_work_group_size (lines 1593-1618)",
+            "Copy loop: k iterations per work-group thread (line 43 of top-k.cpp)"
+          ],
+          "unrolled": false,
+          "notes": "No #pragma unroll on any loop. The inner tasks_per_thread loop (typically 32+ iterations for vocab-size columns) could benefit from unrolling. The bitonic sort barrier is inside the innermost loop (line 1617), creating massive synchronization overhead — O(ncols_pad * log²(ncols_pad)) barriers per row."
+        },
+        "estimated_bottleneck": "launch_overhead",
+        "anti_patterns": [
+          "ALGORITHMIC: Full O(n log² n) bitonic sort for top-k when k << n (typically k=1-50, n=32000-128000). CUDA uses O(n) CUB DeviceTopK::MaxPairs. For k=1 (argmax), this is thousands of times slower than necessary.",
+          "SLM OVERFLOW: ncols_pad * sizeof(int) for vocab-size columns (32K-128K) massively exceeds 64 KB SLM limit. No fallback path exists in SYCL unlike CUDA which switches to CUB DeviceSegmentedSort.",
+          "MEMORY WASTE: Allocates ncols * nrows temporary buffer (tmp_alloc) to hold full argsort result, then copies only k elements per row. For nrows=1, ncols=32000, k=10: allocates 125 KB to use 40 bytes.",
+          "REDUNDANT WORK: Sorts ALL ncols elements descending when only the top k are needed.",
+          "Missing [[sycl::reqd_sub_group_size(16)]] on both argsort and copy kernels",
+          "Argsort uses 3D nd_range with dimensions 0 and 2 trivial (DPCT artifact from CUDA dim3)",
+          "dpct::queue_ptr instead of sycl::queue& in argsort_f32_i32_sycl declaration (top-k.cpp line 19)",
+          "Barrier inside innermost loop of bitonic sort — O(ncols_pad * log²(ncols_pad)) barriers per row",
+          "Copy kernel is unnecessarily complex — could use sycl::queue::memcpy with 2D stride (matching CUDA's cudaMemcpy2DAsync)"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_029_001",
+          "category": "work_group_size",
+          "priority": "high",
+          "description": "Implement a proper top-k selection algorithm instead of full argsort. For the common case k << ncols (e.g., k=1-50, ncols=32000-128000 for LLM vocabularies), a partial sort or selection algorithm is O(n) vs the current O(n log² n) bitonic sort. Options: (1) Radix-select (like CUB DeviceTopK): O(n) single-pass selection using radix bits to partition elements. (2) Heap-based top-k: each thread maintains a local min-heap of size k, then merge across work-group. (3) Multi-pass filter: first pass finds approximate k-th value via sampling, second pass collects elements above threshold. For k=1, this degenerates to a simple parallel max reduction (already implemented as argmax_f32_i32_sycl). The CUDA backend uses CUB DeviceTopK::MaxPairs which is a highly optimized radix-select.",
+          "expected_improvement": "10-100x for typical LLM use cases (k=1-50, ncols=32000). For k=1 (most common in greedy decoding), simply calling the existing argmax kernel would be ~1000x faster than full sort. Even for k=50, a proper selection algorithm avoids the full O(n log² n) sort overhead.",
+          "implementation_notes": "Phase 1 (quick win): For k=1, detect and call argmax_f32_i32_sycl directly. Phase 2: Implement a oneAPI-compatible top-k selection. Options: (a) Use oneDPL (oneAPI DPC++ Library) which has std::partial_sort equivalent. (b) Port the CUB DeviceTopK approach: use radix bits (starting from MSB of float representation) to count elements in each bucket, determine which bucket contains the k-th element, recursively narrow. (c) For small k (< 32): thread-local insertion sort of k elements, then warp-level merge. The allocation of ncols*nrows temporary buffer should be eliminated — proper top-k only needs O(k*nrows) output space.",
+          "risk": "high",
+          "risk_notes": "Algorithmic rewrite. The radix-select approach is complex to implement correctly, especially for floating-point comparisons (need IEEE 754 bit tricks for correct ordering of negative numbers). The heap approach is simpler but less efficient. Testing against the current full-sort implementation for correctness is straightforward. For k=1, the argmax fast-path is zero risk."
+        },
+        {
+          "id": "opt_029_002",
+          "category": "slm_tuning",
+          "priority": "high",
+          "description": "Fix SLM overflow for large ncols. The current implementation allocates ncols_pad * sizeof(int) bytes of SLM, which for typical LLM vocab sizes (32000→32768 pad, 128KB) exceeds the 64KB SLM limit per Xe-core on Intel Arc Pro B60. The CUDA version detects this (shared_mem > max_shared_mem || ncols > 1024) and falls back to CUB sort. The SYCL version has only an assert (line 1819 of ggml-sycl.cpp: GGML_ASSERT(shared_mem <= smpbo)) which will abort at runtime for any vocabulary > 16384 tokens. This is a blocking bug for most LLM inference workloads.",
+          "expected_improvement": "Correctness fix — enables top-k to work at all for typical LLM vocabulary sizes (32K-128K tokens). Without this fix, the kernel crashes for ncols > 16384.",
+          "implementation_notes": "Implement a fallback path in argsort_f32_i32_sycl (or better, in ggml_sycl_op_top_k directly) that handles ncols > SLM_LIMIT/sizeof(int). Options: (1) Use oneDPL sorting (oneapi::dpl::sort_by_key) which handles arbitrary sizes via multi-pass global memory algorithms. (2) Implement a multi-pass merge sort in global memory. (3) For top-k specifically, the radix-select from opt_029_001 naturally handles large ncols without SLM overflow since it works in O(1) SLM per thread. Interim fix: detect ncols > 16384 (SLM limit / sizeof(int)) and use a CPU fallback or oneDPL sort.",
+          "risk": "medium",
+          "risk_notes": "Using oneDPL adds a dependency but is well-supported in oneAPI. The merge-sort approach is more complex but self-contained. For now, the assert crash means this is a hard blocker that must be fixed regardless of approach."
+        },
+        {
+          "id": "opt_029_003",
+          "category": "work_group_size",
+          "priority": "medium",
+          "description": "Replace the inline copy kernel with sycl::queue::memcpy or sycl::handler::copy with 2D stride semantics. The CUDA version uses cudaMemcpy2DAsync(dst, k*sizeof(int), src, ncols*sizeof(int), k*sizeof(int), nrows, D2D) which is optimized for strided 2D copies by the DMA engine. The SYCL inline copy kernel (lines 38-47 of top-k.cpp) launches 256 threads per row to copy k elements — significant launch overhead for typical k values (1-50).",
+          "expected_improvement": "Minor (5-10%) for the copy phase. The main bottleneck is the sort phase, not the copy. However, for k=1 this launches an entire kernel to copy a single int per row, which is wasteful.",
+          "implementation_notes": "Replace the parallel_for copy kernel with: for (int row = 0; row < nrows; ++row) { main_stream->memcpy(dst_dd + row * k_int, tmp_dst + row * ncols_int, k_int * sizeof(int)); } or use sycl::handler::copy with appropriate offset computation. For a batched approach, use USM or buffer-based 2D copy patterns. Note: SYCL does not have a direct memcpy2D equivalent, so the loop of 1D copies is the idiomatic approach. Alternatively, keep the kernel but reduce work-group size to match k (e.g., use min(k, 256) threads).",
+          "risk": "low",
+          "risk_notes": "Simple replacement. The memcpy approach is idiomatic SYCL."
+        },
+        {
+          "id": "opt_029_004",
+          "category": "work_group_size",
+          "priority": "medium",
+          "description": "Eliminate the ncols*nrows temporary buffer allocation. The current implementation allocates ncols*nrows ints to hold the full argsort result, then copies only k elements per row. For typical LLM inference (ncols=32000, nrows=1, k=10), this allocates 125 KB to use 40 bytes. A proper top-k selection algorithm (opt_029_001) would only need k*nrows output space. Even with the current argsort approach, the copy could write directly to dst during the sort's final write-back phase, avoiding the temporary buffer entirely.",
+          "expected_improvement": "Memory savings: up to ncols*nrows*sizeof(int) bytes freed from the device memory pool. For ncols=128000, nrows=32 batch, this saves 16 MB of temporary allocation. Also eliminates the copy kernel launch entirely if integrated into argsort write-back.",
+          "implementation_notes": "Option 1 (with argsort): Modify the argsort kernel's final write-back (lines 1623-1628 of ggml-sycl.cpp) to only write the first k elements: if (col < k) { dst[row * k + col] = dst_row[col]; }. Pass k as an additional parameter. This eliminates both the temporary buffer and the copy kernel. Option 2 (with proper top-k): The selection algorithm writes directly to the k-element output buffer.",
+          "risk": "low",
+          "risk_notes": "Option 1 is a minimal change to the argsort kernel. Option 2 is part of the larger algorithmic rewrite."
+        },
+        {
+          "id": "opt_029_005",
+          "category": "sub_group_ops",
+          "priority": "low",
+          "description": "Add [[sycl::reqd_sub_group_size(16)]] to both the argsort kernel and the copy kernel lambda. Without this attribute, the compiler may choose SIMD32 which halves occupancy on Xe2. The argsort kernel's barrier-heavy nature means occupancy has limited impact (threads are mostly waiting at barriers), but the copy kernel benefits from better latency hiding.",
+          "expected_improvement": "2-5% for the copy kernel. Negligible for the argsort kernel which is barrier-dominated.",
+          "implementation_notes": "Add [[sycl::reqd_sub_group_size(16)]] to the lambda at line 41 of top-k.cpp and to the argsort lambda at lines 1828 and 1843 of ggml-sycl.cpp. Ref: optimization_guide.md section 1.2.",
+          "risk": "low",
+          "risk_notes": "No sub-group operations are used, so this only affects SIMD width and occupancy."
+        },
+        {
+          "id": "opt_029_006",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Clean up DPCT artifacts: (1) Replace dpct::queue_ptr with sycl::queue& in top-k.cpp line 19. (2) Replace 3D nd_range with 1D for the argsort dispatch (only dimension 2 is meaningful). (3) Clean up get_multi_ptr extraction pattern in argsort (lines 1832-1833 of ggml-sycl.cpp). (4) Replace __dpct_inline__ with standard inline or remove.",
+          "expected_improvement": "Negligible performance improvement. Primary benefit is code clarity and maintainability.",
+          "implementation_notes": "1. In argsort_f32_i32_sycl: change nd_range<3>((1, nrows, nth), (1, 1, nth)) to nd_range<2>((nrows, nth), (1, nth)) or nd_range<1>(nrows*nth, nth) with group-id for row. 2. Change k_argsort_f32_i32 to accept nd_item<1> or nd_item<2>. 3. Remove __dpct_inline__ from k_argsort_f32_i32 declaration.",
+          "risk": "low",
+          "risk_notes": "Mechanical refactoring. The argsort function is shared with ggml_sycl_op_argsort, so changes need to be compatible with both callers."
+        }
+      ],
+      "overall_optimization_potential": "high",
+      "estimated_current_efficiency": "5-10% — The top-k kernel is fundamentally broken for typical LLM use cases: (1) it uses O(n log² n) full bitonic sort instead of O(n) selection for top-k when k << n, (2) SLM overflow crashes for vocabulary sizes > 16384 tokens (most LLMs use 32K-128K), (3) allocates unnecessarily large temporary buffers. CUDA uses CUB DeviceTopK::MaxPairs (O(n) radix-select) for the primary path and only falls back to argsort+copy when CUB is unavailable. The SYCL version is always in the worst-case fallback path. For the common inference case of k=1 (greedy decoding), the existing argmax kernel could handle this 1000x faster. The kernel is functionally correct for small ncols (< 16384) but crashes or produces undefined behavior for typical LLM vocabulary sizes."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 28,
+    "total_kernels_analyzed": 29,
     "critical_potential": 1,
-    "high_potential": 7,
+    "high_potential": 8,
     "medium_potential": 9,
     "low_potential": 10,
     "no_optimization_needed": 1,
@@ -4041,6 +4176,20 @@
         "opportunity_id": "opt_028_002",
         "description": "Eliminate redundant logits read via online softmax — 20-40% memory traffic reduction for non-SLM path",
         "priority": "high"
+      },
+      {
+        "kernel_id": "sk_029",
+        "kernel_name": "ggml_sycl_op_top_k",
+        "opportunity_id": "opt_029_001",
+        "description": "Replace O(n log² n) bitonic argsort with O(n) radix-select algorithm — 10-100x speedup for typical LLM vocabulary sizes (32K-128K tokens with k << n)",
+        "priority": "critical"
+      },
+      {
+        "kernel_id": "sk_029",
+        "kernel_name": "ggml_sycl_op_top_k",
+        "opportunity_id": "opt_029_002",
+        "description": "Fix SLM overflow bug — ncols_pad * sizeof(int) exceeds 64KB Xe-core SLM limit for vocabulary sizes > 16384, causing runtime crash via GGML_ASSERT",
+        "priority": "critical"
       }
     ]
   }

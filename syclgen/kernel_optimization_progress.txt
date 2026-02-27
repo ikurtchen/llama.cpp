@@ -5,9 +5,9 @@
 
 ## Summary
 - Total SYCL kernels to analyze: 33
-- Kernels analyzed so far: 28
+- Kernels analyzed so far: 29
 - Analysis complete: No
-- Kernels with optimization potential: 27
+- Kernels with optimization potential: 28
 - Kernels with no optimization needed: 1
 - Optimization tasks created: 0 (pending finalization)
 
@@ -40,13 +40,21 @@
 - [x] sk_026: ggml_sycl_op_conv_transpose_2d — low potential (5 optimization opportunities)
 - [x] sk_027: ggml_sycl_cross_entropy_loss — high potential (6 optimization opportunities)
 - [x] sk_028: ggml_sycl_cross_entropy_loss_back — medium potential (7 optimization opportunities)
-- [ ] sk_029: ggml_sycl_op_top_k — pending
+- [x] sk_029: ggml_sycl_op_top_k — high potential (6 optimization opportunities)
 - [ ] sk_030: ggml_sycl_op_cumsum — pending
 - [ ] sk_031: ggml_sycl_op_solve_tri — pending
 - [ ] sk_032: ggml_sycl_op_ssm_scan — pending
 - [ ] sk_033: ggml_sycl_op_topk_moe — pending
 
 ## Recent Activity
+[2026-02-27] Analyzed kernel ggml_sycl_op_top_k (sk_029). Found 6 optimization opportunities (high potential).
+  - CRITICAL: Uses O(n log² n) full bitonic argsort instead of O(n) radix-select for top-k — CUDA uses CUB DeviceTopK::MaxPairs. For greedy decoding (k=1), existing argmax would be ~1000x faster.
+  - CRITICAL: SLM overflow bug — allocates ncols_pad * sizeof(int) in SLM, which is 128KB-512KB for typical LLM vocabularies (32K-128K tokens), far exceeding the 64KB Xe-core limit. Crashes at runtime via GGML_ASSERT.
+  - HIGH: Allocates ncols * nrows temporary int32 buffer for full sort results, then copies only k per row — massive memory waste.
+  - HIGH: No fast-path for k=1 (greedy decoding) — most common inference case could use simple argmax.
+  - MEDIUM: Missing [[sycl::reqd_sub_group_size(16)]] on both argsort and copy kernels.
+  - LOW: DPCT artifacts — 3D nd_range with trivial dims, dpct::queue_ptr, manual get_multi_ptr extraction.
+
 [2026-02-27] Analyzed kernel ggml_sycl_cross_entropy_loss_back (sk_028). Found 7 optimization opportunities (medium potential).
   - HIGH: Work-group size is only WARP_SIZE (16 threads) — 4-8x throughput gain possible by increasing to 256+ with multi-sub-group reduction. Identical to forward kernel (sk_027).
   - HIGH: Redundant logits read from global memory in non-SLM path — online softmax could eliminate extra write+read (20-40% memory traffic reduction).
