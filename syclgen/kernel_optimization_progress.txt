@@ -5,9 +5,9 @@
 
 ## Summary
 - Total SYCL kernels to analyze: 33
-- Kernels analyzed so far: 29
+- Kernels analyzed so far: 30
 - Analysis complete: No
-- Kernels with optimization potential: 28
+- Kernels with optimization potential: 29
 - Kernels with no optimization needed: 1
 - Optimization tasks created: 0 (pending finalization)
 
@@ -41,12 +41,20 @@
 - [x] sk_027: ggml_sycl_cross_entropy_loss — high potential (6 optimization opportunities)
 - [x] sk_028: ggml_sycl_cross_entropy_loss_back — medium potential (7 optimization opportunities)
 - [x] sk_029: ggml_sycl_op_top_k — high potential (6 optimization opportunities)
-- [ ] sk_030: ggml_sycl_op_cumsum — pending
+- [x] sk_030: ggml_sycl_op_cumsum — low potential (5 optimization opportunities)
 - [ ] sk_031: ggml_sycl_op_solve_tri — pending
 - [ ] sk_032: ggml_sycl_op_ssm_scan — pending
 - [ ] sk_033: ggml_sycl_op_topk_moe — pending
 
 ## Recent Activity
+[2026-02-27] Analyzed kernel ggml_sycl_op_cumsum (sk_030). Found 5 optimization opportunities (low potential).
+  - MEDIUM: Missing CUB DeviceScan/BlockScan equivalent — SYCL only implements CUDA's fallback two-level scan path. For long rows (ne00 > 4096), oneDPL inclusive_scan could provide 2-4x speedup.
+  - LOW: Scalar loads/stores — vec4 vectorization would improve memory throughput 10-20% (each thread already processes 4 contiguous elements).
+  - LOW: Missing #pragma unroll on 3-4 iteration inner loops that CUDA version explicitly unrolls.
+  - LOW: DPCT artifacts — 3D nd_range with block_dims=(1,1,N), item_ct1 naming, get_local_id(2) indexing.
+  - LOW: No contiguous fast-path — always uses element strides even for contiguous tensors.
+  - Note: Kernel already uses idiomatic sycl::inclusive_scan_over_group for sub-group prefix scan. Has correct reqd_sub_group_size(16). SLM usage is minimal (~1KB). Near-optimal for short rows (ne00 <= 1024).
+
 [2026-02-27] Analyzed kernel ggml_sycl_op_top_k (sk_029). Found 6 optimization opportunities (high potential).
   - CRITICAL: Uses O(n log² n) full bitonic argsort instead of O(n) radix-select for top-k — CUDA uses CUB DeviceTopK::MaxPairs. For greedy decoding (k=1), existing argmax would be ~1000x faster.
   - CRITICAL: SLM overflow bug — allocates ncols_pad * sizeof(int) in SLM, which is 128KB-512KB for typical LLM vocabularies (32K-128K tokens), far exceeding the 64KB Xe-core limit. Crashes at runtime via GGML_ASSERT.

@@ -3887,14 +3887,132 @@
       ],
       "overall_optimization_potential": "high",
       "estimated_current_efficiency": "5-10% — The top-k kernel is fundamentally broken for typical LLM use cases: (1) it uses O(n log² n) full bitonic sort instead of O(n) selection for top-k when k << n, (2) SLM overflow crashes for vocabulary sizes > 16384 tokens (most LLMs use 32K-128K), (3) allocates unnecessarily large temporary buffers. CUDA uses CUB DeviceTopK::MaxPairs (O(n) radix-select) for the primary path and only falls back to argsort+copy when CUB is unavailable. The SYCL version is always in the worst-case fallback path. For the common inference case of k=1 (greedy decoding), the existing argmax kernel could handle this 1000x faster. The kernel is functionally correct for small ncols (< 16384) but crashes or produces undefined behavior for typical LLM vocabulary sizes."
+    },
+    {
+      "kernel_id": "sk_030",
+      "name": "ggml_sycl_op_cumsum",
+      "file": "ggml/src/ggml-sycl/cumsum.cpp",
+      "source_cuda_ids": ["ck_048", "ck_049"],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": "dynamic: min(ceil(ne00/WARP_SIZE)*WARP_SIZE, 256). Max 256 (SYCL_CUMSUM_BLOCK_SIZE). One work-group per row.",
+          "sub_group_size": 16,
+          "global_size_expression": "3D: (ne03, ne02, ne01) * (1, 1, block_size) — one work-group per row across batch/channel/row dims",
+          "notes": "Uses 3D nd_range with block_dims=(1,1,block_size) — the work-group is effectively 1D but wrapped in 3D grid for batch/channel indexing. Has [[sycl::reqd_sub_group_size(WARP_SIZE)]] attribute (line 160). WARP_SIZE=16 on Intel. Grid dimension ordering (ne03,ne02,ne01) is the SYCL-correct reverse of CUDA's (ne01,ne02,ne03)."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "strided_accesses": [],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "Each thread reads 4 contiguous elements (num_unroll=4) per chunk iteration. Adjacent threads access adjacent 4-element blocks, so accesses are effectively coalesced within cache lines. Loads and stores are all scalar float — no sycl::vec usage. Source uses element strides (s01, s02, s03) to support non-contiguous tensors."
+        },
+        "slm_usage": {
+          "uses_slm": true,
+          "slm_bytes": "~1096 bytes max (Intel): block_size*4 + warps_per_block*4 + 2*4 = 256*4 + 16*4 + 8 = 1096. Negligible.",
+          "potential_bank_conflicts": false,
+          "notes": "Three separate local_accessor allocations: (1) s_vals[block_size] for per-thread scan values, (2) s_warp_sums[warps_per_block] for cross-warp scan, (3) s_carry[2] for carry+chunk_total. All accesses are conflict-free: s_vals indexed by thread-id (consecutive, different banks), s_warp_sums indexed by warp-id (only one writer per warp), s_carry broadcast reads."
+        },
+        "reduction_pattern": {
+          "has_reduction": true,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "Uses sycl::inclusive_scan_over_group(sub_group, ...) (lines 62, 73) — idiomatic SYCL sub-group prefix scan, NOT a simple reduction. This is the correct translation of CUDA's manual warp_prefix_inclusive_sum using __shfl_up_sync. Two-level scan: (1) intra-warp scan via sub-group collective, (2) cross-warp scan by warp 0 using sub-group collective + SLM. No atomics."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "Float-only (hardcoded). Cumulative sum accumulates error linearly with row length — using half precision would introduce unacceptable numerical error for typical row sizes (hundreds to thousands of elements). Float is the appropriate type."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [],
+          "notes": "Pure arithmetic (addition only). No transcendental or special math functions."
+        },
+        "loop_analysis": {
+          "hot_loops": [
+            "Main chunk loop (line 46): iterates ceil(ne00 / (4 * block_size)) times — for ne00 <= 1024 this is 1 iteration",
+            "Thread-local scan loop (lines 51-56): 3 iterations (num_unroll-1), compile-time constant",
+            "Write-back loop (lines 88-92): 4 iterations (num_unroll), compile-time constant"
+          ],
+          "unrolled": false,
+          "notes": "No explicit #pragma unroll on any loops. CUDA version has #pragma unroll on the equivalent inner loops (lines 48, 64, 132, 172 of cumsum.cu). The DPC++ compiler likely auto-unrolls the small constant-trip loops but this is not guaranteed across all SYCL compilers."
+        },
+        "estimated_bottleneck": "memory",
+        "anti_patterns": [
+          "3D nd_range with block_dims=(1,1,block_size) for effectively 1D work-group — DPCT-style artifact (line 150, 159)",
+          "get_local_id(2) / get_local_range(2) indexing — DPCT convention mapping threadIdx.x to dim 2 (lines 15-16)",
+          "item_ct1 parameter naming — DPCT naming convention artifact (line 12)",
+          "Missing #pragma unroll on 3-4 iteration inner loops that CUDA version explicitly unrolls",
+          "Missing CUB DeviceScan/BlockScan equivalent — SYCL only implements CUDA's fallback path, not the optimized CUB paths"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_030_001",
+          "category": "reduction",
+          "priority": "medium",
+          "description": "Implement oneDPL inclusive_scan equivalent for long rows (ne00 > 1024). CUDA uses CUB DeviceScan::InclusiveSum for large single-row prefix sums and CUB BlockScan for block-wide scans, both of which are significantly faster than the manual two-level scan for long rows. The oneDPL library (oneapi::dpl::inclusive_scan) provides a device-wide prefix scan that maps to the same class of multi-pass look-back algorithms. For ne00 > 4096, this could provide 2-4x speedup over the current approach which processes 4*256=1024 elements per chunk with a serial carry chain between chunks.",
+          "expected_improvement": "2-4x for long rows (ne00 > 4096). No improvement for short rows (ne00 <= 1024) where the current single-chunk approach is already efficient.",
+          "implementation_notes": "Add a dispatch check: if ne00 > threshold (e.g. 4096) and data is contiguous, use oneapi::dpl::inclusive_scan_async or equivalent. Keep the current kernel as fallback for non-contiguous data and short rows. Ref: Intel oneAPI DPL documentation. Note that oneDPL must be linked (add -lonedpl to CMake). The CUB path in CUDA (cumsum.cu lines 190-210, 232-236) calls cub::DeviceScan::InclusiveSum per row.",
+          "risk": "medium",
+          "risk_notes": "Adds a dependency on oneDPL library. Need to verify oneDPL availability across all supported SYCL compilers (Intel DPC++, hipSYCL, AdaptiveCpp). For non-Intel backends, the fallback kernel would still be used."
+        },
+        {
+          "id": "opt_030_002",
+          "category": "vectorization",
+          "priority": "low",
+          "description": "Use sycl::vec<float,4> for vectorized loads and stores. Each thread already processes 4 contiguous elements (num_unroll=4), so the access pattern naturally maps to vec4 loads/stores. Currently each element is loaded individually (lines 50, 54) and stored individually (line 90). Replacing with vec4 operations would reduce memory transaction count by 4x and better utilize the memory bus.",
+          "expected_improvement": "10-20% for memory-bound cases (ne00 > 256). For very short rows (ne00 < 64), the kernel is launch-overhead-bound and vectorization has minimal effect.",
+          "implementation_notes": "Replace the scalar load at line 50 with: sycl::vec<float,4> v = *reinterpret_cast<const sycl::vec<float,4>*>(&src_row[idx]); with a bounds check. Replace the scalar store at line 90 similarly. Need to handle the case where ne00 is not a multiple of 4 (partial vec at the end). Ref: optimization_guide.md section 2.2.",
+          "risk": "low",
+          "risk_notes": "Standard vectorization transformation. Need to verify alignment requirements — src_row pointer may not be 16-byte aligned. Use unaligned access or conditional scalar fallback for unaligned cases."
+        },
+        {
+          "id": "opt_030_003",
+          "category": "loop_unroll",
+          "priority": "low",
+          "description": "Add explicit #pragma unroll on the two inner loops: the thread-local scan loop (line 51, trip count 3) and the write-back loop (line 88, trip count 4). The CUDA version has #pragma unroll on all equivalent loops. While DPC++ likely auto-unrolls these small constant-trip loops, explicit pragmas guarantee unrolling across all SYCL compilers and make the optimization intent clear.",
+          "expected_improvement": "0-5%. The compiler almost certainly auto-unrolls these already, but making it explicit eliminates any uncertainty.",
+          "implementation_notes": "Add '#pragma unroll' before lines 51 and 88. Also consider adding it before the main chunk loop body's inner statements if the compiler doesn't fully unroll. Ref: optimization_guide.md section 3.3.",
+          "risk": "low",
+          "risk_notes": "No risk — #pragma unroll is a hint that the compiler can ignore if it determines unrolling is harmful."
+        },
+        {
+          "id": "opt_030_004",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Clean up DPCT artifacts: (1) Replace 3D nd_range with 1D nd_range + manual row/batch indexing from work-group ID, or use 3D but with natural dimension ordering. (2) Replace item_ct1 naming with item. (3) Use get_local_id(0) instead of get_local_id(2) with 1D nd_range. The current 3D layout with block_dims=(1,1,N) is a direct CUDA-to-SYCL port artifact.",
+          "expected_improvement": "Negligible performance impact. Primary benefit is code clarity and maintainability.",
+          "implementation_notes": "Option A (1D nd_range): Change to nd_range<1>(ne01*ne02*ne03*block_size, block_size). Compute row/batch indices from group_id: row_idx = group_id % ne01, slice_idx = (group_id/ne01) % ne02, batch_idx = group_id / (ne01*ne02). Option B (keep 3D, fix naming): Just rename item_ct1→item and change get_local_id(2)→get_local_id(2) is already the innermost dim, so no change needed — just clean naming. The 3D grid structure is functionally justified by the 3D tensor indexing, so Option B is simpler.",
+          "risk": "low",
+          "risk_notes": "Mechanical refactoring. Option A requires verifying that the flattened group_id decomposition matches the 3D decomposition exactly."
+        },
+        {
+          "id": "opt_030_005",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Add contiguous fast-path optimization. When the source tensor is contiguous (nb00 == sizeof(float)), skip the element-stride indexing for source reads and use direct pointer arithmetic. Currently the kernel always uses element strides (s01, s02, s03) for source indexing (line 38), which adds unnecessary multiplication overhead for the common contiguous case. The CUDA CUB path checks contiguity (cumsum.cu line 225) and the SYCL version could similarly branch.",
+          "expected_improvement": "2-5% for contiguous tensors from eliminating stride multiplications. Most tensors in practice are contiguous.",
+          "implementation_notes": "Add a check in ggml_sycl_op_cumsum: if (src0->type == GGML_TYPE_F32 && ggml_is_contiguous(src0)), launch a variant that computes src_row = src + row_idx * ne00 directly. The kernel could be templated on a bool is_contiguous parameter.",
+          "risk": "low",
+          "risk_notes": "Simple conditional optimization. The non-contiguous path remains unchanged as fallback."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "60-75% — The kernel correctly implements a two-level parallel prefix scan using idiomatic SYCL sub-group collectives (sycl::inclusive_scan_over_group). Work-group size is reasonable (up to 256), sub-group size is correctly enforced at 16 for Intel. SLM usage is minimal (~1KB). The main gap vs CUDA is the missing CUB DeviceScan/BlockScan equivalents for long rows (ne00 > 1024), where the current approach's serial carry chain between chunks becomes the bottleneck. For short rows (ne00 <= 1024, single chunk), the kernel is already near-optimal. The cumsum operation is rarely in the hot path for LLM inference (primarily used by Mamba SSM models), so the overall wall-clock impact of optimization is low."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 29,
+    "total_kernels_analyzed": 30,
     "critical_potential": 1,
     "high_potential": 8,
     "medium_potential": 9,
-    "low_potential": 10,
+    "low_potential": 11,
     "no_optimization_needed": 1,
     "top_opportunities": [
       {
