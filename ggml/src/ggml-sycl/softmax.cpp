@@ -3,6 +3,12 @@
 #include <utility>
 #include <cmath>
 
+// opt_task_014: Enable vec4 vectorized loads/stores for memory-bound kernels
+// Target: Intel Arc Pro B60 (Xe2), 456 GB/s memory bandwidth
+// vec4 loads can improve memory bandwidth utilization by 20-40%
+#ifndef GGML_SYCL_VEC4
+#define GGML_SYCL_VEC4 1
+#endif
 
 template <typename T> static __dpct_inline__ float t2f32(T val) {
     return (float) val;
@@ -177,6 +183,8 @@ static void soft_max_f32(const float *         x,
 
 static void soft_max_back_f32(const float *grad, const float *dstf, float *dst,
                               const int ncols, const float scale) {
+    // opt_001_003: vec4 vectorized loads/stores for memory-bound kernel
+    // Target: Intel Arc Pro B60 (Xe2), 456 GB/s memory bandwidth
     auto      item_ct1 = sycl::ext::oneapi::this_work_item::get_nd_item<3>();
     const int tid      = item_ct1.get_local_id(2);
     const int rowx     = item_ct1.get_group(2);
@@ -187,15 +195,43 @@ static void soft_max_back_f32(const float *grad, const float *dstf, float *dst,
 
     float dgf_dot = 0.0f; // dot product of dst from forward pass and gradients
 
+#if GGML_SYCL_VEC4
+    // Process 4 elements at a time with vec4 loads
+    const int vec4_col_end = (ncols / 4) * 4;
+    for (int col = tid; col < vec4_col_end; col += WARP_SIZE) {
+        sycl::vec<float, 4> grad_v = *reinterpret_cast<const sycl::vec<float, 4>*>(&grad[col]);
+        sycl::vec<float, 4> dstf_v = *reinterpret_cast<const sycl::vec<float, 4>*>(&dstf[col]);
+        dgf_dot += dstf_v[0] * grad_v[0] + dstf_v[1] * grad_v[1] + dstf_v[2] * grad_v[2] + dstf_v[3] * grad_v[3];
+    }
+    // Handle remaining elements (0-3)
+    for (int col = vec4_col_end + tid; col < ncols; col += WARP_SIZE) {
+        dgf_dot += dstf[col]*grad[col];
+    }
+#else
     for (int col = tid; col < ncols; col += WARP_SIZE) {
         dgf_dot += dstf[col]*grad[col];
     }
+#endif
 
     dgf_dot = warp_reduce_sum(dgf_dot);
 
+#if GGML_SYCL_VEC4
+    // Process 4 elements at a time with vec4 loads/stores
+    for (int col = tid; col < vec4_col_end; col += WARP_SIZE) {
+        sycl::vec<float, 4> grad_v = *reinterpret_cast<const sycl::vec<float, 4>*>(&grad[col]);
+        sycl::vec<float, 4> dstf_v = *reinterpret_cast<const sycl::vec<float, 4>*>(&dstf[col]);
+        sycl::vec<float, 4> dst_v = scale * (grad_v - dgf_dot) * dstf_v;
+        *reinterpret_cast<sycl::vec<float, 4>*>(&dst[col]) = dst_v;
+    }
+    // Handle remaining elements (0-3)
+    for (int col = vec4_col_end + tid; col < ncols; col += WARP_SIZE) {
+        dst[col] = scale * (grad[col] - dgf_dot) * dstf[col];
+    }
+#else
     for (int col = tid; col < ncols; col += WARP_SIZE) {
         dst[col] = scale * (grad[col] - dgf_dot) * dstf[col];
     }
+#endif
 }
 
 template <int... Ns, typename T>

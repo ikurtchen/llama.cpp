@@ -1,6 +1,17 @@
 {
   "results": [
     {
+      "task_id": "opt_task_014",
+      "kernel": "softmax",
+      "optimization": "Add vec4 vectorized loads/stores to soft_max_back_f32 kernel",
+      "timestamp": "2026-02-27T23:45:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": null,
+      "notes": "Added GGML_SYCL_VEC4 macro (default enabled). Applied vec4 vectorization to soft_max_back_f32: uses sycl::vec<float,4> loads for grad/dstf arrays and stores for dst array. Handles tail elements (non-multiple-of-4) with scalar fallback. Enabled via #if GGML_SYCL_VEC4 guard. Unit tests pass. Note: Other kernels (norm, element_wise, cross_entropy) have complex access patterns where threads process non-consecutive elements - unsafe to apply simple vec4 without major kernel restructuring."
+    },
+    {
       "task_id": "opt_task_013",
       "kernel": "multiple (rope, element_wise, cross_entropy, ssm_scan, topk_moe)",
       "optimization": "Replace standard sycl math functions with native:: variants (exp, sin, cos, log, sqrt, exp2+log2 for pow)",

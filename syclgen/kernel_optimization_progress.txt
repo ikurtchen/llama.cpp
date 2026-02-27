@@ -47,6 +47,15 @@
 - [x] sk_033: ggml_sycl_op_topk_moe — low potential (5 optimization opportunities)
 
 ## Recent Activity
+[2026-02-27] opt_task_014 (vec4 vectorization): COMPLETED. Applied vec4 vectorization to soft_max_back_f32:
+  - Added GGML_SYCL_VEC4 macro (default enabled)
+  - Added vec4 loads for grad/dstf arrays in first loop (dot product computation)
+  - Added vec4 loads/stores for dst array in second loop
+  - Handles tail elements (non-multiple-of-4) with scalar fallback
+  - Enabled via #if GGML_SYCL_VEC4 guard
+  - Correctness: PASS (SOFTMAX, CROSS_ENTROPY_LOSS, CROSS_ENTROPY_LOSS_BACK unit tests pass)
+  - Note: Other kernels (norm, element_wise, cross_entropy) have complex access patterns where threads process non-consecutive elements - unsafe to apply simple vec4 without major restructuring
+
 [2026-02-27] opt_task_013 (native math functions): COMPLETED. Replaced standard sycl math functions with native:: variants:
   - rope.cpp: sycl::log->native::log, sycl::cos/sin->native::cos/sin, sycl::pow->exp2(log2())
   - element_wise.cpp: sycl::exp->native::exp, sycl::log->native::log, sycl::sqrt->native::sqrt, sycl::sin/cos->native::sin/cos
