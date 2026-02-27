@@ -2192,14 +2192,20 @@
       "current_analysis": {
         "launch_config": {
           "uses_nd_range": true,
-          "work_group_size": [256, 1, 1],
+          "work_group_size": [
+            256,
+            1,
+            1
+          ],
           "sub_group_size": null,
-          "global_size_expression": "ceil_div(k_elements, 256) * 256 — one work-item per element",
-          "notes": "Uses ggml_sycl_op_unary framework with nd_range<1> and work-group size 256 (SYCL_ELEMENT_WISE_BLOCK_SIZE). No [[sycl::reqd_sub_group_size]] specified. The SYCL_GLOBAL_ID_LOOP macro implements a grid-stride loop, but since global_range >= k always holds, each work-item processes exactly 0 or 1 elements — the loop is effectively a single-iteration guard."
+          "global_size_expression": "ceil_div(k_elements, 256) * 256 \u2014 one work-item per element",
+          "notes": "Uses ggml_sycl_op_unary framework with nd_range<1> and work-group size 256 (SYCL_ELEMENT_WISE_BLOCK_SIZE). No [[sycl::reqd_sub_group_size]] specified. The SYCL_GLOBAL_ID_LOOP macro implements a grid-stride loop, but since global_range >= k always holds, each work-item processes exactly 0 or 1 elements \u2014 the loop is effectively a single-iteration guard."
         },
         "memory_patterns": {
           "coalesced_accesses": true,
-          "strided_accesses": ["Generic path: always performs 4D index decomposition (3 int64 divisions + 3 modulos per element) via unary_op_generic_kernel, even for contiguous tensors. For contiguous tensors, adjacent work-items access adjacent memory (coalesced), but the index math is wasted overhead."],
+          "strided_accesses": [
+            "Generic path: always performs 4D index decomposition (3 int64 divisions + 3 modulos per element) via unary_op_generic_kernel, even for contiguous tensors. For contiguous tensors, adjacent work-items access adjacent memory (coalesced), but the index math is wasted overhead."
+          ],
           "vectorized_loads": false,
           "vector_width": null,
           "notes": "Each work-item reads 1 scalar float and writes 1 scalar float. No sycl::vec usage. The unary_op_generic_kernel performs byte-offset pointer arithmetic (i0*nb0 + i1*nb1 + i2*nb2 + i3*nb3) supporting non-contiguous tensors, but the CUDA equivalent asserts contiguity and uses simple dst[i] = f(src[i]) addressing. This is a shared issue with all ops that go through ggml_sycl_op_unary."
@@ -2208,7 +2214,7 @@
           "uses_slm": false,
           "slm_bytes": 0,
           "potential_bank_conflicts": false,
-          "notes": "No SLM needed — purely element-wise operation with no data sharing between work-items."
+          "notes": "No SLM needed \u2014 purely element-wise operation with no data sharing between work-items."
         },
         "reduction_pattern": {
           "has_reduction": false,
@@ -2216,17 +2222,19 @@
           "uses_work_group_reduce": false,
           "uses_slm_manual_reduce": false,
           "uses_atomic": false,
-          "notes": "No reductions — each work-item independently computes expm1 for one element."
+          "notes": "No reductions \u2014 each work-item independently computes expm1 for one element."
         },
         "data_types": {
           "compute_type": "float",
           "could_use_half": false,
           "could_use_joint_matrix": false,
-          "notes": "FP32 computation via dispatch_ggml_sycl_op_unary (GGML_TYPE_F32 path). When GGML_SYCL_F16 is defined, also supports sycl::half. Unlike CUDA which always casts to float before calling the op (dst[i] = (T)op((float)x[i])), the SYCL version calls sycl::expm1 directly on the template type T — for half this may give different precision characteristics."
+          "notes": "FP32 computation via dispatch_ggml_sycl_op_unary (GGML_TYPE_F32 path). When GGML_SYCL_F16 is defined, also supports sycl::half. Unlike CUDA which always casts to float before calling the op (dst[i] = (T)op((float)x[i])), the SYCL version calls sycl::expm1 directly on the template type T \u2014 for half this may give different precision characteristics."
         },
         "math_functions": {
           "uses_native_math": false,
-          "functions": ["sycl::expm1 (standard precision, called at element_wise.cpp line 44)"],
+          "functions": [
+            "sycl::expm1 (standard precision, called at element_wise.cpp line 44)"
+          ],
           "notes": "Uses standard sycl::expm1, not a native variant. CUDA uses expm1f() which is the single-precision C math function (equivalent to fast-math on GPU). There is no sycl::native::expm1 in the SYCL spec, so switching to native is not directly possible. Could be decomposed to sycl::native::exp(x) - 1.0f but this loses precision for small x values where expm1 is specifically designed to be accurate. Given the low frequency of this op, the standard function is appropriate."
         },
         "loop_analysis": {
@@ -2237,10 +2245,10 @@
         "estimated_bottleneck": "memory",
         "anti_patterns": [
           "No contiguity fast-path: always performs expensive 4D index decomposition (3 int64 divisions + 3 modulos per element) via unary_op_generic_kernel even for contiguous tensors. CUDA asserts contiguity and uses simple dst[i] = op(src[i]) addressing. This is a shared issue across all ggml_sycl_op_unary ops.",
-          "Missing [[sycl::reqd_sub_group_size(16)]] — suboptimal SIMD width selection on Xe2 (shared with all unary ops)",
+          "Missing [[sycl::reqd_sub_group_size(16)]] \u2014 suboptimal SIMD width selection on Xe2 (shared with all unary ops)",
           "__dpct_inline__ macro artifact on op_expm1 function (line 42)",
-          "Half-precision path calls sycl::expm1(half) directly instead of promoting to float first like CUDA does — potential precision divergence",
-          "Grid-stride loop (SYCL_GLOBAL_ID_LOOP) is unnecessary since global_range >= k always — a simple if (i >= k) return guard would suffice"
+          "Half-precision path calls sycl::expm1(half) directly instead of promoting to float first like CUDA does \u2014 potential precision divergence",
+          "Grid-stride loop (SYCL_GLOBAL_ID_LOOP) is unnecessary since global_range >= k always \u2014 a simple if (i >= k) return guard would suffice"
         ]
       },
       "optimization_opportunities": [
@@ -2248,7 +2256,7 @@
           "id": "opt_016_001",
           "category": "memory_coalescing",
           "priority": "medium",
-          "description": "Add a contiguous fast-path to ggml_sycl_op_unary that bypasses the generic 4D index decomposition kernel. For contiguous tensors (the common case), use a simple kernel: dst[i] = func(src[i]). This eliminates 3 int64 divisions and 3 modulo operations per element. The CUDA version asserts contiguity and always uses direct addressing. Some other SYCL ops in element_wise.cpp (log, softplus, step, neg) already bypass ggml_sycl_op_unary and call dispatch_ggml_sycl_op_unary directly with simpler kernels — expm1 should follow the same pattern. NOTE: This optimization applies to ALL ~25 unary ops that go through ggml_sycl_op_unary, not just expm1.",
+          "description": "Add a contiguous fast-path to ggml_sycl_op_unary that bypasses the generic 4D index decomposition kernel. For contiguous tensors (the common case), use a simple kernel: dst[i] = func(src[i]). This eliminates 3 int64 divisions and 3 modulo operations per element. The CUDA version asserts contiguity and always uses direct addressing. Some other SYCL ops in element_wise.cpp (log, softplus, step, neg) already bypass ggml_sycl_op_unary and call dispatch_ggml_sycl_op_unary directly with simpler kernels \u2014 expm1 should follow the same pattern. NOTE: This optimization applies to ALL ~25 unary ops that go through ggml_sycl_op_unary, not just expm1.",
           "expected_improvement": "10-25% throughput improvement for contiguous tensors. Integer division is expensive on GPU (20-30 cycles per div64 on Xe2). Eliminating 6 per element for a memory-bound kernel that only does ~10 cycles of useful work (expm1) is significant. The improvement scales with all unary ops, not just expm1.",
           "implementation_notes": "Add an ggml_is_contiguous check in ggml_sycl_op_unary (line 562). If contiguous, dispatch to a simple kernel: SYCL_GLOBAL_ID_LOOP(k, item) { dst[i] = func(src[i]); }. If non-contiguous, fall through to the existing unary_op_generic_kernel. Alternatively, refactor expm1 to follow the pattern used by ggml_sycl_op_log (line 821) which calls dispatch_ggml_sycl_op_unary directly with a simple kernel lambda.",
           "risk": "low",
@@ -2276,7 +2284,7 @@
         }
       ],
       "overall_optimization_potential": "low",
-      "estimated_current_efficiency": "65-75% — expm1 is a simple element-wise unary operation that is inherently memory-bound (1 transcendental op per 8 bytes of memory traffic). The work-group size (256) and nd_range<1> launch are appropriate. The main inefficiency is the generic 4D index decomposition overhead for contiguous tensors (~6 int64 div/mod operations per element that are unnecessary in the common case). However, expm1 is a rarely-used operation in LLM inference (not part of standard transformer architectures), so optimization priority is minimal. The identified optimizations apply to the shared ggml_sycl_op_unary framework and would benefit all ~25 unary ops collectively."
+      "estimated_current_efficiency": "65-75% \u2014 expm1 is a simple element-wise unary operation that is inherently memory-bound (1 transcendental op per 8 bytes of memory traffic). The work-group size (256) and nd_range<1> launch are appropriate. The main inefficiency is the generic 4D index decomposition overhead for contiguous tensors (~6 int64 div/mod operations per element that are unnecessary in the common case). However, expm1 is a rarely-used operation in LLM inference (not part of standard transformer architectures), so optimization priority is minimal. The identified optimizations apply to the shared ggml_sycl_op_unary framework and would benefit all ~25 unary ops collectively."
     },
     {
       "kernel_id": "sk_017",
@@ -2291,20 +2299,20 @@
           "work_group_size": 256,
           "sub_group_size": null,
           "global_size_expression": "nd_range<1>(num_blocks * 256, 256) where num_blocks = (k + 255) / 256, k = ggml_nelements(src0)",
-          "notes": "Good work-group size of 256, matching the preferred size for Xe2. Uses nd_range<1> which is correct for a 1D element-wise operation — no DPCT nd_range<3> artifact. Dispatches separately for F16 and F32 with identical launch configs. No [[sycl::reqd_sub_group_size(16)]] attribute on the lambda."
+          "notes": "Good work-group size of 256, matching the preferred size for Xe2. Uses nd_range<1> which is correct for a 1D element-wise operation \u2014 no DPCT nd_range<3> artifact. Dispatches separately for F16 and F32 with identical launch configs. No [[sycl::reqd_sub_group_size(16)]] attribute on the lambda."
         },
         "memory_patterns": {
           "coalesced_accesses": true,
           "strided_accesses": [],
           "vectorized_loads": false,
           "vector_width": null,
-          "notes": "Each work-item reads x[i] and writes dst[i] where i = get_global_id(0) — perfectly coalesced sequential access. All loads/stores are scalar (1 element per work-item). For F32, each work-item reads 4 bytes and writes 4 bytes. No opportunity for shared memory since there is no data reuse — purely streaming access pattern. Compute intensity: ~10 FLOPs / 8 bytes = ~1.25 ops/byte, well below the Xe2 compute intensity threshold of ~27 ops/byte, confirming this kernel is memory-bound."
+          "notes": "Each work-item reads x[i] and writes dst[i] where i = get_global_id(0) \u2014 perfectly coalesced sequential access. All loads/stores are scalar (1 element per work-item). For F32, each work-item reads 4 bytes and writes 4 bytes. No opportunity for shared memory since there is no data reuse \u2014 purely streaming access pattern. Compute intensity: ~10 FLOPs / 8 bytes = ~1.25 ops/byte, well below the Xe2 compute intensity threshold of ~27 ops/byte, confirming this kernel is memory-bound."
         },
         "slm_usage": {
           "uses_slm": false,
           "slm_bytes": 0,
           "potential_bank_conflicts": false,
-          "notes": "No SLM needed — element-wise operation with no data reuse or inter-thread communication."
+          "notes": "No SLM needed \u2014 element-wise operation with no data reuse or inter-thread communication."
         },
         "reduction_pattern": {
           "has_reduction": false,
@@ -2312,32 +2320,32 @@
           "uses_work_group_reduce": false,
           "uses_slm_manual_reduce": false,
           "uses_atomic": false,
-          "notes": "No reduction — each output element is independently computed from one input element."
+          "notes": "No reduction \u2014 each output element is independently computed from one input element."
         },
         "data_types": {
           "compute_type": "float (F32 intermediate regardless of input type)",
           "could_use_half": false,
           "could_use_joint_matrix": false,
-          "notes": "Both F16 and F32 inputs are cast to float for computation via static_cast<float>(x[i]), with the result cast back via static_cast<T>(out). This is appropriate — the expm1 and multiply operations need FP32 precision. Half-precision compute would lose accuracy on the quadratic term (alpha_p * xi * xi) for large xi values."
+          "notes": "Both F16 and F32 inputs are cast to float for computation via static_cast<float>(x[i]), with the result cast back via static_cast<T>(out). This is appropriate \u2014 the expm1 and multiply operations need FP32 precision. Half-precision compute would lose accuracy on the quadratic term (alpha_p * xi * xi) for large xi values."
         },
         "math_functions": {
           "uses_native_math": false,
           "functions": [
-            "sycl::expm1 (standard precision, not native — called on fmin(xi, eps) for the negative branch)",
-            "sycl::fmin (standard precision — clamps xi to eps before expm1)"
+            "sycl::expm1 (standard precision, not native \u2014 called on fmin(xi, eps) for the negative branch)",
+            "sycl::fmin (standard precision \u2014 clamps xi to eps before expm1)"
           ],
-          "notes": "CUDA uses expm1f() and fminf() which are the device-native single-precision versions. The SYCL equivalents sycl::expm1 and sycl::fmin should compile to the same hardware instructions, but sycl::native::exp could be used as a replacement: expm1(x) = exp(x) - 1, and native::exp is faster on Xe2. However, native::exp has lower precision which may affect accuracy for small negative x values where expm1 is specifically designed to avoid catastrophic cancellation. The gate_pos computation uses a ternary (xi > 0.0f) ? 1.0f : 0.0f while CUDA uses implicit bool-to-float conversion — functionally identical."
+          "notes": "CUDA uses expm1f() and fminf() which are the device-native single-precision versions. The SYCL equivalents sycl::expm1 and sycl::fmin should compile to the same hardware instructions, but sycl::native::exp could be used as a replacement: expm1(x) = exp(x) - 1, and native::exp is faster on Xe2. However, native::exp has lower precision which may affect accuracy for small negative x values where expm1 is specifically designed to avoid catastrophic cancellation. The gate_pos computation uses a ternary (xi > 0.0f) ? 1.0f : 0.0f while CUDA uses implicit bool-to-float conversion \u2014 functionally identical."
         },
         "loop_analysis": {
           "hot_loops": [],
           "unrolled": false,
-          "notes": "No loops in the kernel body — each work-item processes exactly one element. The kernel is purely a set of conditional arithmetic operations: gate_pos, y_pos (quadratic), y_neg (expm1-based), and blending. Total ~10 FLOPs per element."
+          "notes": "No loops in the kernel body \u2014 each work-item processes exactly one element. The kernel is purely a set of conditional arithmetic operations: gate_pos, y_pos (quadratic), y_neg (expm1-based), and blending. Total ~10 FLOPs per element."
         },
         "estimated_bottleneck": "memory",
         "anti_patterns": [
-          "LOW: Missing [[sycl::reqd_sub_group_size(16)]] on both F16 and F32 kernel launch lambdas (lines 726, 734) — compiler may choose suboptimal SIMD width on Xe2",
-          "LOW: Scalar loads/stores — each work-item reads/writes exactly 1 element. Vectorized (vec4) loads would reduce memory transaction count by 4x for this memory-bound kernel",
-          "LOW: Standard sycl::expm1 instead of native::exp decomposition — native::exp is faster but expm1 has better numerical precision for small negative values. Trade-off favors keeping standard expm1 for correctness"
+          "LOW: Missing [[sycl::reqd_sub_group_size(16)]] on both F16 and F32 kernel launch lambdas (lines 726, 734) \u2014 compiler may choose suboptimal SIMD width on Xe2",
+          "LOW: Scalar loads/stores \u2014 each work-item reads/writes exactly 1 element. Vectorized (vec4) loads would reduce memory transaction count by 4x for this memory-bound kernel",
+          "LOW: Standard sycl::expm1 instead of native::exp decomposition \u2014 native::exp is faster but expm1 has better numerical precision for small negative values. Trade-off favors keeping standard expm1 for correctness"
         ]
       },
       "optimization_opportunities": [
@@ -2349,7 +2357,7 @@
           "expected_improvement": "20-40% throughput improvement from reduced memory transaction overhead. The kernel is purely memory-bound, so maximizing memory bandwidth utilization is the primary optimization lever.",
           "implementation_notes": "1. Create a vec4 variant of the kernel: each work-item loads sycl::vec<T,4>, converts to sycl::vec<float,4> (for F16 input), computes XiELU on each component, stores sycl::vec<T,4>. 2. Reduce grid size by 4x: num_blocks = (k/4 + 255) / 256. 3. Handle tail elements (k % 4 != 0) with a scalar fallback for the last few elements. 4. The branchless gate_pos computation works identically per-component. 5. sycl::fmin and sycl::expm1 should work on individual float components extracted from the vec4. Alternatively, use sycl::vec component accessors (.s0(), .s1(), etc.) to apply expm1 per-element since sycl::expm1 does not have a vec overload.",
           "risk": "low",
-          "risk_notes": "Purely mechanical change — no algorithmic modification. The only risk is vec4 alignment requirements, but ggml tensors are typically aligned to at least 16 bytes. Tail handling adds minor complexity."
+          "risk_notes": "Purely mechanical change \u2014 no algorithmic modification. The only risk is vec4 alignment requirements, but ggml tensors are typically aligned to at least 16 bytes. Tail handling adds minor complexity."
         },
         {
           "id": "opt_017_002",
@@ -2365,7 +2373,7 @@
           "id": "opt_017_003",
           "category": "math_functions",
           "priority": "low",
-          "description": "Consider replacing sycl::expm1(x) with sycl::native::exp(x) - 1.0f for the negative branch computation. native::exp is faster on Xe2 hardware but has lower precision (~2 ULP vs 1 ULP). The expm1 function is specifically designed for numerical stability when x is near zero (avoiding catastrophic cancellation in exp(x)-1), which is important for the xielu negative branch where fmin(xi, eps) can be very small. This trade-off should be evaluated empirically — if eps is typically a small negative value like -1e-3, the precision difference may be negligible.",
+          "description": "Consider replacing sycl::expm1(x) with sycl::native::exp(x) - 1.0f for the negative branch computation. native::exp is faster on Xe2 hardware but has lower precision (~2 ULP vs 1 ULP). The expm1 function is specifically designed for numerical stability when x is near zero (avoiding catastrophic cancellation in exp(x)-1), which is important for the xielu negative branch where fmin(xi, eps) can be very small. This trade-off should be evaluated empirically \u2014 if eps is typically a small negative value like -1e-3, the precision difference may be negligible.",
           "expected_improvement": "5-15% throughput improvement for the expm1 computation. However, since the kernel is memory-bound and expm1 is only computed for the negative branch (roughly half the elements), the actual end-to-end improvement is likely 2-5%.",
           "implementation_notes": "Replace: const float y_neg = (sycl::expm1(min_v_eps) - xi) * alpha_n + beta * xi; With: const float y_neg = (sycl::native::exp(min_v_eps) - 1.0f - xi) * alpha_n + beta * xi; Add a comment noting the precision trade-off. Requires numerical validation against the standard-precision version across the expected input range.",
           "risk": "medium",
@@ -2373,33 +2381,39 @@
         }
       ],
       "overall_optimization_potential": "low",
-      "estimated_current_efficiency": "70-80% — The xielu kernel is a well-structured element-wise operation with appropriate work-group size (256), proper nd_range<1> dispatch, and coalesced memory access. It avoids the generic unary framework overhead (no 4D index decomposition). The kernel is purely memory-bound (~1.25 ops/byte compute intensity vs 27 ops/byte threshold), so the primary optimization lever is vectorized loads/stores (vec4) which could improve throughput by 20-40%. The missing reqd_sub_group_size(16) and standard-precision expm1 are minor issues. XiELU is a relatively new activation function and not yet widely used in production LLM models, so optimization priority is low."
+      "estimated_current_efficiency": "70-80% \u2014 The xielu kernel is a well-structured element-wise operation with appropriate work-group size (256), proper nd_range<1> dispatch, and coalesced memory access. It avoids the generic unary framework overhead (no 4D index decomposition). The kernel is purely memory-bound (~1.25 ops/byte compute intensity vs 27 ops/byte threshold), so the primary optimization lever is vectorized loads/stores (vec4) which could improve throughput by 20-40%. The missing reqd_sub_group_size(16) and standard-precision expm1 are minor issues. XiELU is a relatively new activation function and not yet widely used in production LLM models, so optimization priority is low."
     },
     {
       "kernel_id": "sk_018",
       "name": "ggml_sycl_op_opt_step_sgd",
       "file": "ggml/src/ggml-sycl/opt-step-sgd.cpp",
-      "source_cuda_ids": ["ck_080"],
+      "source_cuda_ids": [
+        "ck_080"
+      ],
       "current_analysis": {
         "launch_config": {
           "uses_nd_range": true,
-          "work_group_size": [256, 1, 1],
+          "work_group_size": [
+            256,
+            1,
+            1
+          ],
           "sub_group_size": null,
           "global_size_expression": "ceil_div(ne, 256) * 256",
-          "notes": "Uses nd_range<1> with SYCL_OPT_STEP_SGD_BLOCK_SIZE=256. This is the correct pattern — matches CUDA's CUDA_OPT_STEP_SGD_BLOCK_SIZE. Missing [[sycl::reqd_sub_group_size(16)]] but this has no functional impact since the kernel uses no sub-group operations."
+          "notes": "Uses nd_range<1> with SYCL_OPT_STEP_SGD_BLOCK_SIZE=256. This is the correct pattern \u2014 matches CUDA's CUDA_OPT_STEP_SGD_BLOCK_SIZE. Missing [[sycl::reqd_sub_group_size(16)]] but this has no functional impact since the kernel uses no sub-group operations."
         },
         "memory_patterns": {
           "coalesced_accesses": true,
           "strided_accesses": [],
           "vectorized_loads": false,
           "vector_width": null,
-          "notes": "All memory accesses are scalar float. Consecutive threads access consecutive elements (coalesced). Reads x[i] (4B), g[i] (4B), writes x[i] (4B) = 12 bytes per element. Also reads pars[0] and pars[1] from global memory — these are broadcast reads of 2 floats by all threads (L1 cache will handle this efficiently after first access within a sub-group). No sycl::vec usage."
+          "notes": "All memory accesses are scalar float. Consecutive threads access consecutive elements (coalesced). Reads x[i] (4B), g[i] (4B), writes x[i] (4B) = 12 bytes per element. Also reads pars[0] and pars[1] from global memory \u2014 these are broadcast reads of 2 floats by all threads (L1 cache will handle this efficiently after first access within a sub-group). No sycl::vec usage."
         },
         "slm_usage": {
           "uses_slm": false,
           "slm_bytes": 0,
           "potential_bank_conflicts": false,
-          "notes": "No SLM needed — purely element-wise operation with no data sharing."
+          "notes": "No SLM needed \u2014 purely element-wise operation with no data sharing."
         },
         "reduction_pattern": {
           "has_reduction": false,
@@ -2407,18 +2421,18 @@
           "uses_work_group_reduce": false,
           "uses_slm_manual_reduce": false,
           "uses_atomic": false,
-          "notes": "No reductions — each thread independently updates one element."
+          "notes": "No reductions \u2014 each thread independently updates one element."
         },
         "data_types": {
           "compute_type": "float",
           "could_use_half": false,
           "could_use_joint_matrix": false,
-          "notes": "FP32 throughout. Optimizer updates should be FP32 for numerical stability — weight updates accumulate over many steps and half-precision would lose significant bits. FP32 is the correct choice here."
+          "notes": "FP32 throughout. Optimizer updates should be FP32 for numerical stability \u2014 weight updates accumulate over many steps and half-precision would lose significant bits. FP32 is the correct choice here."
         },
         "math_functions": {
           "uses_native_math": false,
           "functions": [],
-          "notes": "No transcendental math functions. Only FMA-like operations: multiply and subtract. The computation x[i] * (1.0f - pars[0] * pars[1]) - pars[0] * g[i] involves 4 multiplies and 2 subtracts — trivial compute."
+          "notes": "No transcendental math functions. Only FMA-like operations: multiply and subtract. The computation x[i] * (1.0f - pars[0] * pars[1]) - pars[0] * g[i] involves 4 multiplies and 2 subtracts \u2014 trivial compute."
         },
         "loop_analysis": {
           "hot_loops": [],
@@ -2427,10 +2441,10 @@
         },
         "estimated_bottleneck": "memory",
         "anti_patterns": [
-          "Minor: dpct::queue_ptr instead of sycl::queue& (line 41) — DPCT migration artifact",
+          "Minor: dpct::queue_ptr instead of sycl::queue& (line 41) \u2014 DPCT migration artifact",
           "Minor: Manual thread indexing (local_range*group+local_id) at line 12 instead of item_ct1.get_global_id(0)",
-          "Minor: pars[0] and pars[1] read from global memory by every thread — could be precomputed on host and passed as scalar kernel arguments to eliminate broadcast global reads (though L1 cache makes this negligible)",
-          "Minor: No [[sycl::reqd_sub_group_size(16)]] — compiler may choose non-native sub-group size, slightly affecting occupancy"
+          "Minor: pars[0] and pars[1] read from global memory by every thread \u2014 could be precomputed on host and passed as scalar kernel arguments to eliminate broadcast global reads (though L1 cache makes this negligible)",
+          "Minor: No [[sycl::reqd_sub_group_size(16)]] \u2014 compiler may choose non-native sub-group size, slightly affecting occupancy"
         ]
       },
       "optimization_opportunities": [
@@ -2449,7 +2463,7 @@
           "category": "work_group_size",
           "priority": "low",
           "description": "Precompute pars[0] (learning rate) and pars[1] (weight decay) on the host and pass as scalar kernel arguments instead of pointer to global memory. Currently all threads read pars[0] and pars[1] from global memory. While L1 cache makes this efficient after the first sub-group access, passing as scalar arguments eliminates the global memory dependency entirely and allows the compiler to treat them as compile-time constants within the kernel.",
-          "expected_improvement": "1-3% — negligible since L1 cache handles broadcast reads efficiently. Primary benefit is code clarity: making lr and wd explicit kernel parameters instead of indexing into a pointer.",
+          "expected_improvement": "1-3% \u2014 negligible since L1 cache handles broadcast reads efficiently. Primary benefit is code clarity: making lr and wd explicit kernel parameters instead of indexing into a pointer.",
           "implementation_notes": "In ggml_sycl_op_opt_step_sgd: float lr, wd; ctx.stream()->memcpy(&lr, &params_d[0], sizeof(float)); ctx.stream()->memcpy(&wd, &params_d[1], sizeof(float)); ctx.stream()->wait(); // need sync to read host values. Then pass lr, wd as scalar args. Alternatively, since params is host-accessible memory, read directly: const float lr = ((float*)params->data)[0]; const float wd = ((float*)params->data)[1]; (the memcpy path is safer for device-only allocations). The CUDA version also reads pars from device pointer, so both are equivalent.",
           "risk": "low",
           "risk_notes": "Need to ensure params data is accessible on the host before kernel launch. If params is a device-only allocation, the host read won't work and memcpy+wait is needed (adding a sync point). May not be worth the synchronization overhead."
@@ -2460,23 +2474,29 @@
           "priority": "low",
           "description": "Add [[sycl::reqd_sub_group_size(16)]] to the kernel lambda and replace manual thread indexing with get_global_id(0). Minor DPCT artifact cleanup: replace dpct::queue_ptr with sycl::queue&.",
           "expected_improvement": "1-5% from ensuring native SIMD16 width on Xe2. get_global_id(0) may enable minor compiler optimizations vs manual local_range*group+local_id arithmetic.",
-          "implementation_notes": "1. Add [[sycl::reqd_sub_group_size(16)]] to line 50 lambda. 2. Replace line 12: const int64_t i = item_ct1.get_global_id(0); 3. Replace line 41: dpct::queue_ptr → sycl::queue* or pass by reference.",
+          "implementation_notes": "1. Add [[sycl::reqd_sub_group_size(16)]] to line 50 lambda. 2. Replace line 12: const int64_t i = item_ct1.get_global_id(0); 3. Replace line 41: dpct::queue_ptr \u2192 sycl::queue* or pass by reference.",
           "risk": "low",
           "risk_notes": "Purely mechanical changes with no algorithmic impact."
         }
       ],
       "overall_optimization_potential": "low",
-      "estimated_current_efficiency": "75-85% — The SGD step kernel is a well-implemented element-wise operation with correct work-group size (256), proper nd_range<1> dispatch, coalesced memory access, and a clean near-1:1 translation from CUDA. The kernel is purely memory-bound (~0.5 ops/byte) with trivial arithmetic (4 multiplies, 2 subtracts). Main inefficiency is scalar (non-vectorized) memory access, which leaves ~20-40% of memory bandwidth on the table. However, since SGD step is called only once per training batch (not per token or per layer), its contribution to total runtime is negligible — optimization effort should be directed at hot-path kernels (softmax, norm, matmul) instead."
+      "estimated_current_efficiency": "75-85% \u2014 The SGD step kernel is a well-implemented element-wise operation with correct work-group size (256), proper nd_range<1> dispatch, coalesced memory access, and a clean near-1:1 translation from CUDA. The kernel is purely memory-bound (~0.5 ops/byte) with trivial arithmetic (4 multiplies, 2 subtracts). Main inefficiency is scalar (non-vectorized) memory access, which leaves ~20-40% of memory bandwidth on the table. However, since SGD step is called only once per training batch (not per token or per layer), its contribution to total runtime is negligible \u2014 optimization effort should be directed at hot-path kernels (softmax, norm, matmul) instead."
     },
     {
       "kernel_id": "sk_019",
       "name": "ggml_sycl_op_opt_step_adamw",
       "file": "ggml/src/ggml-sycl/opt-step-adamw.cpp",
-      "source_cuda_ids": ["ck_081"],
+      "source_cuda_ids": [
+        "ck_081"
+      ],
       "current_analysis": {
         "launch_config": {
           "uses_nd_range": true,
-          "work_group_size": [256, 1, 1],
+          "work_group_size": [
+            256,
+            1,
+            1
+          ],
           "sub_group_size": null,
           "global_size_expression": "ceil_div(ne, 256) * 256",
           "notes": "Uses nd_range<1> with SYCL_OPT_STEP_ADAMW_BLOCK_SIZE=256. Correct pattern matching CUDA. Missing [[sycl::reqd_sub_group_size(16)]] on kernel lambda (line 76) but no functional impact since no sub-group operations are used."
@@ -2486,13 +2506,13 @@
           "strided_accesses": [],
           "vectorized_loads": false,
           "vector_width": null,
-          "notes": "All memory accesses are scalar float. Consecutive threads access consecutive elements (coalesced). Reads x[i], g[i], gm[i], gv[i] (16B), writes x[i], gm[i], gv[i] (12B) = 28 bytes per element. Also reads pars[] (7 floats) from global memory — broadcast read served from L1 cache after first sub-group access. No sycl::vec usage."
+          "notes": "All memory accesses are scalar float. Consecutive threads access consecutive elements (coalesced). Reads x[i], g[i], gm[i], gv[i] (16B), writes x[i], gm[i], gv[i] (12B) = 28 bytes per element. Also reads pars[] (7 floats) from global memory \u2014 broadcast read served from L1 cache after first sub-group access. No sycl::vec usage."
         },
         "slm_usage": {
           "uses_slm": false,
           "slm_bytes": 0,
           "potential_bank_conflicts": false,
-          "notes": "No SLM needed — purely element-wise operation with no data sharing between threads."
+          "notes": "No SLM needed \u2014 purely element-wise operation with no data sharing between threads."
         },
         "reduction_pattern": {
           "has_reduction": false,
@@ -2500,13 +2520,13 @@
           "uses_work_group_reduce": false,
           "uses_slm_manual_reduce": false,
           "uses_atomic": false,
-          "notes": "No reductions — each thread independently updates one element across 3 arrays (x, gm, gv)."
+          "notes": "No reductions \u2014 each thread independently updates one element across 3 arrays (x, gm, gv)."
         },
         "data_types": {
           "compute_type": "float",
           "could_use_half": false,
           "could_use_joint_matrix": false,
-          "notes": "FP32 throughout. Optimizer state (first/second moments gm, gv) must be FP32 for numerical stability — Adam accumulates statistics over many steps, and half-precision would cause significant drift. FP32 is the correct choice."
+          "notes": "FP32 throughout. Optimizer state (first/second moments gm, gv) must be FP32 for numerical stability \u2014 Adam accumulates statistics over many steps, and half-precision would cause significant drift. FP32 is the correct choice."
         },
         "math_functions": {
           "uses_native_math": false,
@@ -2522,11 +2542,11 @@
         },
         "estimated_bottleneck": "memory",
         "anti_patterns": [
-          "Minor: dpct::queue_ptr instead of sycl::queue& (line 67) — DPCT migration artifact",
+          "Minor: dpct::queue_ptr instead of sycl::queue& (line 67) \u2014 DPCT migration artifact",
           "Minor: Manual thread indexing (local_range*group+local_id) at line 12 instead of item_ct1.get_global_id(0)",
-          "Minor: _ct1 naming convention on item parameter — DPCT artifact",
-          "Minor: pars[] (7 floats) read from global memory by every thread — could be precomputed on host and passed as scalar kernel arguments",
-          "Minor: No [[sycl::reqd_sub_group_size(16)]] — compiler may choose non-native sub-group size",
+          "Minor: _ct1 naming convention on item parameter \u2014 DPCT artifact",
+          "Minor: pars[] (7 floats) read from global memory by every thread \u2014 could be precomputed on host and passed as scalar kernel arguments",
+          "Minor: No [[sycl::reqd_sub_group_size(16)]] \u2014 compiler may choose non-native sub-group size",
           "Minor: Uses standard sycl::sqrt instead of sycl::native::sqrt"
         ]
       },
@@ -2539,14 +2559,14 @@
           "expected_improvement": "20-40% throughput improvement for the kernel itself, but near-zero wall-clock impact since AdamW step is not on the critical path.",
           "implementation_notes": "Change each work-item to process 4 elements using sycl::vec<float,4> for x, g, gm, gv arrays. Precompute all 7 pars[] values as scalar kernel arguments. Handle tail (ne % 4 != 0) with scalar fallback. The computation (bias-corrected moment updates + weight decay) is trivially vectorizable since there are no inter-element dependencies. Ref: optimization_guide.md section 2.2.",
           "risk": "low",
-          "risk_notes": "Simple element-wise vectorization with no inter-element dependencies. Need to handle non-multiple-of-4 tensor sizes. The 4 input reads + 3 output writes per element means 7 vector operations per iteration — ensure register pressure doesn't cause spills."
+          "risk_notes": "Simple element-wise vectorization with no inter-element dependencies. Need to handle non-multiple-of-4 tensor sizes. The 4 input reads + 3 output writes per element means 7 vector operations per iteration \u2014 ensure register pressure doesn't cause spills."
         },
         {
           "id": "opt_019_002",
           "category": "work_group_size",
           "priority": "low",
           "description": "Precompute pars[] (7 floats: lr, beta1, beta2, eps, wd, beta1h, beta2h) on the host and pass as scalar kernel arguments instead of a global memory pointer. Currently all threads index into pars[0..6] from global memory. While L1 cache makes broadcast reads efficient, scalar arguments eliminate the indirection entirely and allow the compiler to treat them as constants.",
-          "expected_improvement": "1-3% — negligible since L1 cache handles broadcast reads efficiently. Primary benefit is code clarity.",
+          "expected_improvement": "1-3% \u2014 negligible since L1 cache handles broadcast reads efficiently. Primary benefit is code clarity.",
           "implementation_notes": "In ggml_sycl_op_opt_step_adamw: read all 7 float values from host-accessible params tensor and pass as individual kernel arguments. The CUDA version also reads from device pointer, so this would be a SYCL-specific improvement. Need to ensure params data is host-accessible before kernel launch.",
           "risk": "low",
           "risk_notes": "Need to verify params tensor is host-accessible. If device-only, would need memcpy+wait which adds synchronization overhead."
@@ -2563,33 +2583,39 @@
         }
       ],
       "overall_optimization_potential": "low",
-      "estimated_current_efficiency": "75-85% — The AdamW step kernel is a well-implemented element-wise operation with correct work-group size (256), proper nd_range<1> dispatch, coalesced memory access, and functionally equivalent to the CUDA counterpart. The kernel is purely memory-bound (~0.3 ops/byte with 28 bytes/element traffic) with straightforward arithmetic (moment updates, bias correction, weight decay). Main inefficiency is scalar (non-vectorized) memory access for 4 input + 3 output arrays. However, since AdamW step is called only once per training batch (not per token or per layer), its contribution to total runtime is negligible — optimization effort should be directed at hot-path inference kernels instead."
+      "estimated_current_efficiency": "75-85% \u2014 The AdamW step kernel is a well-implemented element-wise operation with correct work-group size (256), proper nd_range<1> dispatch, coalesced memory access, and functionally equivalent to the CUDA counterpart. The kernel is purely memory-bound (~0.3 ops/byte with 28 bytes/element traffic) with straightforward arithmetic (moment updates, bias correction, weight decay). Main inefficiency is scalar (non-vectorized) memory access for 4 input + 3 output arrays. However, since AdamW step is called only once per training batch (not per token or per layer), its contribution to total runtime is negligible \u2014 optimization effort should be directed at hot-path inference kernels instead."
     },
     {
       "kernel_id": "sk_020",
       "name": "ggml_sycl_silu_back",
       "file": "ggml/src/ggml-sycl/element_wise.cpp",
-      "source_cuda_ids": ["ck_113"],
+      "source_cuda_ids": [
+        "ck_113"
+      ],
       "current_analysis": {
         "launch_config": {
           "uses_nd_range": true,
-          "work_group_size": [256, 1, 1],
+          "work_group_size": [
+            256,
+            1,
+            1
+          ],
           "sub_group_size": null,
           "global_size_expression": "ceil_div(k, 256) * 256 where k = ggml_nelements(src0)",
-          "notes": "Uses nd_range<1> with work-group size 256 — matches CUDA's CUDA_SILU_BACK_BLOCK_SIZE=256. No [[sycl::reqd_sub_group_size(16)]] specified. Two launch paths: F16 and F32, both with identical nd_range configuration. Global size is properly rounded up to multiple of 256 with bounds check in kernel."
+          "notes": "Uses nd_range<1> with work-group size 256 \u2014 matches CUDA's CUDA_SILU_BACK_BLOCK_SIZE=256. No [[sycl::reqd_sub_group_size(16)]] specified. Two launch paths: F16 and F32, both with identical nd_range configuration. Global size is properly rounded up to multiple of 256 with bounds check in kernel."
         },
         "memory_patterns": {
           "coalesced_accesses": true,
           "strided_accesses": [],
           "vectorized_loads": false,
           "vector_width": null,
-          "notes": "Three arrays accessed: grad[i], x[i], dst[i] — all scalar loads/stores. Adjacent work-items access adjacent elements (coalesced). Each work-item reads 2 floats (8 bytes) and writes 1 float (4 bytes) = 12 bytes total traffic per element. No sycl::vec usage. The kernel only asserts src0 (grad) is contiguous but does NOT assert src1 (x) is contiguous — potential correctness concern if src1 is non-contiguous, though in practice the backward pass input should be contiguous."
+          "notes": "Three arrays accessed: grad[i], x[i], dst[i] \u2014 all scalar loads/stores. Adjacent work-items access adjacent elements (coalesced). Each work-item reads 2 floats (8 bytes) and writes 1 float (4 bytes) = 12 bytes total traffic per element. No sycl::vec usage. The kernel only asserts src0 (grad) is contiguous but does NOT assert src1 (x) is contiguous \u2014 potential correctness concern if src1 is non-contiguous, though in practice the backward pass input should be contiguous."
         },
         "slm_usage": {
           "uses_slm": false,
           "slm_bytes": 0,
           "potential_bank_conflicts": false,
-          "notes": "No SLM needed — purely element-wise operation with no data sharing between work-items."
+          "notes": "No SLM needed \u2014 purely element-wise operation with no data sharing between work-items."
         },
         "reduction_pattern": {
           "has_reduction": false,
@@ -2597,33 +2623,33 @@
           "uses_work_group_reduce": false,
           "uses_slm_manual_reduce": false,
           "uses_atomic": false,
-          "notes": "No reductions — each work-item independently computes one output element."
+          "notes": "No reductions \u2014 each work-item independently computes one output element."
         },
         "data_types": {
           "compute_type": "float",
           "could_use_half": false,
           "could_use_joint_matrix": false,
-          "notes": "All computation in FP32 regardless of input type T (sycl::half or float). Input values are cast to float for computation, result cast back to T. FP32 is appropriate — the sigmoid computation 1/(1+exp(-x)) and the derivative formula require FP32 precision to avoid overflow/underflow in the exponential for large |x| values."
+          "notes": "All computation in FP32 regardless of input type T (sycl::half or float). Input values are cast to float for computation, result cast back to T. FP32 is appropriate \u2014 the sigmoid computation 1/(1+exp(-x)) and the derivative formula require FP32 precision to avoid overflow/underflow in the exponential for large |x| values."
         },
         "math_functions": {
           "uses_native_math": false,
           "functions": [
-            "sycl::exp (line 653 — sigmoid computation: 1.0f / (1.0f + sycl::exp(-xf)))"
+            "sycl::exp (line 653 \u2014 sigmoid computation: 1.0f / (1.0f + sycl::exp(-xf)))"
           ],
-          "notes": "Uses standard sycl::exp instead of sycl::native::exp. The CUDA version uses expf() which is the fast-math single-precision variant. sycl::native::exp on Xe2 is ~2-4x faster than standard sycl::exp. The forward silu kernel in the same file (element_wise.cpp) already uses sycl::native::exp for the sigmoid computation — this is an inconsistency. The division 1.0f/(1.0f+exp(-x)) could also be replaced with sycl::native::recip but precision trade-off may not be worthwhile."
+          "notes": "Uses standard sycl::exp instead of sycl::native::exp. The CUDA version uses expf() which is the fast-math single-precision variant. sycl::native::exp on Xe2 is ~2-4x faster than standard sycl::exp. The forward silu kernel in the same file (element_wise.cpp) already uses sycl::native::exp for the sigmoid computation \u2014 this is an inconsistency. The division 1.0f/(1.0f+exp(-x)) could also be replaced with sycl::native::recip but precision trade-off may not be worthwhile."
         },
         "loop_analysis": {
           "hot_loops": [],
           "unrolled": false,
-          "notes": "No loops — each work-item processes exactly one element. The outer dispatch is the nd_range grid."
+          "notes": "No loops \u2014 each work-item processes exactly one element. The outer dispatch is the nd_range grid."
         },
         "estimated_bottleneck": "memory",
         "anti_patterns": [
-          "Uses standard sycl::exp instead of sycl::native::exp — inconsistent with forward silu which uses native::exp",
-          "Missing [[sycl::reqd_sub_group_size(16)]] on both F16 and F32 launch paths — compiler may choose suboptimal SIMD width on Xe2",
-          "Uses dpct::queue_ptr instead of standard sycl::queue* or sycl::queue& — DPCT migration artifact",
-          "Scalar loads/stores only — no vectorization despite trivially vectorizable element-wise pattern",
-          "Only asserts src0 contiguous, not src1 — potential correctness gap if src1 (forward input) is non-contiguous"
+          "Uses standard sycl::exp instead of sycl::native::exp \u2014 inconsistent with forward silu which uses native::exp",
+          "Missing [[sycl::reqd_sub_group_size(16)]] on both F16 and F32 launch paths \u2014 compiler may choose suboptimal SIMD width on Xe2",
+          "Uses dpct::queue_ptr instead of standard sycl::queue* or sycl::queue& \u2014 DPCT migration artifact",
+          "Scalar loads/stores only \u2014 no vectorization despite trivially vectorizable element-wise pattern",
+          "Only asserts src0 contiguous, not src1 \u2014 potential correctness gap if src1 (forward input) is non-contiguous"
         ]
       },
       "optimization_opportunities": [
@@ -2641,11 +2667,11 @@
           "id": "opt_020_002",
           "category": "vectorization",
           "priority": "medium",
-          "description": "Add vectorized loads/stores (sycl::vec<float, 4>) to the silu_back kernel. Currently processes 1 element per work-item with scalar loads. The kernel reads 2 arrays and writes 1 array — 12 bytes per element. With vec4, each work-item processes 4 elements using 48 bytes per vec4 iteration, reducing memory transaction count by 4x. The kernel is memory-bound (compute intensity ~4 ops/byte, well below the 27 ops/byte threshold).",
+          "description": "Add vectorized loads/stores (sycl::vec<float, 4>) to the silu_back kernel. Currently processes 1 element per work-item with scalar loads. The kernel reads 2 arrays and writes 1 array \u2014 12 bytes per element. With vec4, each work-item processes 4 elements using 48 bytes per vec4 iteration, reducing memory transaction count by 4x. The kernel is memory-bound (compute intensity ~4 ops/byte, well below the 27 ops/byte threshold).",
           "expected_improvement": "20-40% memory throughput improvement. However, silu_back is training-only, so practical wall-clock impact is limited compared to inference-hot kernels.",
           "implementation_notes": "Change the kernel to process 4 elements per work-item: (1) Adjust global size to k/4 work-items. (2) Load grad and x as sycl::vec<float,4>. (3) Compute sigmoid and derivative for each component. (4) Store result as sycl::vec<float,4>. (5) Handle tail elements (k%4 != 0) with scalar fallback. For F16 path, use sycl::vec<sycl::half,4> for loads/stores but still compute in FP32. Ref: optimization_guide.md section 2.2.",
           "risk": "low",
-          "risk_notes": "Element-wise operations are the simplest case for vectorization — no inter-element dependencies. Tail handling adds minor complexity. For typical tensor sizes in training (millions of elements), the tail is negligible."
+          "risk_notes": "Element-wise operations are the simplest case for vectorization \u2014 no inter-element dependencies. Tail handling adds minor complexity. For typical tensor sizes in training (millions of elements), the tail is negligible."
         },
         {
           "id": "opt_020_003",
@@ -2661,23 +2687,138 @@
           "id": "opt_020_004",
           "category": "work_group_size",
           "priority": "low",
-          "description": "Clean up DPCT migration artifacts: (1) Replace dpct::queue_ptr with sycl::queue* or sycl::queue& in ggml_sycl_op_silu_back. (2) Consider adding a contiguity assertion for src1 (forward input x) in addition to the existing src0 (grad) assertion — the kernel accesses src1[i] directly which requires contiguity. The CUDA version also only asserts src0 contiguity, but this is likely a latent bug in both backends.",
+          "description": "Clean up DPCT migration artifacts: (1) Replace dpct::queue_ptr with sycl::queue* or sycl::queue& in ggml_sycl_op_silu_back. (2) Consider adding a contiguity assertion for src1 (forward input x) in addition to the existing src0 (grad) assertion \u2014 the kernel accesses src1[i] directly which requires contiguity. The CUDA version also only asserts src0 contiguity, but this is likely a latent bug in both backends.",
           "expected_improvement": "No performance improvement. Correctness/maintainability fix.",
-          "implementation_notes": "1. At line 667: change dpct::queue_ptr stream = ctx.stream(); to sycl::queue* stream = ctx.stream(); or auto stream = ctx.stream(); — ctx.stream() already returns a sycl::queue*. 2. Add GGML_ASSERT(ggml_is_contiguous(src1)); after line 671.",
+          "implementation_notes": "1. At line 667: change dpct::queue_ptr stream = ctx.stream(); to sycl::queue* stream = ctx.stream(); or auto stream = ctx.stream(); \u2014 ctx.stream() already returns a sycl::queue*. 2. Add GGML_ASSERT(ggml_is_contiguous(src1)); after line 671.",
           "risk": "low",
           "risk_notes": "Mechanical cleanup. The contiguity assertion for src1 may trigger on edge cases that currently produce silent wrong results, which would be a correctness improvement."
         }
       ],
       "overall_optimization_potential": "low",
-      "estimated_current_efficiency": "70-80% — The silu_back kernel is a well-structured element-wise operation with correct nd_range<1> dispatch, appropriate work-group size (256), and coalesced memory access. The main inefficiency is using standard sycl::exp instead of native::exp (inconsistent with forward silu which uses native), and scalar-only memory access. The kernel is memory-bound with only ~4 ops/byte compute intensity. Since silu_back is training-only (backward pass), its contribution to inference latency is zero and its training wall-clock impact is modest — optimization effort should be directed at hot-path inference kernels (softmax, norm, mmq, mmvq, dmmv) first."
+      "estimated_current_efficiency": "70-80% \u2014 The silu_back kernel is a well-structured element-wise operation with correct nd_range<1> dispatch, appropriate work-group size (256), and coalesced memory access. The main inefficiency is using standard sycl::exp instead of native::exp (inconsistent with forward silu which uses native), and scalar-only memory access. The kernel is memory-bound with only ~4 ops/byte compute intensity. Since silu_back is training-only (backward pass), its contribution to inference latency is zero and its training wall-clock impact is modest \u2014 optimization effort should be directed at hot-path inference kernels (softmax, norm, mmq, mmvq, dmmv) first."
+    },
+    {
+      "kernel_id": "sk_021",
+      "name": "ggml_sycl_op_get_rows_back",
+      "file": "ggml/src/ggml-sycl/getrows.cpp",
+      "source_cuda_ids": [
+        "ck_062"
+      ],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": [
+            1,
+            1,
+            256
+          ],
+          "sub_group_size": null,
+          "global_size_expression": "(1, ne1, ceil_div(ne00, 256)) * (1, 1, 256) \u2014 one work-item per (dst_row, column) pair",
+          "notes": "Uses 3D nd_range with dimension 0 = 1 (DPCT artifact). Work-group size 256 matches CUDA's CUDA_GET_ROWS_BACK_BLOCK_SIZE=256. Each work-item processes one column of one destination row. Missing [[sycl::reqd_sub_group_size(16)]]. CUDA uses dim3(block_num_x, ne1, 1) while SYCL swaps to (1, ne1, block_num_x) \u2014 dimension mapping is inverted but functionally equivalent."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "strided_accesses": [
+            "Inner loop reads grad[i*ncols + col] \u2014 stride of ncols between consecutive iterations, but within a sub-group, adjacent threads access adjacent columns (coalesced per iteration)"
+          ],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "Within a sub-group, adjacent work-items access adjacent columns (col = tid, tid+1, ...), so each iteration's grad read is coalesced. However, the kernel iterates over ALL nrows_grad rows per work-item, reading grad rows sequentially. The dst write (line 192) is a single coalesced write per work-item. No sycl::vec usage. The rows[] array is read nrows_grad times per work-item \u2014 should be in L1 cache after first access."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes": 0,
+          "potential_bank_conflicts": false,
+          "notes": "No SLM usage. The kernel could benefit from SLM to cache rows[] indices for the work-group, but the array is small enough to fit in L1 cache."
+        },
+        "reduction_pattern": {
+          "has_reduction": true,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "The kernel performs an implicit scatter-add reduction: for each destination row, it scans ALL gradient rows to find matching indices and accumulates. This is a serial scan (O(nrows_grad) per work-item) rather than a parallel reduction. The CUDA version uses the same O(nrows_grad) serial scan \u2014 atomicAdd was not used because the operation is a backward pass and correctness requires exact accumulation order. Both SYCL and CUDA use the same brute-force algorithm."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "FP32 only. CUDA version is templated on grad_t and dst_t, supporting non-F32 types. SYCL hardcodes float for both grad and dst. FP32 is appropriate for gradient accumulation where precision matters for training convergence."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [],
+          "notes": "No math functions used \u2014 only integer comparison, floating-point addition, and memory loads/stores."
+        },
+        "loop_analysis": {
+          "hot_loops": [
+            "Inner loop (lines 185-190): iterates nrows_grad times per work-item, performing index comparison and conditional accumulation. For typical LLM training with batch_size=32 and seq_len=2048, nrows_grad could be 65536, making this loop the dominant cost."
+          ],
+          "unrolled": false,
+          "notes": "The inner loop cannot be unrolled because nrows_grad is a runtime parameter and the loop body contains a data-dependent branch (rows[i] != dst_row). The branch is highly unpredictable when rows are scattered. No #pragma unroll. The algorithm is O(nrows_grad * nrows_dst * ncols) total work \u2014 brute force. A more efficient algorithm would use atomicAdd on a per-column basis, reducing to O(nrows_grad * ncols) total work."
+        },
+        "estimated_bottleneck": "compute",
+        "anti_patterns": [
+          "3D nd_range with dimension 0 always 1 \u2014 DPCT artifact, should be 2D nd_range<2>((ne1, block_num_x), (1, 256))",
+          "item_ct1 naming \u2014 DPCT artifact, should use descriptive name like 'item'",
+          "Missing [[sycl::reqd_sub_group_size(16)]] \u2014 compiler may choose non-native SIMD width",
+          "Brute-force O(nrows_grad * nrows_dst) algorithm \u2014 same as CUDA, but could be replaced with atomicAdd-based O(nrows_grad) scatter for significant speedup",
+          "Hardcoded float types \u2014 CUDA is templated on grad_t/dst_t, SYCL only supports F32",
+          "Manual thread indexing instead of get_global_id()"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_021_001",
+          "category": "reduction",
+          "priority": "medium",
+          "description": "Replace brute-force serial scan with atomic scatter-add. The current algorithm iterates over ALL nrows_grad rows for EACH destination row, giving O(nrows_grad * nrows_dst) total work. An alternative approach: each work-item processes one (grad_row, column) pair and atomically adds grad[grad_row * ncols + col] to dst[rows[grad_row] * ncols + col]. This reduces total work to O(nrows_grad * ncols) \u2014 eliminating the O(nrows_dst) factor entirely. For typical training with nrows_dst=50000 (vocab size) and nrows_grad=2048 (seq_len), this is a ~24x work reduction.",
+          "expected_improvement": "10-25x speedup for typical training workloads where nrows_dst >> nrows_grad (e.g., embedding gradient scatter where nrows_dst = vocab_size). For cases where nrows_dst ~ nrows_grad, improvement is more modest (2-5x) from better parallelism.",
+          "implementation_notes": "Replace the current kernel with: (1) First zero dst (memset or fill kernel), (2) Launch scatter kernel with grid = (ceil_div(ncols, 256), nrows_grad, 1), work-group = (256, 1, 1). Each work-item computes: col = get_global_id(0); grad_row = get_global_id(1); if (col < ncols) { int dst_row = rows[grad_row]; sycl::atomic_ref<float, sycl::memory_order::relaxed, sycl::memory_scope::device, sycl::access::address_space::global_space> a(dst[dst_row*ncols + col]); a.fetch_add(grad[grad_row*ncols + col]); }. Note: CUDA chose the serial scan to avoid atomics; the trade-off depends on whether nrows_dst >> nrows_grad (atomics win) or nrows_dst << nrows_grad (serial scan wins). A dispatch heuristic choosing between the two would be ideal.",
+          "risk": "medium",
+          "risk_notes": "Atomic FP32 add on Intel Xe2 is natively supported but slower per-operation than regular store. For small nrows_grad with many collisions (multiple grad rows mapping to same dst row), atomic contention could reduce gains. The zero-initialization requires an extra kernel launch or memset. FP32 atomic add is non-deterministic (different reduction order) \u2014 acceptable for training gradients but worth noting."
+        },
+        {
+          "id": "opt_021_002",
+          "category": "vectorization",
+          "priority": "low",
+          "description": "Add vectorized loads/stores (sycl::vec<float, 4>) for the grad read and dst write. Currently each work-item processes one column with scalar loads. Processing 4 columns per work-item would reduce memory transactions by 4x for aligned data. This applies to both the current serial scan algorithm and the atomic scatter alternative.",
+          "expected_improvement": "20-40% throughput improvement for the memory-bound portion of the kernel. However, the kernel is currently compute-bound (due to the brute-force algorithm), so the real benefit depends on whether opt_021_001 is implemented first to make it memory-bound.",
+          "implementation_notes": "Change thread mapping: col = get_global_id(0) * 4. Load grad as sycl::vec<float, 4> v = *reinterpret_cast<const sycl::vec<float, 4>*>(&grad[i*ncols + col]). Store as *reinterpret_cast<sycl::vec<float, 4>*>(&dst[dst_row*ncols + col]) = sum_vec. Adjust grid size to ceil_div(ncols, 4*256). Handle ncols % 4 != 0 with scalar tail. For the atomic scatter path, vec4 atomics would need to decompose into 4 scalar atomic_ref::fetch_add calls.",
+          "risk": "low",
+          "risk_notes": "Requires ncols to be a multiple of 4 for the vectorized path. Most LLM hidden dimensions (768, 1024, 2048, 4096, 8192) are multiples of 256, so this is safe in practice. Tail handling needed for non-standard dimensions."
+        },
+        {
+          "id": "opt_021_003",
+          "category": "sub_group_ops",
+          "priority": "low",
+          "description": "Add [[sycl::reqd_sub_group_size(16)]] to the kernel launch lambda (line 225). Without this attribute, the compiler may choose SIMD32 on Xe2, which halves the number of hardware threads per XVE and reduces memory latency hiding. Since this kernel has no sub-group operations, the attribute only affects occupancy.",
+          "expected_improvement": "5-10% from better occupancy if compiler would otherwise choose SIMD32. No impact if compiler already defaults to SIMD16.",
+          "implementation_notes": "At line 225 of getrows.cpp, add [[sycl::reqd_sub_group_size(16)]] to the lambda: [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(16)]] { ... }",
+          "risk": "low",
+          "risk_notes": "No functional impact \u2014 only affects thread scheduling."
+        },
+        {
+          "id": "opt_021_004",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Clean up DPCT artifacts: (1) Simplify 3D nd_range to 2D \u2014 dimension 0 is always 1, (2) Replace manual thread indexing with get_global_id(), (3) Rename item_ct1 to item. This improves code clarity and removes unnecessary complexity.",
+          "expected_improvement": "Negligible performance improvement. Primary benefit is code maintainability and readability.",
+          "implementation_notes": "1. Change nd_range<3>((1, ne1, block_num_x * 256), (1, 1, 256)) to nd_range<2>((ne1, block_num_x * 256), (1, 256)). 2. Update kernel to accept nd_item<2>, with col = item.get_global_id(1) and dst_row = item.get_global_id(0). 3. Rename item_ct1 to item throughout.",
+          "risk": "low",
+          "risk_notes": "Purely mechanical refactoring with no algorithmic changes."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "60-70% \u2014 The kernel uses the same brute-force algorithm as CUDA (serial scan over all gradient rows per destination row). For the serial scan approach, the implementation is reasonably efficient with coalesced column accesses and good work-group size (256). The main optimization opportunity (atomic scatter) would change the algorithm entirely but the kernel is training-only and not on the inference hot path. Missing reqd_sub_group_size and DPCT artifacts are minor issues."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 20,
+    "total_kernels_analyzed": 21,
     "critical_potential": 1,
     "high_potential": 6,
     "medium_potential": 6,
-    "low_potential": 7,
+    "low_potential": 8,
     "no_optimization_needed": 1,
     "top_opportunities": [
       {

@@ -5,9 +5,9 @@
 
 ## Summary
 - Total SYCL kernels to analyze: 33
-- Kernels analyzed so far: 20
+- Kernels analyzed so far: 21
 - Analysis complete: No
-- Kernels with optimization potential: 19
+- Kernels with optimization potential: 20
 - Kernels with no optimization needed: 1
 - Optimization tasks created: 0 (pending finalization)
 
@@ -32,7 +32,7 @@
 - [x] sk_018: ggml_sycl_op_opt_step_sgd — low potential (3 optimization opportunities)
 - [x] sk_019: ggml_sycl_op_opt_step_adamw — low potential (3 optimization opportunities)
 - [x] sk_020: ggml_sycl_silu_back — low potential (4 optimization opportunities)
-- [ ] sk_021: ggml_sycl_op_get_rows_back — pending
+- [x] sk_021: ggml_sycl_op_get_rows_back — low potential (4 optimization opportunities)
 - [ ] sk_022: ggml_sycl_op_im2col_3d — pending
 - [ ] sk_023: ggml_sycl_rope_back — pending
 - [ ] sk_024: ggml_sycl_op_conv_2d — pending
@@ -47,6 +47,12 @@
 - [ ] sk_033: ggml_sycl_op_topk_moe — pending
 
 ## Recent Activity
+[2026-02-27] Analyzed kernel ggml_sycl_op_get_rows_back (sk_021). Found 4 optimization opportunities (low potential).
+  - MEDIUM: Replace brute-force O(nrows_grad*nrows_dst) serial scan with atomic scatter-add O(nrows_grad) — 10-25x speedup for typical training workloads where nrows_dst >> nrows_grad.
+  - LOW: Add vectorized loads/stores (vec4) — 20-40% throughput improvement for memory-bound portion.
+  - LOW: Add [[sycl::reqd_sub_group_size(16)]] — 5-10% occupancy improvement on Xe2.
+  - LOW: Clean DPCT artifacts — 3D→2D nd_range, item_ct1 naming, manual thread indexing.
+
 [2026-02-27] Analyzed kernel ggml_sycl_silu_back (sk_020). Found 4 optimization opportunities (low potential).
   - LOW: Uses standard sycl::exp instead of sycl::native::exp — inconsistent with forward silu which uses native. 5-15% improvement possible.
   - LOW: Scalar-only memory access — vec4 vectorized loads/stores would improve throughput 20-40% but near-zero wall-clock impact (training-only kernel).
