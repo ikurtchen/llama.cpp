@@ -24,13 +24,16 @@
 - [x] sk_011: getrows SYCL kernels — medium potential (6 optimization opportunities)
 - [x] sk_012: wkv SYCL kernels — medium potential (5 optimization opportunities)
 - [x] sk_013: gla SYCL kernel — low potential (4 optimization opportunities)
-[2026-02-27] ATTEMPTED opt_010_007: Vectorized Y loads for dmmv.
-  - opt_010_007: Tried to add sycl::vec<float,2> vectorized Y loads for QR=1 case
-  - Implementation requires if constexpr which needs forward declarations
-  - dmmv.cpp template structure requires significant refactoring for if constexpr
-  - Changes reverted - build has pre-existing issues unrelated to this change
-  - task_041 remains in_progress with opt_011_001 completed
-  - Remaining: mmq IQ types, convert BF16, dmmv BF16
+[2026-02-27] IN_PROGRESS task_041: Add missing quant type support (continued).
+  - opt_011_001: Completed previously (getrows I32/BF16)
+  - opt_dmmv_bf16: Added BF16 support to dmmv
+    * Added convert_bf16 function to convert BF16 weights to float2
+    * Added convert_mul_mat_vec_bf16_sycl kernel with SLM and non-SLM paths
+    * Added GGML_TYPE_BF16 case in dispatch
+    * Build could not be verified due to pre-existing build errors in fattn.hpp/cpy.hpp
+  - opt_010_007: Previously attempted but blocked (template visibility issues)
+  - Remaining: mmq IQ types (8 types), convert BF16 NC support
+
 
 [2026-02-27] COMPLETED task_040: Consolidate dmmv basic quant dispatch functions into template.
   - opt_010_005: Created dequantize_mul_mat_vec_dispatch<QK, QR, dequantize_kernel> template

@@ -75,6 +75,17 @@ static void convert_f16(const void * vx, const int64_t ib, const int iqs, dfloat
     v.y() = x[ib + iqs + 1];
 }
 
+#ifdef GGML_SYCL_HAS_BF16
+// BF16-specific convert function using float2 to avoid half2 precision issues
+static void convert_bf16(const void * vx, const int64_t ib, const int iqs, float2 & v){
+    const sycl::ext::oneapi::bfloat16 *x = (const sycl::ext::oneapi::bfloat16 *)vx;
+
+    // bfloat16 -> float conversion
+    v.x = float(x[ib + iqs + 0]);
+    v.y = float(x[ib + iqs + 1]);
+}
+#endif // GGML_SYCL_HAS_BF16
+
 static void convert_f32(const void * vx, const int64_t ib, const int iqs, dfloat2 & v){
     const float * x = (const float *) vx;
 
@@ -375,6 +386,107 @@ static void convert_mul_mat_vec_f16_sycl(const void *vx, const dfloat *y,
     }
 #endif
 }
+
+#ifdef GGML_SYCL_HAS_BF16
+static void convert_mul_mat_vec_bf16_sycl(const void *vx, const float *y,
+                                          float *dst, const int ncols,
+                                          const int nrows,
+                                          dpct::queue_ptr stream) {
+    GGML_ASSERT(ncols % GGML_SYCL_DMMV_X == 0);
+    const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
+    const sycl::range<3> block_nums(1, 1, block_num_y);
+#if GGML_SYCL_DMMV_USE_SLM
+    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, GGML_SYCL_DMMV_WG_SIZE);
+    {
+        dpct::has_capability_or_fail(stream->get_device(),
+                                     {sycl::aspect::bfloat16});
+
+        stream->submit([&](sycl::handler& cgh) {
+            sycl::local_accessor<float, 1> partial_sums(sycl::range<1>(DMMV_SUBGRP_CNT), cgh);
+
+            cgh.parallel_for(
+                sycl::nd_range<3>(block_nums * block_dims, block_dims),
+                [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                    // BF16-specific: use float arithmetic (not half2)
+                    const int row = item_ct1.get_group(2) * item_ct1.get_local_range(1) +
+                                    item_ct1.get_local_id(1);
+                    if (row >= nrows) return;
+
+                    const int tid = item_ct1.get_local_id(2);
+                    const int ncols_tmp = ncols;
+
+                    float sum = 0.0f;
+                    for (int col = tid; col < ncols_tmp; col += WARP_SIZE) {
+                        const int ib = (row*ncols + col)/2;
+                        const int iqs = col%2;
+                        float2 v;
+                        convert_bf16(vx, ib, iqs, v);
+                        sum += v.x * y[col + 0];
+                        sum += v.y * y[col + 1];
+                    }
+
+                    // sub-group reduction
+                    for (int mask = WARP_SIZE >> 1; mask > 0; mask >>= 1) {
+                        sum += dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), sum, mask);
+                    }
+
+                    if (tid == 0) {
+                        partial_sums[item_ct1.get_local_id(1)] = sum;
+                    }
+
+                    item_ct1.barrier(sycl::local_memory_fence);
+
+                    // work-group reduction
+                    if (tid == 0) {
+                        float result = 0.0f;
+                        for (int i = 0; i < DMMV_SUBGRP_CNT; i++) {
+                            result += partial_sums[i];
+                        }
+                        dst[row] = result;
+                    }
+                });
+        });
+    }
+#else
+    const sycl::range<3> block_dims(1, GGML_SYCL_MMV_Y, WARP_SIZE);
+    {
+        dpct::has_capability_or_fail(stream->get_device(),
+                                     {sycl::aspect::bfloat16});
+
+        stream->parallel_for(
+            sycl::nd_range<3>(block_nums * block_dims, block_dims),
+            [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                // BF16-specific: use float arithmetic (not half2)
+                const int row = item_ct1.get_group(2) * item_ct1.get_local_range(1) +
+                                item_ct1.get_local_id(1);
+                if (row >= nrows) return;
+
+                const int tid = item_ct1.get_local_id(2);
+                const int ncols_tmp = ncols;
+
+                float sum = 0.0f;
+                for (int col = tid; col < ncols_tmp; col += WARP_SIZE) {
+                    const int ib = (row*ncols + col)/2;
+                    const int iqs = col%2;
+                    float2 v;
+                    convert_bf16(vx, ib, iqs, v);
+                    sum += v.x * y[col + 0];
+                    sum += v.y * y[col + 1];
+                }
+
+                // sub-group reduction
+                for (int mask = WARP_SIZE >> 1; mask > 0; mask >>= 1) {
+                    sum += dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), sum, mask);
+                }
+
+                if (tid == 0) {
+                    dst[row] = sum;
+                }
+            });
+    }
+#endif
+}
+#endif // GGML_SYCL_HAS_BF16
 
 /*
 DPCT1110:4: The total declared local variable size in device function
@@ -1988,6 +2100,13 @@ void ggml_sycl_op_dequantize_mul_mat_vec(
         case GGML_TYPE_F16:
             convert_mul_mat_vec_f16_sycl(src0_dd_i, src1_dfloat, dst_dd_i, ne00, row_diff, stream);
             break;
+#ifdef GGML_SYCL_HAS_BF16
+        case GGML_TYPE_BF16:
+            // For BF16, pass src1_ddf_i (F32) directly since we don't have BF16 vector ops
+            // The convert_bf16 function will convert BF16 weights to float, and the rest uses F32 arithmetic
+            convert_mul_mat_vec_bf16_sycl(src0_dd_i, src1_ddf_i, dst_dd_i, ne00, row_diff, stream);
+            break;
+#endif // GGML_SYCL_HAS_BF16
         default:
             printf("ggml_sycl_op_dequantize_mul_mat_vec unsupported GGML_TYPE %d\n", src0->type);
             GGML_ABORT("fatal error");

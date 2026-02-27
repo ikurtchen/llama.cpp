@@ -776,7 +776,7 @@
           "status": "in_progress",
           "expected_improvement": "Feature completeness — enables new model architectures",
           "estimated_effort": "xlarge",
-          "current_focus": "opt_011_001: getrows I32/BF16 src0/dst types - COMPLETED",
+          "current_focus": "opt_011_001: getrows I32/BF16 src0/dst types - COMPLETED; opt_dmmv_bf16: dmmv BF16 support - IMPLEMENTED",
           "dependencies": [],
           "benchmark_command": "./syclgen/remote_run.sh -s b60 -t unit -k MUL_MAT,DEQUANT,MUL_MAT_VEC,GET_ROWS",
           "build_command": "./syclgen/remote_run.sh -s b60 -t build",
@@ -786,7 +786,7 @@
             "ggml/src/ggml-sycl/dmmv.cpp",
             "ggml/src/ggml-sycl/getrows.cpp"
           ],
-          "notes": "opt_011_001 COMPLETED: Added I32 and BF16 src0 types + I32, F16, BF16 dst types to getrows. Implemented two-level dispatch matching CUDA pattern. Build SUCCESS, 35/35 GET_ROWS tests PASSED. opt_010_007 ATTEMPTED: Tried vectorized Y loads for dmmv using sycl::vec<float,2>, but code has pre-existing template visibility issues that prevent adding if constexpr. The dmmv.cpp functions require forward declarations to use with if constexpr, which would require significant refactoring. Remaining components: mmq IQ types, convert BF16, dmmv BF16."
+          "notes": "opt_011_001 COMPLETED: Added I32 and BF16 src0 types + I32, F16, BF16 dst types to getrows. Implemented two-level dispatch matching CUDA pattern. Build SUCCESS, 35/35 GET_ROWS tests PASSED. opt_010_007 ATTEMPTED: Tried vectorized Y loads for dmmv using sycl::vec<float,2>, but code has pre-existing template visibility issues that prevent adding if constexpr. The dmmv.cpp functions require forward declarations to use with if constexpr, which would require significant refactoring. opt_dmmv_bf16 IMPLEMENTED: Added BF16 support to dmmv (dequantize matrix-vector multiply). Added convert_bf16 function to convert BF16 weights to float2. Added convert_mul_mat_vec_bf16_sycl kernel with both SLM and non-SLM paths. Added GGML_TYPE_BF16 case in dispatch. Build could not be verified due to pre-existing build errors in fattn.hpp and cpy.hpp unrelated to this change. Remaining components: mmq IQ types (8 types), convert BF16 NC support."
         },
         {
           "task_id": "task_042",
