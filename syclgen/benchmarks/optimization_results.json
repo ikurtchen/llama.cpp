@@ -1,6 +1,17 @@
 {
   "results": [
     {
+      "task_id": "opt_task_001",
+      "kernel": "mmq (quantized matmul)",
+      "optimization": "Add [[sycl::reqd_sub_group_size(WARP_SIZE)]] to all 20 mmq kernel launches",
+      "timestamp": "2026-02-28T02:00:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": null,
+      "notes": "Added reqd_sub_group_size(WARP_SIZE) to all 20 parallel_for kernel launches in mmq.cpp: q4_0 (2), q4_1 (2), q5_0 (2), q5_1 (2), q8_0 (2), q2_K (2), q3_K (2), q4_K (2), q5_K (2), q6_K (2). Without this attribute, compiler may choose SIMD32 which halves occupancy on Intel Xe2 (Arc Pro B60). This optimization is part of opt_008_006 under opt_task_001 (MMQ XMX optimization). Build: SUCCESS on b60. Unit tests: PASS (mul_mat_q tests OK). Expected 5-15% improvement from guaranteed SIMD16."
+    },
+    {
       "task_id": "opt_task_019",
       "kernel": "unary ops (element_wise.cpp)",
       "optimization": "Add contiguous fast-path to unary op framework - bypasses 4D index decomposition for contiguous tensors",

@@ -1,3 +1,11 @@
+[2026-02-28] opt_task_001 (MMQ XMX optimization - partial): IN PROGRESS.
+  - mmq.cpp: Added [[sycl::reqd_sub_group_size(WARP_SIZE)]] to all 20 kernel launches
+  - This ensures SIMD16 execution on Intel Xe2 (Arc Pro B60)
+  - Prevents compiler from choosing SIMD32 which would halve occupancy
+  - Build: SUCCESS on b60
+  - Unit tests: PASS (mul_mat_q tests OK)
+  - Expected improvement: 5-15% from guaranteed SIMD16 selection
+
 [2026-02-28] opt_task_019 (Unary contiguous fast-path): COMPLETED.
   - element_wise.cpp: Added unary_op_contiguous_kernel for fast-path when tensors are contiguous
   - ggml_sycl_op_unary: Added check for ggml_is_contiguous(src0) && ggml_is_contiguous(dst)
