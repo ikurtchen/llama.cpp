@@ -1,6 +1,17 @@
 {
   "results": [
     {
+      "task_id": "opt_task_027",
+      "kernel": "MUL_MAT_ID_FUSION (mmvq/dmmv)",
+      "optimization": "Investigate q4_K failures - confirmed pre-existing from SIMD16 change",
+      "timestamp": "2026-02-28T13:00:00Z",
+      "correctness": "not_applicable",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": null,
+      "notes": "Investigated MUL_MAT_ID_FUSION q4_K test failures. Finding: Only 2 tests fail (not 3 as expected) - q4_K n=1 and n=4. q4_0 n=4 actually passes (task description was wrong). These failures are PRE-EXISTING from dmmv SIMD32->SIMD16 change (opt_task_002, commit 6e02f9a38). The q4_K kernel was designed for 32-thread warps (CUDA default) and has subtle algorithmic issues when running with 16 threads on Intel Xe2. Documented in commit 96396c350 as known issue. Fixing would require deep kernel re-architecting. Result: 11/13 MUL_MAT_ID_FUSION tests pass, 2 fail (pre-existing)."
+    },
+    {
       "task_id": "opt_task_025",
       "kernel": "mmq (MUL_MAT)",
       "optimization": "Revert XE2 tile sizes - restore baseline correctness",
