@@ -66,6 +66,14 @@
   - Unit tests: PASS (SSM_SCAN, SOLVE_TRI, SET_ROWS 168/168, TIMESTEP_EMBED, PAD, COUNT_EQUAL, CONV)
   - Note: opt_task_020 is a large cleanup task - dpct::queue_ptr mostly replaced in smaller files, remaining work in large files like ggml-sycl.cpp, mmq.cpp, convert.cpp, mmvq.cpp, dmmv.cpp, and header files
 
+[2026-02-28] opt_task_023 (CONV_2D regression fix): COMPLETED.
+  - conv2d.cpp: Removed incorrect 1x1 kernel specialization
+  - Problem: 1x1 specialization had hardcoded bounds {0,1,0,1} assuming stride=1, dilation=1, padding=0
+  - For arbitrary stride/dilation/padding (e.g., stride=5, dilation=4, padding=2), this produced incorrect results
+  - Fix: Removed 1x1 special case - now falls through to generic path with correct bounds calculation
+  - Build: SUCCESS on b60
+  - Tests: 1568/1568 CONV_2D tests PASS (was 130 failures)
+
 [2026-02-28] opt_task_001 (MMQ XMX optimization - partial): IN PROGRESS.
   - mmq.cpp: Added [[sycl::reqd_sub_group_size(WARP_SIZE)]] to all 20 kernel launches
   - This ensures SIMD16 execution on Intel Xe2 (Arc Pro B60)

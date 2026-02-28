@@ -169,14 +169,7 @@ static void conv2d_sycl_dispatch(const float * input, const T * kernel_data, flo
 
     // opt_024_002: Switch on kernel size to dispatch specialized kernels
     // opt_024_004: reqd_sub_group_size(16) attribute applied in kernel lambda
-    if (P.KW == 1 && P.KH == 1) {
-        stream->parallel_for(
-            sycl::nd_range<1>(sycl::range<1>(num_blocks) * sycl::range<1>(SYCL_CONV2D_BLOCK_SIZE),
-                              sycl::range<1>(SYCL_CONV2D_BLOCK_SIZE)),
-            [=](sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(16)]] {
-                conv2d_kernel<T, 1, 1>(input, kernel_data, output, P, item);
-            });
-    } else if (P.KW == 3 && P.KH == 3) {
+    if (P.KW == 3 && P.KH == 3) {
         stream->parallel_for(
             sycl::nd_range<1>(sycl::range<1>(num_blocks) * sycl::range<1>(SYCL_CONV2D_BLOCK_SIZE),
                               sycl::range<1>(SYCL_CONV2D_BLOCK_SIZE)),

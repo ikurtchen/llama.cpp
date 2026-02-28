@@ -18,6 +18,7 @@ $3 is the other arguments to pass to the script
 * When run tests on **Nvidia GPU**, always add `-e CUDA_VISIBLE_DEVICES="0"` to avoid using all GPUs.
 * You can use `--command` to overwrite the default command for tasks like build, unit test, benchmark.
 * **ALWAYS** upload modified code before build on remote server, **NEVER** build and test on local computer.
+* **ALWAYS** check kernel name with custom command `-t custom --command "source /opt/intel/oneapi/setvars.sh && ./build/bin/test-backend-ops --list-ops"` before run unit test and benchmark. ONLY do test when the kernel name is found. If cannot determine the kernel name, record it.
 
 Examples:
 

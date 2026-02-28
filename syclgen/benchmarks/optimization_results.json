@@ -1,6 +1,17 @@
 {
   "results": [
     {
+      "task_id": "opt_task_023",
+      "kernel": "conv2d",
+      "optimization": "Fix CONV_2D regression - remove incorrect 1x1 kernel specialization",
+      "timestamp": "2026-02-28T04:30:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": null,
+      "notes": "Fixed 130 CONV_2D test failures. Problem: The 1x1 kernel specialization had hardcoded bounds {0,1,0,1} which assumed stride=1, dilation=1, padding=0. For arbitrary stride/dilation/padding (e.g., stride=5, dilation=4, padding=2), this produced incorrect results because input coordinates were out of bounds. Fix: Removed 1x1 special case from dispatch - now falls through to generic conv2d_kernel<T, 0, 0> path which correctly calculates bounds using calculate_input_coord(). Build: SUCCESS. Tests: 1568/1568 CONV_2D tests PASS."
+    },
+    {
       "task_id": "opt_task_001",
       "kernel": "mmq (quantized matmul)",
       "optimization": "Fix tile size mismatch - dispatch now uses XE2 sizes when SYCL_USE_XMX is defined (matching kernel)",

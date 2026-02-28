@@ -13,7 +13,7 @@
       "priority": "critical",
       "complexity": "very_high",
       "category": "compute_path",
-      "status": "pending",
+      "status": "abandoned",
       "description": "Implement Intel XMX compute path for quantized matrix multiply (mmq) using SYCL joint_matrix",
       "target_kernels": [
         {
@@ -146,7 +146,7 @@
       "priority": "high",
       "complexity": "medium",
       "category": "work_group_size",
-      "status": "pending",
+      "status": "abandoned",
       "description": "Fix mmq tile sizes: fix dispatch/kernel mismatch bug and tune for Xe2",
       "target_kernels": [
         {
@@ -194,6 +194,7 @@
       "actual_improvement": "Work-group size increased from 32 to 128 threads (4x). Uses sycl::reduce_over_group for multi-sub-group reduction.",
       "blocked_reason": null
     },
+    {
       "id": "opt_task_008",
       "priority": "high",
       "complexity": "medium",
@@ -386,41 +387,6 @@
       "optimized_metric": null,
       "actual_improvement": "Expected 5-30% speedup from faster transcendental functions; correctness verified by unit tests (ROPE 248/248, GELU 8/8, SILU 8/8, TANH 8/8, SIGMOID 8/8, EXP 8/8, LOG 4/4, COS 4/4, SQRT 4/4)",
       "blocked_reason": null
-    },
-        {
-          "kernel_id": "sk_004",
-          "file": "ggml/src/ggml-sycl/element_wise.cpp"
-        },
-        {
-          "kernel_id": "sk_027",
-          "file": "ggml/src/ggml-sycl/cross-entropy-loss.cpp"
-        },
-        {
-          "kernel_id": "sk_028",
-          "file": "ggml/src/ggml-sycl/cross-entropy-loss-back.cpp"
-        },
-        {
-          "kernel_id": "sk_032",
-          "file": "ggml/src/ggml-sycl/ssm_scan.cpp"
-        },
-        {
-          "kernel_id": "sk_033",
-          "file": "ggml/src/ggml-sycl/topk-moe.cpp"
-        }
-      ],
-      "optimization_ids": [
-        "opt_002_001",
-        "opt_002_002",
-        "opt_004_002",
-        "opt_027_004",
-        "opt_028_004",
-        "opt_032_003",
-        "opt_033_002"
-      ],
-      "dependencies": [],
-      "estimated_improvement": "5-30% per kernel depending on transcendental density. Largest impact on rope (sin/cos/pow), element_wise (exp/gelu), softmax/sigmoid (exp)",
-      "risk": "low",
-      "notes": "Batch task across all kernels using standard sycl::exp/sin/cos/pow where native:: equivalents exist. native:: provides ~1 ULP accuracy, matching CUDA's fast-math behavior."
     },
     {
       "id": "opt_task_014",
@@ -686,7 +652,7 @@
       "baseline_metric": null,
       "optimized_metric": null,
       "actual_improvement": "Code quality: replaced 93 dpct::queue_ptr occurrences with sycl::queue* across ggml-sycl.cpp, mmq.cpp, convert.cpp, mmvq.cpp, dmmv.cpp and header files (convert.hpp, quantize.hpp, mmvq.hpp, mmq.hpp, dmmv.hpp)",
-      "notes": "DPCT cleanup: replaced all dpct::queue_ptr with sycl::queue*. This removes Intel DPCT migration tool artifacts and uses standard SYCL types. Build: SUCCESS on b60. Unit tests: PASS (MUL_MAT_Q, MMQ, DMMV, CONV). The __dpct_inline__ replacements were done in previous sessions. Remaining: item_ct1 naming (optional, low impact)."
+      "notes": "DPCT cleanup: replaced all dpct::queue_ptr with sycl::queue*. This removes Intel DPCT migration tool artifacts and uses standard SYCL types. Build: SUCCESS on b60. Unit tests: PASS (MUL_MAT_Q, MMQ, DMMV, CONV). The __dpct_inline__ replacements were done in previous sessions. Remaining: item_ct1 naming (optional, low impact).",
       "target_kernels": [
         {
           "kernel_id": "sk_001",
@@ -742,7 +708,7 @@
       "priority": "low",
       "complexity": "medium",
       "category": "feature_gap",
-      "status": "pending",
+      "status": "abandoned",
       "description": "Add missing quantization type support: BF16, I32, IQ types, MXFP4",
       "target_kernels": [
         {
@@ -773,7 +739,7 @@
       "priority": "low",
       "complexity": "low",
       "category": "work_group_size",
-      "status": "pending",
+      "status": "abandoned",
       "description": "Minor work-group and occupancy improvements for low-impact kernels",
       "target_kernels": [
         {
@@ -818,6 +784,204 @@
       "estimated_improvement": "5-40% per kernel but near-zero wall-clock impact (training-only or infrequent kernels)",
       "risk": "low",
       "notes": "Batch of minor improvements for training-only and infrequently-called kernels. Low wall-clock impact during inference."
+    },
+    {
+      "id": "opt_task_023",
+      "priority": "critical",
+      "complexity": "medium",
+      "category": "regression_fix",
+      "status": "completed",
+      "description": "Fix CONV_2D regression: 128 unit test failures after conv2d kernel optimization",
+      "target_kernels": [
+        {
+          "kernel_id": "sk_024",
+          "file": "ggml/src/ggml-sycl/conv2d.cpp"
+        }
+      ],
+      "optimization_ids": [],
+      "dependencies": [],
+      "estimated_improvement": "Regression fix - restore baseline correctness",
+      "risk": "medium",
+      "notes": "Fixed by removing incorrect 1x1 kernel specialization. The specialization had hardcoded bounds {0,1,0,1} which assumed stride=1, dilation=1, padding=0. For arbitrary stride/dilation/padding (e.g., stride=5, dilation=4, padding=2), this produced incorrect results because input coordinates were out of bounds. Now 1x1 kernels fall through to generic path which correctly calculates bounds using calculate_input_coord().",
+      "completed_at": "2026-02-28T04:30:00Z",
+      "baseline_metric": "130 CONV_2D test failures",
+      "optimized_metric": "1568 CONV_2D tests PASS",
+      "actual_improvement": "All 130 failures fixed - regression restored to baseline correctness"
+    },
+    {
+      "id": "opt_task_024",
+      "priority": "critical",
+      "complexity": "low",
+      "category": "regression_fix",
+      "status": "pending",
+      "description": "Fix SSM_SCAN regression: 1 unit test failure after L_template specialization",
+      "target_kernels": [
+        {
+          "kernel_id": "sk_032",
+          "file": "ggml/src/ggml-sycl/ssm_scan.cpp"
+        }
+      ],
+      "optimization_ids": [],
+      "dependencies": [],
+      "estimated_improvement": "Regression fix - restore baseline correctness",
+      "risk": "low",
+      "notes": "Failing test: SSM_SCAN(type=f32,d_state=16,head_dim=1,n_head=1024,n_group=1,n_seq_tokens=32,n_seqs=4). This is a Mamba-1 case (head_dim=1) with n_seq_tokens=32 (>8), so it hits the runtime L path (L_template=0). Likely caused by opt_task_017 (L_template specialization) or opt_task_013/015 (native math / unroll pragmas in ssm_scan). Check the runtime L-loop path for large n_seq_tokens and the n_head=1024 work distribution.",
+      "completed_at": null,
+      "baseline_metric": "SSM_SCAN test PASS in baseline",
+      "optimized_metric": null,
+      "actual_improvement": null,
+      "blocked_reason": null
+    },
+    {
+      "id": "opt_task_025",
+      "priority": "critical",
+      "complexity": "medium",
+      "category": "regression_fix",
+      "status": "pending",
+      "description": "Fix MUL_MAT regression: revert abandoned opt_task_001/006 changes that broke 32 quantized matmul tests",
+      "target_kernels": [
+        {
+          "kernel_id": "sk_008",
+          "file": "ggml/src/ggml-sycl/mmq.cpp"
+        },
+        {
+          "kernel_id": "sk_009",
+          "file": "ggml/src/ggml-sycl/mmvq.cpp"
+        },
+        {
+          "kernel_id": "sk_010",
+          "file": "ggml/src/ggml-sycl/dequantize_mul_mat_vec.cpp"
+        }
+      ],
+      "optimization_ids": [],
+      "dependencies": [],
+      "estimated_improvement": "Regression fix - restore baseline correctness",
+      "risk": "medium",
+      "notes": "32 MUL_MAT test failures. Affected quant types: q8_0, q2_K, q3_K, q5_K, q4_0, q4_1, q4_K, mxfp4. Many failures have o=1 (output ordering flag). Failures include both small (m=16,n=1-8,k=256) and batched (bs=[2,3], bs=[3,2], bs=[1536,1]) cases with various permutation orders. Since opt_task_001 (XMX mmq) and opt_task_006 (mmq tile sizes) are abandoned, their partial changes (XE2 tile sizes, reqd_sub_group_size additions to mmq) should be reverted. Also check opt_task_007 (mmvq multi-column batching) and opt_task_002 (dmmv work-group sizes) for related regressions.",
+      "completed_at": null,
+      "baseline_metric": "32 MUL_MAT tests PASS in baseline",
+      "optimized_metric": null,
+      "actual_improvement": null,
+      "blocked_reason": null
+    },
+    {
+      "id": "opt_task_026",
+      "priority": "critical",
+      "complexity": "medium",
+      "category": "regression_fix",
+      "status": "pending",
+      "description": "Fix MUL_MAT_ID regression: revert abandoned changes that broke 78 quantized matmul-ID tests",
+      "target_kernels": [
+        {
+          "kernel_id": "sk_008",
+          "file": "ggml/src/ggml-sycl/mmq.cpp"
+        },
+        {
+          "kernel_id": "sk_009",
+          "file": "ggml/src/ggml-sycl/mmvq.cpp"
+        },
+        {
+          "kernel_id": "sk_010",
+          "file": "ggml/src/ggml-sycl/dequantize_mul_mat_vec.cpp"
+        }
+      ],
+      "optimization_ids": [],
+      "dependencies": [
+        "opt_task_025"
+      ],
+      "estimated_improvement": "Regression fix - restore baseline correctness",
+      "risk": "medium",
+      "notes": "78 MUL_MAT_ID test failures. Affected quant types: mxfp4, q8_0, q4_K, q2_K, q3_K, q5_K, q6_K. MUL_MAT_ID uses the same underlying matmul kernels as MUL_MAT (mmq/mmvq/dmmv) with expert routing. Fixing MUL_MAT (opt_task_025) by reverting abandoned opt_task_001/006 changes should also fix most MUL_MAT_ID failures. The mxfp4 failures (n_mats=32, n_used=2, m=2880, n=32, k=2880) should also be investigated separately as mxfp4 is a newer type.",
+      "completed_at": null,
+      "baseline_metric": "78 MUL_MAT_ID tests PASS in baseline",
+      "optimized_metric": null,
+      "actual_improvement": null,
+      "blocked_reason": null
+    },
+    {
+      "id": "opt_task_027",
+      "priority": "critical",
+      "complexity": "low",
+      "category": "regression_fix",
+      "status": "pending",
+      "description": "Fix MUL_MAT_ID_FUSION regression: 3 test failures in fused matmul-ID kernels",
+      "target_kernels": [
+        {
+          "kernel_id": "sk_008",
+          "file": "ggml/src/ggml-sycl/mmq.cpp"
+        },
+        {
+          "kernel_id": "sk_009",
+          "file": "ggml/src/ggml-sycl/mmvq.cpp"
+        }
+      ],
+      "optimization_ids": [],
+      "dependencies": [
+        "opt_task_025",
+        "opt_task_026"
+      ],
+      "estimated_improvement": "Regression fix - restore baseline correctness",
+      "risk": "low",
+      "notes": "3 MUL_MAT_ID_FUSION test failures: q4_K (n=1, n=4) and q4_0 (n=4) with n_mats=128, n_used=8, m=768, k=2048, o=1, mul=1. These are fused matmul-ID operations that combine expert selection with matmul. Likely shares root cause with MUL_MAT/MUL_MAT_ID failures (opt_task_025/026). Should be resolved after reverting abandoned mmq changes.",
+      "completed_at": null,
+      "baseline_metric": "3 MUL_MAT_ID_FUSION tests PASS in baseline",
+      "optimized_metric": null,
+      "actual_improvement": null,
+      "blocked_reason": null
+    },
+    {
+      "id": "opt_task_028",
+      "priority": "critical",
+      "complexity": "low",
+      "category": "regression_fix",
+      "status": "pending",
+      "description": "Fix SOFT_MAX_BACK regression: 24 test failures after vec4 vectorization",
+      "target_kernels": [
+        {
+          "kernel_id": "sk_001",
+          "file": "ggml/src/ggml-sycl/softmax.cpp"
+        }
+      ],
+      "optimization_ids": [],
+      "dependencies": [],
+      "estimated_improvement": "Regression fix - restore baseline correctness",
+      "risk": "low",
+      "notes": "24 SOFT_MAX_BACK test failures across various ne dimensions ([16,16], [15,15], [16,1024], [15,1023], [1024,16], [1023,15], [1024,1024], [1023,1023]) with batch sizes [1,1] and [2,3], and scale values 1.0 and 0.1. Likely caused by opt_task_014 (vec4 vectorization of soft_max_back_f32). The non-power-of-2 dimensions (15, 1023) suggest the vec4 path has an incorrect tail-handling for ncols not divisible by 4. Need to fix the vec4 path or revert it.",
+      "completed_at": null,
+      "baseline_metric": "24 SOFT_MAX_BACK tests PASS in baseline",
+      "optimized_metric": null,
+      "actual_improvement": null,
+      "blocked_reason": null
+    },
+    {
+      "id": "opt_task_029",
+      "priority": "critical",
+      "complexity": "medium",
+      "category": "regression_fix",
+      "status": "pending",
+      "description": "Fix MUL_MAT_VEC_FUSION regression: 25 test failures in fused matmul-vec kernels",
+      "target_kernels": [
+        {
+          "kernel_id": "sk_009",
+          "file": "ggml/src/ggml-sycl/mmvq.cpp"
+        },
+        {
+          "kernel_id": "sk_010",
+          "file": "ggml/src/ggml-sycl/dequantize_mul_mat_vec.cpp"
+        }
+      ],
+      "optimization_ids": [],
+      "dependencies": [
+        "opt_task_025"
+      ],
+      "estimated_improvement": "Regression fix - restore baseline correctness",
+      "risk": "medium",
+      "notes": "25 MUL_MAT_VEC_FUSION test failures. All use type=q4_K with m=1 (vector), n=32, k=256, n_mats=16, n_used=8. Failures span glu_op=1|2, use_id=0|1, b=0|1, with_bias=0|1, with_gate=0|1, batch_dims=[4,2]|[1,1]. MUL_MAT_VEC_FUSION is a fused kernel combining matmul-vec with GLU activation. Likely caused by opt_task_007 (mmvq multi-column batching) or opt_task_002 (dmmv work-group size changes). The with_bias and with_gate variants suggest the fusion logic interacts poorly with the batching/work-group changes. May also need reverting abandoned task changes if root cause is shared with MUL_MAT.",
+      "completed_at": null,
+      "baseline_metric": "25 MUL_MAT_VEC_FUSION tests PASS in baseline",
+      "optimized_metric": null,
+      "actual_improvement": null,
+      "blocked_reason": null
     }
   ]
 }
