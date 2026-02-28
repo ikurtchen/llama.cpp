@@ -5,10 +5,11 @@
 #include "quants.hpp"
 #include "vecdotq.hpp"
 
-// opt_009_002: Increase non-reorder work-group size from WARP_SIZE to 4*WARP_SIZE for better memory latency hiding on Xe2
+// opt_009_002: DISABLED - reduce_over_group only reduces within sub-group, not across sub-groups
+// Reverted to WG_SCALE=1 for correctness
 // See: hw_spec (Intel Arc Pro B60, Xe2) and optimization_guide
 #ifndef GGML_SYCL_MMVQ_WG_SCALE
-#define GGML_SYCL_MMVQ_WG_SCALE 4  // Default: 4x WARP_SIZE (64 threads) for non-reorder path
+#define GGML_SYCL_MMVQ_WG_SCALE 1  // Disabled: WG_SCALE > 1 has incorrect reduction
 #endif
 
 template <typename reorder_vec_dot_q_sycl>

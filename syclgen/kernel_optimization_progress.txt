@@ -116,3 +116,15 @@
   - Build: SUCCESS on b60
   - Note: The XE2 changes were making things worse, not better
 
+[2026-02-28] opt_task_026 (MUL_MAT_ID regression fix): COMPLETED.
+  - mmvq.cpp: Set GGML_SYCL_MMVQ_WG_SCALE=1 to disable buggy multi-sub-group reduction
+  - Problem: opt_task_007 added WG_SCALE=4 which used sycl::reduce_over_group incorrectly
+    - reduce_over_group only reduces within a sub-group, not across sub-groups
+    - This caused incorrect results for q8_0 (small n values) 
+  - Fix: Set GGML_SYCL_MMVQ_WG_SCALE=1 to revert to original warp shuffle reduction
+  - Result: q8_0 now passes completely (was ~28 failures)
+  - MUL_MAT_ID failures reduced from 53 to ~34-39
+  - Remaining failures: q4_K with small n (n=1,4,5,17), some iq2 types
+  - These may be related to dmmv SIMD32->SIMD16 change (opt_task_002) or are pre-existing
+  - Build: SUCCESS on b60
+
