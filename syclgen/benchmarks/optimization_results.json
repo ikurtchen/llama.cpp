@@ -1,6 +1,17 @@
 {
   "results": [
     {
+      "task_id": "opt_task_028",
+      "kernel": "softmax (soft_max_back_f32)",
+      "optimization": "Fix vec4 indexing bug - threads should start at tid*4 and increment by WARP_SIZE*4",
+      "timestamp": "2026-02-28T14:00:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": null,
+      "notes": "Fixed 24 SOFTMAX_BACK test failures. Root cause: vec4 loop used col=tid which caused overlapping vec4 loads (thread 0 loads elements 0-3, thread 1 loads 1-4, etc.) instead of consecutive non-overlapping blocks. Fix: Changed col=tid to col=tid*4 and col+=WARP_SIZE to col+=WARP_SIZE*4 for vec4 loops. Each thread now processes a separate vec4 chunk: thread 0 processes elements 0-3, thread 1 processes 4-7, etc. Build: SUCCESS. Tests: 24/24 SOFTMAX_BACK tests PASS."
+    },
+    {
       "task_id": "opt_task_027",
       "kernel": "MUL_MAT_ID_FUSION (mmvq/dmmv)",
       "optimization": "Investigate q4_K failures - confirmed pre-existing from SIMD16 change",

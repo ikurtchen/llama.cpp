@@ -938,8 +938,8 @@
       "priority": "critical",
       "complexity": "low",
       "category": "regression_fix",
-      "status": "pending",
-      "description": "Fix SOFT_MAX_BACK regression: 24 test failures after vec4 vectorization",
+      "status": "completed",
+      "description": "Fix SOFTMAX_BACK regression: 24 test failures after vec4 vectorization",
       "target_kernels": [
         {
           "kernel_id": "sk_001",
@@ -950,11 +950,11 @@
       "dependencies": [],
       "estimated_improvement": "Regression fix - restore baseline correctness",
       "risk": "low",
-      "notes": "24 SOFT_MAX_BACK test failures across various ne dimensions ([16,16], [15,15], [16,1024], [15,1023], [1024,16], [1023,15], [1024,1024], [1023,1023]) with batch sizes [1,1] and [2,3], and scale values 1.0 and 0.1. Likely caused by opt_task_014 (vec4 vectorization of soft_max_back_f32). The non-power-of-2 dimensions (15, 1023) suggest the vec4 path has an incorrect tail-handling for ncols not divisible by 4. Need to fix the vec4 path or revert it.",
-      "completed_at": null,
-      "baseline_metric": "24 SOFT_MAX_BACK tests PASS in baseline",
-      "optimized_metric": null,
-      "actual_improvement": null,
+      "notes": "24 SOFTMAX_BACK test failures fixed. Root cause: vec4 loop used incorrect indexing - threads should start at tid*4 and increment by WARP_SIZE*4 when processing vec4 elements. The original code used col=tid which caused each thread to load overlapping vec4 windows (thread 0 loads elements 0-3, thread 1 loads 1-4, etc.) instead of non-overlapping consecutive blocks. Fix: Changed col=tid to col=tid*4 and col+=WARP_SIZE to col+=WARP_SIZE*4 for vec4 loops.",
+      "completed_at": "2026-02-28T14:00:00Z",
+      "baseline_metric": "0 SOFTMAX_BACK tests PASS (24 tests FAIL)",
+      "optimized_metric": "24 SOFTMAX_BACK tests PASS",
+      "actual_improvement": "24/24 tests PASS - regression fixed",
       "blocked_reason": null
     },
     {

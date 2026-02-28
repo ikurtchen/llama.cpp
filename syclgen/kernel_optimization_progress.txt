@@ -128,6 +128,15 @@
   - These may be related to dmmv SIMD32->SIMD16 change (opt_task_002) or are pre-existing
   - Build: SUCCESS on b60
 
+[2026-02-28] opt_task_028 (SOFTMAX_BACK vec4 fix): COMPLETED.
+  - softmax.cpp: Fixed vec4 indexing bug in soft_max_back_f32
+  - Problem: vec4 loop used col=tid which caused overlapping vec4 loads
+    (thread 0 loads elements 0-3, thread 1 loads 1-4, etc.)
+  - Fix: Changed col=tid to col=tid*4 and col+=WARP_SIZE to col+=WARP_SIZE*4
+  - Each thread now processes separate vec4 chunk: thread 0 -> 0-3, thread 1 -> 4-7, etc.
+  - Build: SUCCESS on b60
+  - Tests: 24/24 SOFTMAX_BACK tests PASS (was 24 failures)
+
 [2026-02-28] opt_task_027 (MUL_MAT_ID_FUSION investigation): COMPLETED.
   - Investigated MUL_MAT_ID_FUSION q4_K failures
   - Finding: Only 2 tests fail (not 3 as expected) - q4_K n=1 and n=4
@@ -136,6 +145,6 @@
   - The q4_K kernel was designed for 32-thread warps (CUDA default)
   - Has subtle algorithmic issues when running with 16 threads on Intel Xe2
   - Documented in commit 96396c350 as known issue
-  - Fixing would require deep kernel re-architecting
   - Result: 11/13 MUL_MAT_ID_FUSION tests pass, 2 fail (pre-existing)
+
 

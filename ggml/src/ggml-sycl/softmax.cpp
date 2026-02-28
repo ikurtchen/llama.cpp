@@ -197,8 +197,9 @@ static void soft_max_back_f32(const float *grad, const float *dstf, float *dst,
 
 #if GGML_SYCL_VEC4
     // Process 4 elements at a time with vec4 loads
+    // Each thread processes consecutive vec4 elements: thread i handles elements [i*4, i*4+1, i*4+2, i*4+3]
     const int vec4_col_end = (ncols / 4) * 4;
-    for (int col = tid; col < vec4_col_end; col += WARP_SIZE) {
+    for (int col = tid * 4; col < vec4_col_end; col += WARP_SIZE * 4) {
         sycl::vec<float, 4> grad_v = *reinterpret_cast<const sycl::vec<float, 4>*>(&grad[col]);
         sycl::vec<float, 4> dstf_v = *reinterpret_cast<const sycl::vec<float, 4>*>(&dstf[col]);
         dgf_dot += dstf_v[0] * grad_v[0] + dstf_v[1] * grad_v[1] + dstf_v[2] * grad_v[2] + dstf_v[3] * grad_v[3];
@@ -217,7 +218,7 @@ static void soft_max_back_f32(const float *grad, const float *dstf, float *dst,
 
 #if GGML_SYCL_VEC4
     // Process 4 elements at a time with vec4 loads/stores
-    for (int col = tid; col < vec4_col_end; col += WARP_SIZE) {
+    for (int col = tid * 4; col < vec4_col_end; col += WARP_SIZE * 4) {
         sycl::vec<float, 4> grad_v = *reinterpret_cast<const sycl::vec<float, 4>*>(&grad[col]);
         sycl::vec<float, 4> dstf_v = *reinterpret_cast<const sycl::vec<float, 4>*>(&dstf[col]);
         sycl::vec<float, 4> dst_v = scale * (grad_v - dgf_dot) * dstf_v;
