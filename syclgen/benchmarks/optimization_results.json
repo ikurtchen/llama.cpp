@@ -1,6 +1,17 @@
 {
   "results": [
     {
+      "task_id": "opt_task_029",
+      "kernel": "MUL_MAT_VEC_FUSION (mmvq/dmmv)",
+      "optimization": "Investigate q4_K failures - confirmed pre-existing from SIMD16 change (same as opt_task_027)",
+      "timestamp": "2026-02-28T15:00:00Z",
+      "correctness": "not_applicable",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": null,
+      "notes": "Investigated MUL_MAT_VEC_FUSION q4_K test failures (25 tests). Root cause: q4_K dmmv kernel (dmmv.cpp line 491-507) assumes WARP_SIZE=32 but runs with WARP_SIZE=16 on Intel Xe2. The kernel computes: tid = local_id(2) / K_QUANTS_PER_ITERATION which breaks with 16 threads (gives 0-7 instead of 0-15). This is the SAME pre-existing issue as opt_task_027 - documented in commit 96396c350 as known issue. Fixing requires kernel re-architecting. All other types (f32, f16, q8_0, q4_0, q4_1, mxfp4, iq2_xxs) PASS. Task marked completed_with_known_issue."
+    },
+    {
       "task_id": "opt_task_028",
       "kernel": "softmax (soft_max_back_f32)",
       "optimization": "Fix vec4 indexing bug - threads should start at tid*4 and increment by WARP_SIZE*4",
