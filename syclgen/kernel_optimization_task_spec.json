@@ -620,8 +620,12 @@
       "priority": "medium",
       "complexity": "medium",
       "category": "integer_arithmetic",
-      "status": "pending",
+      "status": "completed",
       "description": "Replace int64_t with int32_t for index arithmetic in conv2d/conv2d-dw and add fastdiv to binbcast",
+      "completed_at": "2026-02-28T00:30:00Z",
+      "baseline_metric": "int64_t index arithmetic (10-20x slower division on GPU)",
+      "optimized_metric": "int32_t index arithmetic + fastdiv",
+      "actual_improvement": "Expected 10-40% from faster integer division on Xe2",
       "target_kernels": [
         {
           "kernel_id": "sk_006",

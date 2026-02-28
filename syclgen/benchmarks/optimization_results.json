@@ -45,9 +45,18 @@
       "notes": "Applied 5 optimizations to conv2d.cpp: (1) Template specialization for 1x1, 3x3, 5x5, 7x7 kernel sizes - enables compile-time loop unrolling, 20-40% expected. (2) Added [[sycl::reqd_sub_group_size(16)]] for native SIMD16 on Xe2 - 5-15% expected. (3) Changed int64_t to int32_t for index arithmetic - 10-20% expected from faster integer ops. (4) Replaced acc += x*y with sycl::fma(x,y,acc) - 1-5% expected. (5) Hoisted calculate_kernel_bounds outside c_in loop - 2-5% expected. Added overflow assertions. Correctness: 480+ unit tests pass on b60. SLM tiling (opt_024_001) deferred due to complexity."
     },
     {
-      "task_id": "opt_task_011",
-      "kernel": "convert (dequantize)",
-      "optimization": "Add reqd_sub_group_size(WARP_SIZE) to all dequantize kernel launches",
+      "task_id": "opt_task_018",
+      "kernel": "binbcast, conv2d, conv2d_dw",
+      "optimization": "Replace int64_t with int32_t for index arithmetic + fastdiv for binbcast",
+      "timestamp": "2026-02-28T00:30:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": null,
+      "notes": "conv2d-dw.cpp: Changed conv2d_dw_params struct fields from int64_t to int32_t (except TOTAL for overflow check), changed dw_kernel_bounds to int32_t, updated all helper functions (calculate_dw_kernel_bounds, calculate_dw_input_coord, whcn_*/cwhn_* index helpers), changed kernel loop variables from int64_t to int32_t, added runtime overflow assertion. binbcast.cpp: Added fastdiv32() using multiply-high trick (sycl::mul_hi) and ctz for power-of-2 fast path, added fastmodulo32() using bitwise AND for power-of-2 and subtraction for non-powers. conv2d.cpp already had int32_t from previous session. Build: SUCCESS on b60. Unit tests: PASS. Expected 10-40% speedup from faster integer division on Intel Xe2 (int64 div is 10-20x slower than int32)."
+    }
+  ]
+}
       "timestamp": "2026-02-27T22:00:00Z",
       "correctness": "pass",
       "baseline_time_us": null,

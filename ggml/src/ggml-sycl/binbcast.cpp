@@ -6,6 +6,36 @@
 
 #include "ggml.h"
 
+namespace {
+
+static inline unsigned int ctz(unsigned int x) {
+    return sycl::ctz(x);
+}
+
+static inline unsigned int fastdiv32(unsigned int n, unsigned int d) {
+    if (d == 0) return 0;
+    if ((d & (d - 1)) == 0) {
+        return n >> ctz(d);
+    }
+    unsigned int L = 0;
+    while (L < 32 && (1u << L) < d) {
+        L++;
+    }
+    unsigned int mp = (unsigned int)(((uint64_t)1 << 32) * ((uint64_t)(1 << L) - d) / d + 1);
+    const unsigned int hi = sycl::mul_hi(n, mp);
+    return (hi + n) >> L;
+}
+
+static inline unsigned int fastmodulo32(unsigned int n, unsigned int d) {
+    if (d == 0) return 0;
+    if ((d & (d - 1)) == 0) {
+        return n & (d - 1);
+    }
+    return n - d * fastdiv32(n, d);
+}
+
+}
+
 template<float (*bin_op)(const float, const float), typename src0_t, typename src1_t, typename dst_t>
 static void k_bin_bcast(const src0_t * src0, const src1_t * src1, dst_t * dst,
         int ne0, int ne1, int ne2, int ne3,
@@ -18,20 +48,18 @@ static void k_bin_bcast(const src0_t * src0, const src1_t * src1, dst_t * dst,
                     item_ct1.get_local_id(2);
     const int i1 = (item_ct1.get_local_range(1) * item_ct1.get_group(1) +
                     item_ct1.get_local_id(1));
-    const int i2 = (item_ct1.get_local_range(0) * item_ct1.get_group(0) +
-                    item_ct1.get_local_id(0)) /
-                   ne3;
-    const int i3 = (item_ct1.get_local_range(0) * item_ct1.get_group(0) +
-                    item_ct1.get_local_id(0)) %
-                   ne3;
+    const int i2 = fastdiv32(item_ct1.get_local_range(0) * item_ct1.get_group(0) +
+                    item_ct1.get_local_id(0), ne3);
+    const int i3 = fastmodulo32(item_ct1.get_local_range(0) * item_ct1.get_group(0) +
+                    item_ct1.get_local_id(0), ne3);
 
     if (i0s >= ne0 || i1 >= ne1 || i2 >= ne2 || i3 >= ne3) {
         return;
     }
 
-    const int i11 = i1 % ne11;
-    const int i12 = i2 % ne12;
-    const int i13 = i3 % ne13;
+    const int i11 = fastmodulo32(i1, ne11);
+    const int i12 = fastmodulo32(i2, ne12);
+    const int i13 = fastmodulo32(i3, ne13);
 
     const size_t i_src0 =  i3*s03 +  i2*s02 +  i1*s01;
     const size_t i_src1 = i13*s13 + i12*s12 + i11*s11;
@@ -43,7 +71,7 @@ static void k_bin_bcast(const src0_t * src0, const src1_t * src1, dst_t * dst,
 
     for (int i0 = i0s; i0 < ne0;
          i0 += item_ct1.get_local_range(2) * item_ct1.get_group_range(2)) {
-        const int i10 = i0 % ne10;
+        const int i10 = fastmodulo32(i0, ne10);
         dst_row[i0] = (dst_t)bin_op(src0 ? (float)src0_row[i0] : 0.0f, (float)src1_row[i10]);
     }
 }
@@ -60,18 +88,18 @@ static void k_bin_bcast_unravel(const src0_t * src0, const src1_t * src1, dst_t 
     const int i = item_ct1.get_local_range(2) * item_ct1.get_group(2) +
                   item_ct1.get_local_id(2);
 
-    const int i3 = i/(ne2*ne1*ne0);
-    const int i2 = (i/(ne1*ne0)) % ne2;
-    const int i1 = (i/ne0) % ne1;
-    const int i0 = i % ne0;
+    const int i3 = fastdiv32(i, ne2*ne1*ne0);
+    const int i2 = fastmodulo32(fastdiv32(i, ne1*ne0), ne2);
+    const int i1 = fastmodulo32(fastdiv32(i, ne0), ne1);
+    const int i0 = fastmodulo32(i, ne0);
 
     if (i0 >= ne0 || i1 >= ne1 || i2 >= ne2 || i3 >= ne3) {
         return;
     }
 
-    const int i11 = i1 % ne11;
-    const int i12 = i2 % ne12;
-    const int i13 = i3 % ne13;
+    const int i11 = fastmodulo32(i1, ne11);
+    const int i12 = fastmodulo32(i2, ne12);
+    const int i13 = fastmodulo32(i3, ne13);
 
     const size_t i_src0 =  i3*s03 +  i2*s02 +  i1*s01;
     const size_t i_src1 = i13*s13 + i12*s12 + i11*s11;
@@ -81,7 +109,7 @@ static void k_bin_bcast_unravel(const src0_t * src0, const src1_t * src1, dst_t 
     const src1_t * src1_row = src1 + i_src1;
     dst_t * dst_row = dst + i_dst;
 
-    const int i10 = i0 % ne10;
+    const int i10 = fastmodulo32(i0, ne10);
     dst_row[i0] = (dst_t)bin_op(src0 ? (float)src0_row[i0] : 0.0f, (float)src1_row[i10]);
 }
 
