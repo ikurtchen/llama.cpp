@@ -7,7 +7,7 @@
   - cross-entropy-loss.cpp: Replaced dpct::queue_ptr -> sycl::queue* (2)
   - rope.cpp: Replaced dpct::queue_ptr -> sycl::queue* (5)
   - Total from previous session: 60 replacements across 5 files
-  - THIS SESSION: Additional dpct::queue_ptr -> sycl::queue* replacements:
+  - Previous session: Additional dpct::queue_ptr -> sycl::queue* replacements:
     - binbcast.cpp: 1 replacement
     - wkv.cpp: 2 replacements  
     - gla.cpp: 2 replacements
@@ -19,11 +19,21 @@
     - opt-step-sgd.cpp: 1 replacement
     - fill.cpp: 1 replacement
     - cumsum.cpp: 1 replacement
-    - Total this session: 13 replacements across 11 files
-  - Remaining dpct::queue_ptr occurrences: ~95 (in ggml-sycl.cpp, mmq.cpp, convert.cpp, mmvq.cpp, dmmv.cpp, etc.)
+    - Total previous session: 13 replacements across 11 files
+  - THIS SESSION: Additional dpct::queue_ptr -> sycl::queue* replacements:
+    - ssm_scan.cpp: 2 replacements
+    - solve_tri.cpp: 3 replacements
+    - set_rows.cpp: 1 replacement
+    - tsembd.cpp: 1 replacement
+    - pad_reflect_1d.cpp: 1 replacement
+    - pad.cpp: 2 replacements
+    - count-equal.cpp: 1 replacement
+    - conv.cpp: 1 replacement
+    - Total this session: 12 replacements across 8 files
+  - Remaining dpct::queue_ptr occurrences: ~93 (in ggml-sycl.cpp, mmq.cpp, convert.cpp, mmvq.cpp, dmmv.cpp, and header files)
   - Build: SUCCESS on b60
-  - Unit tests: PASS (DIAG 3/3, FILL 4/4, CUMSUM 16/16, ROPE 248/248)
-  - Note: opt_task_020 is a large cleanup task - dpct::queue_ptr mostly replaced in smaller files, remaining work in large files like ggml-sycl.cpp, mmq.cpp, convert.cpp, mmvq.cpp, dmmv.cpp
+  - Unit tests: PASS (SSM_SCAN, SOLVE_TRI, SET_ROWS 168/168, TIMESTEP_EMBED, PAD, COUNT_EQUAL, CONV)
+  - Note: opt_task_020 is a large cleanup task - dpct::queue_ptr mostly replaced in smaller files, remaining work in large files like ggml-sycl.cpp, mmq.cpp, convert.cpp, mmvq.cpp, dmmv.cpp, and header files
 
 [2026-02-28] opt_task_001 (MMQ XMX optimization - partial): IN PROGRESS.
   - mmq.cpp: Added [[sycl::reqd_sub_group_size(WARP_SIZE)]] to all 20 kernel launches

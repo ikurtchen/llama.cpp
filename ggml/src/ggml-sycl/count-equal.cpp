@@ -43,7 +43,7 @@ void ggml_sycl_count_equal(ggml_backend_sycl_context &ctx, ggml_tensor *dst) {
 
     int64_t * dst_d  = (int64_t *) dst->data;
 
-    dpct::queue_ptr stream = ctx.stream();
+    sycl::queue* stream = ctx.stream();
     const int id       = get_current_device_id();
     const int nsm = ggml_sycl_info().devices[id].nsm;
 

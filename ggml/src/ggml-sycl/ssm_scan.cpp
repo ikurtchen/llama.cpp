@@ -227,7 +227,7 @@ static void ssm_scan_f32_sycl(
         const int src2_nb2, const int src3_nb1, const int src4_nb2, const int src4_nb3, const int src5_nb2,
         const int src5_nb3, const int64_t s_off, const int64_t d_state, const int64_t head_dim,
         const int64_t n_head, const int64_t n_group, const int64_t n_tok, const int64_t n_seq,
-        dpct::queue_ptr stream) {
+        sycl::queue* stream) {
 
     if (src3_nb1 == sizeof(float)) {
         // Mamba-2
@@ -440,7 +440,7 @@ void ggml_sycl_op_ssm_scan(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
     const int32_t * src6_d = (const int32_t *) src6->data;
     float *         dst_d  = (float *)         dst->data;
 
-    dpct::queue_ptr stream = ctx.stream();
+    sycl::queue* stream = ctx.stream();
     SYCL_CHECK(ggml_sycl_set_device(ctx.device));
 
     GGML_ASSERT(src0->type == GGML_TYPE_F32);

@@ -154,7 +154,7 @@ static void set_rows_sycl(ggml_backend_sycl_context & ctx, const ggml_tensor * s
 
     GGML_TENSOR_BINARY_OP_LOCALS
 
-    dpct::queue_ptr stream = ctx.stream();
+    sycl::queue* stream = ctx.stream();
     switch (dst->type) {
         case GGML_TYPE_F32:
             set_rows_sycl<TIn, TIdx, float>(

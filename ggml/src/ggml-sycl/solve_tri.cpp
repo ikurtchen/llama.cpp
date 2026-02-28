@@ -169,7 +169,7 @@ static void solve_tri_f32_sycl(const float * A,
                                 size_t        nb13,
                                 size_t        nb2,
                                 size_t        nb3,
-                                dpct::queue_ptr stream) {
+                                sycl::queue* stream) {
     const sycl::uint3 ne02_fd = init_fastdiv_values((uint32_t) ne02);
 
     // SYCL nd_range<3>: dim0=batch, dim1=col_idx(k), dim2=lane(WARP_SIZE)
@@ -233,7 +233,7 @@ static void solve_tri_f32_onemkl(ggml_backend_sycl_context & ctx,
                                   size_t                      s13,
                                   size_t                      s2,
                                   size_t                      s3,
-                                  dpct::queue_ptr             stream) {
+                                  sycl::queue*             stream) {
     const float   alpha         = 1.0f;
     const int64_t total_batches = ne02 * ne03;
     if (total_batches == 0) {
@@ -317,7 +317,7 @@ void ggml_sycl_op_solve_tri(ggml_backend_sycl_context & ctx, ggml_tensor * dst) 
     const int64_t ne02 = src0->ne[2];
     const int64_t ne03 = src0->ne[3];
 
-    dpct::queue_ptr stream = ctx.stream();
+    sycl::queue* stream = ctx.stream();
     SYCL_CHECK(ggml_sycl_set_device(ctx.device));
 
     if (n <= MAX_N_FAST && k <= MAX_K_FAST) {

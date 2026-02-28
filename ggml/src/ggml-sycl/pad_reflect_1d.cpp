@@ -50,7 +50,7 @@ void ggml_sycl_op_pad_reflect_1d(ggml_backend_sycl_context &ctx,
                                  ggml_tensor *dst) {
 
     const ggml_tensor *src0 = dst->src[0];
-    dpct::queue_ptr stream = ctx.stream();
+    sycl::queue* stream = ctx.stream();
 
     GGML_ASSERT(src0->type == GGML_TYPE_F32);
     GGML_ASSERT(dst->type == GGML_TYPE_F32);
