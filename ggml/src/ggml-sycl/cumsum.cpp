@@ -122,7 +122,7 @@ void ggml_sycl_op_cumsum(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
     const float * src0_d = (const float *) src0->data;
     float       * dst_d  = (float       *) dst->data;
 
-    dpct::queue_ptr stream = ctx.stream();
+    sycl::queue * stream = ctx.stream();
     SYCL_CHECK(ggml_sycl_set_device(ctx.device));
 
     // Compute block size (same logic as CUDA)

@@ -64,7 +64,7 @@ void ggml_sycl_op_opt_step_adamw(ggml_backend_sycl_context & ctx, ggml_tensor * 
     float       * src0_grad_v_d  = (float       *) src0_grad_v->data;
     const float * adamw_params_d = (const float *) adamw_params->data;
 
-    dpct::queue_ptr stream = ctx.stream();
+    sycl::queue * stream = ctx.stream();
     SYCL_CHECK(ggml_sycl_set_device(ctx.device));
 
     const int64_t ne = ggml_nelements(src0);

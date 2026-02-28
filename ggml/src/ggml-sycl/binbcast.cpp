@@ -290,7 +290,7 @@ struct bin_bcast_sycl {
 template <class op>
 inline void ggml_sycl_op_bin_bcast(ggml_backend_sycl_context & ctx, const ggml_tensor * src0, const ggml_tensor * src1,
                                    ggml_tensor * dst) {
-    dpct::queue_ptr main_stream = ctx.stream();
+    sycl::queue * main_stream = ctx.stream();
     GGML_TENSOR_BINARY_OP_LOCALS
 
     if (src0->type == GGML_TYPE_F32 && src1->type == GGML_TYPE_F32 && dst->type == GGML_TYPE_F32) {

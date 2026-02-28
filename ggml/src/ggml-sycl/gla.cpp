@@ -3,7 +3,7 @@
 #include "common.hpp"
 
 template <u_int HEAD_SIZE>
-static void gated_linear_attn_f32_kernel(const dpct::queue_ptr stream, u_int B, u_int T, u_int C, u_int H, float scale,
+static void gated_linear_attn_f32_kernel(sycl::queue * stream, u_int B, u_int T, u_int C, u_int H, float scale,
                                          const float * k, const float * v, const float * r, const float * td,
                                          const float * s, float * dst) {
     const u_int head_size    = HEAD_SIZE;
@@ -92,7 +92,7 @@ void ggml_sycl_op_gated_linear_attn(ggml_backend_sycl_context & ctx, ggml_tensor
     const int64_t C = dst->ne[0];
     const int64_t H = dst->src[0]->ne[1];
 
-    dpct::queue_ptr stream = ctx.stream();
+    sycl::queue * stream = ctx.stream();
     GGML_ASSERT(dst->src[4]->type == GGML_TYPE_F32);
     GGML_ASSERT(C % H == 0);
     GGML_ASSERT(C / H == 64 || C / H == 128);

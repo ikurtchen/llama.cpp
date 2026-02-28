@@ -306,7 +306,7 @@ static void launch_topk_moe_sycl(ggml_backend_sycl_context & ctx,
     const sycl::range<2> local_range(rows_per_block, WARP_SIZE);
     const sycl::range<2> global_range(n_blocks * rows_per_block, WARP_SIZE);
 
-    dpct::queue_ptr stream = ctx.stream();
+    sycl::queue * stream = ctx.stream();
 
     // Helper macro to reduce repetition in the switch cases
     #define LAUNCH_TOPK_MOE_SYCL(N_EXPERTS) \

@@ -38,7 +38,7 @@ void ggml_sycl_op_opt_step_sgd(ggml_backend_sycl_context & ctx, ggml_tensor * ds
     const float * src0_grad_d = (const float *) src0_grad->data;
     const float * params_d    = (const float *) params->data;
 
-    dpct::queue_ptr stream = ctx.stream();
+    sycl::queue * stream = ctx.stream();
     SYCL_CHECK(ggml_sycl_set_device(ctx.device));
 
     const int64_t ne = ggml_nelements(src0);

@@ -23,7 +23,7 @@ void ggml_sycl_op_fill(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
     const int64_t k = ggml_nelements(dst);
     const int64_t num_blocks = ceil_div((size_t)k, (size_t)SYCL_FILL_BLOCK_SIZE);
 
-    dpct::queue_ptr stream = ctx.stream();
+    sycl::queue * stream = ctx.stream();
     SYCL_CHECK(ggml_sycl_set_device(ctx.device));
 
     switch (dst->type) {

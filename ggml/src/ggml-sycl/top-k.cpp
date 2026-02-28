@@ -20,7 +20,7 @@ void ggml_sycl_op_top_k(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
     const float * src0_dd = static_cast<const float *>(src0->data);
     int32_t *     dst_dd  = static_cast<int32_t *>(dst->data);
 
-    dpct::queue_ptr main_stream = ctx.stream();
+    sycl::queue * main_stream = ctx.stream();
     SYCL_CHECK(ggml_sycl_set_device(ctx.device));
 
     const int64_t ncols = src0->ne[0];

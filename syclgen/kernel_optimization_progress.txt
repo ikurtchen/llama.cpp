@@ -6,10 +6,24 @@
   - norm.cpp: Replaced dpct::queue_ptr -> sycl::queue* (5)
   - cross-entropy-loss.cpp: Replaced dpct::queue_ptr -> sycl::queue* (2)
   - rope.cpp: Replaced dpct::queue_ptr -> sycl::queue* (5)
-  - Total: 60 replacements across 5 files
+  - Total from previous session: 60 replacements across 5 files
+  - THIS SESSION: Additional dpct::queue_ptr -> sycl::queue* replacements:
+    - binbcast.cpp: 1 replacement
+    - wkv.cpp: 2 replacements  
+    - gla.cpp: 2 replacements
+    - topk-moe.cpp: 1 replacement
+    - diag.cpp: 1 replacement
+    - top-k.cpp: 1 replacement
+    - opt-step-adamw.cpp: 1 replacement
+    - outprod.cpp: 1 replacement
+    - opt-step-sgd.cpp: 1 replacement
+    - fill.cpp: 1 replacement
+    - cumsum.cpp: 1 replacement
+    - Total this session: 13 replacements across 11 files
+  - Remaining dpct::queue_ptr occurrences: ~95 (in ggml-sycl.cpp, mmq.cpp, convert.cpp, mmvq.cpp, dmmv.cpp, etc.)
   - Build: SUCCESS on b60
-  - Unit tests: PASS (ELEMENT_WISE OK, NORM 16/16, ROPE 248/248)
-  - Note: opt_task_020 has many more files to clean up (dpct::, item_ct1 naming); this is partial progress
+  - Unit tests: PASS (DIAG 3/3, FILL 4/4, CUMSUM 16/16, ROPE 248/248)
+  - Note: opt_task_020 is a large cleanup task - dpct::queue_ptr mostly replaced in smaller files, remaining work in large files like ggml-sycl.cpp, mmq.cpp, convert.cpp, mmvq.cpp, dmmv.cpp
 
 [2026-02-28] opt_task_001 (MMQ XMX optimization - partial): IN PROGRESS.
   - mmq.cpp: Added [[sycl::reqd_sub_group_size(WARP_SIZE)]] to all 20 kernel launches
