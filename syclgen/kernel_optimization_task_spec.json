@@ -681,7 +681,7 @@
       "priority": "low",
       "complexity": "low",
       "category": "dpct_cleanup",
-      "status": "pending",
+      "status": "in_progress",
       "description": "Batch DPCT artifact cleanup across all kernels: dpct::queue_ptr, item_ct1 naming, 3D\u21922D nd_range",
       "target_kernels": [
         {

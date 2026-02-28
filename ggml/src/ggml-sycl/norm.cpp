@@ -419,7 +419,7 @@ void ggml_sycl_op_norm(ggml_backend_sycl_context& ctx, ggml_tensor* dst) {
     GGML_ASSERT(dst->type == GGML_TYPE_F32);
 
     GGML_TENSOR_UNARY_OP_LOCALS
-    dpct::queue_ptr main_stream = ctx.stream();
+    sycl::queue* main_stream = ctx.stream();
     SYCL_CHECK(ggml_sycl_set_device(ctx.device));
     const float * src0_dd = static_cast<const float *>(dst->src[0]->data);
     float *       dst_dd  = static_cast<float *>(dst->data);
@@ -442,7 +442,7 @@ void ggml_sycl_op_group_norm(ggml_backend_sycl_context& ctx, ggml_tensor* dst) {
     GGML_ASSERT(dst->type == GGML_TYPE_F32);
 
     int num_groups = dst->op_params[0];
-    dpct::queue_ptr main_stream = ctx.stream();
+    sycl::queue* main_stream = ctx.stream();
     SYCL_CHECK(ggml_sycl_set_device(ctx.device));
 
     const float * src0_dd = static_cast<const float *>(dst->src[0]->data);
@@ -461,7 +461,7 @@ void ggml_sycl_op_rms_norm(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
     GGML_ASSERT(dst->src[0]->type == GGML_TYPE_F32);
     GGML_ASSERT(dst->type == GGML_TYPE_F32);
 
-    dpct::queue_ptr main_stream = ctx.stream();
+    sycl::queue* main_stream = ctx.stream();
     SYCL_CHECK(ggml_sycl_set_device(ctx.device));
 
     const float * src0_dd = static_cast<const float *>(dst->src[0]->data);
@@ -510,7 +510,7 @@ void ggml_sycl_op_rms_norm_back(ggml_backend_sycl_context & ctx, ggml_tensor * d
     const int64_t gs1 = G->nb[1] / ts, gs2 = G->nb[2] / ts, gs3 = G->nb[3] / ts;
     const int64_t ds1 = dst->nb[1] / ts, ds2 = dst->nb[2] / ts, ds3 = dst->nb[3] / ts;
 
-    dpct::queue_ptr q = ctx.stream();
+    sycl::queue* q = ctx.stream();
 
     // work-group size: multiple of WARP_SIZE, capped by device and 256, and not larger than D
     const int device_max_wg = ggml_sycl_info().max_work_group_sizes[ctx.device];
@@ -640,7 +640,7 @@ void ggml_sycl_op_l2_norm(ggml_backend_sycl_context& ctx, ggml_tensor* dst) {
     GGML_ASSERT(dst->src[0]->type == GGML_TYPE_F32);
     GGML_ASSERT(dst->type == GGML_TYPE_F32);
 
-    dpct::queue_ptr main_stream = ctx.stream();
+    sycl::queue* main_stream = ctx.stream();
     SYCL_CHECK(ggml_sycl_set_device(ctx.device));
 
     const int64_t ne00 = dst->src[0]->ne[0];

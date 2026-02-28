@@ -10,11 +10,11 @@
 #define GGML_SYCL_VEC4 1
 #endif
 
-template <typename T> static __dpct_inline__ float t2f32(T val) {
+template <typename T> static inline float t2f32(T val) {
     return (float) val;
 }
 
-template <> float __dpct_inline__ t2f32<sycl::half>(sycl::half val) {
+template <> float inline t2f32<sycl::half>(sycl::half val) {
   return sycl::vec<sycl::half, 1>(val)
       .convert<float, sycl::rounding_mode::automatic>()[0];
 }
@@ -240,7 +240,7 @@ static void launch_soft_max_kernels(const float *           x,
                                     const float *           sinks,
                                     float *                 dst,
                                     const soft_max_params & p,
-                                    dpct::queue_ptr         stream,
+                                    sycl::queue*         stream,
                                     dpct::dim3              block_dims,
                                     dpct::dim3              block_nums,
                                     size_t                  nbytes_shared)
@@ -297,7 +297,7 @@ template <typename T>
 static void soft_max_f32_sycl(const float *x, const T *mask,
                               const float *sinks, float *dst,
                               const soft_max_params &params,
-                              dpct::queue_ptr stream, int device) {
+                              sycl::queue* stream, int device) {
     int nth = WARP_SIZE;
     int max_block_size = ggml_sycl_info().max_work_group_sizes[device];
     const int64_t ncols_x = params.ncols;
@@ -345,7 +345,7 @@ static void soft_max_back_f32_sycl(const float *   grad,
                                    const int       ncols,
                                    const int       nrows,
                                    const float     scale,
-                                   dpct::queue_ptr stream) {
+                                   sycl::queue* stream) {
     const dpct::dim3 block_dims(WARP_SIZE, 1, 1);
     const dpct::dim3 block_nums(nrows, 1, 1);
 
@@ -369,7 +369,7 @@ void ggml_sycl_op_soft_max(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
     const void  * src2_d = src2 ? (const void *) src2->data : nullptr;
     float       *  dst_d = (float *) dst->data;
 
-    dpct::queue_ptr stream = ctx.stream();
+    sycl::queue* stream = ctx.stream();
 
     GGML_ASSERT(src0->type == GGML_TYPE_F32);
     GGML_ASSERT( dst->type == GGML_TYPE_F32);
@@ -443,7 +443,7 @@ void ggml_sycl_op_soft_max_back(ggml_backend_sycl_context & ctx, ggml_tensor * d
     const float * src1_d = (const float *) src1->data;
     float       * dst_d  = (float       *) dst->data;
 
-    dpct::queue_ptr stream = ctx.stream();
+    sycl::queue* stream = ctx.stream();
 
     GGML_ASSERT(src0->type == GGML_TYPE_F32);
     GGML_ASSERT(src1->type == GGML_TYPE_F32);

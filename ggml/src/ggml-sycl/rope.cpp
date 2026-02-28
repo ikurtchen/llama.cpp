@@ -242,7 +242,7 @@ template <typename T, bool forward>
 static void rope_norm_sycl(const T * x, T * dst, const int ne0, const int ne1, const int s1, const int s2,
                            const int n_dims, int nr, const int32_t * pos, const float freq_scale, const float freq_base,
                            const float ext_factor, const float attn_factor, const rope_corr_dims corr_dims,
-                           const float * freq_factors, queue_ptr stream) {
+                           const float * freq_factors, sycl::queue* stream) {
     GGML_ASSERT(ne0 % 2 == 0);
     const sycl::range<3> block_dims(1, SYCL_ROPE_BLOCK_SIZE, 1);
     const int            num_blocks_x = ceil_div(ne0, (2 * SYCL_ROPE_BLOCK_SIZE));
@@ -279,7 +279,7 @@ template <typename T, bool forward>
 static void rope_neox_sycl(const T * x, T * dst, const int ne0, const int ne1, const int s1, const int s2,
                            const int n_dims, const int nr, const int32_t * pos, const float freq_scale,
                            const float freq_base, const float ext_factor, const float attn_factor,
-                           const rope_corr_dims corr_dims, const float * freq_factors, queue_ptr stream) {
+                           const rope_corr_dims corr_dims, const float * freq_factors, sycl::queue* stream) {
     GGML_ASSERT(ne0 % 2 == 0);
     const sycl::range<3> block_dims(1, SYCL_ROPE_BLOCK_SIZE, 1);
     const int            num_blocks_x = ceil_div(ne0, (2 * SYCL_ROPE_BLOCK_SIZE));
@@ -307,7 +307,7 @@ static void rope_multi_sycl(const T * x, T * dst, const int ne0, const int ne1, 
                              const size_t s2, const int n_dims, const int nr, const int32_t * pos,
                              const float freq_scale, const float freq_base, const float ext_factor,
                              const float attn_factor, const rope_corr_dims corr_dims, const float * freq_factors,
-                             const mrope_sections sections, const bool is_imrope, queue_ptr stream) {
+                             const mrope_sections sections, const bool is_imrope, sycl::queue* stream) {
     GGML_ASSERT(ne0 % 2 == 0);
     const sycl::range<3>    block_dims(1, SYCL_ROPE_BLOCK_SIZE, 1);
     const int               n_blocks_y = ceil_div(ne0, (2 * SYCL_ROPE_BLOCK_SIZE));
@@ -342,7 +342,7 @@ static void rope_vision_sycl(const T * x, T * dst, const int ne0, const int ne1,
                              const size_t s2, const int n_dims, const int nr, const int32_t * pos,
                              const float freq_scale, const float freq_base, const float ext_factor,
                              const float attn_factor, const rope_corr_dims corr_dims, const float * freq_factors,
-                             const mrope_sections sections, queue_ptr stream) {
+                             const mrope_sections sections, sycl::queue* stream) {
     GGML_ASSERT(ne0 % 2 == 0);
     const sycl::range<3>    block_dims(1, SYCL_ROPE_BLOCK_SIZE, 1);
     const int               n_blocks_y = ceil_div(ne0, (2 * SYCL_ROPE_BLOCK_SIZE));
@@ -429,7 +429,7 @@ inline void ggml_sycl_op_rope_impl(ggml_backend_sycl_context & ctx, ggml_tensor 
     rope_corr_dims corr_dims;
     ggml_rope_yarn_corr_dims(n_dims, n_ctx_orig, freq_base, beta_fast, beta_slow, corr_dims.v);
 
-    dpct::queue_ptr main_stream = ctx.stream();
+    sycl::queue* main_stream = ctx.stream();
     SYCL_CHECK(ggml_sycl_set_device(ctx.device));
 
     // compute

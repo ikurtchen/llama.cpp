@@ -1562,7 +1562,7 @@ static inline void ggml_sycl_swap(T & a, T & b) {
 }
 
 template <ggml_sort_order order>
-__dpct_inline__ static void
+inline static void
 k_argsort_f32_i32(const float *x, int *dst, const int ncols, int ncols_pad,
                   const int tasks_per_thread, const sycl::nd_item<3> &item_ct1,
                   uint8_t *dpct_local) {
@@ -3515,7 +3515,7 @@ struct mmid_row_mapping {
     int32_t i2;
 };
 
-__dpct_inline__ static void k_copy_src1_to_contiguous(
+inline static void k_copy_src1_to_contiguous(
     const char *__restrict__ src1_original, char *__restrict__ src1_contiguous,
     int *__restrict__ cur_src1_row, mmid_row_mapping *__restrict__ row_mapping,
     const char *__restrict ids, int64_t i02, size_t ids_nb1, size_t ids_nb0,
@@ -3556,7 +3556,7 @@ __dpct_inline__ static void k_copy_src1_to_contiguous(
     }
 }
 
-__dpct_inline__ static void k_copy_dst_from_contiguous(
+inline static void k_copy_dst_from_contiguous(
     char *__restrict__ dst_original, const char *__restrict__ dst_contiguous,
     const mmid_row_mapping *__restrict__ row_mapping, int64_t ne0, size_t nb1,
     size_t nb2, const sycl::nd_item<3> &item_ct1) {

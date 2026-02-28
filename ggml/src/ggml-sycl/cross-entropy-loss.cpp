@@ -150,7 +150,7 @@ void ggml_sycl_cross_entropy_loss(ggml_backend_sycl_context & ctx, ggml_tensor *
     const float * src1_d = (const float *) src1->data;
     float       * dst_d  = (float       *) dst->data;
 
-    dpct::queue_ptr stream = ctx.stream();
+    sycl::queue* stream = ctx.stream();
     SYCL_CHECK(ggml_sycl_set_device(ctx.device));
 
     // opt_task_010: Increase work-group size from WARP_SIZE (16) to 256
@@ -224,7 +224,7 @@ void ggml_sycl_cross_entropy_loss_back(ggml_backend_sycl_context & ctx, ggml_ten
     const float * src1f_d = (const float *) src1f->data;
     float       * dst_d   = (float       *) dst->data;
 
-    dpct::queue_ptr stream = ctx.stream();
+    sycl::queue* stream = ctx.stream();
     SYCL_CHECK(ggml_sycl_set_device(ctx.device));
 
     // opt_task_010: Increase work-group size from WARP_SIZE (16) to 256

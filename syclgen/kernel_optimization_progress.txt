@@ -1,3 +1,16 @@
+[2026-02-28] opt_task_020 (DPCT cleanup - partial): IN PROGRESS.
+  - element_wise.cpp: Replaced __dpct_inline__ -> inline (28 occurrences), dpct::queue_ptr -> sycl::queue* (9 occurrences)
+  - softmax.cpp: Replaced __dpct_inline__ -> inline (2), dpct::queue_ptr -> sycl::queue* (5)
+  - cpy.hpp: Replaced __dpct_inline__ -> inline (1)
+  - ggml-sycl.cpp: Replaced __dpct_inline__ -> inline (3)
+  - norm.cpp: Replaced dpct::queue_ptr -> sycl::queue* (5)
+  - cross-entropy-loss.cpp: Replaced dpct::queue_ptr -> sycl::queue* (2)
+  - rope.cpp: Replaced dpct::queue_ptr -> sycl::queue* (5)
+  - Total: 60 replacements across 5 files
+  - Build: SUCCESS on b60
+  - Unit tests: PASS (ELEMENT_WISE OK, NORM 16/16, ROPE 248/248)
+  - Note: opt_task_020 has many more files to clean up (dpct::, item_ct1 naming); this is partial progress
+
 [2026-02-28] opt_task_001 (MMQ XMX optimization - partial): IN PROGRESS.
   - mmq.cpp: Added [[sycl::reqd_sub_group_size(WARP_SIZE)]] to all 20 kernel launches
   - This ensures SIMD16 execution on Intel Xe2 (Arc Pro B60)
@@ -5,6 +18,10 @@
   - Build: SUCCESS on b60
   - Unit tests: PASS (mul_mat_q tests OK)
   - Expected improvement: 5-15% from guaranteed SIMD16 selection
+  - Attempted barrier optimization (opt_008_006): REVERTED - introduced new test failures
+    - Changed item_ct1.barrier() to item_ct1.barrier(sycl::access::fence_space::local_space)
+    - This optimization is NOT SAFE for this kernel - it introduced accuracy errors in q4_K, q8_0, etc.
+    - The default barrier includes global memory synchronization which appears needed for correctness
 
 [2026-02-28] opt_task_019 (Unary contiguous fast-path): COMPLETED.
   - element_wise.cpp: Added unary_op_contiguous_kernel for fast-path when tensors are contiguous
