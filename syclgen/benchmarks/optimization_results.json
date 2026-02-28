@@ -1,6 +1,28 @@
 {
   "results": [
     {
+      "task_id": "opt_task_025",
+      "kernel": "mmq (MUL_MAT)",
+      "optimization": "Revert XE2 tile sizes - restore baseline correctness",
+      "timestamp": "2026-02-28T12:00:00Z",
+      "correctness": "partial",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": null,
+      "notes": "Investigated MUL_MAT regression (32 failures). Reverted mmq.cpp to baseline f5a700d7f, removing all XE2 tile size overrides from commits ebad83b11 and 309219c43. Result: 10 test failures remain (pre-existing bugs), down from 32. The XE2 changes were making things worse, not better. Remaining failures: q8_0 (n=2-8), q2_K/q3_K/q5_K (n=1) - these are pre-existing bugs in the original migrated SYCL code, not regressions from syclgen optimizations. Build: SUCCESS on b60."
+    },
+    {
+      "task_id": "opt_task_024",
+      "kernel": "ssm_scan",
+      "optimization": "Verify no regression - SSM_SCAN tests passing",
+      "timestamp": "2026-02-28T11:00:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": null,
+      "notes": "Verified SSM_SCAN tests on b60: All 3/3 tests PASS. The test case mentioned in task (f32,d_state=16,head_dim=1,n_head=1024,n_group=1,n_seq_tokens=32,n_seqs=4) passes. No regression found - the task was likely a false alarm or the issue was already fixed in a previous session."
+    },
+    {
       "task_id": "opt_task_023",
       "kernel": "conv2d",
       "optimization": "Fix CONV_2D regression - remove incorrect 1x1 kernel specialization",

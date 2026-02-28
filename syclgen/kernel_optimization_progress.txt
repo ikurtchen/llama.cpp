@@ -102,3 +102,17 @@
   - Unit tests: PASS (SYCL backend OK)
   - Expected improvement: 10-40% from faster integer division on Xe2
 
+[2026-02-28] opt_task_024 (SSM_SCAN regression check): COMPLETED.
+  - SSM_SCAN unit tests: 3/3 PASS on b60
+  - No regression found - the task was likely a false alarm or already fixed
+  - Tests cover: d_state=16/128/256, various head dimensions
+
+[2026-02-28] opt_task_025 (MUL_MAT regression): PARTIALLY COMPLETED.
+  - Issue: XE2 tile sizes added in commits ebad83b11 and 309219c43 caused 32 test failures
+  - Investigation: Reverted mmq.cpp to baseline f5a700d7f (removed XE2 tile size overrides)
+  - Result: 10 test failures remain (pre-existing bugs in baseline)
+  - Improved from 32 to 10 failures (22 fixed)
+  - Remaining failures: q8_0 (n=2-8), q2_K/q3_K/q5_K (n=1) - pre-existing bugs
+  - Build: SUCCESS on b60
+  - Note: The XE2 changes were making things worse, not better
+
