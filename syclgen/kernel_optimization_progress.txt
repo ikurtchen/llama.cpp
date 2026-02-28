@@ -1,3 +1,21 @@
+[2026-02-28] opt_task_020 (DPCT cleanup): COMPLETED.
+  - This session: Replaced remaining dpct::queue_ptr -> sycl::queue* (93 occurrences) in:
+    - ggml-sycl.cpp: 18 replacements
+    - mmq.cpp: 11 replacements
+    - convert.cpp: 25 replacements
+    - mmvq.cpp: 26 replacements
+    - dmmv.cpp: 12 replacements
+    - convert.hpp: 2 replacements
+    - quantize.hpp: 1 replacement
+    - mmvq.hpp: 1 replacement
+    - mmq.hpp: 1 replacement
+    - dmmv.hpp: 1 replacement
+  - Also fixed function pointer typedef ggml_sycl_op_mul_mat_t in ggml-sycl.cpp
+  - Build: SUCCESS on b60
+  - Unit tests: PASS (MUL_MAT_Q, MMQ, DMMV, CONV)
+  - Total replacements across all sessions: ~150+ dpct::queue_ptr -> sycl::queue*
+  - Note: __dpct_inline__ replacements were done in previous sessions
+
 [2026-02-28] opt_task_020 (DPCT cleanup - partial): IN PROGRESS.
   - element_wise.cpp: Replaced __dpct_inline__ -> inline (28 occurrences), dpct::queue_ptr -> sycl::queue* (9 occurrences)
   - softmax.cpp: Replaced __dpct_inline__ -> inline (2), dpct::queue_ptr -> sycl::queue* (5)

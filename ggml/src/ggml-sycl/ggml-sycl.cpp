@@ -1423,7 +1423,7 @@ typedef void (*ggml_sycl_op_mul_mat_t)(
     const char *src0_dd_i, const float *src1_ddf_i, const char *src1_ddq_i,
     float *dst_dd_i, const int64_t row_low, const int64_t row_high,
     const int64_t src1_ncols, const int64_t src1_padded_row_size,
-    const queue_ptr &stream);
+    sycl::queue* stream);
 
 
 
@@ -2058,7 +2058,7 @@ inline void ggml_sycl_op_mul_mat_sycl(
     const char *src0_dd_i, const float *src1_ddf_i, const char *src1_ddq_i,
     float *dst_dd_i, const int64_t row_low, const int64_t row_high,
     const int64_t src1_ncols, const int64_t src1_padded_row_size,
-    const queue_ptr &stream) try {
+    sycl::queue* stream) try {
 
     GGML_ASSERT(src0_dd_i  != nullptr);
     GGML_ASSERT(src1_ddf_i != nullptr);
@@ -2191,7 +2191,7 @@ catch (sycl::exception const &exc) {
 static void ggml_sycl_op_pool2d(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
     GGML_ASSERT(dst->src[0]->type == GGML_TYPE_F32);
     GGML_ASSERT( dst->type == GGML_TYPE_F32);
-    dpct::queue_ptr main_stream = ctx.stream();
+    sycl::queue* main_stream = ctx.stream();
     SYCL_CHECK(ggml_sycl_set_device(ctx.device));
     const float * src0_dd = static_cast<const float *>(dst->src[0]->data);
     float *       dst_dd  = static_cast<float *>(dst->data);
@@ -2230,7 +2230,7 @@ static void ggml_sycl_op_pool2d(ggml_backend_sycl_context & ctx, ggml_tensor * d
 inline void ggml_sycl_op_sum(ggml_backend_sycl_context & ctx, ggml_tensor *dst) {
     GGML_ASSERT(dst->src[0]->type == GGML_TYPE_F32);
     GGML_ASSERT( dst->type == GGML_TYPE_F32);
-    dpct::queue_ptr main_stream = ctx.stream();
+    sycl::queue* main_stream = ctx.stream();
     SYCL_CHECK(ggml_sycl_set_device(ctx.device));
     const float * src0_dd = static_cast<const float *>(dst->src[0]->data);
     float *       dst_dd  = static_cast<float *>(dst->data);
@@ -2243,7 +2243,7 @@ inline void ggml_sycl_op_sum(ggml_backend_sycl_context & ctx, ggml_tensor *dst) 
 inline void ggml_sycl_op_sum_rows(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
     GGML_ASSERT(dst->src[0]->type == GGML_TYPE_F32);
     GGML_ASSERT( dst->type == GGML_TYPE_F32);
-    dpct::queue_ptr main_stream = ctx.stream();
+    sycl::queue* main_stream = ctx.stream();
     SYCL_CHECK(ggml_sycl_set_device(ctx.device));
     const float * src0_dd = static_cast<const float *>(dst->src[0]->data);
     float *       dst_dd  = static_cast<float *>(dst->data);
@@ -2258,7 +2258,7 @@ inline void ggml_sycl_op_mean(ggml_backend_sycl_context & ctx, ggml_tensor * dst
     GGML_ASSERT(dst->src[0]->type == GGML_TYPE_F32);
     GGML_ASSERT(dst->type == GGML_TYPE_F32);
 
-    dpct::queue_ptr main_stream = ctx.stream();
+    sycl::queue* main_stream = ctx.stream();
     SYCL_CHECK(ggml_sycl_set_device(ctx.device));
 
     const float * src0_dd = static_cast<const float *>(dst->src[0]->data);
@@ -2281,7 +2281,7 @@ inline void ggml_sycl_op_mean(ggml_backend_sycl_context & ctx, ggml_tensor * dst
 inline void ggml_sycl_op_argsort(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
     GGML_ASSERT(dst->src[0]->type == GGML_TYPE_F32);
     GGML_ASSERT(dst->type == GGML_TYPE_I32);
-    dpct::queue_ptr main_stream = ctx.stream();
+    sycl::queue* main_stream = ctx.stream();
     SYCL_CHECK(ggml_sycl_set_device(ctx.device));
     const float * src0_dd = static_cast<const float *>(dst->src[0]->data);
     int32_t *       dst_dd  = static_cast<int32_t *>(dst->data);
@@ -2300,7 +2300,7 @@ inline void ggml_sycl_op_argmax(ggml_backend_sycl_context & ctx, ggml_tensor * d
     GGML_ASSERT(dst->src[0]->type == GGML_TYPE_F32);
     GGML_ASSERT( dst->type == GGML_TYPE_I32);
 
-    dpct::queue_ptr main_stream = ctx.stream();
+    sycl::queue* main_stream = ctx.stream();
     SYCL_CHECK(ggml_sycl_set_device(ctx.device));
     const float * src0_dd = static_cast<const float *>(dst->src[0]->data);
     int32_t *       dst_dd  = static_cast<int32_t *>(dst->data);
@@ -2314,7 +2314,7 @@ inline void ggml_sycl_op_argmax(ggml_backend_sycl_context & ctx, ggml_tensor * d
 inline void ggml_sycl_op_diag_mask_inf(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
     GGML_ASSERT(dst->src[0]->type == GGML_TYPE_F32);
     GGML_ASSERT( dst->type == GGML_TYPE_F32);
-    dpct::queue_ptr main_stream = ctx.stream();
+    sycl::queue* main_stream = ctx.stream();
     SYCL_CHECK(ggml_sycl_set_device(ctx.device));
     const float * src0_dd = static_cast<const float *>(dst->src[0]->data);
     float *       dst_dd  = static_cast<float *>(dst->data);
@@ -2336,7 +2336,7 @@ static void tri_f32_sycl(
     const int64_t ne2,
     const int64_t ne3,
     const ggml_tri_type ttype,
-    dpct::queue_ptr main_stream
+    sycl::queue* main_stream
 ) {
     const size_t total = (size_t) ne0 * (size_t) ne1 * (size_t) ne2 * (size_t) ne3;
 
@@ -2370,7 +2370,7 @@ static void ggml_sycl_op_tri(ggml_backend_sycl_context & ctx, ggml_tensor * dst)
     GGML_ASSERT(ggml_is_contiguous(dst));
     GGML_ASSERT(ggml_are_same_shape(src0, dst));
 
-    dpct::queue_ptr main_stream = ctx.stream();
+    sycl::queue* main_stream = ctx.stream();
     SYCL_CHECK(ggml_sycl_set_device(ctx.device));
 
     const float * src0_dd = static_cast<const float *>(src0->data);
@@ -2390,7 +2390,7 @@ static void ggml_sycl_op_tri(ggml_backend_sycl_context & ctx, ggml_tensor * dst)
 inline void ggml_sycl_op_scale(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
     GGML_ASSERT(dst->src[0]->type == GGML_TYPE_F32);
     GGML_ASSERT( dst->type == GGML_TYPE_F32);
-    dpct::queue_ptr main_stream = ctx.stream();
+    sycl::queue* main_stream = ctx.stream();
     SYCL_CHECK(ggml_sycl_set_device(ctx.device));
     const float * src0_dd = static_cast<const float *>(dst->src[0]->data);
     float *       dst_dd  = static_cast<float *>(dst->data);
@@ -3207,7 +3207,7 @@ static bool ggml_sycl_supports_dmmv(enum ggml_type type) {
 }
 
 // Helper functions to unify device memory allocation for both async and sync paths
-static inline void * sycl_ext_malloc_device(dpct::queue_ptr stream, size_t size) {
+static inline void * sycl_ext_malloc_device(sycl::queue* stream, size_t size) {
     bool use_async = g_ggml_sycl_use_async_mem_op;
 #if defined(GGML_SYCL_GRAPH) && SYCL_EXT_ONEAPI_ASYNC_MEMORY_ALLOC
     if (use_async) {
@@ -3220,7 +3220,7 @@ static inline void * sycl_ext_malloc_device(dpct::queue_ptr stream, size_t size)
     return sycl::malloc(size, *stream, sycl::usm::alloc::device);
 }
 
-static inline void sycl_ext_free(dpct::queue_ptr stream, void * ptr) {
+static inline void sycl_ext_free(sycl::queue* stream, void * ptr) {
     bool use_async = g_ggml_sycl_use_async_mem_op;
 #if defined(GGML_SYCL_GRAPH) && SYCL_EXT_ONEAPI_ASYNC_MEMORY_ALLOC
     if (use_async) {
@@ -3235,7 +3235,7 @@ static inline void sycl_ext_free(dpct::queue_ptr stream, void * ptr) {
 }
 
 static void reorder_qw_q4_0(uint8_t * data_device, const int ncols, const int nrows, size_t size, size_t offset,
-                            dpct::queue_ptr stream) {
+                            sycl::queue* stream) {
     uint8_t * tmp_buf = static_cast<uint8_t *>(sycl_ext_malloc_device(stream, size));
 
     sycl::event copy_event;
@@ -3268,7 +3268,7 @@ static void reorder_qw_q4_0(uint8_t * data_device, const int ncols, const int nr
     sycl_ext_free(stream, tmp_buf);
 }
 
-static void reorder_qw_q4_k(uint8_t * data_device, size_t size, size_t offset, dpct::queue_ptr stream) {
+static void reorder_qw_q4_k(uint8_t * data_device, size_t size, size_t offset, sycl::queue* stream) {
     GGML_ASSERT(size % sizeof(block_q4_K) == 0);
     GGML_ASSERT(offset % sizeof(block_q4_K) == 0);
 
@@ -3306,7 +3306,7 @@ static void reorder_qw_q4_k(uint8_t * data_device, size_t size, size_t offset, d
     sycl_ext_free(stream, tmp_buf);
 }
 
-static void reorder_qw_q6_k(uint8_t * data_device, size_t size, size_t offset, dpct::queue_ptr stream) {
+static void reorder_qw_q6_k(uint8_t * data_device, size_t size, size_t offset, sycl::queue* stream) {
     GGML_ASSERT(size % sizeof(block_q6_K) == 0);
     GGML_ASSERT(offset % sizeof(block_q6_K) == 0);
 
@@ -3354,7 +3354,7 @@ static void reorder_qw_q6_k(uint8_t * data_device, size_t size, size_t offset, d
     sycl_ext_free(stream, tmp_buf);
 }
 
-static void reorder_qw(const ggml_tensor * src0, dpct::queue_ptr stream) {
+static void reorder_qw(const ggml_tensor * src0, sycl::queue* stream) {
     uint8_t * data_device = (uint8_t *) src0->data;
     size_t ncols = src0->ne[0];
     size_t nrows = src0->ne[1];

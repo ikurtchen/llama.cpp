@@ -119,7 +119,7 @@ template <int ElementsPerWI> struct quantize_q8_1 {
 
 template <template <int> typename quantize_f>
 void quantize_row_q8_1_sycl(const float * x, void * vy, const int kx, const int ky, const int kx_padded,
-                            dpct::queue_ptr stream) {
+                            sycl::queue* stream) {
     static_assert(QK8_1 % WARP_SIZE == 0);
     auto local_range      = std::size_t(WARP_SIZE);
     auto num_quant_blocks = ky * (kx / QK8_1);

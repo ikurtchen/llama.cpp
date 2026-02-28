@@ -35,7 +35,7 @@ static void dequantize_block(const void * __restrict__ vx, dst_t * __restrict__ 
 template <int qk, int qr, dequantize_kernel_t dequantize_kernel, typename dst_t>
 static void dequantize_block_sycl(const void *__restrict__ vx,
                                   dst_t *__restrict__ y, const int64_t k,
-                                  dpct::queue_ptr stream) {
+                                  sycl::queue* stream) {
     const int64_t num_blocks = (k + 2*SYCL_DEQUANTIZE_BLOCK_SIZE - 1) / (2*SYCL_DEQUANTIZE_BLOCK_SIZE);
     {
         dpct::has_capability_or_fail(stream->get_device(),
@@ -53,7 +53,7 @@ static void dequantize_block_sycl(const void *__restrict__ vx,
 
 template <typename dst_t>
 static void dequantize_row_q2_K_sycl(const void *vx, dst_t *y, const int64_t k,
-                                     dpct::queue_ptr stream) {
+                                     sycl::queue* stream) {
     const int64_t nb = k / QK_K;
 #if QK_K == 256
     {
@@ -85,7 +85,7 @@ static void dequantize_row_q2_K_sycl(const void *vx, dst_t *y, const int64_t k,
 
 template <typename dst_t>
 static void dequantize_row_q3_K_sycl(const void *vx, dst_t *y, const int64_t k,
-                                     dpct::queue_ptr stream) {
+                                     sycl::queue* stream) {
     const int64_t nb = k / QK_K;
 #if QK_K == 256
     {
@@ -116,7 +116,7 @@ static void dequantize_row_q3_K_sycl(const void *vx, dst_t *y, const int64_t k,
 
 template <typename dst_t>
 static void dequantize_row_q4_0_sycl(const void *vx, dst_t *y, const int64_t k,
-                                     dpct::queue_ptr stream) {
+                                     sycl::queue* stream) {
     const int64_t nb32 = k / 32;
     const int64_t nb = (k + 255) / 256;
     {
@@ -134,7 +134,7 @@ static void dequantize_row_q4_0_sycl(const void *vx, dst_t *y, const int64_t k,
 
 template <typename dst_t>
 static void dequantize_row_q4_0_sycl_reorder(const void *vx, dst_t *y, const int64_t k,
-                                     dpct::queue_ptr stream) {
+                                     sycl::queue* stream) {
 
     dpct::has_capability_or_fail(stream->get_device(),
                                     {sycl::aspect::fp16});
@@ -153,7 +153,7 @@ static void dequantize_row_q4_0_sycl_reorder(const void *vx, dst_t *y, const int
 
 template <typename dst_t>
 static void dequantize_row_q4_1_sycl(const void *vx, dst_t *y, const int64_t k,
-                                     dpct::queue_ptr stream) {
+                                     sycl::queue* stream) {
     const int64_t nb32 = k / 32;
     const int64_t nb = (k + 255) / 256;
     {
@@ -172,7 +172,7 @@ static void dequantize_row_q4_1_sycl(const void *vx, dst_t *y, const int64_t k,
 
 template <typename dst_t>
 static void dequantize_row_q4_K_sycl(const void *vx, dst_t *y, const int64_t k,
-                                     dpct::queue_ptr stream) {
+                                     sycl::queue* stream) {
     const int64_t nb = k / QK_K;
     {
         dpct::has_capability_or_fail(stream->get_device(),
@@ -191,7 +191,7 @@ static void dequantize_row_q4_K_sycl(const void *vx, dst_t *y, const int64_t k,
 }
 
 template <typename dst_t>
-static void dequantize_row_q4_K_sycl_reorder(const void * vx, dst_t * y, const int64_t k, dpct::queue_ptr stream) {
+static void dequantize_row_q4_K_sycl_reorder(const void * vx, dst_t * y, const int64_t k, sycl::queue* stream) {
     const int64_t nb = k / QK_K;
     const size_t  local_size  = 32;
     const size_t  global_size = nb * local_size;
@@ -210,7 +210,7 @@ static void dequantize_row_q4_K_sycl_reorder(const void * vx, dst_t * y, const i
 
 template <typename dst_t>
 static void dequantize_row_q5_K_sycl(const void *vx, dst_t *y, const int64_t k,
-                                     dpct::queue_ptr stream) {
+                                     sycl::queue* stream) {
     const int64_t nb = k / QK_K;
 #if QK_K == 256
     {
@@ -242,7 +242,7 @@ static void dequantize_row_q5_K_sycl(const void *vx, dst_t *y, const int64_t k,
 
 template <typename dst_t>
 static void dequantize_row_q6_K_sycl(const void *vx, dst_t *y, const int64_t k,
-                                     dpct::queue_ptr stream) {
+                                     sycl::queue* stream) {
     const int64_t nb = k / QK_K;
 #if QK_K == 256
     {
@@ -273,7 +273,7 @@ static void dequantize_row_q6_K_sycl(const void *vx, dst_t *y, const int64_t k,
 }
 
 template <typename dst_t>
-static void dequantize_row_q6_K_sycl_reorder(const void * vx, dst_t * y, const int64_t k, dpct::queue_ptr stream) {
+static void dequantize_row_q6_K_sycl_reorder(const void * vx, dst_t * y, const int64_t k, sycl::queue* stream) {
     const int64_t nb = k / QK_K;
 
     dpct::has_capability_or_fail(stream->get_device(), { sycl::aspect::fp16 });
@@ -285,7 +285,7 @@ static void dequantize_row_q6_K_sycl_reorder(const void * vx, dst_t * y, const i
 
 template <typename dst_t>
 static void dequantize_row_iq1_s_sycl(const void *vx, dst_t *y, const int64_t k,
-                                        dpct::queue_ptr stream) {
+                                        sycl::queue* stream) {
     const int64_t nb = k / QK_K;
     {
         dpct::has_capability_or_fail(stream->get_device(),
@@ -306,7 +306,7 @@ static void dequantize_row_iq1_s_sycl(const void *vx, dst_t *y, const int64_t k,
 
 template <typename dst_t>
 static void dequantize_row_iq1_m_sycl(const void *vx, dst_t *y, const int64_t k,
-                                        dpct::queue_ptr stream) {
+                                        sycl::queue* stream) {
     const int64_t nb = k / QK_K;
     {
         dpct::has_capability_or_fail(stream->get_device(),
@@ -327,7 +327,7 @@ static void dequantize_row_iq1_m_sycl(const void *vx, dst_t *y, const int64_t k,
 
 template <typename dst_t>
 static void dequantize_row_iq2_xxs_sycl(const void *vx, dst_t *y, const int64_t k,
-                                        dpct::queue_ptr stream) {
+                                        sycl::queue* stream) {
     const int64_t nb = k / QK_K;
     {
         dpct::has_capability_or_fail(stream->get_device(),
@@ -348,7 +348,7 @@ static void dequantize_row_iq2_xxs_sycl(const void *vx, dst_t *y, const int64_t 
 
 template <typename dst_t>
 static void dequantize_row_iq2_xs_sycl(const void *vx, dst_t *y, const int64_t k,
-                                       dpct::queue_ptr stream) {
+                                       sycl::queue* stream) {
     const int64_t nb = k / QK_K;
     {
         dpct::has_capability_or_fail(stream->get_device(),
@@ -369,7 +369,7 @@ static void dequantize_row_iq2_xs_sycl(const void *vx, dst_t *y, const int64_t k
 
 template <typename dst_t>
 static void dequantize_row_iq2_s_sycl(const void *vx, dst_t *y, const int64_t k,
-                                      dpct::queue_ptr stream) {
+                                      sycl::queue* stream) {
     const int64_t nb = k / QK_K;
     {
         dpct::has_capability_or_fail(stream->get_device(),
@@ -389,7 +389,7 @@ static void dequantize_row_iq2_s_sycl(const void *vx, dst_t *y, const int64_t k,
 
 template <typename dst_t>
 static void dequantize_row_iq3_xxs_sycl(const void *vx, dst_t *y, const int64_t k,
-                                        dpct::queue_ptr stream) {
+                                        sycl::queue* stream) {
     const int64_t nb = k / QK_K;
     {
         dpct::has_capability_or_fail(stream->get_device(),
@@ -410,7 +410,7 @@ static void dequantize_row_iq3_xxs_sycl(const void *vx, dst_t *y, const int64_t 
 
 template <typename dst_t>
 static void dequantize_row_iq3_s_sycl(const void *vx, dst_t *y, const int64_t k,
-                                        dpct::queue_ptr stream) {
+                                        sycl::queue* stream) {
     const int64_t nb = k / QK_K;
     {
         dpct::has_capability_or_fail(stream->get_device(),
@@ -430,7 +430,7 @@ static void dequantize_row_iq3_s_sycl(const void *vx, dst_t *y, const int64_t k,
 
 template <typename dst_t>
 static void dequantize_row_iq4_xs_sycl(const void *vx, dst_t *y, const int64_t k,
-                                       dpct::queue_ptr stream) {
+                                       sycl::queue* stream) {
     const int64_t nb = (k + QK_K - 1) / QK_K;
 #if QK_K == 64
     dequantize_row_iq4_nl_sycl(vx, y, k, stream);
@@ -454,7 +454,7 @@ static void dequantize_row_iq4_xs_sycl(const void *vx, dst_t *y, const int64_t k
 
 template <typename dst_t>
 static void dequantize_row_iq4_nl_sycl(const void *vx, dst_t *y, const int64_t k,
-                                       dpct::queue_ptr stream) {
+                                       sycl::queue* stream) {
     const int64_t nb = (k + QK_K - 1) / QK_K;
       {
             dpct::has_capability_or_fail(stream->get_device(),
@@ -473,7 +473,7 @@ static void dequantize_row_iq4_nl_sycl(const void *vx, dst_t *y, const int64_t k
 }
 
 template <typename dst_t>
-static void dequantize_row_mxfp4_sycl(const void * vx, dst_t * y, const int64_t k, dpct::queue_ptr stream) {
+static void dequantize_row_mxfp4_sycl(const void * vx, dst_t * y, const int64_t k, sycl::queue* stream) {
     const int nb = (k + QK_K - 1) / QK_K;
     stream->parallel_for(
         sycl::nd_range<3>(sycl::range<3>(1, 1, nb) * sycl::range<3>(1, 1, 32), sycl::range<3>(1, 1, 32)),
@@ -508,7 +508,7 @@ static void convert_unary_nc(const void * __restrict__ vx, dst_t * __restrict__ 
 template <typename src_t, typename dst_t>
 static void convert_unary_nc_sycl(const void * __restrict__ vx, dst_t * __restrict__ y,
                                   const int64_t ne00, const int64_t ne01, const int64_t ne02, const int64_t ne03,
-                                  const int64_t s01, const int64_t s02, const int64_t s03, dpct::queue_ptr queue) {
+                                  const int64_t s01, const int64_t s02, const int64_t s03, sycl::queue* queue) {
     dpct::has_capability_or_fail(queue->get_device(), { sycl::aspect::fp16 });
 
     sycl::range<3> global_size(ne02 * ne03, ne01, ceil_div(ne00, SYCL_DEQUANTIZE_BLOCK_SIZE));
@@ -524,7 +524,7 @@ static void convert_unary_nc_sycl(const void * __restrict__ vx, dst_t * __restri
 }
 
 template <typename src_t, typename dst_t>
-static void convert_unary_sycl(const void * vx, dst_t * y, const int64_t k, dpct::queue_ptr queue) {
+static void convert_unary_sycl(const void * vx, dst_t * y, const int64_t k, sycl::queue* queue) {
     convert_unary_nc_sycl<src_t>(vx, y, k, 1, 1, 1, k, k, k, queue);
 }
 

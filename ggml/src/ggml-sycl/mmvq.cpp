@@ -551,7 +551,7 @@ static void mul_mat_vec_q_iq4_xs_q8_1(const void *__restrict__ vx,
 }
 
 static void reorder_mul_mat_vec_q4_0_q8_1_sycl(const void * vx, const void * vy, float * dst, const int ncols,
-                                                    const int nrows, dpct::queue_ptr stream) {
+                                                    const int nrows, sycl::queue* stream) {
     GGML_ASSERT(ncols % QK4_0 == 0);
     const int        block_num_y   = ceil_div(nrows, GGML_SYCL_MMV_Y);
     constexpr size_t num_subgroups = 16;
@@ -570,7 +570,7 @@ static void reorder_mul_mat_vec_q4_0_q8_1_sycl(const void * vx, const void * vy,
 }
 
 static void mul_mat_vec_q4_0_q8_1_sycl(const void * vx, const void * vy, float * dst, const int ncols, const int nrows,
-                                       dpct::queue_ptr stream) {
+                                       sycl::queue* stream) {
     GGML_ASSERT(ncols % QK4_0 == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
@@ -591,7 +591,7 @@ static void mul_mat_vec_q4_0_q8_1_sycl(const void * vx, const void * vy, float *
 static void mul_mat_vec_q4_1_q8_1_sycl(const void *vx, const void *vy,
                                        float *dst, const int ncols,
                                        const int nrows,
-                                       dpct::queue_ptr stream) {
+                                       sycl::queue* stream) {
     GGML_ASSERT(ncols % QK4_1 == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
@@ -614,7 +614,7 @@ static void mul_mat_vec_q4_1_q8_1_sycl(const void *vx, const void *vy,
 }
 
 static void mul_mat_vec_mxfp4_q8_1_sycl(const void * vx, const void * vy, float * dst, const int ncols, const int nrows,
-                                         dpct::queue_ptr stream) {
+                                         sycl::queue* stream) {
     GGML_ASSERT(ncols % QK_MXFP4 == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
@@ -636,7 +636,7 @@ static void mul_mat_vec_mxfp4_q8_1_sycl(const void * vx, const void * vy, float 
 static void mul_mat_vec_q5_0_q8_1_sycl(const void *vx, const void *vy,
                                        float *dst, const int ncols,
                                        const int nrows,
-                                       dpct::queue_ptr stream) {
+                                       sycl::queue* stream) {
     GGML_ASSERT(ncols % QK5_0 == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
@@ -661,7 +661,7 @@ static void mul_mat_vec_q5_0_q8_1_sycl(const void *vx, const void *vy,
 static void mul_mat_vec_q5_1_q8_1_sycl(const void *vx, const void *vy,
                                        float *dst, const int ncols,
                                        const int nrows,
-                                       dpct::queue_ptr stream) {
+                                       sycl::queue* stream) {
     GGML_ASSERT(ncols % QK5_1 == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
@@ -686,7 +686,7 @@ static void mul_mat_vec_q5_1_q8_1_sycl(const void *vx, const void *vy,
 static void mul_mat_vec_q8_0_q8_1_sycl(const void *vx, const void *vy,
                                        float *dst, const int ncols,
                                        const int nrows,
-                                       dpct::queue_ptr stream) {
+                                       sycl::queue* stream) {
     GGML_ASSERT(ncols % QK8_0 == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
@@ -710,7 +710,7 @@ static void mul_mat_vec_q8_0_q8_1_sycl(const void *vx, const void *vy,
 static void mul_mat_vec_q2_K_q8_1_sycl(const void *vx, const void *vy,
                                        float *dst, const int ncols,
                                        const int nrows,
-                                       dpct::queue_ptr stream) {
+                                       sycl::queue* stream) {
     GGML_ASSERT(ncols % QK_K == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
@@ -734,7 +734,7 @@ static void mul_mat_vec_q2_K_q8_1_sycl(const void *vx, const void *vy,
 static void mul_mat_vec_q3_K_q8_1_sycl(const void *vx, const void *vy,
                                        float *dst, const int ncols,
                                        const int nrows,
-                                       dpct::queue_ptr stream) {
+                                       sycl::queue* stream) {
     GGML_ASSERT(ncols % QK_K == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
@@ -758,7 +758,7 @@ static void mul_mat_vec_q3_K_q8_1_sycl(const void *vx, const void *vy,
 static void mul_mat_vec_q4_K_q8_1_sycl(const void *vx, const void *vy,
                                        float *dst, const int ncols,
                                        const int nrows,
-                                       dpct::queue_ptr stream) {
+                                       sycl::queue* stream) {
     GGML_ASSERT(ncols % QK_K == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
@@ -780,7 +780,7 @@ static void mul_mat_vec_q4_K_q8_1_sycl(const void *vx, const void *vy,
 }
 
 static void reorder_mul_mat_vec_q4_k_q8_1_sycl(const void * vx, const void * vy, float * dst, const int ncols,
-    const int nrows, dpct::queue_ptr stream) {
+    const int nrows, sycl::queue* stream) {
     GGML_ASSERT(ncols % QK_K == 0);
 
     const int block_num_y = ceil_div(nrows, GGML_SYCL_MMV_Y);
@@ -803,7 +803,7 @@ static void reorder_mul_mat_vec_q4_k_q8_1_sycl(const void * vx, const void * vy,
 static void mul_mat_vec_q5_K_q8_1_sycl(const void *vx, const void *vy,
                                        float *dst, const int ncols,
                                        const int nrows,
-                                       dpct::queue_ptr stream) {
+                                       sycl::queue* stream) {
     GGML_ASSERT(ncols % QK_K == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
@@ -825,7 +825,7 @@ static void mul_mat_vec_q5_K_q8_1_sycl(const void *vx, const void *vy,
 }
 
 static void reorder_mul_mat_vec_q6_k_q8_1_sycl(const void * vx, const void * vy, float * dst, const int ncols,
-                                               const int nrows, dpct::queue_ptr stream) {
+                                               const int nrows, sycl::queue* stream) {
     GGML_ASSERT(ncols % QK_K == 0);
     const int        block_num_y   = ceil_div(nrows, GGML_SYCL_MMV_Y);
     constexpr size_t num_subgroups = 16;
@@ -845,7 +845,7 @@ static void reorder_mul_mat_vec_q6_k_q8_1_sycl(const void * vx, const void * vy,
 static void mul_mat_vec_q6_K_q8_1_sycl(const void *vx, const void *vy,
                                        float *dst, const int ncols,
                                        const int nrows,
-                                       dpct::queue_ptr stream) {
+                                       sycl::queue* stream) {
     GGML_ASSERT(ncols % QK_K == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
@@ -870,7 +870,7 @@ static void mul_mat_vec_q6_K_q8_1_sycl(const void *vx, const void *vy,
 static void mul_mat_vec_iq2_xxs_q8_1_sycl(const void *vx, const void *vy,
                                           float *dst, const int ncols,
                                           const int nrows,
-                                          dpct::queue_ptr stream) {
+                                          sycl::queue* stream) {
     GGML_ASSERT(ncols % QK_K == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
@@ -891,7 +891,7 @@ static void mul_mat_vec_iq2_xxs_q8_1_sycl(const void *vx, const void *vy,
 static void mul_mat_vec_iq2_xs_q8_1_sycl(const void *vx, const void *vy,
                                          float *dst, const int ncols,
                                          const int nrows,
-                                         dpct::queue_ptr stream) {
+                                         sycl::queue* stream) {
     GGML_ASSERT(ncols % QK_K == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
@@ -912,7 +912,7 @@ static void mul_mat_vec_iq2_xs_q8_1_sycl(const void *vx, const void *vy,
 static void mul_mat_vec_iq2_s_q8_1_sycl(const void *vx, const void *vy,
                                          float *dst, const int ncols,
                                          const int nrows,
-                                         dpct::queue_ptr stream) {
+                                         sycl::queue* stream) {
     GGML_ASSERT(ncols % QK_K == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
@@ -934,7 +934,7 @@ static void mul_mat_vec_iq2_s_q8_1_sycl(const void *vx, const void *vy,
 static void mul_mat_vec_iq3_xxs_q8_1_sycl(const void *vx, const void *vy,
                                           float *dst, const int ncols,
                                           const int nrows,
-                                          dpct::queue_ptr stream) {
+                                          sycl::queue* stream) {
     GGML_ASSERT(ncols % QK_K == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
@@ -956,7 +956,7 @@ static void mul_mat_vec_iq3_xxs_q8_1_sycl(const void *vx, const void *vy,
 static void mul_mat_vec_iq3_s_q8_1_sycl(const void *vx, const void *vy,
                                           float *dst, const int ncols,
                                           const int nrows,
-                                          dpct::queue_ptr stream) {
+                                          sycl::queue* stream) {
     GGML_ASSERT(ncols % QK_K == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
@@ -978,7 +978,7 @@ static void mul_mat_vec_iq3_s_q8_1_sycl(const void *vx, const void *vy,
 static void mul_mat_vec_iq1_s_q8_1_sycl(const void *vx, const void *vy,
                                           float *dst, const int ncols,
                                           const int nrows,
-                                          dpct::queue_ptr stream) {
+                                          sycl::queue* stream) {
     GGML_ASSERT(ncols % QK_K == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
@@ -1000,7 +1000,7 @@ static void mul_mat_vec_iq1_s_q8_1_sycl(const void *vx, const void *vy,
 static void mul_mat_vec_iq1_m_q8_1_sycl(const void *vx, const void *vy,
                                           float *dst, const int ncols,
                                           const int nrows,
-                                          dpct::queue_ptr stream) {
+                                          sycl::queue* stream) {
     GGML_ASSERT(ncols % QK_K == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
@@ -1021,7 +1021,7 @@ static void mul_mat_vec_iq1_m_q8_1_sycl(const void *vx, const void *vy,
 static void mul_mat_vec_iq4_nl_q8_1_sycl(const void *vx, const void *vy,
                                           float *dst, const int ncols,
                                           const int nrows,
-                                          dpct::queue_ptr stream) {
+                                          sycl::queue* stream) {
     GGML_ASSERT(ncols % QK4_NL == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
@@ -1043,7 +1043,7 @@ static void mul_mat_vec_iq4_nl_q8_1_sycl(const void *vx, const void *vy,
 static void mul_mat_vec_iq4_xs_q8_1_sycl(const void *vx, const void *vy,
                                           float *dst, const int ncols,
                                           const int nrows,
-                                          dpct::queue_ptr stream) {
+                                          sycl::queue* stream) {
     GGML_ASSERT(ncols % QK_K == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
@@ -1066,7 +1066,7 @@ void ggml_sycl_op_mul_mat_vec_q(ggml_backend_sycl_context & ctx, const ggml_tens
                                 ggml_tensor * dst, const char * src0_dd_i, const float * src1_ddf_i,
                                 const char * src1_ddq_i, float * dst_dd_i, const int64_t row_low,
                                 const int64_t row_high, const int64_t src1_ncols, const int64_t src1_padded_col_size,
-                                const dpct::queue_ptr & stream) {
+                                sycl::queue* stream) {
     const int64_t ne10 = src1->ne[0];
     GGML_ASSERT(ne10 % QK8_1 == 0);
 

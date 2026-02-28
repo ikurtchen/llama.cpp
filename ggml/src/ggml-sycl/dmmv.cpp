@@ -199,7 +199,7 @@ static void dequantize_mul_mat_vec_reorder(const void * __restrict__ vx, const d
 static void convert_mul_mat_vec_f16_sycl(const void *vx, const dfloat *y,
                                          float *dst, const int ncols,
                                          const int nrows,
-                                         dpct::queue_ptr stream) {
+                                         sycl::queue* stream) {
     GGML_ASSERT(ncols % GGML_SYCL_DMMV_X == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
@@ -867,7 +867,7 @@ static void dequantize_mul_mat_vec_q6_k(const void * __restrict__ vx, const floa
 static void dequantize_mul_mat_vec_q4_0_sycl_reorder(const void *vx, const dfloat *y,
                                              float *dst, const int ncols,
                                              const int nrows,
-                                             dpct::queue_ptr stream) {
+                                             sycl::queue* stream) {
     GGML_ASSERT(ncols % GGML_SYCL_DMMV_X == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     // the number of rows may exceed maximum grid size in the y or z dimensions, use the x dimension instead
@@ -890,7 +890,7 @@ static void dequantize_mul_mat_vec_q4_0_sycl_reorder(const void *vx, const dfloa
 static void dequantize_mul_mat_vec_q4_0_sycl(const void *vx, const dfloat *y,
                                              float *dst, const int ncols,
                                              const int nrows,
-                                             dpct::queue_ptr stream) {
+                                             sycl::queue* stream) {
     GGML_ASSERT(ncols % GGML_SYCL_DMMV_X == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     // the number of rows may exceed maximum grid size in the y or z dimensions, use the x dimension instead
@@ -912,7 +912,7 @@ static void dequantize_mul_mat_vec_q4_0_sycl(const void *vx, const dfloat *y,
 static void dequantize_mul_mat_vec_q4_1_sycl(const void *vx, const dfloat *y,
                                              float *dst, const int ncols,
                                              const int nrows,
-                                             dpct::queue_ptr stream) {
+                                             sycl::queue* stream) {
     GGML_ASSERT(ncols % GGML_SYCL_DMMV_X == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
@@ -933,7 +933,7 @@ static void dequantize_mul_mat_vec_q4_1_sycl(const void *vx, const dfloat *y,
 static void dequantize_mul_mat_vec_q5_0_sycl(const void *vx, const dfloat *y,
                                              float *dst, const int ncols,
                                              const int nrows,
-                                             dpct::queue_ptr stream) {
+                                             sycl::queue* stream) {
     GGML_ASSERT(ncols % GGML_SYCL_DMMV_X == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
@@ -954,7 +954,7 @@ static void dequantize_mul_mat_vec_q5_0_sycl(const void *vx, const dfloat *y,
 static void dequantize_mul_mat_vec_q5_1_sycl(const void *vx, const dfloat *y,
                                              float *dst, const int ncols,
                                              const int nrows,
-                                             dpct::queue_ptr stream) {
+                                             sycl::queue* stream) {
     GGML_ASSERT(ncols % GGML_SYCL_DMMV_X == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
@@ -975,7 +975,7 @@ static void dequantize_mul_mat_vec_q5_1_sycl(const void *vx, const dfloat *y,
 static void dequantize_mul_mat_vec_q8_0_sycl(const void *vx, const dfloat *y,
                                              float *dst, const int ncols,
                                              const int nrows,
-                                             dpct::queue_ptr stream) {
+                                             sycl::queue* stream) {
     GGML_ASSERT(ncols % GGML_SYCL_DMMV_X == 0);
     const int block_num_y = (nrows + GGML_SYCL_MMV_Y - 1) / GGML_SYCL_MMV_Y;
     const sycl::range<3> block_nums(1, 1, block_num_y);
@@ -996,7 +996,7 @@ static void dequantize_mul_mat_vec_q8_0_sycl(const void *vx, const dfloat *y,
 static void dequantize_mul_mat_vec_q2_K_sycl(const void *vx, const float *y,
                                              float *dst, const int ncols,
                                              const int nrows,
-                                             dpct::queue_ptr stream) {
+                                             sycl::queue* stream) {
     GGML_ASSERT(ncols % QK_K == 0);
     const int ny = 2; // very slightly faster than 1 even when K_QUANTS_PER_ITERATION = 2
     const int block_num_y = (nrows + ny - 1) / ny;
@@ -1012,7 +1012,7 @@ static void dequantize_mul_mat_vec_q2_K_sycl(const void *vx, const float *y,
 static void dequantize_mul_mat_vec_q3_K_sycl(const void *vx, const float *y,
                                              float *dst, const int ncols,
                                              const int nrows,
-                                             dpct::queue_ptr stream) {
+                                             sycl::queue* stream) {
     GGML_ASSERT(ncols % QK_K == 0);
     const int ny = 2 / K_QUANTS_PER_ITERATION;
     const int block_num_y = (nrows + ny - 1) / ny;
@@ -1028,7 +1028,7 @@ static void dequantize_mul_mat_vec_q3_K_sycl(const void *vx, const float *y,
 static void dequantize_mul_mat_vec_q4_K_sycl(const void *vx, const float *y,
                                              float *dst, const int ncols,
                                              const int nrows,
-                                             dpct::queue_ptr stream) {
+                                             sycl::queue* stream) {
     GGML_ASSERT(ncols % QK_K == 0);
     const int ny = 2 / K_QUANTS_PER_ITERATION;
     const int block_num_y = (nrows + ny - 1) / ny;
@@ -1044,7 +1044,7 @@ static void dequantize_mul_mat_vec_q4_K_sycl(const void *vx, const float *y,
 static void dequantize_mul_mat_vec_q5_K_sycl(const void *vx, const float *y,
                                              float *dst, const int ncols,
                                              const int nrows,
-                                             dpct::queue_ptr stream) {
+                                             sycl::queue* stream) {
     GGML_ASSERT(ncols % QK_K == 0);
     const sycl::range<3> block_dims(1, 1, WARP_SIZE);
     stream->parallel_for(
@@ -1057,7 +1057,7 @@ static void dequantize_mul_mat_vec_q5_K_sycl(const void *vx, const float *y,
 static void dequantize_mul_mat_vec_q6_K_sycl(const void *vx, const float *y,
                                              float *dst, const int ncols,
                                              const int nrows,
-                                             dpct::queue_ptr stream) {
+                                             sycl::queue* stream) {
     GGML_ASSERT(ncols % QK_K == 0);
     const int ny = 2 / K_QUANTS_PER_ITERATION;
     const int block_num_y = (nrows + ny - 1) / ny;
@@ -1076,7 +1076,7 @@ void ggml_sycl_op_dequantize_mul_mat_vec(
     const char *src0_dd_i, const float *src1_ddf_i, const char *src1_ddq_i,
     float *dst_dd_i, const int64_t row_low, const int64_t row_high,
     const int64_t src1_ncols, const int64_t src1_padded_row_size,
-    const dpct::queue_ptr &stream) {
+    sycl::queue* stream) {
 
     const int64_t ne00 = src0->ne[0];
     const int64_t row_diff = row_high - row_low;
