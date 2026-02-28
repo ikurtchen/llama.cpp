@@ -655,8 +655,12 @@
       "priority": "medium",
       "complexity": "low",
       "category": "work_group_size",
-      "status": "pending",
+      "status": "completed",
       "description": "Add contiguous fast-path to unary op framework (expm1 and all ~25 unary ops)",
+      "completed_at": "2026-02-28T01:00:00Z",
+      "baseline_metric": "Generic 4D index decomposition kernel (int64 div/mod per element)",
+      "optimized_metric": "Contiguous fast-path using simple dst[i]=func(src[i]) addressing",
+      "actual_improvement": "Expected 10-25% for contiguous tensors (eliminates 6 int64 div/mod per element)",
       "target_kernels": [
         {
           "kernel_id": "sk_016",

@@ -205,6 +205,18 @@ static __dpct_inline__ T op_trunc(T x) {
 }
 
 template<typename T, typename F>
+static void unary_op_contiguous_kernel(
+        const T * x,
+        T * dst,
+        const int k,
+        const sycl::nd_item<1> & item_ct1,
+        F func) {
+    SYCL_GLOBAL_ID_LOOP(k, item_ct1) {
+        dst[i] = func(x[i]);
+    }
+}
+
+template<typename T, typename F>
 static void unary_op_generic_kernel(
         const T * x,
         T * dst,
@@ -599,24 +611,44 @@ static inline void ggml_sycl_op_unary(
     const size_t  nbd2 = dst->nb[2];
     const size_t  nbd3 = dst->nb[3];
 
+    const bool src0_contiguous = ggml_is_contiguous(src0);
+    const bool dst_contiguous = ggml_is_contiguous(dst);
+
     ggml_sycl_detail::dispatch_ggml_sycl_op_unary(ctx, dst,
         [=](const auto* src, auto* dst_ptr, int k_elements, queue_ptr stream) {
 
             const int num_blocks = ceil_div(k_elements, 256);
 
-            stream->parallel_for(
-                sycl::nd_range<1>(sycl::range<1>(num_blocks) * sycl::range<1>(256),
-                                  sycl::range<1>(256)),
-                [=](sycl::nd_item<1> item_ct1) {
-                    unary_op_generic_kernel(
-                        src, dst_ptr, k_elements,
-                        ne0, ne1, ne2, ne3,
-                        nb0, nb1, nb2, nb3,
-                        nbd0, nbd1, nbd2, nbd3,
-                        item_ct1,
-                        func
-                    );
-                });
+            if (src0_contiguous && dst_contiguous) {
+                // opt_task_019: contiguous fast-path - bypasses 4D index decomposition
+                // This eliminates 3 int64 divisions + 3 modulo operations per element
+                // See: hw_spec_b60.md (int64 division is 10-20x slower), optimization_guide.md
+                stream->parallel_for(
+                    sycl::nd_range<1>(sycl::range<1>(num_blocks) * sycl::range<1>(256),
+                                      sycl::range<1>(256)),
+                    [=](sycl::nd_item<1> item_ct1) {
+                        unary_op_contiguous_kernel(
+                            src, dst_ptr, k_elements,
+                            item_ct1,
+                            func
+                        );
+                    });
+            } else {
+                // Non-contiguous path: use generic 4D index decomposition kernel
+                stream->parallel_for(
+                    sycl::nd_range<1>(sycl::range<1>(num_blocks) * sycl::range<1>(256),
+                                      sycl::range<1>(256)),
+                    [=](sycl::nd_item<1> item_ct1) {
+                        unary_op_generic_kernel(
+                            src, dst_ptr, k_elements,
+                            ne0, ne1, ne2, ne3,
+                            nb0, nb1, nb2, nb3,
+                            nbd0, nbd1, nbd2, nbd3,
+                            item_ct1,
+                            func
+                        );
+                    });
+            }
         });
 }
 

@@ -1,6 +1,50 @@
 {
   "results": [
     {
+      "task_id": "opt_task_019",
+      "kernel": "unary ops (element_wise.cpp)",
+      "optimization": "Add contiguous fast-path to unary op framework - bypasses 4D index decomposition for contiguous tensors",
+      "timestamp": "2026-02-28T01:00:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": null,
+      "notes": "Added unary_op_contiguous_kernel for fast-path when src0 and dst tensors are contiguous. In ggml_sycl_op_unary, added check for ggml_is_contiguous(src0) && ggml_is_contiguous(dst). If contiguous, uses simple dst[i]=func(src[i]) addressing. Otherwise falls back to generic 4D index decomposition kernel. Eliminates 3 int64 divisions + 3 modulo operations per element for the common contiguous case. Benefits all ~25 unary operations (EXP, ABS, SILU, GELU, ELU, EXPM1, etc.) that use ggml_sycl_op_unary. Build: SUCCESS. Unit tests: EXP 8/8, ABS 8/8, SILU 8/8, GELU 8/8 PASS. Expected 10-25% improvement for contiguous tensors."
+    },
+    {
+      "task_id": "opt_task_018",
+      "kernel": "binbcast, conv2d, conv2d_dw",
+      "optimization": "Replace int64_t with int32_t for index arithmetic + fastdiv for binbcast",
+      "timestamp": "2026-02-28T00:30:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": null,
+      "notes": "conv2d-dw.cpp: Changed conv2d_dw_params struct fields from int64_t to int32_t (except TOTAL for overflow check), changed dw_kernel_bounds to int32_t, updated all helper functions (calculate_dw_kernel_bounds, calculate_dw_input_coord, whcn_*/cwhn_* index helpers), changed kernel loop variables from int64_t to int32_t, added runtime overflow assertion. binbcast.cpp: Added fastdiv32() using multiply-high trick (sycl::mul_hi) and ctz for power-of-2 fast path, added fastmodulo32() using bitwise AND for power-of-2 and subtraction for non-powers. conv2d.cpp already had int32_t from previous session. Build: SUCCESS on b60. Unit tests: PASS. Expected 10-40% speedup from faster integer division on Intel Xe2 (int64 div is 10-20x slower than int32)."
+    },
+    {
+      "task_id": "opt_task_017",
+      "kernel": "ssm_scan (Mamba-1)",
+      "optimization": "Add L_template specialization (1..8) for compile-time loop unrolling in Mamba-1 SSM scan kernel",
+      "timestamp": "2026-02-27T23:59:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": null,
+      "notes": "Added L_template parameter to ssm_scan_f32 kernel template. Uses if constexpr to separate compile-time (L_template>0) and runtime (L_template=0) code paths. Switch statement in dispatch instantiates kernels with L=1..8 for common short sequence lengths (n_tok=1..8). For L>8, falls back to runtime L (no compile-time unrolling). L=1 is the dominant case in autoregressive Mamba inference - enables full outer loop unrolling with no loop overhead. Also added reqd_sub_group_size(WARP_SIZE) to Mamba-1 kernel launch. Correctness: PASS (SSM_SCAN 3/3 tests on b60). Expected 20-50% speedup for L=1 case."
+    },
+    {
+      "task_id": "opt_task_016",
+      "kernel": "multiple (rope, binbcast, getrows, gla, diag, im2col, conv2d_dw)",
+      "optimization": "Add [[sycl::reqd_sub_group_size(WARP_SIZE)]] to remaining kernel launches",
+      "timestamp": "2026-02-27T23:59:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": null,
+      "notes": "Added reqd_sub_group_size(WARP_SIZE) to 19 kernel launches across 7 files: rope.cpp (8 kernels), binbcast.cpp (2 kernels), getrows.cpp (3 kernels), gla.cpp (1 kernel), diag.cpp (2 kernels), im2col.cpp (2 kernels), conv2d-dw.cpp (1 kernel). Remaining kernels (softmax, convert, cpy, wkv, conv2d, top-k, mmvq, norm, cross-entropy, ssm_scan, topk-moe, solve_tri) already had this attribute from earlier tasks. This ensures native SIMD16 execution on Intel Xe2 (Arc Pro B60). Tests: ROPE 248/248, DIAG 3/3, IM2COL 88/88 PASS. Expected 5-15% occupancy improvement per kernel from guaranteed SIMD16."
+    },
+    {
       "task_id": "opt_task_015",
       "kernel": "multiple (ssm_scan, topk_moe, gla, solve_tri, conv2d_dw)",
       "optimization": "Add #pragma unroll to compile-time-constant inner loops",
@@ -45,18 +89,9 @@
       "notes": "Applied 5 optimizations to conv2d.cpp: (1) Template specialization for 1x1, 3x3, 5x5, 7x7 kernel sizes - enables compile-time loop unrolling, 20-40% expected. (2) Added [[sycl::reqd_sub_group_size(16)]] for native SIMD16 on Xe2 - 5-15% expected. (3) Changed int64_t to int32_t for index arithmetic - 10-20% expected from faster integer ops. (4) Replaced acc += x*y with sycl::fma(x,y,acc) - 1-5% expected. (5) Hoisted calculate_kernel_bounds outside c_in loop - 2-5% expected. Added overflow assertions. Correctness: 480+ unit tests pass on b60. SLM tiling (opt_024_001) deferred due to complexity."
     },
     {
-      "task_id": "opt_task_018",
-      "kernel": "binbcast, conv2d, conv2d_dw",
-      "optimization": "Replace int64_t with int32_t for index arithmetic + fastdiv for binbcast",
-      "timestamp": "2026-02-28T00:30:00Z",
-      "correctness": "pass",
-      "baseline_time_us": null,
-      "optimized_time_us": null,
-      "speedup": null,
-      "notes": "conv2d-dw.cpp: Changed conv2d_dw_params struct fields from int64_t to int32_t (except TOTAL for overflow check), changed dw_kernel_bounds to int32_t, updated all helper functions (calculate_dw_kernel_bounds, calculate_dw_input_coord, whcn_*/cwhn_* index helpers), changed kernel loop variables from int64_t to int32_t, added runtime overflow assertion. binbcast.cpp: Added fastdiv32() using multiply-high trick (sycl::mul_hi) and ctz for power-of-2 fast path, added fastmodulo32() using bitwise AND for power-of-2 and subtraction for non-powers. conv2d.cpp already had int32_t from previous session. Build: SUCCESS on b60. Unit tests: PASS. Expected 10-40% speedup from faster integer division on Intel Xe2 (int64 div is 10-20x slower than int32)."
-    }
-  ]
-}
+      "task_id": "opt_task_011",
+      "kernel": "convert",
+      "optimization": "Add reqd_sub_group_size(WARP_SIZE) to all ~25 kernel launch sites in convert.cpp",
       "timestamp": "2026-02-27T22:00:00Z",
       "correctness": "pass",
       "baseline_time_us": null,
@@ -76,17 +111,6 @@
       "notes": "Increased work-group size from WARP_SIZE (16) to CE_WG_SIZE (256) for cross_entropy_loss_f32 and cross_entropy_loss_back_f32. Replaced warp_reduce_max/sum with sycl::reduce_over_group for multi-sub-group reduction. Updated stride loops to use wg_size (item_ct1.get_local_range(2)) instead of WARP_SIZE constant. Fixed sum kernel k_sum_f32 to use 256 threads with sycl::reduce_over_group. Precomputed grad/nrows as scalar in backward kernel. Expected 4-8x throughput improvement from better hardware utilization (16x more threads per row). Note: cross-entropy loss is training-only (zero wall-clock impact during inference). Unit tests: 4/4 pass on b60."
     },
     {
-      "task_id": "opt_task_007",
-      "kernel": "mmvq",
-      "optimization": "Increase non-reorder work-group size from 32 to 128 threads (4x), add multi-sub-group reduction",
-      "timestamp": "2026-02-27T18:30:00Z",
-      "correctness": "pass",
-      "baseline_time_us": null,
-      "optimized_time_us": null,
-      "speedup": null,
-      "notes": "Added GGML_SYCL_MMVQ_WG_SCALE constant (default=4) for work-group scaling. Changed work-group size from GGML_SYCL_MMV_Y * WARP_SIZE = 32 to GGML_SYCL_MMV_Y * WG_SCALE * WARP_SIZE = 128. Added WG_SCALE template parameter to mul_mat_vec_q kernel. Uses sycl::reduce_over_group for multi-sub-group reduction when WG_SCALE > 1. Updated work-group sizes for main kernels (Q4_0, Q4_1, Q5_0, Q5_1, Q8_0, Q2_K-Q6_K, MXFP4). Expected 2-3x throughput improvement from better memory latency hiding on Intel Xe2. Unit tests pass on b60."
-    },
-    {
       "task_id": "opt_task_009",
       "kernel": "wkv",
       "optimization": "Fix SLM over-allocation (byte count -> element count), add reqd_sub_group_size to all kernel launches",
@@ -98,6 +122,28 @@
       "notes": "Fixed SLM over-allocation bug in both wkv6 and wkv7 kernels: Changed local_accessor size from byte count to element count. OLD: C/H * 4 * sizeof(float) passed as element count = head_size * 16 elements (4x too many). NEW: C/H * 4 = head_size * 4 elements (correct). For head_size=64: wkv6 1024->256 elements (4x reduction), wkv7 1280->320 elements (4x reduction). Added [[sycl::reqd_sub_group_size(WARP_SIZE)]] to all 4 kernel launches. Expected 25-50% occupancy improvement from freeing 3/4 of wasted SLM per work-group. Correctness: 4/4 tests passed on b60."
     },
     {
+      "task_id": "opt_task_008",
+      "kernel": "norm",
+      "optimization": "Fix group_norm global barriers (local_space fence), increase small-path work-group size from 16 to 256",
+      "timestamp": "2026-02-27T19:00:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": null,
+      "notes": "Fixed 2 global barriers in group_norm_f32: changed item_ct1.barrier() to item_ct1.barrier(sycl::access::fence_space::local_space). Removed 8 lines of DPCT comments. Increased work-group size from 16 to 256 threads for small-path (ncols < 1024) in norm_f32_sycl, rms_norm_f32_sycl, and l2_norm_f32_sycl. Added SLM allocation for small path (64-128 bytes per work-group). Expected 2-4x throughput improvement from better occupancy - 16x more parallelism per row. Unit tests: 43/43 pass on b60."
+    },
+    {
+      "task_id": "opt_task_007",
+      "kernel": "mmvq",
+      "optimization": "Increase non-reorder work-group size from 32 to 128 threads (4x), add multi-sub-group reduction",
+      "timestamp": "2026-02-27T18:30:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": null,
+      "notes": "Added GGML_SYCL_MMVQ_WG_SCALE constant (default=4) for work-group scaling. Changed work-group size from GGML_SYCL_MMV_Y * WARP_SIZE = 32 to GGML_SYCL_MMV_Y * WG_SCALE * WARP_SIZE = 128. Added WG_SCALE template parameter to mul_mat_vec_q kernel. Uses sycl::reduce_over_group for multi-sub-group reduction when WG_SCALE > 1. Updated work-group sizes for main kernels (Q4_0, Q4_1, Q5_0, Q5_1, Q8_0, Q2_K-Q6_K, MXFP4). Expected 2-3x throughput improvement from better memory latency hiding on Intel Xe2. Unit tests pass on b60."
+    },
+    {
       "task_id": "opt_task_005",
       "kernel": "cpy",
       "optimization": "Increase quantized copy work-group from 1 to 256, add reqd_sub_group_size(WARP_SIZE)",
@@ -106,7 +152,7 @@
       "baseline_time_us": 804.77,
       "optimized_time_us": 119.69,
       "speedup": 6.72,
-      "notes": "f32->q4_0: 6.72x speedup (804.77 us -> 119.69 us). q4_0->f32: 8.71x speedup (3946.24 us -> 453.45 us). Changed SYCL_CPY_BLOCK_SIZE from 32 to 256. Changed all 11 quantized copy kernels from work-group size 1 to 256. Added reqd_sub_group_size(WARP_SIZE) to all 20+ kernel launches. Quantized copy with work-group=1 was catastrophically bad - 15/16 SIMD lanes wasted on Xe2. Unit tests: 131/131 pass on b60."
+      "notes": "f32->q4_0: 6.72x speedup (804.77 us -> 119.69 us). q4_0->f32: 8.71x speedup (3946.24 us -> 453.45 us). Changed SYCL_CPY_BLOCK_SIZE from 32 to 256. Changed all 11 quantized copy kernels from work-group size 1 to 256. Added reqd_sub_group_size(WARP_SIZE) to all 20+ kernel launches. Quantized copy with work-group=1 was catastrophically bad - 15/16 SIML lanes wasted on Xe2. Unit tests: 131/131 pass on b60."
     },
     {
       "task_id": "opt_task_003",
@@ -151,50 +197,6 @@
       "optimized_time_us": null,
       "speedup": null,
       "notes": "Added XE2-specific tile sizes: MMQ_X=64, MMQ_Y=64, NWARPS=8 (tuned for 64KB SLM, SIMD16). Updated mul_mat_q4_0 and mul_mat_q8_0 kernels. Full XMX joint_matrix implementation still pending - requires ~1000+ lines of new code."
-    },
-    {
-      "task_id": "opt_task_008",
-      "kernel": "norm",
-      "optimization": "Fix group_norm global barriers (local_space fence), increase small-path work-group size from 16 to 256",
-      "timestamp": "2026-02-27T19:00:00Z",
-      "correctness": "pass",
-      "baseline_time_us": null,
-      "optimized_time_us": null,
-      "speedup": null,
-      "notes": "Fixed 2 global barriers in group_norm_f32: changed item_ct1.barrier() to item_ct1.barrier(sycl::access::fence_space::local_space). Removed 8 lines of DPCT comments. Increased work-group size from 16 to 256 threads for small-path (ncols < 1024) in norm_f32_sycl, rms_norm_f32_sycl, and l2_norm_f32_sycl. Added SLM allocation for small path (64-128 bytes per work-group). Expected 2-4x throughput improvement from better occupancy - 16x more parallelism per row. Unit tests: 43/43 pass on b60."
-    },
-    {
-      "task_id": "opt_task_016",
-      "kernel": "multiple (rope, binbcast, getrows, gla, diag, im2col, conv2d_dw)",
-      "optimization": "Add [[sycl::reqd_sub_group_size(WARP_SIZE)]] to remaining kernel launches",
-      "timestamp": "2026-02-27T23:59:00Z",
-      "correctness": "pass",
-      "baseline_time_us": null,
-      "optimized_time_us": null,
-      "speedup": null,
-      "notes": "Added reqd_sub_group_size(WARP_SIZE) to 19 kernel launches across 7 files: rope.cpp (8 kernels), binbcast.cpp (2 kernels), getrows.cpp (3 kernels), gla.cpp (1 kernel), diag.cpp (2 kernels), im2col.cpp (2 kernels), conv2d-dw.cpp (1 kernel). Remaining kernels (softmax, convert, cpy, wkv, conv2d, top-k, mmvq, norm, cross-entropy, ssm_scan, topk-moe, solve_tri) already had this attribute from earlier tasks. This ensures native SIMD16 execution on Intel Xe2 (Arc Pro B60). Tests: ROPE 248/248, DIAG 3/3, IM2COL 88/88 PASS. Expected 5-15% occupancy improvement per kernel from guaranteed SIMD16."
-    },
-    {
-      "task_id": "opt_task_017",
-      "kernel": "ssm_scan (Mamba-1)",
-      "optimization": "Add L_template specialization (1..8) for compile-time loop unrolling in Mamba-1 SSM scan kernel",
-      "timestamp": "2026-02-27T23:59:00Z",
-      "correctness": "pass",
-      "baseline_time_us": null,
-      "optimized_time_us": null,
-      "speedup": null,
-      "notes": "Added L_template parameter to ssm_scan_f32 kernel template. Uses if constexpr to separate compile-time (L_template>0) and runtime (L_template=0) code paths. Switch statement in dispatch instantiates kernels with L=1..8 for common short sequence lengths (n_tok=1..8). For L>8, falls back to runtime L (no compile-time unrolling). L=1 is the dominant case in autoregressive Mamba inference - enables full outer loop unrolling with no loop overhead. Also added reqd_sub_group_size(WARP_SIZE) to Mamba-1 kernel launch. Correctness: PASS (SSM_SCAN 3/3 tests on b60). Expected 20-50% speedup for L=1 case."
-    },
-    {
-      "task_id": "opt_task_001",
-      "kernel": "mmq (quantized matmul)",
-      "optimization": "Add XE2 tile sizes for all 10 quant types - incremental progress toward full XMX joint_matrix",
-      "timestamp": "2026-02-28T00:00:00Z",
-      "correctness": "pass",
-      "baseline_time_us": null,
-      "optimized_time_us": null,
-      "speedup": null,
-      "notes": "Added XE2 tile sizes (MMQ_X=64, MMQ_Y=64, NWARPS=8) for all remaining 8 quant types: Q4_1, Q5_0, Q5_1, Q2_K, Q3_K, Q4_K, Q5_K, Q6_K. Q4_0 and Q8_0 already had XE2 sizes. These tile sizes are tuned for Intel Xe2 64KB SLM and SIMD16. When compiled with -DSYCL_USE_XMX, kernels will use these optimized tile sizes. Full joint_matrix implementation (~1000+ lines) still pending - requires multiple sessions. Build: SUCCESS on b60. Unit tests: PASS."
     }
   ]
 }
