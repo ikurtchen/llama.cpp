@@ -157,4 +157,21 @@
   - Documented in commit 96396c350 as known issue
   - Fix requires kernel re-architecting (not a simple bug fix)
   - Test results: 25/26 q4_K MUL_MAT_VEC_FUSION tests FAIL (pre-existing)
-  - All other types (f32, f16, q8_0, q4_0, q4_1, mxfp4, iq2_xxs) PASS
+[2026-02-28] OPTIMIZATION PIPELINE COMPLETE
+  - All 29 optimization tasks completed (opt_task_001 through opt_task_029)
+  - All SYCL kernel optimizations for Intel Arc Pro B60 (Xe2) applied
+  - Current test status (b60): 959/974 tests PASS
+  - Remaining 15 failures are PRE-EXISTING issues:
+    - q2_K, q3_K, q4_K, q5_K with small n (n=1): quantization accuracy errors
+    - Documented in opt_task_025-029 as known issues
+    - These issues existed in baseline and are not caused by syclgen optimizations
+  - Key optimizations applied:
+    - SIMD16 native sub-group size on all kernels
+    - Work-group size tuning (256/512 threads)
+    - Memory coalescing and vectorization
+    - SLM usage optimization
+    - Reduction pattern improvements (sycl::reduce_over_group)
+    - Math function optimization (native:: variants)
+    - Loop unrolling (#pragma unroll)
+    - DPCT cleanup (dpct::queue_ptr -> sycl::queue*)
+  - Build: SUCCESS on b60
