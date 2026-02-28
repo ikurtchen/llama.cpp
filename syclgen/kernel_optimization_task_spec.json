@@ -32,7 +32,7 @@
       "baseline_metric": null,
       "optimized_metric": null,
       "actual_improvement": null,
-      "blocked_reason": "Complexity (~1000+ lines) requires multiple sessions. Partial work done: XE2 tile sizes for Q4_0/Q8_0."
+      "blocked_reason": "Complexity (~1000+ lines) requires multiple sessions. Partial work done: Added XE2 tile sizes (MMQ_X=64, MMQ_Y=64, NWARPS=8) for all 10 quant types (Q4_0, Q4_1, Q5_0, Q5_1, Q8_0, Q2_K, Q3_K, Q4_K, Q5_K, Q6_K). Full joint_matrix implementation still pending."
     },
     {
       "id": "opt_task_002",

@@ -1,10 +1,8 @@
-[2026-02-27] opt_task_017 (L_template specialization): COMPLETED. Added compile-time L_template specialization for Mamba-1 SSM scan kernel:
-  - Added L_template parameter to ssm_scan_f32 kernel template (template<int splitD, int N, int L_template>)
-  - Uses if constexpr to separate compile-time (L_template>0) and runtime (L_template=0) paths
-  - Switch statement in dispatch instantiates kernels with L=1..8 for common short sequence lengths (n_tok=1..8)
-  - For L>8, falls back to runtime L (no compile-time unrolling)
-  - L=1 is the dominant case in autoregressive Mamba inference - enables full outer loop unrolling
-  - Also added reqd_sub_group_size(WARP_SIZE) to Mamba-1 kernel launch (was missing)
-  - Correctness: PASS (SSM_SCAN 3/3 tests on b60)
-  - Expected: 20-50% speedup for L=1 (autoregressive decoding)
+[2026-02-28] opt_task_001 (MMQ XMX): IN PROGRESS. Added XE2 tile sizes for remaining 8 quant types:
+  - Q4_1, Q5_0, Q5_1: Added MMQ_X=64, MMQ_Y=64, NWARPS=8
+  - Q2_K, Q3_K, Q4_K, Q5_K, Q6_K: Added MMQ_X=64, MMQ_Y=64, NWARPS=8
+  - All 10 quant types now have XE2 tile sizes for use with SYCL_USE_XMX
+  - Build: SUCCESS on b60
+  - Unit tests: PASS (MMQ tests OK)
+  - Full joint_matrix implementation (~1000+ lines) still pending - requires multiple sessions
 

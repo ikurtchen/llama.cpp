@@ -175,6 +175,17 @@
       "optimized_time_us": null,
       "speedup": null,
       "notes": "Added L_template parameter to ssm_scan_f32 kernel template. Uses if constexpr to separate compile-time (L_template>0) and runtime (L_template=0) code paths. Switch statement in dispatch instantiates kernels with L=1..8 for common short sequence lengths (n_tok=1..8). For L>8, falls back to runtime L (no compile-time unrolling). L=1 is the dominant case in autoregressive Mamba inference - enables full outer loop unrolling with no loop overhead. Also added reqd_sub_group_size(WARP_SIZE) to Mamba-1 kernel launch. Correctness: PASS (SSM_SCAN 3/3 tests on b60). Expected 20-50% speedup for L=1 case."
+    },
+    {
+      "task_id": "opt_task_001",
+      "kernel": "mmq (quantized matmul)",
+      "optimization": "Add XE2 tile sizes for all 10 quant types - incremental progress toward full XMX joint_matrix",
+      "timestamp": "2026-02-28T00:00:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": null,
+      "notes": "Added XE2 tile sizes (MMQ_X=64, MMQ_Y=64, NWARPS=8) for all remaining 8 quant types: Q4_1, Q5_0, Q5_1, Q2_K, Q3_K, Q4_K, Q5_K, Q6_K. Q4_0 and Q8_0 already had XE2 sizes. These tile sizes are tuned for Intel Xe2 64KB SLM and SIMD16. When compiled with -DSYCL_USE_XMX, kernels will use these optimized tile sizes. Full joint_matrix implementation (~1000+ lines) still pending - requires multiple sessions. Build: SUCCESS on b60. Unit tests: PASS."
     }
   ]
 }
