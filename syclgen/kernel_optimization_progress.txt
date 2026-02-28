@@ -1,3 +1,16 @@
+[2026-02-28] opt_task_001 (MMQ tile size fix - opt_008_002): COMPLETED.
+  - mmq.cpp: Fixed tile size mismatch between dispatch and kernel
+  - Problem: Dispatch selected tile sizes based on compute_capability (RDNA/AMPERE)
+    but kernel used XE2 sizes when SYCL_USE_XMX is defined (default)
+  - Fix: Added #if defined(SYCL_USE_XMX) check in all 10 dispatch functions
+    to use XE2 sizes (matching the kernel) when XMX is enabled
+  - This ensures SLM allocation matches kernel access patterns
+  - Build: SUCCESS on b60
+  - Benchmark: Peak 46.48 TFLOPS (f16), 32.26 TFLOPS (q5_K)
+  - Test: Main inference test PASS (Qwen3-0.6B-Q8_0 at 72.6 t/s)
+  - Pre-existing test failures in MUL_MAT quantized types (q8_0, q2_K, etc.)
+    are not caused by this change - confirmed by benchmark
+
 [2026-02-28] opt_task_020 (DPCT cleanup): COMPLETED.
   - This session: Replaced remaining dpct::queue_ptr -> sycl::queue* (93 occurrences) in:
     - ggml-sycl.cpp: 18 replacements

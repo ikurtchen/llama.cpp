@@ -1881,6 +1881,11 @@ static void ggml_mul_mat_q4_0_q8_1_sycl(const void *vx, const void *vy,
     const int compute_capability = ggml_sycl_info().devices[id].cc;
 
     int mmq_x, mmq_y, nwarps;
+#if defined(SYCL_USE_XMX)
+    mmq_x  =  MMQ_X_Q4_0_XE2;
+    mmq_y  =  MMQ_Y_Q4_0_XE2;
+    nwarps = NWARPS_Q4_0_XE2;
+#else
     if (compute_capability >= VER_GEN13) {
         mmq_x  =  MMQ_X_Q4_0_RDNA2;
         mmq_y  =  MMQ_Y_Q4_0_RDNA2;
@@ -1900,6 +1905,7 @@ static void ggml_mul_mat_q4_0_q8_1_sycl(const void *vx, const void *vy,
     } else {
         GGML_ABORT("fatal error");
     }
+#endif
 
     const int block_num_x = (nrows_x + mmq_y - 1) / mmq_y;
     const int block_num_y = (ncols_y + mmq_x - 1) / mmq_x;
@@ -1996,6 +2002,11 @@ static void ggml_mul_mat_q4_1_q8_1_sycl(const void *vx, const void *vy,
     const int compute_capability = ggml_sycl_info().devices[id].cc;
 
     int mmq_x, mmq_y, nwarps;
+#if defined(SYCL_USE_XMX)
+    mmq_x  =  MMQ_X_Q4_1_XE2;
+    mmq_y  =  MMQ_Y_Q4_1_XE2;
+    nwarps = NWARPS_Q4_1_XE2;
+#else
     if (compute_capability >= VER_GEN13) {
         mmq_x  =  MMQ_X_Q4_1_RDNA2;
         mmq_y  =  MMQ_Y_Q4_1_RDNA2;
@@ -2015,6 +2026,7 @@ static void ggml_mul_mat_q4_1_q8_1_sycl(const void *vx, const void *vy,
     } else {
         GGML_ABORT("fatal error");
     }
+#endif
 
     const int block_num_x = (nrows_x + mmq_y - 1) / mmq_y;
     const int block_num_y = (ncols_y + mmq_x - 1) / mmq_x;
@@ -2111,6 +2123,11 @@ static void ggml_mul_mat_q5_0_q8_1_sycl(const void *vx, const void *vy,
     const int compute_capability = ggml_sycl_info().devices[id].cc;
 
     int mmq_x, mmq_y, nwarps;
+#if defined(SYCL_USE_XMX)
+    mmq_x  =  MMQ_X_Q5_0_XE2;
+    mmq_y  =  MMQ_Y_Q5_0_XE2;
+    nwarps = NWARPS_Q5_0_XE2;
+#else
     if (compute_capability >= VER_GEN13) {
         mmq_x  =  MMQ_X_Q5_0_RDNA2;
         mmq_y  =  MMQ_Y_Q5_0_RDNA2;
@@ -2130,6 +2147,7 @@ static void ggml_mul_mat_q5_0_q8_1_sycl(const void *vx, const void *vy,
     } else {
         GGML_ABORT("fatal error");
     }
+#endif
 
     const int block_num_x = (nrows_x + mmq_y - 1) / mmq_y;
     const int block_num_y = (ncols_y + mmq_x - 1) / mmq_x;
@@ -2226,6 +2244,11 @@ static void ggml_mul_mat_q5_1_q8_1_sycl(const void *vx, const void *vy,
     const int compute_capability = ggml_sycl_info().devices[id].cc;
 
     int mmq_x, mmq_y, nwarps;
+#if defined(SYCL_USE_XMX)
+    mmq_x  =  MMQ_X_Q5_1_XE2;
+    mmq_y  =  MMQ_Y_Q5_1_XE2;
+    nwarps = NWARPS_Q5_1_XE2;
+#else
     if (compute_capability >= VER_GEN13) {
         mmq_x  =  MMQ_X_Q5_1_RDNA2;
         mmq_y  =  MMQ_Y_Q5_1_RDNA2;
@@ -2245,6 +2268,7 @@ static void ggml_mul_mat_q5_1_q8_1_sycl(const void *vx, const void *vy,
     } else {
         GGML_ABORT("fatal error");
     }
+#endif
 
     const int block_num_x = (nrows_x + mmq_y - 1) / mmq_y;
     const int block_num_y = (ncols_y + mmq_x - 1) / mmq_x;
@@ -2341,6 +2365,11 @@ static void ggml_mul_mat_q8_0_q8_1_sycl(const void *vx, const void *vy,
     const int compute_capability = ggml_sycl_info().devices[id].cc;
 
     int mmq_x, mmq_y, nwarps;
+#if defined(SYCL_USE_XMX)
+    mmq_x  =  MMQ_X_Q8_0_XE2;
+    mmq_y  =  MMQ_Y_Q8_0_XE2;
+    nwarps = NWARPS_Q8_0_XE2;
+#else
     if (compute_capability >= VER_GEN13) {
         mmq_x  =  MMQ_X_Q8_0_RDNA2;
         mmq_y  =  MMQ_Y_Q8_0_RDNA2;
@@ -2360,6 +2389,7 @@ static void ggml_mul_mat_q8_0_q8_1_sycl(const void *vx, const void *vy,
     } else {
         GGML_ABORT("fatal error");
     }
+#endif
 
     const int block_num_x = (nrows_x + mmq_y - 1) / mmq_y;
     const int block_num_y = (ncols_y + mmq_x - 1) / mmq_x;
@@ -2456,6 +2486,11 @@ static void ggml_mul_mat_q2_K_q8_1_sycl(const void *vx, const void *vy,
     const int compute_capability = ggml_sycl_info().devices[id].cc;
 
     int mmq_x, mmq_y, nwarps;
+#if defined(SYCL_USE_XMX)
+    mmq_x  =  MMQ_X_Q2_K_XE2;
+    mmq_y  =  MMQ_Y_Q2_K_XE2;
+    nwarps = NWARPS_Q2_K_XE2;
+#else
     if (compute_capability >= VER_GEN13) {
         mmq_x  =  MMQ_X_Q2_K_RDNA2;
         mmq_y  =  MMQ_Y_Q2_K_RDNA2;
@@ -2475,6 +2510,7 @@ static void ggml_mul_mat_q2_K_q8_1_sycl(const void *vx, const void *vy,
     } else {
         GGML_ABORT("fatal error");
     }
+#endif
 
     const int block_num_x = (nrows_x + mmq_y - 1) / mmq_y;
     const int block_num_y = (ncols_y + mmq_x - 1) / mmq_x;
@@ -2579,6 +2615,11 @@ static void ggml_mul_mat_q3_K_q8_1_sycl(const void *vx, const void *vy,
     const int compute_capability = ggml_sycl_info().devices[id].cc;
 
     int mmq_x, mmq_y, nwarps;
+#if defined(SYCL_USE_XMX)
+    mmq_x  =  MMQ_X_Q3_K_XE2;
+    mmq_y  =  MMQ_Y_Q3_K_XE2;
+    nwarps = NWARPS_Q3_K_XE2;
+#else
     if (compute_capability >= VER_GEN13) {
         mmq_x  =  MMQ_X_Q3_K_RDNA2;
         mmq_y  =  MMQ_Y_Q3_K_RDNA2;
@@ -2598,6 +2639,7 @@ static void ggml_mul_mat_q3_K_q8_1_sycl(const void *vx, const void *vy,
     } else {
         GGML_ABORT("fatal error");
     }
+#endif
 
     const int block_num_x = (nrows_x + mmq_y - 1) / mmq_y;
     const int block_num_y = (ncols_y + mmq_x - 1) / mmq_x;
@@ -2707,6 +2749,11 @@ static void ggml_mul_mat_q4_K_q8_1_sycl(const void *vx, const void *vy,
     const int compute_capability = ggml_sycl_info().devices[id].cc;
 
     int mmq_x, mmq_y, nwarps;
+#if defined(SYCL_USE_XMX)
+    mmq_x  =  MMQ_X_Q4_K_XE2;
+    mmq_y  =  MMQ_Y_Q4_K_XE2;
+    nwarps = NWARPS_Q4_K_XE2;
+#else
     if (compute_capability >= VER_GEN13) {
         mmq_x  =  MMQ_X_Q4_K_RDNA2;
         mmq_y  =  MMQ_Y_Q4_K_RDNA2;
@@ -2726,6 +2773,7 @@ static void ggml_mul_mat_q4_K_q8_1_sycl(const void *vx, const void *vy,
     } else {
         GGML_ABORT("fatal error");
     }
+#endif
 
     const int block_num_x = (nrows_x + mmq_y - 1) / mmq_y;
     const int block_num_y = (ncols_y + mmq_x - 1) / mmq_x;
@@ -2828,6 +2876,11 @@ static void ggml_mul_mat_q5_K_q8_1_sycl(const void *vx, const void *vy,
     const int compute_capability = ggml_sycl_info().devices[id].cc;
 
     int mmq_x, mmq_y, nwarps;
+#if defined(SYCL_USE_XMX)
+    mmq_x  =  MMQ_X_Q5_K_XE2;
+    mmq_y  =  MMQ_Y_Q5_K_XE2;
+    nwarps = NWARPS_Q5_K_XE2;
+#else
     if (compute_capability >= VER_GEN13) {
         mmq_x  =  MMQ_X_Q5_K_RDNA2;
         mmq_y  =  MMQ_Y_Q5_K_RDNA2;
@@ -2847,6 +2900,7 @@ static void ggml_mul_mat_q5_K_q8_1_sycl(const void *vx, const void *vy,
     } else {
         GGML_ABORT("fatal error");
     }
+#endif
 
     const int block_num_x = (nrows_x + mmq_y - 1) / mmq_y;
     const int block_num_y = (ncols_y + mmq_x - 1) / mmq_x;
@@ -2949,6 +3003,11 @@ static void ggml_mul_mat_q6_K_q8_1_sycl(const void *vx, const void *vy,
     const int compute_capability = ggml_sycl_info().devices[id].cc;
 
     int mmq_x, mmq_y, nwarps;
+#if defined(SYCL_USE_XMX)
+    mmq_x  =  MMQ_X_Q6_K_XE2;
+    mmq_y  =  MMQ_Y_Q6_K_XE2;
+    nwarps = NWARPS_Q6_K_XE2;
+#else
     if (compute_capability >= VER_GEN13) {
         mmq_x  =  MMQ_X_Q6_K_RDNA2;
         mmq_y  =  MMQ_Y_Q6_K_RDNA2;
@@ -2968,6 +3027,7 @@ static void ggml_mul_mat_q6_K_q8_1_sycl(const void *vx, const void *vy,
     } else {
         GGML_ABORT("fatal error");
     }
+#endif
 
     const int block_num_x = (nrows_x + mmq_y - 1) / mmq_y;
     const int block_num_y = (ncols_y + mmq_x - 1) / mmq_x;
