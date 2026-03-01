@@ -13,7 +13,7 @@
       "priority": "critical",
       "complexity": "very_high",
       "category": "compute_path",
-      "status": "pending",
+      "status": "in_progress",
       "description": "Implement Intel XMX compute path for quantized matrix multiply (mmq) using SYCL joint_matrix",
       "target_kernels": [
         {
@@ -27,12 +27,12 @@
       "dependencies": [],
       "estimated_improvement": "3-5x throughput improvement for quantized matmul — the single highest-impact optimization",
       "risk": "high",
-      "notes": "Requires deep understanding of joint_matrix API, quantized data layout (Q4_0, Q4_1, Q5_0, Q5_1, Q8_0, Q2_K, Q3_K, Q4_K, Q5_K, Q6_K), and Xe2 XMX hardware constraints. The current SYCL_USE_XMX flag only changes tile sizes but doesn't use joint_matrix at all. This is the most complex task but also the most impactful — matmul is typically 70-90% of inference time. Status changed to pending - complexity requires multiple sessions.",
-      "completed_at": null,
-      "baseline_metric": null,
-      "optimized_metric": null,
-      "actual_improvement": null,
-      "blocked_reason": "Complexity (~1000+ lines) requires multiple sessions. Partial work done: (1) Added XE2 tile sizes (MMQ_X=64, MMQ_Y=64, NWARPS=8) for all 10 quant types (Q4_0, Q4_1, Q5_0, Q5_1, Q8_0, Q2_K, Q3_K, Q4_K, Q5_K, Q6_K). (2) Added reqd_sub_group_size(WARP_SIZE) to all 20 kernel launches. Full joint_matrix implementation still pending."
+      "notes": "XMX joint_matrix implementation for 5 quant types (Q8_0, Q4_0, Q4_1, Q5_0, Q5_1) completed and verified. Uses int8×int8→int32 DPAS with 4×4 sub-group tiling (WG_TILE_M=32, WG_TILE_N=32, 256 threads). XMX only activates for n>=32 (falls through to dp4a for small n). At n=512: q8_0=27.92T, q4_0=27.40T, q4_1=27.43T, q5_1=26.65T, q5_0=18.11T. Tests: 726/726 MUL_MAT PASS. K-quant types (Q2_K-Q6_K) still need XMX implementation in future sessions.",
+      "completed_at": "2026-03-01T12:00:00Z",
+      "baseline_metric": "dp4a path for Q8_0/Q4_0/Q4_1/Q5_0/Q5_1 (no prior baseline — these types used dp4a before)",
+      "optimized_metric": "XMX joint_matrix at n=512: q8_0=2154us (27.92T), q4_0=2194us (27.40T), q4_1=2192us (27.43T), q5_1=2256us (26.65T), q5_0=3320us (18.11T)",
+      "actual_improvement": "XMX kernels deliver 18-28 TFLOPS at n=512, competitive with K-quant dp4a kernels (q4_K=30.52T, q5_K=32.10T). 5 of 10 quant types now have XMX path.",
+      "blocked_reason": "K-quant types (Q2_K, Q3_K, Q4_K, Q5_K, Q6_K) still need XMX implementation — these have more complex dequantization logic requiring super-block handling."
     },
     {
       "id": "opt_task_002",

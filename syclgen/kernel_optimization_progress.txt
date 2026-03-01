@@ -162,6 +162,32 @@
   - All SYCL kernel optimizations for Intel Arc Pro B60 (Xe2) applied
   - Current test status (b60): 959/974 tests PASS
   - Remaining 15 failures are PRE-EXISTING issues:
+
+[2026-03-01] opt_task_001 (XMX joint_matrix for quantized matmul): PARTIAL COMPLETION.
+  - mmq.cpp: Implemented XMX joint_matrix kernels for 5 quant types:
+    - Q8_0: int8×int8→int32 DPAS, scale-only dequantization
+    - Q4_0: 4-bit unpack to int8, scale-only dequantization
+    - Q4_1: 4-bit unpack to int8, scale+minimum dequantization
+    - Q5_0: 5-bit unpack to int8 (high bit in qh), scale-only
+    - Q5_1: 5-bit unpack to int8 (high bit in qh), scale+minimum
+  - Architecture: 4×4 sub-group tiling (WG_TILE_M=32, WG_TILE_N=32)
+    - 16 sub-groups per work-group, 256 threads total
+    - SLM staging: A tile (1024 int8) + B tile (1024 int8) + scales + result scratch
+    - Total SLM: ~6400 bytes per work-group (well within 64KB limit)
+  - Dispatch: XMX path activates only when ncols_y >= WG_TILE_N (32)
+    - Small N (n<32) falls through to dp4a path for better performance
+  - Build: SUCCESS on b60
+  - Tests: 726/726 MUL_MAT PASS (including all 5 XMX quant types)
+  - Benchmark (n=512, m=4096, k=14336):
+    - q8_0: 2,154 us (27.92 TFLOPS) — XMX
+    - q4_0: 2,194 us (27.40 TFLOPS) — XMX
+    - q4_1: 2,192 us (27.43 TFLOPS) — XMX
+    - q5_1: 2,256 us (26.65 TFLOPS) — XMX
+    - q5_0: 3,320 us (18.11 TFLOPS) — XMX (slower, needs investigation)
+    - For comparison: q4_K=1,970 us (30.52T), q5_K=1,873 us (32.10T), f16=1,305 us (46.07T)
+  - Remaining: K-quant types (Q2_K, Q3_K, Q4_K, Q5_K, Q6_K) still need XMX implementation
+    - These have complex super-block dequantization (256 elements per super-block)
+    - Requires different tiling strategy due to nested block structure
     - q2_K, q3_K, q4_K, q5_K with small n (n=1): quantization accuracy errors
     - Documented in opt_task_025-029 as known issues
     - These issues existed in baseline and are not caused by syclgen optimizations

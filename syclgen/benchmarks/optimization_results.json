@@ -1,6 +1,17 @@
 {
   "results": [
     {
+      "task_id": "opt_task_001",
+      "kernel": "mmq (MUL_MAT)",
+      "optimization": "XMX joint_matrix kernels for Q8_0, Q4_0, Q4_1, Q5_0, Q5_1 using Intel DPAS hardware",
+      "timestamp": "2026-03-01T12:00:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": 2154,
+      "speedup": null,
+      "notes": "Implemented XMX joint_matrix kernels for 5 quant types (Q8_0, Q4_0, Q4_1, Q5_0, Q5_1). Uses int8×int8→int32 DPAS on Xe2 with 4×4 sub-group tiling (WG_TILE_M=32, WG_TILE_N=32, 256 threads). At n=512 (prompt processing): q8_0=27.92 TFLOPS, q4_0=27.40T, q4_1=27.43T, q5_1=26.65T, q5_0=18.11T. XMX only activates for n>=WG_TILE_N(32) — small n falls through to dp4a path. Build: SUCCESS. Tests: 726/726 MUL_MAT PASS. K-quant types (Q2_K-Q6_K) still pending XMX implementation."
+    },
+    {
       "task_id": "opt_task_029",
       "kernel": "MUL_MAT_VEC_FUSION (mmvq/dmmv)",
       "optimization": "Investigate q4_K failures - confirmed pre-existing from SIMD16 change (same as opt_task_027)",
