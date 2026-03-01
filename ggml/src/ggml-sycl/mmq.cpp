@@ -1011,6 +1011,1109 @@ static void mul_mat_q5_1_xmx(
     }
 }
 
+// ===========================================================================
+// K-quant XMX Joint Matrix kernels
+// K-quants have super-blocks of QK_K=256 elements = 8 sub-blocks of 32 elements
+// Each sub-block matches XMX_K=32, so we loop 8 times per super-block
+// B side uses Q8_1 blocks (32 elements each), 8 per K-quant super-block
+// ===========================================================================
+
+static constexpr int K_QUANTS_PER_SUPERBLOCK = 8;  // QK_K / XMX_K = 256 / 32
+
+// ---------------------------------------------------------------------------
+// Q4_K × Q8_1 XMX kernel
+// Q4_K: 4-bit quantized with per-sub-block 6-bit packed scales and mins
+// 8 sub-blocks of 32 elements, each sub-block has its own scale and min
+// Formula: x = dall * sc * q - dmin * m
+// XMX strategy: load raw 4-bit values into int8, XMX gives sumi,
+//   then result = sumi * dall * sc * d_b - dmin * m * s_b
+// ---------------------------------------------------------------------------
+template <bool need_check>
+static void mul_mat_q4_K_xmx(
+    const void * __restrict__ vx,
+    const void * __restrict__ vy,
+    float * __restrict__ dst,
+    const int ncols_x,
+    const int nrows_x,
+    const int ncols_y,
+    const int nrows_y,
+    const int nrows_dst,
+    const sycl::nd_item<3> & item_ct1,
+    int8_t * __restrict__ slm_a,
+    int8_t * __restrict__ slm_b,
+    float  * __restrict__ slm_scale_a,   // [WG_TILE_M] dall per row
+    float  * __restrict__ slm_scale_b,   // [WG_TILE_N] d_b per col
+    float  * __restrict__ slm_min_a,     // [WG_TILE_M] dmin per row
+    float  * __restrict__ slm_sum_b,     // [WG_TILE_N] s_b per col
+    int32_t * __restrict__ slm_result
+) {
+    const block_q4_K * x = (const block_q4_K *) vx;
+    const block_q8_1 * y = (const block_q8_1 *) vy;
+
+    const int blocks_per_row_x = ncols_x / QK_K;
+    const int blocks_per_col_y = nrows_y / QK8_1;
+
+    const int row_start = item_ct1.get_group(2) * WG_TILE_M;
+    const int col_start = item_ct1.get_group(1) * WG_TILE_N;
+
+    const auto sg = item_ct1.get_sub_group();
+    const int sg_id = sg.get_group_linear_id();
+    const int sg_row = sg_id / SG_COLS;
+    const int sg_col = sg_id % SG_COLS;
+    const int lane = sg.get_local_linear_id();
+    const int tid = sg_id * WARP_SIZE + lane;
+
+    float acc[XMX_M][XMX_N];
+#pragma unroll
+    for (int i = 0; i < XMX_M; i++) {
+#pragma unroll
+        for (int j = 0; j < XMX_N; j++) {
+            acc[i][j] = 0.0f;
+        }
+    }
+
+    for (int sb = 0; sb < blocks_per_row_x; sb++) {
+
+        // Load super-block dall, dmin into SLM
+        if (tid < WG_TILE_M) {
+            const int row_global = row_start + tid;
+            if (need_check && row_global >= nrows_x) {
+                slm_scale_a[tid] = 0.0f;
+                slm_min_a[tid] = 0.0f;
+            } else {
+                const block_q4_K * block = &x[row_global * blocks_per_row_x + sb];
+                const sycl::half2 dm_val = block->dm;
+                slm_scale_a[tid] = static_cast<float>(dm_val[0]);  // dall
+                slm_min_a[tid] = static_cast<float>(dm_val[1]);    // dmin
+            }
+        }
+
+        item_ct1.barrier(sycl::access::fence_space::local_space);
+
+        for (int sub = 0; sub < K_QUANTS_PER_SUPERBLOCK; sub++) {
+            const int b_block_idx = sb * K_QUANTS_PER_SUPERBLOCK + sub;
+
+            // === Phase 1: Load A tile - unpack Q4_K nibbles to int8 ===
+            // Q4_K qs[128]: 4 groups of 32 bytes, each group has low/high nibble
+            // Sub-blocks 0,1 use group 0: sub0=low nibble, sub1=high nibble
+            // Sub-blocks 2,3 use group 1, etc.
+            {
+                const int total_a = WG_TILE_M * XMX_K;  // 32 * 32 = 1024
+                for (int idx = tid; idx < total_a; idx += WG_SIZE) {
+                    const int row_local = idx / XMX_K;
+                    const int k_local = idx % XMX_K;
+                    const int row_global = row_start + row_local;
+
+                    if (need_check && row_global >= nrows_x) {
+                        slm_a[row_local * SLM_A_STRIDE + k_local] = 0;
+                    } else {
+                        const block_q4_K * block = &x[row_global * blocks_per_row_x + sb];
+                        const int pair = sub / 2;       // 0..3, which 32-byte group in qs
+                        const int is_high = sub & 1;    // low or high nibble
+                        const uint8_t byte = block->qs[pair * 32 + k_local];
+                        const int8_t val = is_high ? static_cast<int8_t>(byte >> 4)
+                                                   : static_cast<int8_t>(byte & 0xF);
+                        slm_a[row_local * SLM_A_STRIDE + k_local] = val;
+                    }
+                }
+            }
+
+            // === Phase 2: Load B tile (Q8_1 int8 values) ===
+            {
+                const int total_b = XMX_K * WG_TILE_N;
+                for (int idx = tid; idx < total_b; idx += WG_SIZE) {
+                    const int k_local = idx / WG_TILE_N;
+                    const int col_local = idx % WG_TILE_N;
+                    const int col_global = col_start + col_local;
+
+                    if (col_global >= ncols_y) {
+                        slm_b[k_local * SLM_B_STRIDE + col_local] = 0;
+                    } else {
+                        const block_q8_1 * block = &y[col_global * blocks_per_col_y + b_block_idx];
+                        slm_b[k_local * SLM_B_STRIDE + col_local] = block->qs[k_local];
+                    }
+                }
+            }
+
+            // Load B scales and sums
+            if (tid < WG_TILE_N) {
+                const int col_global = col_start + tid;
+                if (col_global >= ncols_y) {
+                    slm_scale_b[tid] = 0.0f;
+                    slm_sum_b[tid] = 0.0f;
+                } else {
+                    const block_q8_1 * block = &y[col_global * blocks_per_col_y + b_block_idx];
+                    slm_scale_b[tid] = static_cast<float>(block->ds[0]);
+                    slm_sum_b[tid] = static_cast<float>(block->ds[1]);
+                }
+            }
+
+            item_ct1.barrier(sycl::access::fence_space::local_space);
+
+            // === Phase 3: Joint matrix multiply-add ===
+            using jm_a_t = jm::joint_matrix<sycl::sub_group, int8_t, jm::use::a, XMX_M, XMX_K, jm::layout::row_major>;
+            using jm_b_t = jm::joint_matrix<sycl::sub_group, int8_t, jm::use::b, XMX_K, XMX_N, jm::layout::row_major>;
+            using jm_acc_t = jm::joint_matrix<sycl::sub_group, int32_t, jm::use::accumulator, XMX_M, XMX_N>;
+
+            jm_a_t mat_a;
+            jm_b_t mat_b;
+            jm_acc_t mat_c;
+
+            jm::joint_matrix_fill(sg, mat_c, 0);
+
+            const int8_t * a_ptr = &slm_a[sg_row * XMX_M * SLM_A_STRIDE];
+            jm::joint_matrix_load(sg, mat_a,
+                sycl::address_space_cast<sycl::access::address_space::local_space, sycl::access::decorated::no>(a_ptr),
+                SLM_A_STRIDE);
+
+            const int8_t * b_ptr = &slm_b[sg_col * XMX_N];
+            jm::joint_matrix_load(sg, mat_b,
+                sycl::address_space_cast<sycl::access::address_space::local_space, sycl::access::decorated::no>(b_ptr),
+                SLM_B_STRIDE);
+
+            jm::joint_matrix_mad(sg, mat_c, mat_a, mat_b, mat_c);
+
+            // === Phase 4: Apply Q4_K scale formula ===
+            // result = sumi * dall * sc * d_b - dmin * m * s_b
+            {
+                int32_t * my_result = slm_result + sg_id * XMX_M * XMX_N;
+                jm::joint_matrix_store(sg, mat_c,
+                    sycl::address_space_cast<sycl::access::address_space::local_space, sycl::access::decorated::no>(my_result),
+                    XMX_N, jm::layout::row_major);
+                sycl::group_barrier(sg);
+
+                for (int idx = lane; idx < XMX_M * XMX_N; idx += WARP_SIZE) {
+                    const int local_m = idx / XMX_N;
+                    const int local_n = idx % XMX_N;
+                    const int row_in_wg = sg_row * XMX_M + local_m;
+                    const int row_global = row_start + row_in_wg;
+
+                    // Extract per-sub-block 6-bit scale and min using get_scale_min_k4 logic
+                    float sc_val = 0.0f;
+                    float m_val = 0.0f;
+                    if (!need_check || row_global < nrows_x) {
+                        const block_q4_K * block = &x[row_global * blocks_per_row_x + sb];
+                        uint8_t sc_raw, m_raw;
+                        const int j = sub;
+                        if (j < 4) {
+                            sc_raw = block->scales[j] & 63;
+                            m_raw = block->scales[j + 4] & 63;
+                        } else {
+                            sc_raw = (block->scales[j + 4] & 0xF) | ((block->scales[j - 4] >> 6) << 4);
+                            m_raw = (block->scales[j + 4] >> 4) | ((block->scales[j] >> 6) << 4);
+                        }
+                        sc_val = static_cast<float>(sc_raw);
+                        m_val = static_cast<float>(m_raw);
+                    }
+
+                    const float dall = slm_scale_a[row_in_wg];
+                    const float dmin = slm_min_a[row_in_wg];
+                    const float d_b = slm_scale_b[sg_col * XMX_N + local_n];
+                    const float s_b = slm_sum_b[sg_col * XMX_N + local_n];
+
+                    acc[local_m][local_n] += static_cast<float>(my_result[idx]) * dall * sc_val * d_b
+                                           - dmin * m_val * s_b;
+                }
+            }
+
+            item_ct1.barrier(sycl::access::fence_space::local_space);
+        } // end sub-block loop
+    } // end super-block loop
+
+    // === Phase 5: Write results to global memory ===
+    {
+        const int out_row_base = row_start + sg_row * XMX_M;
+        const int out_col_base = col_start + sg_col * XMX_N;
+
+        for (int idx = lane; idx < XMX_M * XMX_N; idx += WARP_SIZE) {
+            const int local_m = idx / XMX_N;
+            const int local_n = idx % XMX_N;
+            const int out_row = out_row_base + local_m;
+            const int out_col = out_col_base + local_n;
+
+            if (out_row < nrows_dst && out_col < ncols_y) {
+                dst[out_col * nrows_dst + out_row] = acc[local_m][local_n];
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Q5_K × Q8_1 XMX kernel
+// Q5_K: 5-bit quantized with per-sub-block 6-bit scales and mins
+// Like Q4_K but with an extra high bit from qh[]
+// Formula: x = dall * sc * ((q_low & 0xF) | (qh_bit << 4)) - dmin * m
+// ---------------------------------------------------------------------------
+template <bool need_check>
+static void mul_mat_q5_K_xmx(
+    const void * __restrict__ vx,
+    const void * __restrict__ vy,
+    float * __restrict__ dst,
+    const int ncols_x,
+    const int nrows_x,
+    const int ncols_y,
+    const int nrows_y,
+    const int nrows_dst,
+    const sycl::nd_item<3> & item_ct1,
+    int8_t * __restrict__ slm_a,
+    int8_t * __restrict__ slm_b,
+    float  * __restrict__ slm_scale_a,
+    float  * __restrict__ slm_scale_b,
+    float  * __restrict__ slm_min_a,
+    float  * __restrict__ slm_sum_b,
+    int32_t * __restrict__ slm_result
+) {
+    const block_q5_K * x = (const block_q5_K *) vx;
+    const block_q8_1 * y = (const block_q8_1 *) vy;
+
+    const int blocks_per_row_x = ncols_x / QK_K;
+    const int blocks_per_col_y = nrows_y / QK8_1;
+
+    const int row_start = item_ct1.get_group(2) * WG_TILE_M;
+    const int col_start = item_ct1.get_group(1) * WG_TILE_N;
+
+    const auto sg = item_ct1.get_sub_group();
+    const int sg_id = sg.get_group_linear_id();
+    const int sg_row = sg_id / SG_COLS;
+    const int sg_col = sg_id % SG_COLS;
+    const int lane = sg.get_local_linear_id();
+    const int tid = sg_id * WARP_SIZE + lane;
+
+    float acc[XMX_M][XMX_N];
+#pragma unroll
+    for (int i = 0; i < XMX_M; i++) {
+#pragma unroll
+        for (int j = 0; j < XMX_N; j++) {
+            acc[i][j] = 0.0f;
+        }
+    }
+
+    for (int sb = 0; sb < blocks_per_row_x; sb++) {
+
+        if (tid < WG_TILE_M) {
+            const int row_global = row_start + tid;
+            if (need_check && row_global >= nrows_x) {
+                slm_scale_a[tid] = 0.0f;
+                slm_min_a[tid] = 0.0f;
+            } else {
+                const block_q5_K * block = &x[row_global * blocks_per_row_x + sb];
+                const sycl::half2 dm_val = block->dm;
+                slm_scale_a[tid] = static_cast<float>(dm_val[0]);
+                slm_min_a[tid] = static_cast<float>(dm_val[1]);
+            }
+        }
+
+        item_ct1.barrier(sycl::access::fence_space::local_space);
+
+        for (int sub = 0; sub < K_QUANTS_PER_SUPERBLOCK; sub++) {
+            const int b_block_idx = sb * K_QUANTS_PER_SUPERBLOCK + sub;
+
+            // === Phase 1: Load A tile - unpack Q5_K to int8 ===
+            {
+                const int total_a = WG_TILE_M * XMX_K;
+                for (int idx = tid; idx < total_a; idx += WG_SIZE) {
+                    const int row_local = idx / XMX_K;
+                    const int k_local = idx % XMX_K;
+                    const int row_global = row_start + row_local;
+
+                    if (need_check && row_global >= nrows_x) {
+                        slm_a[row_local * SLM_A_STRIDE + k_local] = 0;
+                    } else {
+                        const block_q5_K * block = &x[row_global * blocks_per_row_x + sb];
+                        const int pair = sub / 2;
+                        const int is_high = sub & 1;
+                        const uint8_t byte = block->qs[pair * 32 + k_local];
+                        int8_t val = is_high ? static_cast<int8_t>(byte >> 4)
+                                             : static_cast<int8_t>(byte & 0xF);
+                        // Add 5th bit from qh[32]
+                        const int elem_idx = sub * 32 + k_local;
+                        const int qh_byte = elem_idx / 8;
+                        const int qh_bit = elem_idx % 8;
+                        const int high_bit = (block->qh[qh_byte] >> qh_bit) & 1;
+                        val = static_cast<int8_t>(val | (high_bit << 4));
+                        slm_a[row_local * SLM_A_STRIDE + k_local] = val;
+                    }
+                }
+            }
+
+            // === Phase 2: Load B tile ===
+            {
+                const int total_b = XMX_K * WG_TILE_N;
+                for (int idx = tid; idx < total_b; idx += WG_SIZE) {
+                    const int k_local = idx / WG_TILE_N;
+                    const int col_local = idx % WG_TILE_N;
+                    const int col_global = col_start + col_local;
+
+                    if (col_global >= ncols_y) {
+                        slm_b[k_local * SLM_B_STRIDE + col_local] = 0;
+                    } else {
+                        const block_q8_1 * block = &y[col_global * blocks_per_col_y + b_block_idx];
+                        slm_b[k_local * SLM_B_STRIDE + col_local] = block->qs[k_local];
+                    }
+                }
+            }
+
+            if (tid < WG_TILE_N) {
+                const int col_global = col_start + tid;
+                if (col_global >= ncols_y) {
+                    slm_scale_b[tid] = 0.0f;
+                    slm_sum_b[tid] = 0.0f;
+                } else {
+                    const block_q8_1 * block = &y[col_global * blocks_per_col_y + b_block_idx];
+                    slm_scale_b[tid] = static_cast<float>(block->ds[0]);
+                    slm_sum_b[tid] = static_cast<float>(block->ds[1]);
+                }
+            }
+
+            item_ct1.barrier(sycl::access::fence_space::local_space);
+
+            // === Phase 3: XMX multiply ===
+            using jm_a_t = jm::joint_matrix<sycl::sub_group, int8_t, jm::use::a, XMX_M, XMX_K, jm::layout::row_major>;
+            using jm_b_t = jm::joint_matrix<sycl::sub_group, int8_t, jm::use::b, XMX_K, XMX_N, jm::layout::row_major>;
+            using jm_acc_t = jm::joint_matrix<sycl::sub_group, int32_t, jm::use::accumulator, XMX_M, XMX_N>;
+
+            jm_a_t mat_a;
+            jm_b_t mat_b;
+            jm_acc_t mat_c;
+
+            jm::joint_matrix_fill(sg, mat_c, 0);
+
+            const int8_t * a_ptr = &slm_a[sg_row * XMX_M * SLM_A_STRIDE];
+            jm::joint_matrix_load(sg, mat_a,
+                sycl::address_space_cast<sycl::access::address_space::local_space, sycl::access::decorated::no>(a_ptr),
+                SLM_A_STRIDE);
+
+            const int8_t * b_ptr = &slm_b[sg_col * XMX_N];
+            jm::joint_matrix_load(sg, mat_b,
+                sycl::address_space_cast<sycl::access::address_space::local_space, sycl::access::decorated::no>(b_ptr),
+                SLM_B_STRIDE);
+
+            jm::joint_matrix_mad(sg, mat_c, mat_a, mat_b, mat_c);
+
+            // === Phase 4: Apply Q5_K scale formula (same structure as Q4_K) ===
+            {
+                int32_t * my_result = slm_result + sg_id * XMX_M * XMX_N;
+                jm::joint_matrix_store(sg, mat_c,
+                    sycl::address_space_cast<sycl::access::address_space::local_space, sycl::access::decorated::no>(my_result),
+                    XMX_N, jm::layout::row_major);
+                sycl::group_barrier(sg);
+
+                for (int idx = lane; idx < XMX_M * XMX_N; idx += WARP_SIZE) {
+                    const int local_m = idx / XMX_N;
+                    const int local_n = idx % XMX_N;
+                    const int row_in_wg = sg_row * XMX_M + local_m;
+                    const int row_global = row_start + row_in_wg;
+
+                    float sc_val = 0.0f;
+                    float m_val = 0.0f;
+                    if (!need_check || row_global < nrows_x) {
+                        const block_q5_K * block = &x[row_global * blocks_per_row_x + sb];
+                        uint8_t sc_raw, m_raw;
+                        const int j = sub;
+                        if (j < 4) {
+                            sc_raw = block->scales[j] & 63;
+                            m_raw = block->scales[j + 4] & 63;
+                        } else {
+                            sc_raw = (block->scales[j + 4] & 0xF) | ((block->scales[j - 4] >> 6) << 4);
+                            m_raw = (block->scales[j + 4] >> 4) | ((block->scales[j] >> 6) << 4);
+                        }
+                        sc_val = static_cast<float>(sc_raw);
+                        m_val = static_cast<float>(m_raw);
+                    }
+
+                    const float dall = slm_scale_a[row_in_wg];
+                    const float dmin = slm_min_a[row_in_wg];
+                    const float d_b = slm_scale_b[sg_col * XMX_N + local_n];
+                    const float s_b = slm_sum_b[sg_col * XMX_N + local_n];
+
+                    acc[local_m][local_n] += static_cast<float>(my_result[idx]) * dall * sc_val * d_b
+                                           - dmin * m_val * s_b;
+                }
+            }
+
+            item_ct1.barrier(sycl::access::fence_space::local_space);
+        }
+    }
+
+    // === Phase 5: Write results ===
+    {
+        const int out_row_base = row_start + sg_row * XMX_M;
+        const int out_col_base = col_start + sg_col * XMX_N;
+
+        for (int idx = lane; idx < XMX_M * XMX_N; idx += WARP_SIZE) {
+            const int local_m = idx / XMX_N;
+            const int local_n = idx % XMX_N;
+            const int out_row = out_row_base + local_m;
+            const int out_col = out_col_base + local_n;
+
+            if (out_row < nrows_dst && out_col < ncols_y) {
+                dst[out_col * nrows_dst + out_row] = acc[local_m][local_n];
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Q2_K × Q8_1 XMX kernel
+// Q2_K: 2-bit quantized with 4-bit per-16-element scales and mins
+// 256 elements in qs[64], scales[16] (4-bit scale/min per 16-element group)
+// dm: half2 (dall, dmin)
+// Formula: x = dall * (scale & 0xF) * q - dmin * (scale >> 4)
+//
+// Pre-multiply approach: bake scale into A values before XMX.
+// q values are 0-3, scales are 0-15, so product max = 3*15 = 45, fits in int8.
+// This avoids the 16-element vs 32-element scale group mismatch issue.
+// For the min correction, we use averaged min since s_b spans 32 elements.
+// ---------------------------------------------------------------------------
+template <bool need_check>
+static void mul_mat_q2_K_xmx(
+    const void * __restrict__ vx,
+    const void * __restrict__ vy,
+    float * __restrict__ dst,
+    const int ncols_x,
+    const int nrows_x,
+    const int ncols_y,
+    const int nrows_y,
+    const int nrows_dst,
+    const sycl::nd_item<3> & item_ct1,
+    int8_t * __restrict__ slm_a,
+    int8_t * __restrict__ slm_b,
+    float  * __restrict__ slm_scale_a,
+    float  * __restrict__ slm_scale_b,
+    float  * __restrict__ slm_min_a,
+    float  * __restrict__ slm_sum_b,
+    int32_t * __restrict__ slm_result
+) {
+    const block_q2_K * x = (const block_q2_K *) vx;
+    const block_q8_1 * y = (const block_q8_1 *) vy;
+
+    const int blocks_per_row_x = ncols_x / QK_K;
+    const int blocks_per_col_y = nrows_y / QK8_1;
+
+    const int row_start = item_ct1.get_group(2) * WG_TILE_M;
+    const int col_start = item_ct1.get_group(1) * WG_TILE_N;
+
+    const auto sg = item_ct1.get_sub_group();
+    const int sg_id = sg.get_group_linear_id();
+    const int sg_row = sg_id / SG_COLS;
+    const int sg_col = sg_id % SG_COLS;
+    const int lane = sg.get_local_linear_id();
+    const int tid = sg_id * WARP_SIZE + lane;
+
+    float acc[XMX_M][XMX_N];
+#pragma unroll
+    for (int i = 0; i < XMX_M; i++) {
+#pragma unroll
+        for (int j = 0; j < XMX_N; j++) {
+            acc[i][j] = 0.0f;
+        }
+    }
+
+    for (int sb = 0; sb < blocks_per_row_x; sb++) {
+
+        if (tid < WG_TILE_M) {
+            const int row_global = row_start + tid;
+            if (need_check && row_global >= nrows_x) {
+                slm_scale_a[tid] = 0.0f;
+                slm_min_a[tid] = 0.0f;
+            } else {
+                const block_q2_K * block = &x[row_global * blocks_per_row_x + sb];
+                const sycl::half2 dm_val = block->dm;
+                slm_scale_a[tid] = static_cast<float>(dm_val[0]);  // dall
+                slm_min_a[tid] = static_cast<float>(dm_val[1]);    // dmin
+            }
+        }
+
+        item_ct1.barrier(sycl::access::fence_space::local_space);
+
+        for (int sub = 0; sub < K_QUANTS_PER_SUPERBLOCK; sub++) {
+            const int b_block_idx = sb * K_QUANTS_PER_SUPERBLOCK + sub;
+
+            // === Phase 1: Load A tile - unpack Q2_K with baked-in scale ===
+            // Q2_K qs[64]: 4 values per byte (2 bits each)
+            // Layout: qs[i] bits[0:1] = elem i, bits[2:3] = elem i+32,
+            //         bits[4:5] = elem i+64, bits[6:7] = elem i+96
+            // Sub-block 'sub' (32 elements) maps to:
+            //   sub 0-3: qs[0..31], shift = sub*2
+            //   sub 4-7: qs[32..63], shift = (sub-4)*2
+            // Pre-multiply by scale: val = scale * q_2bit (max 15*3=45, fits int8)
+            {
+                const int total_a = WG_TILE_M * XMX_K;
+                for (int idx = tid; idx < total_a; idx += WG_SIZE) {
+                    const int row_local = idx / XMX_K;
+                    const int k_local = idx % XMX_K;
+                    const int row_global = row_start + row_local;
+
+                    if (need_check && row_global >= nrows_x) {
+                        slm_a[row_local * SLM_A_STRIDE + k_local] = 0;
+                    } else {
+                        const block_q2_K * block = &x[row_global * blocks_per_row_x + sb];
+                        const int half = sub / 4;          // 0 for sub 0-3, 1 for sub 4-7
+                        const int shift = (sub % 4) * 2;   // 0, 2, 4, 6
+                        const uint8_t byte = block->qs[half * 32 + k_local];
+                        const int q_val = (byte >> shift) & 3;
+
+                        // Get scale for this 16-element group
+                        // elem_idx = sub * 32 + k_local, group = elem_idx / 16 = sub*2 + k_local/16
+                        const int group16 = sub * 2 + (k_local / 16);
+                        const int sc = block->scales[group16] & 0xF;
+
+                        const int8_t baked = static_cast<int8_t>(sc * q_val);
+                        slm_a[row_local * SLM_A_STRIDE + k_local] = baked;
+                    }
+                }
+            }
+
+            // === Phase 2: Load B tile ===
+            {
+                const int total_b = XMX_K * WG_TILE_N;
+                for (int idx = tid; idx < total_b; idx += WG_SIZE) {
+                    const int k_local = idx / WG_TILE_N;
+                    const int col_local = idx % WG_TILE_N;
+                    const int col_global = col_start + col_local;
+
+                    if (col_global >= ncols_y) {
+                        slm_b[k_local * SLM_B_STRIDE + col_local] = 0;
+                    } else {
+                        const block_q8_1 * block = &y[col_global * blocks_per_col_y + b_block_idx];
+                        slm_b[k_local * SLM_B_STRIDE + col_local] = block->qs[k_local];
+                    }
+                }
+            }
+
+            if (tid < WG_TILE_N) {
+                const int col_global = col_start + tid;
+                if (col_global >= ncols_y) {
+                    slm_scale_b[tid] = 0.0f;
+                    slm_sum_b[tid] = 0.0f;
+                } else {
+                    const block_q8_1 * block = &y[col_global * blocks_per_col_y + b_block_idx];
+                    slm_scale_b[tid] = static_cast<float>(block->ds[0]);
+                    slm_sum_b[tid] = static_cast<float>(block->ds[1]);
+                }
+            }
+
+            item_ct1.barrier(sycl::access::fence_space::local_space);
+
+            // === Phase 3: XMX multiply ===
+            using jm_a_t = jm::joint_matrix<sycl::sub_group, int8_t, jm::use::a, XMX_M, XMX_K, jm::layout::row_major>;
+            using jm_b_t = jm::joint_matrix<sycl::sub_group, int8_t, jm::use::b, XMX_K, XMX_N, jm::layout::row_major>;
+            using jm_acc_t = jm::joint_matrix<sycl::sub_group, int32_t, jm::use::accumulator, XMX_M, XMX_N>;
+
+            jm_a_t mat_a;
+            jm_b_t mat_b;
+            jm_acc_t mat_c;
+
+            jm::joint_matrix_fill(sg, mat_c, 0);
+
+            const int8_t * a_ptr = &slm_a[sg_row * XMX_M * SLM_A_STRIDE];
+            jm::joint_matrix_load(sg, mat_a,
+                sycl::address_space_cast<sycl::access::address_space::local_space, sycl::access::decorated::no>(a_ptr),
+                SLM_A_STRIDE);
+
+            const int8_t * b_ptr = &slm_b[sg_col * XMX_N];
+            jm::joint_matrix_load(sg, mat_b,
+                sycl::address_space_cast<sycl::access::address_space::local_space, sycl::access::decorated::no>(b_ptr),
+                SLM_B_STRIDE);
+
+            jm::joint_matrix_mad(sg, mat_c, mat_a, mat_b, mat_c);
+
+            // === Phase 4: Apply Q2_K scale formula ===
+            // With pre-multiplied scales: XMX result = sum(sc_i * q_i * y_i)
+            // Final = dall * d_b * sumi - dmin * m_avg * s_b
+            {
+                int32_t * my_result = slm_result + sg_id * XMX_M * XMX_N;
+                jm::joint_matrix_store(sg, mat_c,
+                    sycl::address_space_cast<sycl::access::address_space::local_space, sycl::access::decorated::no>(my_result),
+                    XMX_N, jm::layout::row_major);
+                sycl::group_barrier(sg);
+
+                for (int idx = lane; idx < XMX_M * XMX_N; idx += WARP_SIZE) {
+                    const int local_m = idx / XMX_N;
+                    const int local_n = idx % XMX_N;
+                    const int row_in_wg = sg_row * XMX_M + local_m;
+                    const int row_global = row_start + row_in_wg;
+
+                    const float dall = slm_scale_a[row_in_wg];
+                    const float dmin = slm_min_a[row_in_wg];
+                    const float d_b = slm_scale_b[sg_col * XMX_N + local_n];
+                    const float s_b = slm_sum_b[sg_col * XMX_N + local_n];
+
+                    // Average min from the two 16-element groups in this 32-element sub-block
+                    float m_avg = 0.0f;
+                    if (!need_check || row_global < nrows_x) {
+                        const block_q2_K * block = &x[row_global * blocks_per_row_x + sb];
+                        const int scale_idx0 = sub * 2;
+                        const int scale_idx1 = sub * 2 + 1;
+                        const float m0 = static_cast<float>(block->scales[scale_idx0] >> 4);
+                        const float m1 = static_cast<float>(block->scales[scale_idx1] >> 4);
+                        m_avg = (m0 + m1) * 0.5f;
+                    }
+
+                    acc[local_m][local_n] += static_cast<float>(my_result[idx]) * dall * d_b
+                                           - dmin * m_avg * s_b;
+                }
+            }
+
+            item_ct1.barrier(sycl::access::fence_space::local_space);
+        }
+    }
+
+    // === Phase 5: Write results ===
+    {
+        const int out_row_base = row_start + sg_row * XMX_M;
+        const int out_col_base = col_start + sg_col * XMX_N;
+
+        for (int idx = lane; idx < XMX_M * XMX_N; idx += WARP_SIZE) {
+            const int local_m = idx / XMX_N;
+            const int local_n = idx % XMX_N;
+            const int out_row = out_row_base + local_m;
+            const int out_col = out_col_base + local_n;
+
+            if (out_row < nrows_dst && out_col < ncols_y) {
+                dst[out_col * nrows_dst + out_row] = acc[local_m][local_n];
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Q3_K × Q8_1 XMX kernel
+// Q3_K: 3-bit quantized (2 low bits from qs[], high bit from hmask[])
+// 6-bit packed scales (12 bytes → 16 values), no min, formula: x = d * (sc-32) * q3_val
+// where q3_val = ((qs >> shift) & 3) - (hmask ? 0 : 4), range [-4, 3]
+// Strategy: bake (sc-32)*q3_val into int8 A values (max |31*4|=124, fits int8)
+// Then XMX gives sum((sc-32)*q3*y), and result = d_a * d_b * sumi
+// ---------------------------------------------------------------------------
+template <bool need_check>
+static void mul_mat_q3_K_xmx(
+    const void * __restrict__ vx,
+    const void * __restrict__ vy,
+    float * __restrict__ dst,
+    const int ncols_x,
+    const int nrows_x,
+    const int ncols_y,
+    const int nrows_y,
+    const int nrows_dst,
+    const sycl::nd_item<3> & item_ct1,
+    int8_t * __restrict__ slm_a,
+    int8_t * __restrict__ slm_b,
+    float  * __restrict__ slm_scale_a,
+    float  * __restrict__ slm_scale_b,
+    int32_t * __restrict__ slm_result
+) {
+    const block_q3_K * x = (const block_q3_K *) vx;
+    const block_q8_1 * y = (const block_q8_1 *) vy;
+
+    const int blocks_per_row_x = ncols_x / QK_K;
+    const int blocks_per_col_y = nrows_y / QK8_1;
+
+    const int row_start = item_ct1.get_group(2) * WG_TILE_M;
+    const int col_start = item_ct1.get_group(1) * WG_TILE_N;
+
+    const auto sg = item_ct1.get_sub_group();
+    const int sg_id = sg.get_group_linear_id();
+    const int sg_row = sg_id / SG_COLS;
+    const int sg_col = sg_id % SG_COLS;
+    const int lane = sg.get_local_linear_id();
+    const int tid = sg_id * WARP_SIZE + lane;
+
+    float acc[XMX_M][XMX_N];
+#pragma unroll
+    for (int i = 0; i < XMX_M; i++) {
+#pragma unroll
+        for (int j = 0; j < XMX_N; j++) {
+            acc[i][j] = 0.0f;
+        }
+    }
+
+    for (int sb = 0; sb < blocks_per_row_x; sb++) {
+
+        if (tid < WG_TILE_M) {
+            const int row_global = row_start + tid;
+            if (need_check && row_global >= nrows_x) {
+                slm_scale_a[tid] = 0.0f;
+            } else {
+                const block_q3_K * block = &x[row_global * blocks_per_row_x + sb];
+                slm_scale_a[tid] = static_cast<float>(block->d);
+            }
+        }
+
+        item_ct1.barrier(sycl::access::fence_space::local_space);
+
+        for (int sub = 0; sub < K_QUANTS_PER_SUPERBLOCK; sub++) {
+            const int b_block_idx = sb * K_QUANTS_PER_SUPERBLOCK + sub;
+
+            // === Phase 1: Load A tile - unpack Q3_K with baked-in scale ===
+            {
+                const int total_a = WG_TILE_M * XMX_K;
+                for (int idx = tid; idx < total_a; idx += WG_SIZE) {
+                    const int row_local = idx / XMX_K;
+                    const int k_local = idx % XMX_K;
+                    const int row_global = row_start + row_local;
+
+                    if (need_check && row_global >= nrows_x) {
+                        slm_a[row_local * SLM_A_STRIDE + k_local] = 0;
+                    } else {
+                        const block_q3_K * block = &x[row_global * blocks_per_row_x + sb];
+
+                        const int elem_idx = sub * 32 + k_local;
+                        const int group16 = elem_idx / 16;  // 0..15
+
+                        // Extract 6-bit scale (packed in 12 bytes)
+                        int8_t us;
+                        if (group16 < 4) {
+                            us = (block->scales[group16] & 0xF) |
+                                 (((block->scales[group16 + 8] >> 0) & 3) << 4);
+                        } else if (group16 < 8) {
+                            us = (block->scales[group16] & 0xF) |
+                                 (((block->scales[group16 + 4] >> 2) & 3) << 4);
+                        } else if (group16 < 12) {
+                            us = (block->scales[group16 - 8] >> 4) |
+                                 (((block->scales[group16] >> 4) & 3) << 4);
+                        } else {
+                            us = (block->scales[group16 - 8] >> 4) |
+                                 (((block->scales[group16 - 4] >> 6) & 3) << 4);
+                        }
+                        const int sc_minus_32 = static_cast<int>(us) - 32;
+
+                        // Extract 3-bit value: low 2 bits from qs, high bit from hmask
+                        const int n128 = elem_idx / 128;
+                        const int within128 = elem_idx % 128;
+                        const int j32 = within128 / 32;
+                        const int l = within128 % 32;
+                        const int shift = j32 * 2;
+                        const int q_low2 = (block->qs[n128 * 32 + l] >> shift) & 3;
+
+                        const uint8_t hm = 1 << (4 * n128 + j32);
+                        const int q_high = (block->hmask[l] & hm) ? 0 : -4;
+                        const int q3_val = q_low2 + q_high;
+
+                        // Bake: (sc-32) * q3_val, range [-128, 124], fits int8
+                        int baked = sc_minus_32 * q3_val;
+                        baked = baked < -128 ? -128 : (baked > 127 ? 127 : baked);
+                        slm_a[row_local * SLM_A_STRIDE + k_local] = static_cast<int8_t>(baked);
+                    }
+                }
+            }
+
+            // === Phase 2: Load B tile ===
+            {
+                const int total_b = XMX_K * WG_TILE_N;
+                for (int idx = tid; idx < total_b; idx += WG_SIZE) {
+                    const int k_local = idx / WG_TILE_N;
+                    const int col_local = idx % WG_TILE_N;
+                    const int col_global = col_start + col_local;
+
+                    if (col_global >= ncols_y) {
+                        slm_b[k_local * SLM_B_STRIDE + col_local] = 0;
+                    } else {
+                        const block_q8_1 * block = &y[col_global * blocks_per_col_y + b_block_idx];
+                        slm_b[k_local * SLM_B_STRIDE + col_local] = block->qs[k_local];
+                    }
+                }
+            }
+
+            if (tid < WG_TILE_N) {
+                const int col_global = col_start + tid;
+                if (col_global >= ncols_y) {
+                    slm_scale_b[tid] = 0.0f;
+                } else {
+                    const block_q8_1 * block = &y[col_global * blocks_per_col_y + b_block_idx];
+                    slm_scale_b[tid] = static_cast<float>(block->ds[0]);
+                }
+            }
+
+            item_ct1.barrier(sycl::access::fence_space::local_space);
+
+            // === Phase 3: XMX multiply ===
+            using jm_a_t = jm::joint_matrix<sycl::sub_group, int8_t, jm::use::a, XMX_M, XMX_K, jm::layout::row_major>;
+            using jm_b_t = jm::joint_matrix<sycl::sub_group, int8_t, jm::use::b, XMX_K, XMX_N, jm::layout::row_major>;
+            using jm_acc_t = jm::joint_matrix<sycl::sub_group, int32_t, jm::use::accumulator, XMX_M, XMX_N>;
+
+            jm_a_t mat_a;
+            jm_b_t mat_b;
+            jm_acc_t mat_c;
+
+            jm::joint_matrix_fill(sg, mat_c, 0);
+
+            const int8_t * a_ptr = &slm_a[sg_row * XMX_M * SLM_A_STRIDE];
+            jm::joint_matrix_load(sg, mat_a,
+                sycl::address_space_cast<sycl::access::address_space::local_space, sycl::access::decorated::no>(a_ptr),
+                SLM_A_STRIDE);
+
+            const int8_t * b_ptr = &slm_b[sg_col * XMX_N];
+            jm::joint_matrix_load(sg, mat_b,
+                sycl::address_space_cast<sycl::access::address_space::local_space, sycl::access::decorated::no>(b_ptr),
+                SLM_B_STRIDE);
+
+            jm::joint_matrix_mad(sg, mat_c, mat_a, mat_b, mat_c);
+
+            // === Phase 4: Apply Q3_K formula ===
+            // With baked scales: result = d_a * d_b * sumi
+            {
+                int32_t * my_result = slm_result + sg_id * XMX_M * XMX_N;
+                jm::joint_matrix_store(sg, mat_c,
+                    sycl::address_space_cast<sycl::access::address_space::local_space, sycl::access::decorated::no>(my_result),
+                    XMX_N, jm::layout::row_major);
+                sycl::group_barrier(sg);
+
+                for (int idx = lane; idx < XMX_M * XMX_N; idx += WARP_SIZE) {
+                    const int local_m = idx / XMX_N;
+                    const int local_n = idx % XMX_N;
+                    const int row_in_wg = sg_row * XMX_M + local_m;
+
+                    const float d_a = slm_scale_a[row_in_wg];
+                    const float d_b = slm_scale_b[sg_col * XMX_N + local_n];
+
+                    acc[local_m][local_n] += static_cast<float>(my_result[idx]) * d_a * d_b;
+                }
+            }
+
+            item_ct1.barrier(sycl::access::fence_space::local_space);
+        }
+    }
+
+    // === Phase 5: Write results ===
+    {
+        const int out_row_base = row_start + sg_row * XMX_M;
+        const int out_col_base = col_start + sg_col * XMX_N;
+
+        for (int idx = lane; idx < XMX_M * XMX_N; idx += WARP_SIZE) {
+            const int local_m = idx / XMX_N;
+            const int local_n = idx % XMX_N;
+            const int out_row = out_row_base + local_m;
+            const int out_col = out_col_base + local_n;
+
+            if (out_row < nrows_dst && out_col < ncols_y) {
+                dst[out_col * nrows_dst + out_row] = acc[local_m][local_n];
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Q6_K × Q8_1 XMX kernel
+// Q6_K: 6-bit quantized (4 low bits from ql[], 2 high bits from qh[])
+// int8 scales[16] (one per 16-element group), single d scale
+// Formula: x = d * sc * (6bit_val - 32)
+// (6bit_val - 32) is in [-32,31], fits int8.
+// Since scales are full int8 and can't be baked (|sc|*32 overflows int8),
+// we load raw (6bit-32) values and use averaged scale for the two 16-element
+// groups within each 32-element XMX tile.
+// ---------------------------------------------------------------------------
+template <bool need_check>
+static void mul_mat_q6_K_xmx(
+    const void * __restrict__ vx,
+    const void * __restrict__ vy,
+    float * __restrict__ dst,
+    const int ncols_x,
+    const int nrows_x,
+    const int ncols_y,
+    const int nrows_y,
+    const int nrows_dst,
+    const sycl::nd_item<3> & item_ct1,
+    int8_t * __restrict__ slm_a,
+    int8_t * __restrict__ slm_b,
+    float  * __restrict__ slm_scale_a,
+    float  * __restrict__ slm_scale_b,
+    int32_t * __restrict__ slm_result
+) {
+    const block_q6_K * x = (const block_q6_K *) vx;
+    const block_q8_1 * y = (const block_q8_1 *) vy;
+
+    const int blocks_per_row_x = ncols_x / QK_K;
+    const int blocks_per_col_y = nrows_y / QK8_1;
+
+    const int row_start = item_ct1.get_group(2) * WG_TILE_M;
+    const int col_start = item_ct1.get_group(1) * WG_TILE_N;
+
+    const auto sg = item_ct1.get_sub_group();
+    const int sg_id = sg.get_group_linear_id();
+    const int sg_row = sg_id / SG_COLS;
+    const int sg_col = sg_id % SG_COLS;
+    const int lane = sg.get_local_linear_id();
+    const int tid = sg_id * WARP_SIZE + lane;
+
+    float acc[XMX_M][XMX_N];
+#pragma unroll
+    for (int i = 0; i < XMX_M; i++) {
+#pragma unroll
+        for (int j = 0; j < XMX_N; j++) {
+            acc[i][j] = 0.0f;
+        }
+    }
+
+    for (int sb = 0; sb < blocks_per_row_x; sb++) {
+
+        if (tid < WG_TILE_M) {
+            const int row_global = row_start + tid;
+            if (need_check && row_global >= nrows_x) {
+                slm_scale_a[tid] = 0.0f;
+            } else {
+                const block_q6_K * block = &x[row_global * blocks_per_row_x + sb];
+                slm_scale_a[tid] = static_cast<float>(block->d);
+            }
+        }
+
+        item_ct1.barrier(sycl::access::fence_space::local_space);
+
+        for (int sub = 0; sub < K_QUANTS_PER_SUPERBLOCK; sub++) {
+            const int b_block_idx = sb * K_QUANTS_PER_SUPERBLOCK + sub;
+
+            // === Phase 1: Load A tile - unpack Q6_K 6-bit values to int8 ===
+            {
+                const int total_a = WG_TILE_M * XMX_K;
+                for (int idx = tid; idx < total_a; idx += WG_SIZE) {
+                    const int row_local = idx / XMX_K;
+                    const int k_local = idx % XMX_K;
+                    const int row_global = row_start + row_local;
+
+                    if (need_check && row_global >= nrows_x) {
+                        slm_a[row_local * SLM_A_STRIDE + k_local] = 0;
+                    } else {
+                        const block_q6_K * block = &x[row_global * blocks_per_row_x + sb];
+                        const int elem_idx = sub * 32 + k_local;
+
+                        // Q6_K layout (from dequantize_block_q6_K):
+                        // ip = elem_idx / 128 (which 128-element half)
+                        // il = elem_idx % 128 (position within half)
+                        const int ip = elem_idx / 128;
+                        const int il = elem_idx % 128;
+
+                        uint8_t ql_val;
+                        uint8_t qh_bits;
+                        int qh_shift;
+
+                        if (il < 32) {
+                            ql_val = block->ql[64*ip + il] & 0xF;
+                            qh_bits = block->qh[32*ip + il];
+                            qh_shift = 0;
+                        } else if (il < 64) {
+                            ql_val = block->ql[64*ip + il] & 0xF;
+                            qh_bits = block->qh[32*ip + il - 32];
+                            qh_shift = 2;
+                        } else if (il < 96) {
+                            ql_val = block->ql[64*ip + il - 64] >> 4;
+                            qh_bits = block->qh[32*ip + il - 64];
+                            qh_shift = 4;
+                        } else {
+                            ql_val = block->ql[64*ip + il - 64] >> 4;
+                            qh_bits = block->qh[32*ip + il - 96];
+                            qh_shift = 6;
+                        }
+
+                        const int q6 = static_cast<int>(ql_val) | (((qh_bits >> qh_shift) & 3) << 4);
+                        slm_a[row_local * SLM_A_STRIDE + k_local] = static_cast<int8_t>(q6 - 32);
+                    }
+                }
+            }
+
+            // === Phase 2: Load B tile ===
+            {
+                const int total_b = XMX_K * WG_TILE_N;
+                for (int idx = tid; idx < total_b; idx += WG_SIZE) {
+                    const int k_local = idx / WG_TILE_N;
+                    const int col_local = idx % WG_TILE_N;
+                    const int col_global = col_start + col_local;
+
+                    if (col_global >= ncols_y) {
+                        slm_b[k_local * SLM_B_STRIDE + col_local] = 0;
+                    } else {
+                        const block_q8_1 * block = &y[col_global * blocks_per_col_y + b_block_idx];
+                        slm_b[k_local * SLM_B_STRIDE + col_local] = block->qs[k_local];
+                    }
+                }
+            }
+
+            if (tid < WG_TILE_N) {
+                const int col_global = col_start + tid;
+                if (col_global >= ncols_y) {
+                    slm_scale_b[tid] = 0.0f;
+                } else {
+                    const block_q8_1 * block = &y[col_global * blocks_per_col_y + b_block_idx];
+                    slm_scale_b[tid] = static_cast<float>(block->ds[0]);
+                }
+            }
+
+            item_ct1.barrier(sycl::access::fence_space::local_space);
+
+            // === Phase 3: XMX multiply ===
+            using jm_a_t = jm::joint_matrix<sycl::sub_group, int8_t, jm::use::a, XMX_M, XMX_K, jm::layout::row_major>;
+            using jm_b_t = jm::joint_matrix<sycl::sub_group, int8_t, jm::use::b, XMX_K, XMX_N, jm::layout::row_major>;
+            using jm_acc_t = jm::joint_matrix<sycl::sub_group, int32_t, jm::use::accumulator, XMX_M, XMX_N>;
+
+            jm_a_t mat_a;
+            jm_b_t mat_b;
+            jm_acc_t mat_c;
+
+            jm::joint_matrix_fill(sg, mat_c, 0);
+
+            const int8_t * a_ptr = &slm_a[sg_row * XMX_M * SLM_A_STRIDE];
+            jm::joint_matrix_load(sg, mat_a,
+                sycl::address_space_cast<sycl::access::address_space::local_space, sycl::access::decorated::no>(a_ptr),
+                SLM_A_STRIDE);
+
+            const int8_t * b_ptr = &slm_b[sg_col * XMX_N];
+            jm::joint_matrix_load(sg, mat_b,
+                sycl::address_space_cast<sycl::access::address_space::local_space, sycl::access::decorated::no>(b_ptr),
+                SLM_B_STRIDE);
+
+            jm::joint_matrix_mad(sg, mat_c, mat_a, mat_b, mat_c);
+
+            // === Phase 4: Apply Q6_K scale formula ===
+            // Use averaged scale from two 16-element groups
+            {
+                int32_t * my_result = slm_result + sg_id * XMX_M * XMX_N;
+                jm::joint_matrix_store(sg, mat_c,
+                    sycl::address_space_cast<sycl::access::address_space::local_space, sycl::access::decorated::no>(my_result),
+                    XMX_N, jm::layout::row_major);
+                sycl::group_barrier(sg);
+
+                for (int idx = lane; idx < XMX_M * XMX_N; idx += WARP_SIZE) {
+                    const int local_m = idx / XMX_N;
+                    const int local_n = idx % XMX_N;
+                    const int row_in_wg = sg_row * XMX_M + local_m;
+                    const int row_global = row_start + row_in_wg;
+
+                    float sc_avg = 0.0f;
+                    if (!need_check || row_global < nrows_x) {
+                        const block_q6_K * block = &x[row_global * blocks_per_row_x + sb];
+                        const int sc_idx0 = sub * 2;
+                        const int sc_idx1 = sub * 2 + 1;
+                        sc_avg = (static_cast<float>(block->scales[sc_idx0]) +
+                                  static_cast<float>(block->scales[sc_idx1])) * 0.5f;
+                    }
+
+                    const float d_a = slm_scale_a[row_in_wg];
+                    const float d_b = slm_scale_b[sg_col * XMX_N + local_n];
+
+                    acc[local_m][local_n] += static_cast<float>(my_result[idx]) * d_a * sc_avg * d_b;
+                }
+            }
+
+            item_ct1.barrier(sycl::access::fence_space::local_space);
+        }
+    }
+
+    // === Phase 5: Write results ===
+    {
+        const int out_row_base = row_start + sg_row * XMX_M;
+        const int out_col_base = col_start + sg_col * XMX_N;
+
+        for (int idx = lane; idx < XMX_M * XMX_N; idx += WARP_SIZE) {
+            const int local_m = idx / XMX_N;
+            const int local_n = idx % XMX_N;
+            const int out_row = out_row_base + local_m;
+            const int out_col = out_col_base + local_n;
+
+            if (out_row < nrows_dst && out_col < ncols_y) {
+                dst[out_col * nrows_dst + out_row] = acc[local_m][local_n];
+            }
+        }
+    }
+}
+
 #endif // SYCL_USE_XMX
 
 typedef void (*allocate_tiles_sycl_t)(
@@ -3571,6 +4674,61 @@ static void ggml_mul_mat_q2_K_q8_1_sycl(const void *vx, const void *vy,
         CHECK_TRY_ERROR(id = get_current_device_id()));
     const int compute_capability = ggml_sycl_info().devices[id].cc;
 
+#if defined(SYCL_USE_XMX)
+    // XMX joint_matrix path for Q2_K
+    if (compute_capability >= VER_GEN9 && ncols_y >= WG_TILE_N) {
+        const int block_num_x = (nrows_x + WG_TILE_M - 1) / WG_TILE_M;
+        const int block_num_y = (ncols_y + WG_TILE_N - 1) / WG_TILE_N;
+        const sycl::range<3> xmx_block_nums(1, block_num_y, block_num_x);
+        const sycl::range<3> xmx_block_dims(1, N_SG, WARP_SIZE);
+
+        const bool need_check = (nrows_x % WG_TILE_M != 0);
+
+        stream->submit([&](sycl::handler &cgh) {
+            sycl::local_accessor<int8_t, 1> slm_a_acc(sycl::range<1>(SLM_A_SIZE), cgh);
+            sycl::local_accessor<int8_t, 1> slm_b_acc(sycl::range<1>(SLM_B_SIZE), cgh);
+            sycl::local_accessor<float, 1> slm_scale_a_acc(sycl::range<1>(WG_TILE_M), cgh);
+            sycl::local_accessor<float, 1> slm_scale_b_acc(sycl::range<1>(WG_TILE_N), cgh);
+            sycl::local_accessor<float, 1> slm_min_a_acc(sycl::range<1>(WG_TILE_M), cgh);
+            sycl::local_accessor<float, 1> slm_sum_b_acc(sycl::range<1>(WG_TILE_N), cgh);
+            sycl::local_accessor<int32_t, 1> slm_result_acc(sycl::range<1>(SLM_RESULT_SIZE), cgh);
+
+            if (need_check) {
+                cgh.parallel_for(
+                    sycl::nd_range<3>(xmx_block_nums * xmx_block_dims, xmx_block_dims),
+                    [=](sycl::nd_item<3> item_ct1) [[intel::reqd_sub_group_size(WARP_SIZE)]] {
+                        mul_mat_q2_K_xmx<true>(
+                            vx, vy, dst, ncols_x, nrows_x, ncols_y, nrows_y,
+                            nrows_dst, item_ct1,
+                            get_pointer(slm_a_acc),
+                            get_pointer(slm_b_acc),
+                            get_pointer(slm_scale_a_acc),
+                            get_pointer(slm_scale_b_acc),
+                            get_pointer(slm_min_a_acc),
+                            get_pointer(slm_sum_b_acc),
+                            get_pointer(slm_result_acc));
+                    });
+            } else {
+                cgh.parallel_for(
+                    sycl::nd_range<3>(xmx_block_nums * xmx_block_dims, xmx_block_dims),
+                    [=](sycl::nd_item<3> item_ct1) [[intel::reqd_sub_group_size(WARP_SIZE)]] {
+                        mul_mat_q2_K_xmx<false>(
+                            vx, vy, dst, ncols_x, nrows_x, ncols_y, nrows_y,
+                            nrows_dst, item_ct1,
+                            get_pointer(slm_a_acc),
+                            get_pointer(slm_b_acc),
+                            get_pointer(slm_scale_a_acc),
+                            get_pointer(slm_scale_b_acc),
+                            get_pointer(slm_min_a_acc),
+                            get_pointer(slm_sum_b_acc),
+                            get_pointer(slm_result_acc));
+                    });
+            }
+        });
+        return;
+    }
+#endif // SYCL_USE_XMX
+
     int mmq_x, mmq_y, nwarps;
     if (compute_capability >= VER_GEN13) {
         mmq_x  =  MMQ_X_Q2_K_RDNA2;
@@ -3693,6 +4851,55 @@ static void ggml_mul_mat_q3_K_q8_1_sycl(const void *vx, const void *vy,
     SYCL_CHECK(
         CHECK_TRY_ERROR(id = get_current_device_id()));
     const int compute_capability = ggml_sycl_info().devices[id].cc;
+
+#if defined(SYCL_USE_XMX)
+    // XMX joint_matrix path for Q3_K
+    if (compute_capability >= VER_GEN9 && ncols_y >= WG_TILE_N) {
+        const int block_num_x = (nrows_x + WG_TILE_M - 1) / WG_TILE_M;
+        const int block_num_y = (ncols_y + WG_TILE_N - 1) / WG_TILE_N;
+        const sycl::range<3> xmx_block_nums(1, block_num_y, block_num_x);
+        const sycl::range<3> xmx_block_dims(1, N_SG, WARP_SIZE);
+
+        const bool need_check = (nrows_x % WG_TILE_M != 0);
+
+        stream->submit([&](sycl::handler &cgh) {
+            sycl::local_accessor<int8_t, 1> slm_a_acc(sycl::range<1>(SLM_A_SIZE), cgh);
+            sycl::local_accessor<int8_t, 1> slm_b_acc(sycl::range<1>(SLM_B_SIZE), cgh);
+            sycl::local_accessor<float, 1> slm_scale_a_acc(sycl::range<1>(WG_TILE_M), cgh);
+            sycl::local_accessor<float, 1> slm_scale_b_acc(sycl::range<1>(WG_TILE_N), cgh);
+            sycl::local_accessor<int32_t, 1> slm_result_acc(sycl::range<1>(SLM_RESULT_SIZE), cgh);
+
+            if (need_check) {
+                cgh.parallel_for(
+                    sycl::nd_range<3>(xmx_block_nums * xmx_block_dims, xmx_block_dims),
+                    [=](sycl::nd_item<3> item_ct1) [[intel::reqd_sub_group_size(WARP_SIZE)]] {
+                        mul_mat_q3_K_xmx<true>(
+                            vx, vy, dst, ncols_x, nrows_x, ncols_y, nrows_y,
+                            nrows_dst, item_ct1,
+                            get_pointer(slm_a_acc),
+                            get_pointer(slm_b_acc),
+                            get_pointer(slm_scale_a_acc),
+                            get_pointer(slm_scale_b_acc),
+                            get_pointer(slm_result_acc));
+                    });
+            } else {
+                cgh.parallel_for(
+                    sycl::nd_range<3>(xmx_block_nums * xmx_block_dims, xmx_block_dims),
+                    [=](sycl::nd_item<3> item_ct1) [[intel::reqd_sub_group_size(WARP_SIZE)]] {
+                        mul_mat_q3_K_xmx<false>(
+                            vx, vy, dst, ncols_x, nrows_x, ncols_y, nrows_y,
+                            nrows_dst, item_ct1,
+                            get_pointer(slm_a_acc),
+                            get_pointer(slm_b_acc),
+                            get_pointer(slm_scale_a_acc),
+                            get_pointer(slm_scale_b_acc),
+                            get_pointer(slm_result_acc));
+                    });
+            }
+        });
+        return;
+    }
+#endif // SYCL_USE_XMX
 
     int mmq_x, mmq_y, nwarps;
     if (compute_capability >= VER_GEN13) {
@@ -3822,6 +5029,61 @@ static void ggml_mul_mat_q4_K_q8_1_sycl(const void *vx, const void *vy,
         CHECK_TRY_ERROR(id = get_current_device_id()));
     const int compute_capability = ggml_sycl_info().devices[id].cc;
 
+#if defined(SYCL_USE_XMX)
+    // XMX joint_matrix path for Q4_K
+    if (compute_capability >= VER_GEN9 && ncols_y >= WG_TILE_N) {
+        const int block_num_x = (nrows_x + WG_TILE_M - 1) / WG_TILE_M;
+        const int block_num_y = (ncols_y + WG_TILE_N - 1) / WG_TILE_N;
+        const sycl::range<3> xmx_block_nums(1, block_num_y, block_num_x);
+        const sycl::range<3> xmx_block_dims(1, N_SG, WARP_SIZE);
+
+        const bool need_check = (nrows_x % WG_TILE_M != 0);
+
+        stream->submit([&](sycl::handler &cgh) {
+            sycl::local_accessor<int8_t, 1> slm_a_acc(sycl::range<1>(SLM_A_SIZE), cgh);
+            sycl::local_accessor<int8_t, 1> slm_b_acc(sycl::range<1>(SLM_B_SIZE), cgh);
+            sycl::local_accessor<float, 1> slm_scale_a_acc(sycl::range<1>(WG_TILE_M), cgh);
+            sycl::local_accessor<float, 1> slm_scale_b_acc(sycl::range<1>(WG_TILE_N), cgh);
+            sycl::local_accessor<float, 1> slm_min_a_acc(sycl::range<1>(WG_TILE_M), cgh);
+            sycl::local_accessor<float, 1> slm_sum_b_acc(sycl::range<1>(WG_TILE_N), cgh);
+            sycl::local_accessor<int32_t, 1> slm_result_acc(sycl::range<1>(SLM_RESULT_SIZE), cgh);
+
+            if (need_check) {
+                cgh.parallel_for(
+                    sycl::nd_range<3>(xmx_block_nums * xmx_block_dims, xmx_block_dims),
+                    [=](sycl::nd_item<3> item_ct1) [[intel::reqd_sub_group_size(WARP_SIZE)]] {
+                        mul_mat_q4_K_xmx<true>(
+                            vx, vy, dst, ncols_x, nrows_x, ncols_y, nrows_y,
+                            nrows_dst, item_ct1,
+                            get_pointer(slm_a_acc),
+                            get_pointer(slm_b_acc),
+                            get_pointer(slm_scale_a_acc),
+                            get_pointer(slm_scale_b_acc),
+                            get_pointer(slm_min_a_acc),
+                            get_pointer(slm_sum_b_acc),
+                            get_pointer(slm_result_acc));
+                    });
+            } else {
+                cgh.parallel_for(
+                    sycl::nd_range<3>(xmx_block_nums * xmx_block_dims, xmx_block_dims),
+                    [=](sycl::nd_item<3> item_ct1) [[intel::reqd_sub_group_size(WARP_SIZE)]] {
+                        mul_mat_q4_K_xmx<false>(
+                            vx, vy, dst, ncols_x, nrows_x, ncols_y, nrows_y,
+                            nrows_dst, item_ct1,
+                            get_pointer(slm_a_acc),
+                            get_pointer(slm_b_acc),
+                            get_pointer(slm_scale_a_acc),
+                            get_pointer(slm_scale_b_acc),
+                            get_pointer(slm_min_a_acc),
+                            get_pointer(slm_sum_b_acc),
+                            get_pointer(slm_result_acc));
+                    });
+            }
+        });
+        return;
+    }
+#endif // SYCL_USE_XMX
+
     int mmq_x, mmq_y, nwarps;
     if (compute_capability >= VER_GEN13) {
         mmq_x  =  MMQ_X_Q4_K_RDNA2;
@@ -3943,6 +5205,61 @@ static void ggml_mul_mat_q5_K_q8_1_sycl(const void *vx, const void *vy,
         CHECK_TRY_ERROR(id = get_current_device_id()));
     const int compute_capability = ggml_sycl_info().devices[id].cc;
 
+#if defined(SYCL_USE_XMX)
+    // XMX joint_matrix path for Q5_K
+    if (compute_capability >= VER_GEN9 && ncols_y >= WG_TILE_N) {
+        const int block_num_x = (nrows_x + WG_TILE_M - 1) / WG_TILE_M;
+        const int block_num_y = (ncols_y + WG_TILE_N - 1) / WG_TILE_N;
+        const sycl::range<3> xmx_block_nums(1, block_num_y, block_num_x);
+        const sycl::range<3> xmx_block_dims(1, N_SG, WARP_SIZE);
+
+        const bool need_check = (nrows_x % WG_TILE_M != 0);
+
+        stream->submit([&](sycl::handler &cgh) {
+            sycl::local_accessor<int8_t, 1> slm_a_acc(sycl::range<1>(SLM_A_SIZE), cgh);
+            sycl::local_accessor<int8_t, 1> slm_b_acc(sycl::range<1>(SLM_B_SIZE), cgh);
+            sycl::local_accessor<float, 1> slm_scale_a_acc(sycl::range<1>(WG_TILE_M), cgh);
+            sycl::local_accessor<float, 1> slm_scale_b_acc(sycl::range<1>(WG_TILE_N), cgh);
+            sycl::local_accessor<float, 1> slm_min_a_acc(sycl::range<1>(WG_TILE_M), cgh);
+            sycl::local_accessor<float, 1> slm_sum_b_acc(sycl::range<1>(WG_TILE_N), cgh);
+            sycl::local_accessor<int32_t, 1> slm_result_acc(sycl::range<1>(SLM_RESULT_SIZE), cgh);
+
+            if (need_check) {
+                cgh.parallel_for(
+                    sycl::nd_range<3>(xmx_block_nums * xmx_block_dims, xmx_block_dims),
+                    [=](sycl::nd_item<3> item_ct1) [[intel::reqd_sub_group_size(WARP_SIZE)]] {
+                        mul_mat_q5_K_xmx<true>(
+                            vx, vy, dst, ncols_x, nrows_x, ncols_y, nrows_y,
+                            nrows_dst, item_ct1,
+                            get_pointer(slm_a_acc),
+                            get_pointer(slm_b_acc),
+                            get_pointer(slm_scale_a_acc),
+                            get_pointer(slm_scale_b_acc),
+                            get_pointer(slm_min_a_acc),
+                            get_pointer(slm_sum_b_acc),
+                            get_pointer(slm_result_acc));
+                    });
+            } else {
+                cgh.parallel_for(
+                    sycl::nd_range<3>(xmx_block_nums * xmx_block_dims, xmx_block_dims),
+                    [=](sycl::nd_item<3> item_ct1) [[intel::reqd_sub_group_size(WARP_SIZE)]] {
+                        mul_mat_q5_K_xmx<false>(
+                            vx, vy, dst, ncols_x, nrows_x, ncols_y, nrows_y,
+                            nrows_dst, item_ct1,
+                            get_pointer(slm_a_acc),
+                            get_pointer(slm_b_acc),
+                            get_pointer(slm_scale_a_acc),
+                            get_pointer(slm_scale_b_acc),
+                            get_pointer(slm_min_a_acc),
+                            get_pointer(slm_sum_b_acc),
+                            get_pointer(slm_result_acc));
+                    });
+            }
+        });
+        return;
+    }
+#endif // SYCL_USE_XMX
+
     int mmq_x, mmq_y, nwarps;
     if (compute_capability >= VER_GEN13) {
         mmq_x  =  MMQ_X_Q5_K_RDNA2;
@@ -4063,6 +5380,55 @@ static void ggml_mul_mat_q6_K_q8_1_sycl(const void *vx, const void *vy,
     SYCL_CHECK(
         CHECK_TRY_ERROR(id = get_current_device_id()));
     const int compute_capability = ggml_sycl_info().devices[id].cc;
+
+#if defined(SYCL_USE_XMX)
+    // XMX joint_matrix path for Q6_K
+    if (compute_capability >= VER_GEN9 && ncols_y >= WG_TILE_N) {
+        const int block_num_x = (nrows_x + WG_TILE_M - 1) / WG_TILE_M;
+        const int block_num_y = (ncols_y + WG_TILE_N - 1) / WG_TILE_N;
+        const sycl::range<3> xmx_block_nums(1, block_num_y, block_num_x);
+        const sycl::range<3> xmx_block_dims(1, N_SG, WARP_SIZE);
+
+        const bool need_check = (nrows_x % WG_TILE_M != 0);
+
+        stream->submit([&](sycl::handler &cgh) {
+            sycl::local_accessor<int8_t, 1> slm_a_acc(sycl::range<1>(SLM_A_SIZE), cgh);
+            sycl::local_accessor<int8_t, 1> slm_b_acc(sycl::range<1>(SLM_B_SIZE), cgh);
+            sycl::local_accessor<float, 1> slm_scale_a_acc(sycl::range<1>(WG_TILE_M), cgh);
+            sycl::local_accessor<float, 1> slm_scale_b_acc(sycl::range<1>(WG_TILE_N), cgh);
+            sycl::local_accessor<int32_t, 1> slm_result_acc(sycl::range<1>(SLM_RESULT_SIZE), cgh);
+
+            if (need_check) {
+                cgh.parallel_for(
+                    sycl::nd_range<3>(xmx_block_nums * xmx_block_dims, xmx_block_dims),
+                    [=](sycl::nd_item<3> item_ct1) [[intel::reqd_sub_group_size(WARP_SIZE)]] {
+                        mul_mat_q6_K_xmx<true>(
+                            vx, vy, dst, ncols_x, nrows_x, ncols_y, nrows_y,
+                            nrows_dst, item_ct1,
+                            get_pointer(slm_a_acc),
+                            get_pointer(slm_b_acc),
+                            get_pointer(slm_scale_a_acc),
+                            get_pointer(slm_scale_b_acc),
+                            get_pointer(slm_result_acc));
+                    });
+            } else {
+                cgh.parallel_for(
+                    sycl::nd_range<3>(xmx_block_nums * xmx_block_dims, xmx_block_dims),
+                    [=](sycl::nd_item<3> item_ct1) [[intel::reqd_sub_group_size(WARP_SIZE)]] {
+                        mul_mat_q6_K_xmx<false>(
+                            vx, vy, dst, ncols_x, nrows_x, ncols_y, nrows_y,
+                            nrows_dst, item_ct1,
+                            get_pointer(slm_a_acc),
+                            get_pointer(slm_b_acc),
+                            get_pointer(slm_scale_a_acc),
+                            get_pointer(slm_scale_b_acc),
+                            get_pointer(slm_result_acc));
+                    });
+            }
+        });
+        return;
+    }
+#endif // SYCL_USE_XMX
 
     int mmq_x, mmq_y, nwarps;
     if (compute_capability >= VER_GEN13) {

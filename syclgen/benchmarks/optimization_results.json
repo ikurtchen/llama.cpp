@@ -3,13 +3,30 @@
     {
       "task_id": "opt_task_001",
       "kernel": "mmq (MUL_MAT)",
-      "optimization": "XMX joint_matrix kernels for Q8_0, Q4_0, Q4_1, Q5_0, Q5_1 using Intel DPAS hardware",
-      "timestamp": "2026-03-01T12:00:00Z",
+      "optimization": "XMX joint_matrix kernels for ALL 10 quant types (Q8_0, Q4_0, Q4_1, Q5_0, Q5_1, Q2_K, Q3_K, Q4_K, Q5_K, Q6_K) using Intel DPAS hardware",
+      "timestamp": "2026-03-01T18:00:00Z",
       "correctness": "pass",
       "baseline_time_us": null,
-      "optimized_time_us": 2154,
+      "optimized_time_us": null,
       "speedup": null,
-      "notes": "Implemented XMX joint_matrix kernels for 5 quant types (Q8_0, Q4_0, Q4_1, Q5_0, Q5_1). Uses int8×int8→int32 DPAS on Xe2 with 4×4 sub-group tiling (WG_TILE_M=32, WG_TILE_N=32, 256 threads). At n=512 (prompt processing): q8_0=27.92 TFLOPS, q4_0=27.40T, q4_1=27.43T, q5_1=26.65T, q5_0=18.11T. XMX only activates for n>=WG_TILE_N(32) — small n falls through to dp4a path. Build: SUCCESS. Tests: 726/726 MUL_MAT PASS. K-quant types (Q2_K-Q6_K) still pending XMX implementation."
+      "notes": "XMX joint_matrix kernels COMPLETE for all 10 quant types. int8×int8→int32 DPAS on Xe2 with 4×4 sub-group tiling (WG_TILE_M=32, WG_TILE_N=32, 256 threads). K-quants use super-block structure (QK_K=256 = 8 sub-blocks of 32). Benchmark at n=512 (m=4096, k=14336): q5_K=31.83T, q4_K=30.44T, q6_K=29.34T, q8_0=27.83T, q2_K=27.70T, q4_1=27.65T, q4_0=27.28T, q5_1=26.64T, q3_K=19.43T, q5_0=18.01T. f16=46.11T, f32=11.97T. q4_K/q5_K XMX performance matches dp4a baseline (no regression). All 10 types verified: 726/726 MUL_MAT tests PASS on b60.",
+      "benchmark_details": {
+        "test_config": "n=512, m=4096, k=14336",
+        "results": {
+          "f16":  {"time_us": 1304, "tflops": 46.11},
+          "q5_K": {"time_us": 1889, "tflops": 31.83},
+          "q4_K": {"time_us": 1975, "tflops": 30.44},
+          "q6_K": {"time_us": 2049, "tflops": 29.34},
+          "q8_0": {"time_us": 2161, "tflops": 27.83},
+          "q2_K": {"time_us": 2171, "tflops": 27.70},
+          "q4_1": {"time_us": 2175, "tflops": 27.65},
+          "q4_0": {"time_us": 2204, "tflops": 27.28},
+          "q5_1": {"time_us": 2257, "tflops": 26.64},
+          "q3_K": {"time_us": 3095, "tflops": 19.43},
+          "q5_0": {"time_us": 3339, "tflops": 18.01},
+          "f32":  {"time_us": 5022, "tflops": 11.97}
+        }
+      }
     },
     {
       "task_id": "opt_task_029",

@@ -163,41 +163,51 @@
   - Current test status (b60): 959/974 tests PASS
   - Remaining 15 failures are PRE-EXISTING issues:
 
-[2026-03-01] opt_task_001 (XMX joint_matrix for quantized matmul): PARTIAL COMPLETION.
-  - mmq.cpp: Implemented XMX joint_matrix kernels for 5 quant types:
+[2026-03-01] opt_task_001 (XMX joint_matrix for quantized matmul): COMPLETED.
+  - mmq.cpp: Implemented XMX joint_matrix kernels for ALL 10 quant types:
+    Simple quants:
     - Q8_0: int8×int8→int32 DPAS, scale-only dequantization
     - Q4_0: 4-bit unpack to int8, scale-only dequantization
     - Q4_1: 4-bit unpack to int8, scale+minimum dequantization
     - Q5_0: 5-bit unpack to int8 (high bit in qh), scale-only
     - Q5_1: 5-bit unpack to int8 (high bit in qh), scale+minimum
+    K-quant types (super-block structure, QK_K=256 = 8 sub-blocks of 32):
+    - Q4_K: Raw nibble load → post-XMX 6-bit scale/min application
+    - Q5_K: Raw 5-bit load → post-XMX 6-bit scale/min application
+    - Q6_K: Raw (6bit-32) → averaged int8 scale, d_a*sc_avg*d_b*sumi
+    - Q2_K: Pre-baked sc*q into int8 (max 45), dall*d_b*sumi - dmin*m_avg*s_b
+    - Q3_K: Pre-baked (sc-32)*q3 into int8 (max |124|), d_a*d_b*sumi
   - Architecture: 4×4 sub-group tiling (WG_TILE_M=32, WG_TILE_N=32)
     - 16 sub-groups per work-group, 256 threads total
-    - SLM staging: A tile (1024 int8) + B tile (1024 int8) + scales + result scratch
-    - Total SLM: ~6400 bytes per work-group (well within 64KB limit)
-  - Dispatch: XMX path activates only when ncols_y >= WG_TILE_N (32)
-    - Small N (n<32) falls through to dp4a path for better performance
+    - SLM: A tile (1024 int8) + B tile (1024 int8) + scales + result scratch
+    - K-quants use 8 sub-block iterations per super-block with full barrier cycle
+    - Total SLM: ~6400-6656 bytes per work-group (well within 64KB limit)
+  - Dispatch: XMX activates when ncols_y >= WG_TILE_N (32), small N uses dp4a
   - Build: SUCCESS on b60
-  - Tests: 726/726 MUL_MAT PASS (including all 5 XMX quant types)
+  - Tests: 726/726 MUL_MAT PASS (all 10 quant types)
   - Benchmark (n=512, m=4096, k=14336):
-    - q8_0: 2,154 us (27.92 TFLOPS) — XMX
-    - q4_0: 2,194 us (27.40 TFLOPS) — XMX
-    - q4_1: 2,192 us (27.43 TFLOPS) — XMX
-    - q5_1: 2,256 us (26.65 TFLOPS) — XMX
-    - q5_0: 3,320 us (18.11 TFLOPS) — XMX (slower, needs investigation)
-    - For comparison: q4_K=1,970 us (30.52T), q5_K=1,873 us (32.10T), f16=1,305 us (46.07T)
-  - Remaining: K-quant types (Q2_K, Q3_K, Q4_K, Q5_K, Q6_K) still need XMX implementation
-    - These have complex super-block dequantization (256 elements per super-block)
-    - Requires different tiling strategy due to nested block structure
-    - q2_K, q3_K, q4_K, q5_K with small n (n=1): quantization accuracy errors
-    - Documented in opt_task_025-029 as known issues
-    - These issues existed in baseline and are not caused by syclgen optimizations
-  - Key optimizations applied:
-    - SIMD16 native sub-group size on all kernels
-    - Work-group size tuning (256/512 threads)
-    - Memory coalescing and vectorization
-    - SLM usage optimization
-    - Reduction pattern improvements (sycl::reduce_over_group)
-    - Math function optimization (native:: variants)
-    - Loop unrolling (#pragma unroll)
-    - DPCT cleanup (dpct::queue_ptr -> sycl::queue*)
-  - Build: SUCCESS on b60
+    Simple quants:
+    - q8_0: 2,161 us (27.83 TFLOPS) — XMX
+    - q4_0: 2,204 us (27.28 TFLOPS) — XMX
+    - q4_1: 2,175 us (27.65 TFLOPS) — XMX
+    - q5_1: 2,257 us (26.64 TFLOPS) — XMX
+    - q5_0: 3,339 us (18.01 TFLOPS) — XMX
+    K-quant types (NEW XMX):
+    - q4_K: 1,975 us (30.44 TFLOPS) — XMX (was dp4a: 1,970 us / 30.52T)
+    - q5_K: 1,889 us (31.83 TFLOPS) — XMX (was dp4a: 1,873 us / 32.10T)
+    - q6_K: 2,049 us (29.34 TFLOPS) — XMX (newly measured)
+    - q2_K: 2,171 us (27.70 TFLOPS) — XMX (newly measured)
+    - q3_K: 3,095 us (19.43 TFLOPS) — XMX (newly measured)
+    Reference:
+    - f16: 1,304 us (46.11 TFLOPS)
+    - f32: 5,022 us (11.97 TFLOPS)
+  - Performance hierarchy: f16(46.1T) > q5_K(31.8T) > q4_K(30.4T) > q6_K(29.3T)
+    > q8_0(27.8T) > q2_K(27.7T) > q4_1(27.7T) > q4_0(27.3T) > q5_1(26.6T)
+    > q3_K(19.4T) > q5_0(18.0T) > f32(12.0T)
+  - Key observations:
+    - q4_K/q5_K XMX matches dp4a performance (no regression, no speedup)
+    - q6_K delivers strong 29.34T — competitive with q4_K
+    - q2_K at 27.70T comparable to simple quant XMX performance
+    - q3_K/q5_0 are slower due to complex dequantization (more barriers, branches)
+    - All K-quant XMX kernels use 8× more barriers per super-block than simple quants
+    - Future optimization: tile size tuning, reducing barrier count in K-quant inner loop

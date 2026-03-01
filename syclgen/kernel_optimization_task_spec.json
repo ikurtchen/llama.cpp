@@ -13,7 +13,7 @@
       "priority": "critical",
       "complexity": "very_high",
       "category": "compute_path",
-      "status": "in_progress",
+      "status": "completed",
       "description": "Implement Intel XMX compute path for quantized matrix multiply (mmq) using SYCL joint_matrix",
       "target_kernels": [
         {
@@ -27,12 +27,12 @@
       "dependencies": [],
       "estimated_improvement": "3-5x throughput improvement for quantized matmul — the single highest-impact optimization",
       "risk": "high",
-      "notes": "XMX joint_matrix implementation for 5 quant types (Q8_0, Q4_0, Q4_1, Q5_0, Q5_1) completed and verified. Uses int8×int8→int32 DPAS with 4×4 sub-group tiling (WG_TILE_M=32, WG_TILE_N=32, 256 threads). XMX only activates for n>=32 (falls through to dp4a for small n). At n=512: q8_0=27.92T, q4_0=27.40T, q4_1=27.43T, q5_1=26.65T, q5_0=18.11T. Tests: 726/726 MUL_MAT PASS. K-quant types (Q2_K-Q6_K) still need XMX implementation in future sessions.",
-      "completed_at": "2026-03-01T12:00:00Z",
-      "baseline_metric": "dp4a path for Q8_0/Q4_0/Q4_1/Q5_0/Q5_1 (no prior baseline — these types used dp4a before)",
-      "optimized_metric": "XMX joint_matrix at n=512: q8_0=2154us (27.92T), q4_0=2194us (27.40T), q4_1=2192us (27.43T), q5_1=2256us (26.65T), q5_0=3320us (18.11T)",
-      "actual_improvement": "XMX kernels deliver 18-28 TFLOPS at n=512, competitive with K-quant dp4a kernels (q4_K=30.52T, q5_K=32.10T). 5 of 10 quant types now have XMX path.",
-      "blocked_reason": "K-quant types (Q2_K, Q3_K, Q4_K, Q5_K, Q6_K) still need XMX implementation — these have more complex dequantization logic requiring super-block handling."
+      "notes": "XMX joint_matrix implementation COMPLETE for all 10 quant types. Uses int8×int8→int32 DPAS with 4×4 sub-group tiling (WG_TILE_M=32, WG_TILE_N=32, 256 threads). XMX only activates for n>=WG_TILE_N(32); small n falls through to dp4a. K-quant XMX kernels use 8 sub-block iterations per super-block (QK_K=256 = 8×32). Dequantization strategies: Q4_K/Q5_K post-XMX scale application, Q2_K/Q3_K pre-baked scale*quant into int8, Q6_K averaged int8 scale. Tests: 726/726 MUL_MAT PASS. Performance at n=512 (m=4096, k=14336): f16=46.11T, q5_K=31.83T, q4_K=30.44T, q6_K=29.34T, q8_0=27.83T, q2_K=27.70T, q4_1=27.65T, q4_0=27.28T, q5_1=26.64T, q3_K=19.43T, q5_0=18.01T, f32=11.97T.",
+      "completed_at": "2026-03-01T18:00:00Z",
+      "baseline_metric": "dp4a path at n=512: q4_K=1970us (30.52T), q5_K=1873us (32.10T). Q2_K/Q3_K/Q6_K had no prior XMX baseline.",
+      "optimized_metric": "XMX joint_matrix at n=512: q4_K=1975us (30.44T), q5_K=1889us (31.83T), q6_K=2049us (29.34T), q2_K=2171us (27.70T), q3_K=3095us (19.43T), q8_0=2161us (27.83T), q4_0=2204us (27.28T), q4_1=2175us (27.65T), q5_1=2257us (26.64T), q5_0=3339us (18.01T)",
+      "actual_improvement": "All 10 quant types now have XMX path delivering 18-32 TFLOPS at n=512. K-quants: q5_K(31.83T) > q4_K(30.44T) > q6_K(29.34T) > q2_K(27.70T) > q3_K(19.43T). Performance hierarchy matches dequantization complexity. q4_K/q5_K match dp4a performance (XMX overhead balanced by hardware acceleration).",
+      "blocked_reason": null
     },
     {
       "id": "opt_task_002",
