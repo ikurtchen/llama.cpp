@@ -345,6 +345,45 @@
         "theoretical_bandwidth_gbs": 456,
         "peak_efficiency_pct": 79
       }
+    },
+    {
+      "task_id": "opt_task_032",
+      "kernel": "norm (RMS_NORM, NORM, L2_NORM, GROUP_NORM)",
+      "optimization": "Add vec4 vectorized loads/stores to all 5 norm kernels (norm_f32, rms_norm_f32, l2_norm_f32, group_norm_f32, rms_norm_back)",
+      "timestamp": "2026-03-02T16:30:00Z",
+      "correctness": "pass",
+      "baseline_time_us": 43.02,
+      "optimized_time_us": 31.15,
+      "speedup": 1.38,
+      "notes": "Vec4 vectorized loads/stores for all norm kernels. 25-51% improvement on large batch sizes (512 rows). GROUP_NORM: +86% (345→644 GB/s). Small batches (1-4 rows) latency-bound, minimal change. Peak: 501.68 GB/s RMS_NORM[4096,512] (110% of 456 GB/s theoretical, cache-aided). 43/43 norm tests PASS. LLM hidden dims always multiples of 64, so vec4 path always taken in practice.",
+      "benchmark_details": {
+        "test_config": "norm kernels, shapes [ncols x nrows], ncols in {2048,4096,5120,8192,14336}, nrows in {1,4,16,512}",
+        "representative_result": {
+          "shape": "[4096,512]",
+          "kernel": "RMS_NORM",
+          "baseline_us": 43.02,
+          "optimized_us": 31.15,
+          "baseline_gbs": 363.32,
+          "optimized_gbs": 501.68,
+          "improvement_pct": 38.1
+        },
+        "key_results": {
+          "RMS_NORM[2048,512]":  {"baseline_gbs": 231.21, "optimized_gbs": 291.12, "improvement_pct": 25.9},
+          "RMS_NORM[4096,512]":  {"baseline_gbs": 363.32, "optimized_gbs": 501.68, "improvement_pct": 38.1},
+          "RMS_NORM[5120,512]":  {"baseline_gbs": 301.70, "optimized_gbs": 456.88, "improvement_pct": 51.4},
+          "RMS_NORM[8192,512]":  {"baseline_gbs": 287.81, "optimized_gbs": 376.23, "improvement_pct": 30.7},
+          "RMS_NORM[14336,512]": {"baseline_gbs": 301.28, "optimized_gbs": 361.32, "improvement_pct": 19.9},
+          "NORM[4096,512]":      {"baseline_gbs": 343.15, "optimized_gbs": 462.28, "improvement_pct": 34.7},
+          "L2_NORM[4096,512]":   {"baseline_gbs": 378.46, "optimized_gbs": 510.86, "improvement_pct": 35.0},
+          "L2_NORM[5120,512]":   {"baseline_gbs": 308.55, "optimized_gbs": 462.70, "improvement_pct": 50.0},
+          "L2_NORM[8192,512]":   {"baseline_gbs": 290.79, "optimized_gbs": 377.26, "improvement_pct": 29.7},
+          "GROUP_NORM[64,64,320]":  {"baseline_gbs": 345.43, "optimized_gbs": 644.11, "improvement_pct": 86.5},
+          "GROUP_NORM[32,32,1280]": {"baseline_gbs": 345.93, "optimized_gbs": 644.14, "improvement_pct": 86.2}
+        },
+        "peak_bandwidth_gbs": 644.14,
+        "theoretical_bandwidth_gbs": 456,
+        "notes": "Peak exceeds theoretical due to L2/L3 cache effects on GROUP_NORM (10MB working set fits in 24MB L3). For pure DRAM-bound cases, peak is 510.86 GB/s (L2_NORM[4096,512])."
+      }
     }
   ]
 }

@@ -24,10 +24,19 @@ static void norm_f32(const float* x, float* dst, const int ncols, const int64_t 
 
     sycl::float2 mean_var = sycl::float2(0.f, 0.f);
 
-    for (int col = tid; col < ncols; col += block_size) {
-        const float xi = x[col];
-        mean_var.x() += xi;
-        mean_var.y() += xi * xi;
+    // Vec4 vectorized accumulation for sum and sum-of-squares
+    if (ncols % 4 == 0) {
+        for (int col = tid * 4; col < ncols; col += block_size * 4) {
+            sycl::vec<float, 4> xv = *reinterpret_cast<const sycl::vec<float, 4>*>(&x[col]);
+            mean_var.x() += xv[0] + xv[1] + xv[2] + xv[3];
+            mean_var.y() += xv[0]*xv[0] + xv[1]*xv[1] + xv[2]*xv[2] + xv[3]*xv[3];
+        }
+    } else {
+        for (int col = tid; col < ncols; col += block_size) {
+            const float xi = x[col];
+            mean_var.x() += xi;
+            mean_var.y() += xi * xi;
+        }
     }
 
     // sum up partial sums
@@ -53,8 +62,17 @@ static void norm_f32(const float* x, float* dst, const int ncols, const int64_t 
     const float var = mean_var.y() / ncols - mean * mean;
     const float inv_std = sycl::rsqrt(var + eps);
 
-    for (int col = tid; col < ncols; col += block_size) {
-        dst[col] = (x[col] - mean) * inv_std;
+    // Vec4 vectorized write-back
+    if (ncols % 4 == 0) {
+        for (int col = tid * 4; col < ncols; col += block_size * 4) {
+            sycl::vec<float, 4> xv = *reinterpret_cast<const sycl::vec<float, 4>*>(&x[col]);
+            sycl::vec<float, 4> dv = (xv - mean) * inv_std;
+            *reinterpret_cast<sycl::vec<float, 4>*>(&dst[col]) = dv;
+        }
+    } else {
+        for (int col = tid; col < ncols; col += block_size) {
+            dst[col] = (x[col] - mean) * inv_std;
+        }
     }
 }
 
@@ -73,8 +91,19 @@ static void group_norm_f32(const float* x, float* dst, const int group_size, con
 
     float tmp = 0.0f; // partial sum for thread in warp
 
-    for (int j = start; j < end; j += block_size) {
-        tmp += x[j];
+    // Vec4 vectorized mean accumulation
+    const int tid = item_ct1.get_local_id(2);
+    const int group_start = start - tid; // undo the tid offset to get original group start
+    const int group_len = end - group_start; // actual number of elements in this group
+    if (group_len % 4 == 0) {
+        for (int j = group_start + tid * 4; j + 3 < end; j += block_size * 4) {
+            sycl::vec<float, 4> xv = *reinterpret_cast<const sycl::vec<float, 4>*>(&x[j]);
+            tmp += xv[0] + xv[1] + xv[2] + xv[3];
+        }
+    } else {
+        for (int j = start; j < end; j += block_size) {
+            tmp += x[j];
+        }
     }
 
     tmp = warp_reduce_sum(tmp, item_ct1);
@@ -98,10 +127,20 @@ static void group_norm_f32(const float* x, float* dst, const int group_size, con
     float mean = tmp / group_size;
     tmp = 0.0f;
 
-    for (int j = start; j < end; j += block_size) {
-        float xi = x[j] - mean;
-        dst[j] = xi;
-        tmp += xi * xi;
+    // Vec4 vectorized variance accumulation + centered write
+    if (group_len % 4 == 0) {
+        for (int j = group_start + tid * 4; j + 3 < end; j += block_size * 4) {
+            sycl::vec<float, 4> xv = *reinterpret_cast<const sycl::vec<float, 4>*>(&x[j]);
+            sycl::vec<float, 4> centered = xv - mean;
+            *reinterpret_cast<sycl::vec<float, 4>*>(&dst[j]) = centered;
+            tmp += centered[0]*centered[0] + centered[1]*centered[1] + centered[2]*centered[2] + centered[3]*centered[3];
+        }
+    } else {
+        for (int j = start; j < end; j += block_size) {
+            float xi = x[j] - mean;
+            dst[j] = xi;
+            tmp += xi * xi;
+        }
     }
 
     tmp = warp_reduce_sum(tmp, item_ct1);
@@ -124,8 +163,18 @@ static void group_norm_f32(const float* x, float* dst, const int group_size, con
 
     float variance = tmp / group_size;
     float scale = sycl::rsqrt(variance + eps);
-    for (int j = start; j < end; j += block_size) {
-        dst[j] *= scale;
+
+    // Vec4 vectorized scale write-back
+    if (group_len % 4 == 0) {
+        for (int j = group_start + tid * 4; j + 3 < end; j += block_size * 4) {
+            sycl::vec<float, 4> dv = *reinterpret_cast<sycl::vec<float, 4>*>(&dst[j]);
+            dv *= scale;
+            *reinterpret_cast<sycl::vec<float, 4>*>(&dst[j]) = dv;
+        }
+    } else {
+        for (int j = start; j < end; j += block_size) {
+            dst[j] *= scale;
+        }
     }
 }
 
@@ -153,9 +202,17 @@ static void rms_norm_f32(const float* x, float* dst, const int ncols, const int6
 
     float tmp = 0.0f; // partial sum for thread in warp
 
-    for (int col = tid; col < ncols; col += block_size) {
-        const float xi = x[col];
-        tmp += xi * xi;
+    // Vec4 vectorized accumulation for sum of squares
+    if (ncols % 4 == 0) {
+        for (int col = tid * 4; col < ncols; col += block_size * 4) {
+            sycl::vec<float, 4> xv = *reinterpret_cast<const sycl::vec<float, 4>*>(&x[col]);
+            tmp += xv[0]*xv[0] + xv[1]*xv[1] + xv[2]*xv[2] + xv[3]*xv[3];
+        }
+    } else {
+        for (int col = tid; col < ncols; col += block_size) {
+            const float xi = x[col];
+            tmp += xi * xi;
+        }
     }
 
     // sum up partial sums
@@ -181,8 +238,17 @@ static void rms_norm_f32(const float* x, float* dst, const int ncols, const int6
     const float mean = tmp / ncols;
     const float scale = sycl::rsqrt(mean + eps);
 
-    for (int col = tid; col < ncols; col += block_size) {
-        dst[col] = scale * x[col];
+    // Vec4 vectorized write-back
+    if (ncols % 4 == 0) {
+        for (int col = tid * 4; col < ncols; col += block_size * 4) {
+            sycl::vec<float, 4> xv = *reinterpret_cast<const sycl::vec<float, 4>*>(&x[col]);
+            sycl::vec<float, 4> dv = xv * scale;
+            *reinterpret_cast<sycl::vec<float, 4>*>(&dst[col]) = dv;
+        }
+    } else {
+        for (int col = tid; col < ncols; col += block_size) {
+            dst[col] = scale * x[col];
+        }
     }
 }
 
@@ -195,9 +261,18 @@ static void l2_norm_f32(const float* x, float* dst, const int ncols, const float
     const int nwarps = nthreads / WARP_SIZE;
     float tmp = 0.0f; // partial sum for thread in warp
 
-    for (int col = tid; col < ncols; col += block_size) {
-        const float xi = x[row * ncols + col];
-        tmp += xi * xi;
+    // Vec4 vectorized accumulation for sum of squares
+    if (ncols % 4 == 0) {
+        const float* x_row = x + row * ncols;
+        for (int col = tid * 4; col < ncols; col += block_size * 4) {
+            sycl::vec<float, 4> xv = *reinterpret_cast<const sycl::vec<float, 4>*>(&x_row[col]);
+            tmp += xv[0]*xv[0] + xv[1]*xv[1] + xv[2]*xv[2] + xv[3]*xv[3];
+        }
+    } else {
+        for (int col = tid; col < ncols; col += block_size) {
+            const float xi = x[row * ncols + col];
+            tmp += xi * xi;
+        }
     }
 
     // sum up partial sums
@@ -225,8 +300,19 @@ static void l2_norm_f32(const float* x, float* dst, const int ncols, const float
 
     const float scale = sycl::rsqrt(sycl::max(tmp, eps * eps));
 
-    for (int col = tid; col < ncols; col += block_size) {
-        dst[row * ncols + col] = scale * x[row * ncols + col];
+    // Vec4 vectorized write-back
+    if (ncols % 4 == 0) {
+        const float* x_row = x + row * ncols;
+        float* dst_row = dst + row * ncols;
+        for (int col = tid * 4; col < ncols; col += block_size * 4) {
+            sycl::vec<float, 4> xv = *reinterpret_cast<const sycl::vec<float, 4>*>(&x_row[col]);
+            sycl::vec<float, 4> dv = xv * scale;
+            *reinterpret_cast<sycl::vec<float, 4>*>(&dst_row[col]) = dv;
+        }
+    } else {
+        for (int col = tid; col < ncols; col += block_size) {
+            dst[row * ncols + col] = scale * x[row * ncols + col];
+        }
     }
 }
 
@@ -546,13 +632,27 @@ void ggml_sycl_op_rms_norm_back(ggml_backend_sycl_context & ctx, ggml_tensor * d
 #ifndef GGML_SYCL_RMS_BACK_FAST
                 float c_xx = 0.f, c_xg = 0.f;
 #endif
+#ifdef GGML_SYCL_RMS_BACK_FAST
+                // Vec4 vectorized accumulation for fast path
+                if (D % 4 == 0) {
+                    for (int64_t col = tid * 4; col < D; col += WG * 4) {
+                        sycl::vec<float, 4> xv4 = *reinterpret_cast<const sycl::vec<float, 4>*>(&x_row[col]);
+                        sycl::vec<float, 4> gv4 = *reinterpret_cast<const sycl::vec<float, 4>*>(&g_row[col]);
+                        sum_xx += xv4[0]*xv4[0] + xv4[1]*xv4[1] + xv4[2]*xv4[2] + xv4[3]*xv4[3];
+                        sum_xg += xv4[0]*gv4[0] + xv4[1]*gv4[1] + xv4[2]*gv4[2] + xv4[3]*gv4[3];
+                    }
+                } else {
+                    for (int64_t col = tid; col < D; col += WG) {
+                        const float xv = x_row[col];
+                        const float gv = g_row[col];
+                        sum_xx += xv * xv;
+                        sum_xg += xv * gv;
+                    }
+                }
+#else
                 for (int64_t col = tid; col < D; col += WG) {
                     const float xv = x_row[col];
                     const float gv = g_row[col];
-#ifdef GGML_SYCL_RMS_BACK_FAST
-                    sum_xx += xv * xv;
-                    sum_xg += xv * gv;
-#else
                     float y1 = xv * xv - c_xx;
                     float t1 = sum_xx + y1;
                     c_xx = (t1 - sum_xx) - y1;
@@ -562,8 +662,8 @@ void ggml_sycl_op_rms_norm_back(ggml_backend_sycl_context & ctx, ggml_tensor * d
                     float t2 = sum_xg + y2;
                     c_xg = (t2 - sum_xg) - y2;
                     sum_xg = t2;
-#endif
                 }
+#endif
 
                 // warp-level reduction
                 sycl::float2 xx = sycl::float2(sum_xx,
@@ -627,8 +727,18 @@ void ggml_sycl_op_rms_norm_back(ggml_backend_sycl_context & ctx, ggml_tensor * d
                 inv_r = sycl::group_broadcast(item_ct1.get_group(), inv_r);
                 coeff = sycl::group_broadcast(item_ct1.get_group(), coeff);
 
-                for (int64_t col = tid; col < D; col += WG) {
-                    d_row[col] = (g_row[col] + coeff * x_row[col]) * inv_r;
+                // Vec4 vectorized write-back
+                if (D % 4 == 0) {
+                    for (int64_t col = tid * 4; col < D; col += WG * 4) {
+                        sycl::vec<float, 4> gv4 = *reinterpret_cast<const sycl::vec<float, 4>*>(&g_row[col]);
+                        sycl::vec<float, 4> xv4 = *reinterpret_cast<const sycl::vec<float, 4>*>(&x_row[col]);
+                        sycl::vec<float, 4> dv4 = (gv4 + xv4 * coeff) * inv_r;
+                        *reinterpret_cast<sycl::vec<float, 4>*>(&d_row[col]) = dv4;
+                    }
+                } else {
+                    for (int64_t col = tid; col < D; col += WG) {
+                        d_row[col] = (g_row[col] + coeff * x_row[col]) * inv_r;
+                    }
                 }
             });
     });

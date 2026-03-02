@@ -243,3 +243,28 @@
     - [12888,256,5,1]: 267.01 → 324.02 GB/s (+21.3%)
     - [131072,16,1,1]: 242.68 → 604.63 GB/s (+149.2%, cache-aided)
   - Primary workload now at 79% of 456 GB/s theoretical (was 59%)
+
+[2026-03-02] opt_task_032 (Norm kernels vec4 vectorization): COMPLETED.
+  - norm.cpp: Added sycl::vec<float, 4> to all 5 norm kernel functions
+  - norm_f32: vec4 for sum/sum-of-squares accumulation + vec4 write-back (mean/scale)
+  - rms_norm_f32: vec4 for sum-of-squares accumulation + vec4 scale write-back
+  - l2_norm_f32: vec4 with precomputed row pointers for accumulation + vec4 write-back
+  - group_norm_f32: vec4 for all 3 loops (mean, variance+centered-write, scale) with j+3<end guard
+  - rms_norm_back: vec4 for FAST path accumulation + vec4 write-back (compensated path stays scalar)
+  - All vec4 paths have ncols%4==0 runtime guard with scalar fallback
+  - Build: SUCCESS on b60
+  - Tests: 43/43 NORM/RMS_NORM/GROUP_NORM/L2_NORM PASS (including non-aligned 1025-element)
+  - Also added norm perf test cases to test-backend-ops.cpp for benchmarking
+  - Benchmark comparison (baseline scalar → vec4, batch=512 rows):
+    - RMS_NORM[2048,512]: 231.21 → 291.12 GB/s (+25.9%)
+    - RMS_NORM[4096,512]: 363.32 → 501.68 GB/s (+38.1%)
+    - RMS_NORM[5120,512]: 301.70 → 456.88 GB/s (+51.4%)
+    - RMS_NORM[8192,512]: 287.81 → 376.23 GB/s (+30.7%)
+    - RMS_NORM[14336,512]: 301.28 → 361.32 GB/s (+19.9%)
+    - NORM[4096,512]: 343.15 → 462.28 GB/s (+34.7%)
+    - L2_NORM[4096,512]: 378.46 → 510.86 GB/s (+35.0%)
+    - GROUP_NORM[64,64,320]: 345.43 → 644.11 GB/s (+86.4%)
+    - GROUP_NORM[32,32,1280]: 345.93 → 644.14 GB/s (+86.2%)
+  - Peak: 501.68 GB/s RMS_NORM (110% of 456 GB/s theoretical, cache-aided)
+  - GROUP_NORM nearly doubled throughput
+  - Small batch sizes (1, 4, 16 rows) show minimal change (latency-bound, not bandwidth-bound)

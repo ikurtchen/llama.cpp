@@ -8491,6 +8491,17 @@ static std::vector<std::unique_ptr<test_case>> make_test_cases_perf() {
         }
     }
 
+    // Norm kernel perf tests - realistic LLM hidden dimensions
+    for (int ncols : {2048, 4096, 5120, 8192, 14336}) {
+        for (int nrows : {1, 4, 16, 512}) {
+            test_cases.emplace_back(new test_rms_norm(GGML_TYPE_F32, {ncols, nrows, 1, 1}, false, 1e-5f));
+            test_cases.emplace_back(new test_norm(GGML_TYPE_F32, {ncols, nrows, 1, 1}, false, 1e-5f));
+            test_cases.emplace_back(new test_l2_norm(GGML_TYPE_F32, {ncols, nrows, 1, 1}));
+        }
+    }
+    test_cases.emplace_back(new test_group_norm(GGML_TYPE_F32, {64, 64, 320, 1}));
+    test_cases.emplace_back(new test_group_norm(GGML_TYPE_F32, {32, 32, 1280, 1}));
+
     test_cases.emplace_back(new test_conv_2d_dw({512, 512, 256, 1}, {3, 3, 1, 256}, 1, 1, 1, false));
     test_cases.emplace_back(new test_conv_2d_dw({512, 512, 256, 1}, {3, 3, 1, 256}, 1, 1, 1, true));
 

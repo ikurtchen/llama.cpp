@@ -1039,6 +1039,34 @@
       "optimized_metric": "vec4: [4096,4096,5,1]=358.53 GB/s, [12888,256,5,1]=324.02 GB/s, [131072,16,1,1]=604.63 GB/s. Peak 604.63 GB/s (132% theoretical, cache-aided).",
       "actual_improvement": "+33.2% on [4096,4096,5,1], +21.3% on [12888,256,5,1], +149.2% on [131072,16,1,1]. Primary workload [4096,4096,5,1] now reaches 79% of 456 GB/s theoretical.",
       "blocked_reason": null
+    },
+    {
+      "id": "opt_task_032",
+      "priority": "medium",
+      "complexity": "medium",
+      "category": "vectorization",
+      "status": "completed",
+      "description": "Add vec4 vectorized loads/stores to all 5 norm kernels (norm_f32, rms_norm_f32, l2_norm_f32, group_norm_f32, rms_norm_back)",
+      "target_kernels": [
+        {
+          "kernel_id": "sk_003",
+          "file": "ggml/src/ggml-sycl/norm.cpp"
+        }
+      ],
+      "optimization_ids": [
+        "opt_003_004"
+      ],
+      "dependencies": [
+        "opt_task_008"
+      ],
+      "estimated_improvement": "20-40% throughput improvement for memory-bound norm kernels via vec4 loads reducing memory transactions by 4x",
+      "risk": "medium",
+      "notes": "Added sycl::vec<float, 4> to all 5 norm kernel functions: norm_f32 (accumulation + write-back), rms_norm_f32 (sum-of-squares + scale write-back), l2_norm_f32 (accumulation + write-back with precomputed row pointers), group_norm_f32 (all 3 loops: mean, variance+centered-write, scale), rms_norm_back (FAST path accumulation + write-back, compensated path stays scalar). All vec4 paths have ncols%4==0 runtime guard with scalar fallback. Tests: 43/43 NORM/RMS_NORM/GROUP_NORM/L2_NORM PASS (including non-aligned 1025-element sizes). Also added norm perf test cases to test-backend-ops.cpp for benchmarking.",
+      "completed_at": "2026-03-02T16:15:00Z",
+      "baseline_metric": "Scalar baseline: RMS_NORM[4096,512]=363.32 GB/s, RMS_NORM[5120,512]=301.70 GB/s, RMS_NORM[8192,512]=287.81 GB/s, GROUP_NORM[64,64,320]=345.43 GB/s",
+      "optimized_metric": "Vec4: RMS_NORM[4096,512]=501.68 GB/s (110% theoretical), RMS_NORM[5120,512]=456.88 GB/s (100% theoretical), RMS_NORM[8192,512]=376.23 GB/s, GROUP_NORM[64,64,320]=644.11 GB/s",
+      "actual_improvement": "+38.1% RMS_NORM[4096,512], +51.4% RMS_NORM[5120,512], +30.7% RMS_NORM[8192,512], +86.4% GROUP_NORM[64,64,320]. Peak 501.68 GB/s RMS_NORM (110% of 456 GB/s theoretical, cache-aided). GROUP_NORM nearly doubled.",
+      "blocked_reason": null
     }
   ]
 }
