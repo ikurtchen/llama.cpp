@@ -324,6 +324,27 @@
       "optimized_time_us": 2344.47,
       "speedup": null,
       "notes": "Eliminated 5 explicit barriers (2 MAX + 3 SUM) and buf_iw SLM allocation. Replaced ~50 lines of manual reduction with 2 reduce_over_group calls. Peak 269.15 GB/s on [4096,4096,5,1] (59% of 456 GB/s theoretical). 212/212 SOFT_MAX tests PASS, 24/24 SOFT_MAX_BACK tests PASS. No baseline benchmark for speedup comparison."
+    },
+    {
+      "task_id": "opt_task_031",
+      "kernel": "SOFT_MAX",
+      "optimization": "Add vec4 vectorized loads/stores to all three column loops in softmax forward kernel",
+      "timestamp": "2026-03-02T15:00:00Z",
+      "correctness": "pass",
+      "baseline_time_us": 1759.98,
+      "optimized_time_us": 1759.98,
+      "speedup": 1.33,
+      "notes": "Added sycl::vec<float, 4> processing to all three column loops in soft_max_f32: (1) scale+mask+max, (2) exp+sum, (3) normalize. Loop stride: col = tid*4, col += block_size*4. Template specializations (32-4096) are all multiples of 4 — no scalar tail needed. Fallback path has scalar tail. Benchmark vs opt_task_030 baseline: [4096,4096,5,1]: 269.15→358.53 GB/s (+33.2%), [12888,256,5,1]: 267.01→324.02 GB/s (+21.3%), [131072,16,1,1]: 242.68→604.63 GB/s (+149.2%, cache-aided). Primary workload now at 79% of 456 GB/s theoretical (was 59%). Tests: 212/212 SOFT_MAX PASS, 24/24 SOFT_MAX_BACK PASS.",
+      "benchmark_details": {
+        "key_results": {
+          "[4096,4096,5,1]": {"baseline_gbs": 269.15, "optimized_gbs": 358.53, "improvement_pct": 33.2},
+          "[12888,256,5,1]": {"baseline_gbs": 267.01, "optimized_gbs": 324.02, "improvement_pct": 21.3},
+          "[131072,16,1,1]": {"baseline_gbs": 242.68, "optimized_gbs": 604.63, "improvement_pct": 149.2}
+        },
+        "peak_bandwidth_gbs": 604.63,
+        "theoretical_bandwidth_gbs": 456,
+        "peak_efficiency_pct": 79
+      }
     }
   ]
 }

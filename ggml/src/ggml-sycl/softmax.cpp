@@ -87,6 +87,40 @@ static void soft_max_f32(const float *         x,
     // shared memory buffer to cache values between iterations:
     float *vals = use_shared ? (float *) dpct_local : dst;
     float max_val = sinks ? sinks[i02] : -INFINITY;
+
+    // opt_task_031: vec4 vectorized loads/stores for the three column loops.
+    // Each thread processes 4 consecutive float elements per iteration,
+    // improving memory bandwidth utilization on Xe2 (Intel Arc Pro B60).
+    // For template-specialized paths (ncols_template != 0), ncols is always
+    // a multiple of 4 (32, 64, ..., 4096), so no scalar tail is needed.
+#if GGML_SYCL_VEC4
+    const int ncols_vec4 = (ncols / 4) * 4;
+
+    // Loop 1: scale + mask + max (vec4 path)
+#pragma unroll
+    for (int col = tid * 4; col < ncols_vec4; col += block_size * 4) {
+        sycl::vec<float, 4> x_v = *reinterpret_cast<const sycl::vec<float, 4>*>(&x[col]);
+        sycl::vec<float, 4> val_v;
+        if (mask) {
+            val_v[0] = x_v[0]*p.scale + slope*t2f32(mask[col]);
+            val_v[1] = x_v[1]*p.scale + slope*t2f32(mask[col+1]);
+            val_v[2] = x_v[2]*p.scale + slope*t2f32(mask[col+2]);
+            val_v[3] = x_v[3]*p.scale + slope*t2f32(mask[col+3]);
+        } else {
+            val_v = x_v * p.scale;
+        }
+        *reinterpret_cast<sycl::vec<float, 4>*>(&vals[col]) = val_v;
+        max_val = sycl::max(max_val, sycl::max(sycl::max(val_v[0], val_v[1]), sycl::max(val_v[2], val_v[3])));
+    }
+    // Scalar tail for non-vec4-aligned remainder (only when ncols_template == 0)
+    if (ncols_template == 0) {
+        for (int col = ncols_vec4 + tid; col < ncols; col += block_size) {
+            const float val = x[col]*p.scale + (mask ? slope*t2f32(mask[col]) : 0.0f);
+            vals[col] = val;
+            max_val = sycl::max(max_val, val);
+        }
+    }
+#else
 #pragma unroll
     for (int col0 = 0; col0 < ncols; col0 += block_size) {
         const int col = col0 + tid;
@@ -100,6 +134,8 @@ static void soft_max_f32(const float *         x,
         vals[col] = val;
         max_val   = sycl::max(max_val, val);
     }
+#endif
+
     // opt_task_030: Use sycl::reduce_over_group for work-group max reduction.
     // Replaces manual 2-barrier SLM reduction (warp shuffle + buf_iw + 2 barriers).
     // On Xe2 (Intel Arc Pro B60), this lets the compiler/runtime pick the optimal
@@ -107,6 +143,28 @@ static void soft_max_f32(const float *         x,
     max_val = sycl::reduce_over_group(item_ct1.get_group(), max_val, sycl::maximum<float>());
     float tmp = 0.0f; // partial sum
 
+    // Loop 2: exp + sum (vec4 path)
+#if GGML_SYCL_VEC4
+#pragma unroll
+    for (int col = tid * 4; col < ncols_vec4; col += block_size * 4) {
+        sycl::vec<float, 4> v = *reinterpret_cast<const sycl::vec<float, 4>*>(&vals[col]);
+        sycl::vec<float, 4> exp_v;
+        exp_v[0] = sycl::native::exp(v[0] - max_val);
+        exp_v[1] = sycl::native::exp(v[1] - max_val);
+        exp_v[2] = sycl::native::exp(v[2] - max_val);
+        exp_v[3] = sycl::native::exp(v[3] - max_val);
+        tmp += exp_v[0] + exp_v[1] + exp_v[2] + exp_v[3];
+        *reinterpret_cast<sycl::vec<float, 4>*>(&vals[col]) = exp_v;
+    }
+    // Scalar tail for non-vec4-aligned remainder (only when ncols_template == 0)
+    if (ncols_template == 0) {
+        for (int col = ncols_vec4 + tid; col < ncols; col += block_size) {
+            const float val = sycl::native::exp(vals[col] - max_val);
+            tmp += val;
+            vals[col] = val;
+        }
+    }
+#else
 #pragma unroll
     for (int col0 = 0; col0 < ncols; col0 += block_size) {
         const int col = col0 + tid;
@@ -119,6 +177,8 @@ static void soft_max_f32(const float *         x,
         tmp += val;
         vals[col] = val;
     }
+#endif
+
     // opt_task_030: Use sycl::reduce_over_group for work-group sum reduction.
     // Replaces manual 3-barrier SLM reduction (warp shuffle + buf_iw zero + store + read + 3 barriers).
     // Combined with the max reduction above, this eliminates all 5 manual barriers
@@ -130,6 +190,20 @@ static void soft_max_f32(const float *         x,
     }
     const float inv_sum = 1.0f / tmp;
 
+    // Loop 3: normalize (vec4 path)
+#if GGML_SYCL_VEC4
+#pragma unroll
+    for (int col = tid * 4; col < ncols_vec4; col += block_size * 4) {
+        sycl::vec<float, 4> v = *reinterpret_cast<const sycl::vec<float, 4>*>(&vals[col]);
+        *reinterpret_cast<sycl::vec<float, 4>*>(&dst[col]) = v * inv_sum;
+    }
+    // Scalar tail for non-vec4-aligned remainder (only when ncols_template == 0)
+    if (ncols_template == 0) {
+        for (int col = ncols_vec4 + tid; col < ncols; col += block_size) {
+            dst[col] = vals[col] * inv_sum;
+        }
+    }
+#else
 #pragma unroll
     for (int col0 = 0; col0 < ncols; col0 += block_size) {
         const int col = col0 + tid;
@@ -140,6 +214,7 @@ static void soft_max_f32(const float *         x,
 
         dst[col] = vals[col] * inv_sum;
     }
+#endif
 }
 #ifdef __clang__
 #pragma clang diagnostic pop
