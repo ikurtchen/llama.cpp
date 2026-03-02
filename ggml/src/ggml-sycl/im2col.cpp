@@ -70,7 +70,7 @@ static void im2col_sycl_internal(const float * x, T * dst, int64_t IW, int64_t I
 
     const int64_t CHW = IC * KH * KW;
 
-    stream->parallel_for(sycl::nd_range<3>(block_nums * local_range, local_range), [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+    stream->parallel_for(sycl::nd_range<3>(block_nums * local_range, local_range), [=](sycl::nd_item<3> item_ct1) {
         im2col_kernel<T>(x, dst, batch_offset, offset_delta, IC, IW, IH, OH, OW, KW, KH, parallel_elements, CHW, s0, s1,
                          p0, p1, d0, d1, item_ct1);
     });
@@ -179,7 +179,7 @@ static void im2col_3d_sycl_internal(
     sycl::range<3> block_nums(dim0, OW, num_blocks);
     sycl::range<3> local_range(1, 1, local_size);
 
-    stream->parallel_for(sycl::nd_range<3>(block_nums * local_range, local_range), [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+    stream->parallel_for(sycl::nd_range<3>(block_nums * local_range, local_range), [=](sycl::nd_item<3> item_ct1) {
         im2col_3d_kernel<T>(src, dst, IC_KD_KH_KW, KD_KH_KW, KH_KW, KW,
                             ID, IH, IW, OH, OD_OH, N_OD_OH,
                             OD_OH_OW_IC_KD_KH_KW, OH_OW_IC_KD_KH_KW, OW_IC_KD_KH_KW,
