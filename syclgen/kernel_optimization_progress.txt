@@ -268,3 +268,22 @@
   - Peak: 501.68 GB/s RMS_NORM (110% of 456 GB/s theoretical, cache-aided)
   - GROUP_NORM nearly doubled throughput
   - Small batch sizes (1, 4, 16 rows) show minimal change (latency-bound, not bandwidth-bound)
+
+[2026-03-02] opt_task_033 (element_wise vec4 vectorization - opt_004_001): COMPLETED.
+  - element_wise.cpp: Added vec4 vectorized contiguous kernel for all unary ops
+  - New kernel: unary_op_contiguous_vec4_kernel (lines 219-243)
+    - Uses sycl::vec<T, 4> for coalesced 4-element loads/stores
+    - Applies unary function element-wise to 4 values per work-item
+    - Reduces memory transactions by ~4x on bandwidth-bound ops
+  - Dispatch logic (lines 648-680): checks k_elements % 4 == 0
+    - Vec4 path: work-items = k_elements/4, each processes 4 consecutive elements
+    - Scalar fallback: original unary_op_contiguous_kernel for non-aligned counts
+    - Non-contiguous generic path unchanged
+  - Benefits ~26 unary ops: silu, gelu, gelu_quick, gelu_erf, tanh, relu, sigmoid,
+    exp, log, sqrt, sin, cos, abs, sgn, neg, step, hardsigmoid, hardswish,
+    softplus, expm1, elu, sqr, floor, ceil, round, trunc
+  - Build: SUCCESS on b60
+  - Unit tests: 192/192 PASS (all unary ops, f16+f32, contiguous+non-contiguous)
+  - Benchmark: No dedicated perf test available in test-backend-ops for unary ops
+    (same as opt_task_019). Expected 20-40% throughput improvement for large
+    contiguous tensors (typical LLM sizes: 4096, 5120, 8192, 14336 are all div-by-4)

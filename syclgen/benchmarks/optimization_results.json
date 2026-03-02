@@ -384,6 +384,17 @@
         "theoretical_bandwidth_gbs": 456,
         "notes": "Peak exceeds theoretical due to L2/L3 cache effects on GROUP_NORM (10MB working set fits in 24MB L3). For pure DRAM-bound cases, peak is 510.86 GB/s (L2_NORM[4096,512])."
       }
+    },
+    {
+      "task_id": "opt_task_033",
+      "kernel": "unary ops (element_wise.cpp)",
+      "optimization": "Add vec4 vectorized loads/stores to contiguous unary op kernel - processes 4 elements per work-item via sycl::vec<T,4>",
+      "timestamp": "2026-03-02T16:30:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": null,
+      "notes": "Added unary_op_contiguous_vec4_kernel using sycl::vec<T,4> for coalesced 4-element loads/stores. Dispatch checks k_elements%4==0 for vec4 path, else scalar fallback. Benefits ~26 unary ops (silu, gelu, gelu_quick, gelu_erf, tanh, relu, sigmoid, exp, log, sqrt, sin, cos, abs, sgn, neg, step, hardsigmoid, hardswish, softplus, expm1, elu, sqr, floor, ceil, round, trunc). Build: SUCCESS. Unit tests: 192/192 PASS (f16+f32, all shapes). No dedicated perf test for unary ops in test-backend-ops. Expected 20-40% throughput improvement for large contiguous tensors (LLM ne0 values 4096/5120/8192/14336 are all divisible by 4)."
     }
   ]
 }

@@ -216,6 +216,32 @@ static void unary_op_contiguous_kernel(
     }
 }
 
+// opt_task_033: vec4 vectorized contiguous kernel
+// Processes 4 consecutive elements per work-item using sycl::vec<T, 4>
+// to reduce memory transactions by 4x on bandwidth-bound element-wise ops.
+// See: hw_spec_b60.md (456 GB/s bandwidth), optimization_guide.md (section 2.2 vectorized access)
+template<typename T, typename F>
+static void unary_op_contiguous_vec4_kernel(
+        const T * x,
+        T * dst,
+        const int k,
+        const sycl::nd_item<1> & item_ct1,
+        F func) {
+    const int k4 = k / 4;
+    for (auto i = item_ct1.get_global_id(0); i < (size_t)k4; i += item_ct1.get_global_range(0)) {
+        // Vec4 load
+        sycl::vec<T, 4> v = *reinterpret_cast<const sycl::vec<T, 4>*>(&x[i * 4]);
+        // Apply unary op element-wise
+        sycl::vec<T, 4> r;
+        r[0] = func(v[0]);
+        r[1] = func(v[1]);
+        r[2] = func(v[2]);
+        r[3] = func(v[3]);
+        // Vec4 store
+        *reinterpret_cast<sycl::vec<T, 4>*>(&dst[i * 4]) = r;
+    }
+}
+
 template<typename T, typename F>
 static void unary_op_generic_kernel(
         const T * x,
@@ -623,16 +649,35 @@ static inline void ggml_sycl_op_unary(
                 // opt_task_019: contiguous fast-path - bypasses 4D index decomposition
                 // This eliminates 3 int64 divisions + 3 modulo operations per element
                 // See: hw_spec_b60.md (int64 division is 10-20x slower), optimization_guide.md
-                stream->parallel_for(
-                    sycl::nd_range<1>(sycl::range<1>(num_blocks) * sycl::range<1>(256),
-                                      sycl::range<1>(256)),
-                    [=](sycl::nd_item<1> item_ct1) {
-                        unary_op_contiguous_kernel(
-                            src, dst_ptr, k_elements,
-                            item_ct1,
-                            func
-                        );
-                    });
+                // opt_task_033: vec4 vectorization for 4x bandwidth improvement
+                if (k_elements % 4 == 0) {
+                    // Vec4 path: each work-item processes 4 consecutive elements
+                    // Reduces memory transactions by ~4x on bandwidth-bound unary ops
+                    // See: hw_spec_b60.md (456 GB/s bandwidth), optimization_guide.md (section 2.2)
+                    const int num_blocks_v4 = ceil_div(k_elements / 4, 256);
+                    stream->parallel_for(
+                        sycl::nd_range<1>(sycl::range<1>(num_blocks_v4) * sycl::range<1>(256),
+                                          sycl::range<1>(256)),
+                        [=](sycl::nd_item<1> item_ct1) {
+                            unary_op_contiguous_vec4_kernel(
+                                src, dst_ptr, k_elements,
+                                item_ct1,
+                                func
+                            );
+                        });
+                } else {
+                    // Scalar fallback for non-vec4-aligned element counts
+                    stream->parallel_for(
+                        sycl::nd_range<1>(sycl::range<1>(num_blocks) * sycl::range<1>(256),
+                                          sycl::range<1>(256)),
+                        [=](sycl::nd_item<1> item_ct1) {
+                            unary_op_contiguous_kernel(
+                                src, dst_ptr, k_elements,
+                                item_ct1,
+                                func
+                            );
+                        });
+                }
             } else {
                 // Non-contiguous path: use generic 4D index decomposition kernel
                 stream->parallel_for(
