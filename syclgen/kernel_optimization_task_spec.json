@@ -992,7 +992,7 @@
       "priority": "high",
       "complexity": "medium",
       "category": "reduction",
-      "status": "pending",
+      "status": "completed",
       "description": "Replace manual 5-barrier SLM reduction with sycl::reduce_over_group in softmax forward kernel",
       "target_kernels": [
         {
@@ -1007,10 +1007,11 @@
       "dependencies": [],
       "estimated_improvement": "10-20% forward kernel speedup from reduced barrier overhead (5 barriers to 0-2 runtime-managed). Eliminates buf_iw SLM allocation (auto-resolves opt_001_005). Simplifies ~50 lines of manual reduction to 2 function calls.",
       "risk": "medium",
-      "notes": "The forward kernel soft_max_f32 (lines 111-163) uses manual two-level warp-shuffle + SLM reduction with 5 barriers (2 MAX + 3 SUM). Replace with: max_val = sycl::reduce_over_group(item.get_group(), max_val, sycl::maximum<float>()); and tmp = sycl::reduce_over_group(item.get_group(), tmp, sycl::plus<float>()). This eliminates nreduce, warp_id, lane_id, buf_iw. Requires changing soft_max_f32 to accept nd_item<3> as parameter instead of using this_work_item::get_nd_item<3>() (partial DPCT cleanup). Auto-resolves opt_001_005 (SLM tuning) since buf_iw is eliminated. Must verify numerical equivalence for all block sizes (32-1024) and all template specializations (32,64,128,256,512,1024,2048,4096). Softmax is on the critical inference path \u2014 every transformer attention layer.",
-      "baseline_metric": null,
-      "optimized_metric": null,
-      "actual_improvement": null,
+      "notes": "Replaced manual two-level warp-shuffle + SLM inter-warp reduction with sycl::reduce_over_group for both MAX and SUM reductions. Eliminates 5 explicit barriers (2 MAX + 3 SUM), removes buf_iw SLM allocation, removes warp_id/lane_id/nreduce variables. SLM allocation reduced by WARP_SIZE*sizeof(float) bytes. Non-shared path SLM reduced to 0. vals pointer now starts at beginning of SLM. Auto-resolves opt_001_005 (SLM tuning) since buf_iw is eliminated. Verified: 212/212 SOFT_MAX tests PASS, 24/24 SOFT_MAX_BACK tests PASS. Benchmark: peak 269 GB/s on [4096,4096,5,1] (59% of 456 GB/s theoretical). No baseline available for comparison.",
+      "completed_at": "2026-03-02T12:00:00Z",
+      "baseline_metric": "No baseline available (no prior softmax benchmark). Manual 5-barrier SLM reduction pattern.",
+      "optimized_metric": "sycl::reduce_over_group: peak 269.15 GB/s on [4096,4096,5,1], 267.01 GB/s on [12888,256,5,1], 242.68 GB/s on [131072,16,1,1].",
+      "actual_improvement": "Eliminated 5 barriers and buf_iw SLM allocation. Peak measured 269 GB/s (59% of 456 GB/s theoretical). Code simplified from ~50 lines of manual reduction to 2 reduce_over_group calls.",
       "blocked_reason": null
     },
     {

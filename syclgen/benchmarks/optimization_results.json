@@ -313,6 +313,17 @@
       "optimized_time_us": null,
       "speedup": null,
       "notes": "Added XE2-specific tile sizes: MMQ_X=64, MMQ_Y=64, NWARPS=8 (tuned for 64KB SLM, SIMD16). Updated mul_mat_q4_0 and mul_mat_q8_0 kernels. Full XMX joint_matrix implementation still pending - requires ~1000+ lines of new code."
+    },
+    {
+      "task_id": "opt_task_030",
+      "kernel": "SOFT_MAX",
+      "optimization": "Replace manual 5-barrier SLM reduction with sycl::reduce_over_group for MAX and SUM reductions",
+      "timestamp": "2026-03-02T12:00:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": 2344.47,
+      "speedup": null,
+      "notes": "Eliminated 5 explicit barriers (2 MAX + 3 SUM) and buf_iw SLM allocation. Replaced ~50 lines of manual reduction with 2 reduce_over_group calls. Peak 269.15 GB/s on [4096,4096,5,1] (59% of 456 GB/s theoretical). 212/212 SOFT_MAX tests PASS, 24/24 SOFT_MAX_BACK tests PASS. No baseline benchmark for speedup comparison."
     }
   ]
 }

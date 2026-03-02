@@ -211,3 +211,19 @@
     - q3_K/q5_0 are slower due to complex dequantization (more barriers, branches)
     - All K-quant XMX kernels use 8× more barriers per super-block than simple quants
     - Future optimization: tile size tuning, reducing barrier count in K-quant inner loop
+
+[2026-03-02] opt_task_030 (Softmax reduce_over_group): COMPLETED.
+  - softmax.cpp: Replaced manual 5-barrier SLM reduction with sycl::reduce_over_group
+  - MAX reduction: warp_reduce_max + 2 SLM barriers → sycl::reduce_over_group(group, val, maximum<float>())
+  - SUM reduction: warp_reduce_sum + 3 SLM barriers → sycl::reduce_over_group(group, val, plus<float>())
+  - Eliminated buf_iw SLM allocation (inter-warp reduction buffer)
+  - Removed warp_id, lane_id, nreduce variables (no longer needed)
+  - vals pointer now starts at beginning of SLM (was offset by buf_iw)
+  - SLM allocation reduced by WARP_SIZE*sizeof(float) (128 bytes for SIMD16)
+  - Non-shared path SLM reduced from WARP_SIZE*sizeof(float) to 0
+  - Auto-resolves opt_001_005 (SLM tuning) since buf_iw is eliminated
+  - Net: ~50 lines of manual reduction → 2 reduce_over_group calls
+  - Build: SUCCESS on b60
+  - Tests: 212/212 SOFT_MAX PASS, 24/24 SOFT_MAX_BACK PASS
+  - Benchmark: peak 269.15 GB/s on [4096,4096,5,1] (59% of 456 GB/s theoretical)
+  - No baseline benchmark available for speedup comparison
