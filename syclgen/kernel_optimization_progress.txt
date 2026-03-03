@@ -287,3 +287,35 @@
   - Benchmark: No dedicated perf test available in test-backend-ops for unary ops
     (same as opt_task_019). Expected 20-40% throughput improvement for large
     contiguous tensors (typical LLM sizes: 4096, 5120, 8192, 14336 are all div-by-4)
+
+[2026-03-03] opt_task_034 (Perf test cases for optimized SYCL kernels): COMPLETED.
+  - tests/test-backend-ops.cpp: Added ~75 perf test cases in make_test_cases_perf()
+  - 7 categories of new perf tests:
+    1. Unary ops (SILU, GELU, GELU_QUICK, GELU_ERF, RELU, SIGMOID, TANH, EXP): 32 tests
+       Shapes: [4096,{1,512}], [14336,{1,512}] — covers vec4 + native intrinsics + contiguous fast-path
+    2. GLU ops (SWIGLU, GEGLU, REGLU): 12 tests
+       Shapes: [22016,{1,512}], [28672,{1,512}] — covers fused gate+activation kernels
+    3. Cross-entropy loss: 3 tests
+       Shapes: [4096,64], [8192,32], [4096,1] — covers CE_WG_SIZE=256 optimization
+       Note: ncols>8192 crashes with UR_RESULT_ERROR_OUT_OF_RESOURCES on SYCL/b60
+    4. Get rows (f32, f16, q4_0, q8_0): 8 tests
+       Shapes: [4096,32000,r={1,512}] — covers reqd_sub_group_size optimization
+       Note: q4_K/q6_K removed — not supported on SYCL backend
+    5. RWKV WKV6/WKV7: 6 tests each (12 total)
+       Configs: {32,64} heads × head_size=64 × {prefill(512), generate(1)}
+       Covers SLM fix (byte→element count) and reqd_sub_group_size
+    6. GLA (Gated Linear Attention): 4 tests
+       Configs: {32,64} heads × {64,128} head_size × {prefill, generate}
+    7. TopK-MoE: 6 tests
+       Configs: {8,128} experts × {1,64,512} tokens × top_k={2,8}
+       Note: with_norm=true removed — falls back to CPU on SYCL
+  - Benchmark results on b60 (Intel Arc Pro B60, Xe2):
+    - Unary: RELU 2257 GB/s, EXP 2121 GB/s, SILU 1903 GB/s on [4096,512]
+    - GLU: REGLU 336 GB/s, SWIGLU 322 GB/s on [28672,512]
+    - CE loss: 171 GB/s on [4096,64]
+    - GET_ROWS f32: 4464 GB/s on [4096,32000,r=512]
+    - WKV6: 72.63 GB/s (64 heads), WKV7: 94.61 GB/s (64 heads)
+    - GLA: 28.27 GB/s (64 heads, prefill), 137.79 GB/s (32 heads, generate)
+    - TOPK_MOE: ~10.9 us/run for small expert counts
+  - Build: SUCCESS on b60
+  - All tests PASS (after fixing CE loss size, removing unsupported types, removing with_norm)

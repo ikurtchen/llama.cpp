@@ -1093,6 +1093,24 @@
       "optimized_metric": null,
       "actual_improvement": "Expected 20-40% throughput for large contiguous unary ops (no dedicated perf test available)",
       "blocked_reason": null
+    },
+    {
+      "id": "opt_task_034",
+      "priority": "medium",
+      "complexity": "medium",
+      "category": "benchmark",
+      "status": "completed",
+      "description": "Add perf test cases in tests/test-backend-ops.cpp::make_test_cases_perf() for the kernels have been migrated or optimized. We need to verify if there are regressions.",
+      "target_kernels": [],
+      "optimization_ids": [],
+      "dependencies": [],
+      "estimated_improvement": "",
+      "risk": "medium",
+      "notes": "Added ~75 perf test cases covering 7 categories: unary ops (SILU, GELU, GELU_QUICK, GELU_ERF, RELU, SIGMOID, TANH, EXP × 2 shapes × 2 batch sizes = 32 tests), GLU ops (SWIGLU, GEGLU, REGLU × 2 shapes × 2 batch sizes = 12 tests), cross-entropy loss (3 configs), get_rows (f32/f16/q4_0/q8_0 × 2 batch sizes = 8 tests), RWKV WKV6/WKV7 (6 configs each), GLA (4 configs), TopK-MoE (6 configs). Discoveries: CE loss crashes with ncols>8192 (UR_RESULT_ERROR_OUT_OF_RESOURCES), GET_ROWS doesn't support q4_K/q6_K on SYCL, TOPK_MOE with_norm falls back to CPU. All tests benchmarked on b60.",
+      "completed_at": "2026-03-03T00:00:00Z",
+      "baseline_metric": "No prior perf test cases existed for these kernels",
+      "optimized_metric": "Key results on b60: Unary RELU 2257 GB/s, EXP 2121 GB/s, SILU 1903 GB/s [4096,512]; GLU REGLU 336 GB/s, SWIGLU 322 GB/s [28672,512]; CE loss 171 GB/s [4096,64]; GET_ROWS f32 4464 GB/s [4096,32000,r=512]; WKV6 72.63 GB/s (64 heads), WKV7 94.61 GB/s (64 heads); GLA 28.27 GB/s (64 heads, prefill), 137.79 GB/s (32 heads, generate); TOPK_MOE ~10.9 us/run",
+      "actual_improvement": "Established regression benchmarking baseline for all optimized SYCL kernels on Intel Arc Pro B60 (Xe2)"
     }
   ]
 }

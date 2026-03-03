@@ -8570,6 +8570,58 @@ static std::vector<std::unique_ptr<test_case>> make_test_cases_perf() {
     test_cases.emplace_back(new test_ssm_scan(GGML_TYPE_F32, 128, 64, 48, 1, 512, 1)); // prefill
     test_cases.emplace_back(new test_ssm_scan(GGML_TYPE_F32, 128, 64, 48, 1, 1,   1)); // generate
 
+    // Unary element-wise ops — vec4 vectorized, native intrinsics, contiguous fast-path
+    for (auto op : {GGML_UNARY_OP_SILU, GGML_UNARY_OP_GELU, GGML_UNARY_OP_GELU_QUICK,
+                    GGML_UNARY_OP_GELU_ERF, GGML_UNARY_OP_RELU, GGML_UNARY_OP_SIGMOID,
+                    GGML_UNARY_OP_TANH, GGML_UNARY_OP_EXP}) {
+        for (int nrows : {1, 512}) {
+            test_cases.emplace_back(new test_unary(op, GGML_TYPE_F32, {4096,  nrows, 1, 1}));
+            test_cases.emplace_back(new test_unary(op, GGML_TYPE_F32, {14336, nrows, 1, 1}));
+        }
+    }
+
+    // GLU ops (SwiGLU, GeGLU, ReGLU) — fused gate+activation kernels
+    for (auto op : {GGML_GLU_OP_SWIGLU, GGML_GLU_OP_GEGLU, GGML_GLU_OP_REGLU}) {
+        for (int nrows : {1, 512}) {
+            test_cases.emplace_back(new test_glu(op, GGML_TYPE_F32, {11008*2, nrows, 1, 1}));
+            test_cases.emplace_back(new test_glu(op, GGML_TYPE_F32, {14336*2, nrows, 1, 1}));
+        }
+    }
+
+    // Cross-entropy loss — work-group size 256, reqd_sub_group_size
+    test_cases.emplace_back(new test_cross_entropy_loss(GGML_TYPE_F32, {4096,  64,  1, 1}));
+    test_cases.emplace_back(new test_cross_entropy_loss(GGML_TYPE_F32, {8192,  32,  1, 1}));
+    test_cases.emplace_back(new test_cross_entropy_loss(GGML_TYPE_F32, {4096,  1,   1, 1}));
+
+    // Get rows — reqd_sub_group_size(WARP_SIZE) optimized dequantize
+    for (ggml_type type : {GGML_TYPE_F32, GGML_TYPE_F16, GGML_TYPE_Q4_0, GGML_TYPE_Q8_0}) {
+        test_cases.emplace_back(new test_get_rows(type, 4096, 32000, 512));
+        test_cases.emplace_back(new test_get_rows(type, 4096, 32000, 1));
+    }
+
+    // RWKV WKV6/WKV7 — SLM optimized, reqd_sub_group_size
+    for (int64_t head_size : {64}) {
+        test_cases.emplace_back(new test_rwkv_wkv6(GGML_TYPE_F32, 32, head_size, 512, 1));
+        test_cases.emplace_back(new test_rwkv_wkv6(GGML_TYPE_F32, 64, head_size, 512, 1));
+        test_cases.emplace_back(new test_rwkv_wkv6(GGML_TYPE_F32, 64, head_size,   1, 1));
+
+        test_cases.emplace_back(new test_rwkv_wkv7(GGML_TYPE_F32, 32, head_size, 512, 1));
+        test_cases.emplace_back(new test_rwkv_wkv7(GGML_TYPE_F32, 64, head_size, 512, 1));
+        test_cases.emplace_back(new test_rwkv_wkv7(GGML_TYPE_F32, 64, head_size,   1, 1));
+    }
+
+    // GLA (Gated Linear Attention) — loop unrolling, sub-group ops
+    test_cases.emplace_back(new test_gla(GGML_TYPE_F32, 32, 64, 512, 1));
+    test_cases.emplace_back(new test_gla(GGML_TYPE_F32, 32, 64,   1, 1));
+    test_cases.emplace_back(new test_gla(GGML_TYPE_F32, 64, 64, 512, 1));
+    test_cases.emplace_back(new test_gla(GGML_TYPE_F32, 32, 128, 512, 1));
+
+    // TopK-MoE routing — loop unrolling
+    for (int n_tokens : {1, 64, 512}) {
+        test_cases.emplace_back(new test_topk_moe({8,   n_tokens, 1, 1}, 2));
+        test_cases.emplace_back(new test_topk_moe({128, n_tokens, 1, 1}, 8));
+    }
+
     return test_cases;
 }
 

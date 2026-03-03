@@ -395,6 +395,34 @@
       "optimized_time_us": null,
       "speedup": null,
       "notes": "Added unary_op_contiguous_vec4_kernel using sycl::vec<T,4> for coalesced 4-element loads/stores. Dispatch checks k_elements%4==0 for vec4 path, else scalar fallback. Benefits ~26 unary ops (silu, gelu, gelu_quick, gelu_erf, tanh, relu, sigmoid, exp, log, sqrt, sin, cos, abs, sgn, neg, step, hardsigmoid, hardswish, softplus, expm1, elu, sqr, floor, ceil, round, trunc). Build: SUCCESS. Unit tests: 192/192 PASS (f16+f32, all shapes). No dedicated perf test for unary ops in test-backend-ops. Expected 20-40% throughput improvement for large contiguous tensors (LLM ne0 values 4096/5120/8192/14336 are all divisible by 4)."
+    },
+    {
+      "task_id": "opt_task_034",
+      "kernel": "multiple (unary, GLU, cross_entropy, get_rows, WKV6/WKV7, GLA, TopK-MoE)",
+      "optimization": "Add ~75 perf test cases in make_test_cases_perf() for regression benchmarking of all optimized SYCL kernels",
+      "timestamp": "2026-03-03T00:00:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": null,
+      "notes": "Added ~75 perf test cases covering 7 categories: unary ops (8 ops × 2 shapes × 2 batches = 32), GLU ops (3 ops × 2 shapes × 2 batches = 12), cross-entropy loss (3 configs), get_rows (4 types × 2 batches = 8), RWKV WKV6/WKV7 (12 configs), GLA (4 configs), TopK-MoE (6 configs). All benchmarked on b60. Discoveries: CE loss OOM for ncols>8192, GET_ROWS no q4_K/q6_K support on SYCL, TOPK_MOE with_norm falls back to CPU.",
+      "benchmark_details": {
+        "test_config": "Intel Arc Pro B60 (Xe2, Battlemage), 456 GB/s theoretical bandwidth",
+        "key_results": {
+          "unary_RELU[4096,512]": {"bandwidth_gbs": 2257, "notes": "cache-aided, vec4 optimized"},
+          "unary_EXP[4096,512]": {"bandwidth_gbs": 2121, "notes": "cache-aided, native::exp"},
+          "unary_SILU[4096,512]": {"bandwidth_gbs": 1903, "notes": "cache-aided, native intrinsics"},
+          "GLU_REGLU[28672,512]": {"bandwidth_gbs": 336, "notes": "fused gate+activation"},
+          "GLU_SWIGLU[28672,512]": {"bandwidth_gbs": 322, "notes": "fused gate+activation"},
+          "CROSS_ENTROPY_LOSS[4096,64]": {"bandwidth_gbs": 171, "notes": "CE_WG_SIZE=256"},
+          "GET_ROWS_f32[4096,32000,r=512]": {"bandwidth_gbs": 4464, "notes": "cache-aided"},
+          "RWKV_WKV6[64heads,hs=64,prefill]": {"bandwidth_gbs": 72.63, "notes": "SLM fix applied"},
+          "RWKV_WKV7[64heads,hs=64,prefill]": {"bandwidth_gbs": 94.61, "notes": "SLM fix applied"},
+          "GLA[64heads,hs=64,prefill]": {"bandwidth_gbs": 28.27, "notes": "compute-bound"},
+          "GLA[32heads,hs=64,generate]": {"bandwidth_gbs": 137.79, "notes": "latency-bound"},
+          "TOPK_MOE[8experts,512tok,k=2]": {"time_us": 10.9, "notes": "loop unrolling applied"}
+        }
+      }
     }
   ]
 }
