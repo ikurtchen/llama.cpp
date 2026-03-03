@@ -1919,7 +1919,7 @@ void argmax_f32_i32_sycl(const float *x, int *dst, const int ncols,
 
         cgh.parallel_for(
             sycl::nd_range<3>(block_nums * block_dims, block_dims),
-            [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(16)]] {
+            [=](sycl::nd_item<3> item_ct1) {
                 const int tid = item_ct1.get_local_id(2);
                 const int row = item_ct1.get_global_id(1);
 
