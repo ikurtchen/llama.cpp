@@ -46,6 +46,11 @@ static void dequantize_mul_mat_vec(const void * __restrict__ vx, const dfloat * 
 
     for (int i = 0; i < ncols; i += iter_stride) {
         const int col = i + vals_per_iter*tid;
+
+        if (col + vals_per_iter > ncols) {
+            break;
+        }
+
         const int ib = (row*ncols + col)/qk; // x block index
         const int iqs = (col%qk)/qr; // x quant index
         const int iybs = col - col%qk; // y block start index
@@ -75,19 +80,21 @@ static void dequantize_mul_mat_vec(const void * __restrict__ vx, const dfloat * 
     }
 
     // sum up partial sums and write back result
-    const int mask_start = ncols > GGML_SYCL_DMMV_X ? WARP_SIZE >> 1 : WARP_SIZE >> 2;
-    for (int mask = mask_start; mask > 0; mask >>= 1) {
-        tmp +=
-            dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), tmp, mask);
-    }
-
-    if (tid == 0) {
+    // Use sycl::reduce_over_group for sub-group reduction instead of manual dpct shuffle loop.
+    // Out-of-bounds threads (col >= ncols) skip accumulation, so tmp remains 0 for them.
+    auto sg = item_ct1.get_sub_group();
 #ifdef GGML_SYCL_F16
-        dst[row] = tmp.x() + tmp.y();
-#else
-        dst[row] = tmp;
-#endif // GGML_SYCL_F16
+    float sum = sycl::reduce_over_group(sg, static_cast<float>(tmp.x()), sycl::plus<float>());
+    sum += sycl::reduce_over_group(sg, static_cast<float>(tmp.y()), sycl::plus<float>());
+    if (tid == 0) {
+        dst[row] = sum;
     }
+#else
+    tmp = sycl::reduce_over_group(sg, tmp, sycl::plus<float>());
+    if (tid == 0) {
+        dst[row] = tmp;
+    }
+#endif // GGML_SYCL_F16
 }
 
 template <int qk, int qr, dequantize_kernel_t_reorder dequantize_kernel_reorder>
@@ -181,19 +188,21 @@ static void dequantize_mul_mat_vec_reorder(const void * __restrict__ vx, const d
     }
 
     // sum up partial sums and write back result
-    const int mask_start = ncols > GGML_SYCL_DMMV_X ? WARP_SIZE >> 1 : WARP_SIZE >> 2;
-    for (int mask = mask_start; mask > 0; mask >>= 1) {
-        tmp +=
-            dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), tmp, mask);
-    }
-
-    if (tid == 0) {
+    // Use sycl::reduce_over_group for sub-group reduction instead of manual dpct shuffle loop.
+    // Out-of-bounds threads are guarded (continue/break), so tmp remains 0 for them.
+    auto sg = item_ct1.get_sub_group();
 #ifdef GGML_SYCL_F16
-        dst[row] = tmp.x() + tmp.y();
-#else
-        dst[row] = tmp;
-#endif // GGML_SYCL_F16
+    float sum = sycl::reduce_over_group(sg, static_cast<float>(tmp.x()), sycl::plus<float>());
+    sum += sycl::reduce_over_group(sg, static_cast<float>(tmp.y()), sycl::plus<float>());
+    if (tid == 0) {
+        dst[row] = sum;
     }
+#else
+    tmp = sycl::reduce_over_group(sg, tmp, sycl::plus<float>());
+    if (tid == 0) {
+        dst[row] = tmp;
+    }
+#endif // GGML_SYCL_F16
 }
 
 static void convert_mul_mat_vec_f16_sycl(const void *vx, const dfloat *y,

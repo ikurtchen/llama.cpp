@@ -445,6 +445,34 @@
           "CPY_f16_to_f16_transpose[786432,256]": {"time_us": 9329.78, "bandwidth_gbs": 81.32, "notes": "large transpose"}
         }
       }
+    },
+    {
+      "task_id": "opt_task_036",
+      "kernel": "dmmv (simple quant templates) + norm kernels",
+      "optimization": "Replace dpct::permute_sub_group_by_xor shuffle reductions with sycl::reduce_over_group in dmmv; replace sycl::rsqrt with sycl::native::rsqrt in norm",
+      "timestamp": "2026-03-03T12:00:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": null,
+      "notes": "dmmv: Replaced manual dpct shuffle loop (~15 lines) with single sycl::reduce_over_group call in both dequantize_mul_mat_vec and dequantize_mul_mat_vec_reorder templates. Added bounds guard for ncols <= GGML_SYCL_DMMV_X edge case (k=32). norm: 5x sycl::rsqrt → sycl::native::rsqrt. All 726/726 MUL_MAT + 8/8 norm tests PASS. No pre-optimization baseline available for direct speedup comparison (first measurement with both changes applied).",
+      "benchmark_details": {
+        "test_config": "Intel Arc Pro B60 (Xe2), MUL_MAT n=1 (dmmv path), m=4096, k=14336",
+        "dmmv_results": {
+          "q4_0": {"gflops": 593, "notes": "dmmv simple quant with reduce_over_group"},
+          "q4_1": {"gflops": 512, "notes": "dmmv simple quant with reduce_over_group"},
+          "q5_0": {"gflops": 162, "notes": "dmmv simple quant with reduce_over_group"},
+          "q5_1": {"gflops": 422, "notes": "dmmv simple quant with reduce_over_group"},
+          "q8_0": {"gflops": 136, "notes": "dmmv simple quant with reduce_over_group"},
+          "q4_K": {"gflops": 529, "notes": "K-quant, uses separate kernel (not modified)"},
+          "f16":  {"gflops": 234, "notes": "f16 convert path"}
+        },
+        "norm_results": {
+          "RMS_NORM_peak": {"bandwidth_gbs": 184, "shape": "[14336,16]"},
+          "NORM_peak": {"bandwidth_gbs": 174, "shape": "[14336,16]"},
+          "GROUP_NORM_peak": {"bandwidth_gbs": 345, "shape": "[64,64,320]"}
+        }
+      }
     }
   ]
 }

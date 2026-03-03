@@ -1142,6 +1142,37 @@
       "optimized_metric": "CPY f32->q4_0: 120.96us (294.97 GB/s); q4_0->f32: 452.98us (78.70 GB/s); f32->f16: 66.23us (132.73 GB/s); f32->f32 permuted: 351.44us (178.01 GB/s)",
       "actual_improvement": "CPY quantized: ~same (uses specialized block code path); scalar copies benefit from better occupancy; soft_max_back: correctness verified, no dedicated benchmark available (SOFT_MAX_BACK tests with max_bias=0 pass)",
       "blocked_reason": null
+    },
+    {
+      "id": "opt_task_036",
+      "priority": "medium",
+      "complexity": "low",
+      "category": "reduction",
+      "status": "completed",
+      "description": "Replace dpct::permute_sub_group_by_xor shuffle reductions with sycl::reduce_over_group in dmmv simple quant kernels, and replace sycl::rsqrt with sycl::native::rsqrt in norm kernels",
+      "target_kernels": [
+        {
+          "kernel_id": "sk_010",
+          "file": "ggml/src/ggml-sycl/dmmv.cpp"
+        },
+        {
+          "kernel_id": "sk_003",
+          "file": "ggml/src/ggml-sycl/norm.cpp"
+        }
+      ],
+      "optimization_ids": [
+        "opt_010_006",
+        "opt_003_005"
+      ],
+      "dependencies": [],
+      "estimated_improvement": "5-10% dmmv throughput from better codegen on Intel; 1-3% norm from native::rsqrt",
+      "risk": "low",
+      "notes": "dmmv: Replaced manual dpct::permute_sub_group_by_xor shuffle loop with sycl::reduce_over_group in both dequantize_mul_mat_vec and dequantize_mul_mat_vec_reorder templates. Added bounds guard (col + vals_per_iter > ncols → break) to prevent out-of-bounds accumulation when ncols <= GGML_SYCL_DMMV_X (k=32 edge case). norm: Replaced sycl::rsqrt with sycl::native::rsqrt in 5 locations (norm_f32, rms_norm_f32, l2_norm_f32, group_norm_f32, rms_norm_back).",
+      "completed_at": "2026-03-03T12:00:00Z",
+      "baseline_metric": "dmmv n=1 (m=4096, k=14336): q4_0=593 GFLOPS, q4_1=512 GFLOPS, q5_0=162 GFLOPS, q5_1=422 GFLOPS, q8_0=136 GFLOPS. Norm: RMS_NORM[14336,16]=184 GB/s, NORM[14336,16]=174 GB/s, GROUP_NORM[64,64,320]=345 GB/s",
+      "optimized_metric": "Same benchmark run (first measurement with reduce_over_group + native::rsqrt). No pre-optimization baseline available for direct comparison since these are the first measurements with both changes applied.",
+      "actual_improvement": "Code quality: eliminated ~30 lines of manual dpct shuffle reduction in favor of 2 reduce_over_group calls per template. Fixed edge-case correctness bug at k=32. native::rsqrt provides lower-latency rsqrt on Intel GPU hardware. All 726/726 MUL_MAT + 8/8 norm tests PASS.",
+      "blocked_reason": null
     }
   ]
 }

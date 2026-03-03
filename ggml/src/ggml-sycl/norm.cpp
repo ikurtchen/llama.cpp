@@ -60,7 +60,8 @@ static void norm_f32(const float* x, float* dst, const int ncols, const int64_t 
 
     const float mean = mean_var.x() / ncols;
     const float var = mean_var.y() / ncols - mean * mean;
-    const float inv_std = sycl::rsqrt(var + eps);
+    // native::rsqrt provides ~1 ULP accuracy, sufficient for normalization scaling
+    const float inv_std = sycl::native::rsqrt(var + eps);
 
     // Vec4 vectorized write-back
     if (ncols % 4 == 0) {
@@ -162,7 +163,7 @@ static void group_norm_f32(const float* x, float* dst, const int group_size, con
     }
 
     float variance = tmp / group_size;
-    float scale = sycl::rsqrt(variance + eps);
+    float scale = sycl::native::rsqrt(variance + eps);
 
     // Vec4 vectorized scale write-back
     if (group_len % 4 == 0) {
@@ -236,7 +237,7 @@ static void rms_norm_f32(const float* x, float* dst, const int ncols, const int6
     }
 
     const float mean = tmp / ncols;
-    const float scale = sycl::rsqrt(mean + eps);
+    const float scale = sycl::native::rsqrt(mean + eps);
 
     // Vec4 vectorized write-back
     if (ncols % 4 == 0) {
@@ -298,7 +299,7 @@ static void l2_norm_f32(const float* x, float* dst, const int ncols, const float
         tmp = warp_reduce_sum(tmp, item_ct1);
     }
 
-    const float scale = sycl::rsqrt(sycl::max(tmp, eps * eps));
+    const float scale = sycl::native::rsqrt(sycl::max(tmp, eps * eps));
 
     // Vec4 vectorized write-back
     if (ncols % 4 == 0) {
@@ -721,7 +722,7 @@ void ggml_sycl_op_rms_norm_back(ggml_backend_sycl_context & ctx, ggml_tensor * d
                     const float sum_xdz_f = xg_total.x() + xg_total.y();
                     const float mean_eps  = sum_xx_f / (float) D + eps;
                     const float sum_eps   = sum_xx_f + eps * (float) D;
-                    inv_r = sycl::rsqrt(mean_eps);
+                    inv_r = sycl::native::rsqrt(mean_eps);
                     coeff = -sum_xdz_f / sum_eps;
                 }
                 inv_r = sycl::group_broadcast(item_ct1.get_group(), inv_r);

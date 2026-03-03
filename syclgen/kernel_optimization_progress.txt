@@ -336,3 +336,25 @@
   - Build: SUCCESS on b60
   - Unit tests: 367/367 passed (CPY, SOFT_MAX, SOFT_MAX_BACK)
   - SOFT_MAX_BACK with max_bias>0 shows "not supported" (ALiBi not implemented on SYCL)
+
+[2026-03-03] opt_task_036 (dmmv reduce_over_group + norm native::rsqrt): COMPLETED.
+  - dmmv.cpp: Replaced manual dpct::permute_sub_group_by_xor shuffle reduction with
+    sycl::reduce_over_group(sub_group, ...) in both simple quant templates:
+    - dequantize_mul_mat_vec (normal template, lines 82-97)
+    - dequantize_mul_mat_vec_reorder (reorder template, lines 189-204)
+  - dmmv.cpp: Added bounds guard (col + vals_per_iter > ncols → break) in normal template
+    to prevent garbage accumulation when ncols <= GGML_SYCL_DMMV_X (k=32 edge case)
+    - Bug: threads with tid >= ncols/vals_per_iter computed col >= ncols but still executed
+      inner loop, reading out-of-bounds memory. reduce_over_group included this garbage
+      (old partial shuffle naturally excluded these threads via smaller mask)
+    - Fix: break out of loop when col + vals_per_iter > ncols, keeping tmp=0 for those threads
+  - norm.cpp: Replaced sycl::rsqrt → sycl::native::rsqrt in 5 locations:
+    - norm_f32 (line 64), rms_norm_f32 (line 166), l2_norm_f32 (line 240),
+      group_norm_f32 (line 302), rms_norm_back (line 725)
+  - Build: SUCCESS on b60
+  - Tests: 726/726 MUL_MAT PASS (including previously-failing q4_1/q5_0/q5_1/q8_0 at k=32)
+  - Tests: 8/8 norm PASS (RMS_NORM_BACK)
+  - Benchmark (dmmv n=1, m=4096, k=14336):
+    q4_0=593 GFLOPS, q4_1=512 GFLOPS, q5_0=162 GFLOPS, q5_1=422 GFLOPS, q8_0=136 GFLOPS
+  - Benchmark (norm): RMS_NORM peak=184 GB/s, NORM peak=174 GB/s, GROUP_NORM peak=345 GB/s
+  - Net: ~30 lines of manual shuffle reduction → 2 reduce_over_group calls per template
