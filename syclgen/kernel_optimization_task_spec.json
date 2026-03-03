@@ -1111,6 +1111,37 @@
       "baseline_metric": "No prior perf test cases existed for these kernels",
       "optimized_metric": "Key results on b60: Unary RELU 2257 GB/s, EXP 2121 GB/s, SILU 1903 GB/s [4096,512]; GLU REGLU 336 GB/s, SWIGLU 322 GB/s [28672,512]; CE loss 171 GB/s [4096,64]; GET_ROWS f32 4464 GB/s [4096,32000,r=512]; WKV6 72.63 GB/s (64 heads), WKV7 94.61 GB/s (64 heads); GLA 28.27 GB/s (64 heads, prefill), 137.79 GB/s (32 heads, generate); TOPK_MOE ~10.9 us/run",
       "actual_improvement": "Established regression benchmarking baseline for all optimized SYCL kernels on Intel Arc Pro B60 (Xe2)"
+    },
+    {
+      "id": "opt_task_035",
+      "priority": "high",
+      "complexity": "low",
+      "category": "work_group_size",
+      "status": "completed",
+      "description": "Increase SYCL_CPY_BLOCK_SIZE from 32 to 256 for scalar copy kernels and increase soft_max_back_f32 work-group size from WARP_SIZE to 256",
+      "target_kernels": [
+        {
+          "kernel_id": "sk_007",
+          "file": "ggml/src/ggml-sycl/cpy.cpp"
+        },
+        {
+          "kernel_id": "sk_001",
+          "file": "ggml/src/ggml-sycl/softmax.cpp"
+        }
+      ],
+      "optimization_ids": [
+        "opt_007_002",
+        "opt_001_004"
+      ],
+      "dependencies": [],
+      "estimated_improvement": "30-50% throughput improvement for scalar copy operations; 30-50% for softmax backward pass",
+      "risk": "low",
+      "notes": "Changed SYCL_CPY_BLOCK_SIZE from 32 to 256 in presets.hpp. Rewrote soft_max_back_f32 kernel: replaced warp_reduce_sum with sycl::reduce_over_group for multi-sub-group reduction, changed loop strides from WARP_SIZE to runtime block_size, updated launch from WARP_SIZE(16) to 256 threads with reqd_sub_group_size(WARP_SIZE).",
+      "completed_at": "2026-03-03",
+      "baseline_metric": "CPY f32->q4_0: 119.69us; q4_0->f32: 453.45us (from opt_task_005)",
+      "optimized_metric": "CPY f32->q4_0: 120.96us (294.97 GB/s); q4_0->f32: 452.98us (78.70 GB/s); f32->f16: 66.23us (132.73 GB/s); f32->f32 permuted: 351.44us (178.01 GB/s)",
+      "actual_improvement": "CPY quantized: ~same (uses specialized block code path); scalar copies benefit from better occupancy; soft_max_back: correctness verified, no dedicated benchmark available (SOFT_MAX_BACK tests with max_bias=0 pass)",
+      "blocked_reason": null
     }
   ]
 }

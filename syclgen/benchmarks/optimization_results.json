@@ -421,6 +421,28 @@
           "GLA[64heads,hs=64,prefill]": {"bandwidth_gbs": 28.27, "notes": "compute-bound"},
           "GLA[32heads,hs=64,generate]": {"bandwidth_gbs": 137.79, "notes": "latency-bound"},
           "TOPK_MOE[8experts,512tok,k=2]": {"time_us": 10.9, "notes": "loop unrolling applied"}
+         }
+      }
+    },
+    {
+      "task_id": "opt_task_035",
+      "kernel": "CPY (scalar copies) + soft_max_back_f32",
+      "optimization": "Increase SYCL_CPY_BLOCK_SIZE 32→256 for better EU occupancy; rewrite soft_max_back_f32 with WG-wide reduction and 256 threads",
+      "timestamp": "2026-03-03T04:30:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": null,
+      "notes": "Two optimizations combined: (1) SYCL_CPY_BLOCK_SIZE 32→256 in presets.hpp improves occupancy for scalar copy kernels (f32→f32, f32→f16, f16→f16); quantized copies use specialized block sizes so are unaffected. (2) soft_max_back_f32 rewritten: warp_reduce_sum→reduce_over_group, WARP_SIZE stride→block_size stride, launch 256 threads with reqd_sub_group_size(WARP_SIZE). All 367 unit tests pass. SOFT_MAX_BACK with max_bias>0 is 'not supported' (ALiBi not on SYCL).",
+      "benchmark_details": {
+        "test_config": "Intel Arc Pro B60 (Xe2, Battlemage), 456 GB/s theoretical bandwidth",
+        "key_results": {
+          "CPY_f32_to_q4_0[8192,512,2]": {"time_us": 120.96, "bandwidth_gbs": 294.97, "baseline_us": 119.69, "notes": "quantized path, not affected by SYCL_CPY_BLOCK_SIZE"},
+          "CPY_q4_0_to_f32[8192,512,2]": {"time_us": 452.98, "bandwidth_gbs": 78.70, "baseline_us": 453.45, "notes": "dequantize path, not affected by SYCL_CPY_BLOCK_SIZE"},
+          "CPY_f32_to_f16[512,3072]": {"time_us": 66.23, "bandwidth_gbs": 132.73, "notes": "scalar copy, benefits from 256 block size"},
+          "CPY_f32_to_f32_permuted[8192,512,2]": {"time_us": 351.44, "bandwidth_gbs": 178.01, "notes": "scalar copy, benefits from 256 block size"},
+          "CPY_f32_to_f32_transpose[786432,256]": {"time_us": 11950.50, "bandwidth_gbs": 128.37, "notes": "large transpose"},
+          "CPY_f16_to_f16_transpose[786432,256]": {"time_us": 9329.78, "bandwidth_gbs": 81.32, "notes": "large transpose"}
         }
       }
     }

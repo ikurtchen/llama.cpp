@@ -220,12 +220,15 @@ static void soft_max_f32(const float *         x,
 #pragma clang diagnostic pop
 #endif // __clang__
 
+// opt_task_035: Softmax backward with multi-sub-group work-group (256 threads).
+// Uses sycl::reduce_over_group instead of warp_reduce_sum for cross-sub-group reduction.
+// 256 threads = 16 sub-groups of SIMD16, greatly improving occupancy over the
+// previous single-warp (16 thread) work-group which used only 1/8 of EU capacity.
 static void soft_max_back_f32(const float *grad, const float *dstf, float *dst,
                               const int ncols, const float scale) {
-    // opt_001_003: vec4 vectorized loads/stores for memory-bound kernel
-    // Target: Intel Arc Pro B60 (Xe2), 456 GB/s memory bandwidth
     auto      item_ct1 = sycl::ext::oneapi::this_work_item::get_nd_item<3>();
     const int tid      = item_ct1.get_local_id(2);
+    const int block_size = item_ct1.get_local_range(2);
     const int rowx     = item_ct1.get_group(2);
 
     grad += int64_t(rowx)*ncols;
@@ -238,37 +241,39 @@ static void soft_max_back_f32(const float *grad, const float *dstf, float *dst,
     // Process 4 elements at a time with vec4 loads
     // Each thread processes consecutive vec4 elements: thread i handles elements [i*4, i*4+1, i*4+2, i*4+3]
     const int vec4_col_end = (ncols / 4) * 4;
-    for (int col = tid * 4; col < vec4_col_end; col += WARP_SIZE * 4) {
+    for (int col = tid * 4; col < vec4_col_end; col += block_size * 4) {
         sycl::vec<float, 4> grad_v = *reinterpret_cast<const sycl::vec<float, 4>*>(&grad[col]);
         sycl::vec<float, 4> dstf_v = *reinterpret_cast<const sycl::vec<float, 4>*>(&dstf[col]);
         dgf_dot += dstf_v[0] * grad_v[0] + dstf_v[1] * grad_v[1] + dstf_v[2] * grad_v[2] + dstf_v[3] * grad_v[3];
     }
     // Handle remaining elements (0-3)
-    for (int col = vec4_col_end + tid; col < ncols; col += WARP_SIZE) {
+    for (int col = vec4_col_end + tid; col < ncols; col += block_size) {
         dgf_dot += dstf[col]*grad[col];
     }
 #else
-    for (int col = tid; col < ncols; col += WARP_SIZE) {
+    for (int col = tid; col < ncols; col += block_size) {
         dgf_dot += dstf[col]*grad[col];
     }
 #endif
 
-    dgf_dot = warp_reduce_sum(dgf_dot);
+    // opt_task_035: Use reduce_over_group for multi-sub-group reduction
+    // Replaces warp_reduce_sum which only worked within a single sub-group.
+    dgf_dot = sycl::reduce_over_group(item_ct1.get_group(), dgf_dot, sycl::plus<float>());
 
 #if GGML_SYCL_VEC4
     // Process 4 elements at a time with vec4 loads/stores
-    for (int col = tid * 4; col < vec4_col_end; col += WARP_SIZE * 4) {
+    for (int col = tid * 4; col < vec4_col_end; col += block_size * 4) {
         sycl::vec<float, 4> grad_v = *reinterpret_cast<const sycl::vec<float, 4>*>(&grad[col]);
         sycl::vec<float, 4> dstf_v = *reinterpret_cast<const sycl::vec<float, 4>*>(&dstf[col]);
         sycl::vec<float, 4> dst_v = scale * (grad_v - dgf_dot) * dstf_v;
         *reinterpret_cast<sycl::vec<float, 4>*>(&dst[col]) = dst_v;
     }
     // Handle remaining elements (0-3)
-    for (int col = vec4_col_end + tid; col < ncols; col += WARP_SIZE) {
+    for (int col = vec4_col_end + tid; col < ncols; col += block_size) {
         dst[col] = scale * (grad[col] - dgf_dot) * dstf[col];
     }
 #else
-    for (int col = tid; col < ncols; col += WARP_SIZE) {
+    for (int col = tid; col < ncols; col += block_size) {
         dst[col] = scale * (grad[col] - dgf_dot) * dstf[col];
     }
 #endif
@@ -388,11 +393,14 @@ static void soft_max_back_f32_sycl(const float *   grad,
                                    const int       nrows,
                                    const float     scale,
                                    sycl::queue* stream) {
-    const dpct::dim3 block_dims(WARP_SIZE, 1, 1);
+    // opt_task_035: Increased from WARP_SIZE (16) to 256 for better occupancy.
+    // 256 threads = 16 sub-groups of SIMD16, using full EU thread capacity.
+    const dpct::dim3 block_dims(256, 1, 1);
     const dpct::dim3 block_nums(nrows, 1, 1);
 
     stream->parallel_for(sycl::nd_range<3>(block_nums * block_dims, block_dims),
-                         [=](sycl::nd_item<3> item_ct1) {
+                         [=](sycl::nd_item<3> item_ct1)
+                             [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
                              soft_max_back_f32(grad, dstf, dst, ncols, scale);
                              GGML_UNUSED(item_ct1);
                          });

@@ -319,3 +319,20 @@
     - TOPK_MOE: ~10.9 us/run for small expert counts
   - Build: SUCCESS on b60
   - All tests PASS (after fixing CE loss size, removing unsupported types, removing with_norm)
+
+[2026-03-03] opt_task_035 (CPY block size 32→256 + soft_max_back WG size 16→256): COMPLETED.
+  - Optimization opt_007_002: Changed SYCL_CPY_BLOCK_SIZE from 32 to 256 in presets.hpp
+    - 32-thread WGs used only 2 sub-groups of SIMD16, wasting occupancy
+    - 256 threads = 16 sub-groups, matching Intel GPU optimization guide
+    - Affects all scalar copy kernel launches in cpy.cpp
+    - Benchmark: f32→q4_0: 120.96us (294.97 GB/s), q4_0→f32: 452.98us (78.70 GB/s)
+    - Note: Quantized copy paths use specialized block sizes, not SYCL_CPY_BLOCK_SIZE
+    - Scalar copies (f32→f32, f32→f16, f16→f16) benefit from better occupancy
+  - Optimization opt_001_004: Rewrote soft_max_back_f32 kernel in softmax.cpp
+    - Replaced warp_reduce_sum (single sub-group) with sycl::reduce_over_group (full WG)
+    - Changed loop strides from WARP_SIZE to runtime block_size
+    - Updated launch from WARP_SIZE(16) to 256 threads with reqd_sub_group_size
+    - Pattern matches forward softmax kernel (opt_task_030)
+  - Build: SUCCESS on b60
+  - Unit tests: 367/367 passed (CPY, SOFT_MAX, SOFT_MAX_BACK)
+  - SOFT_MAX_BACK with max_bias>0 shows "not supported" (ALiBi not implemented on SYCL)

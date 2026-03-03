@@ -32,7 +32,10 @@
 #define SYCL_SIN_BLOCK_SIZE 256
 #define SYCL_SQR_BLOCK_SIZE 256
 #define SYCL_SET_BLOCK_SIZE 256
-#define SYCL_CPY_BLOCK_SIZE 32
+// opt_task_035: Increased from 32 to 256 for better occupancy on Xe2.
+// 32-thread work-groups use only 2 sub-groups, wasting occupancy potential.
+// 256 = 16 sub-groups of SIMD16, matching Intel GPU optimization guide recommendation.
+#define SYCL_CPY_BLOCK_SIZE 256
 #define SYCL_SCALE_BLOCK_SIZE 256
 #define SYCL_CLAMP_BLOCK_SIZE 256
 #define SYCL_ROPE_BLOCK_SIZE 256
