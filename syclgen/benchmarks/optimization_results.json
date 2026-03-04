@@ -473,6 +473,33 @@
           "GROUP_NORM_peak": {"bandwidth_gbs": 345, "shape": "[64,64,320]"}
         }
       }
+    },
+    {
+      "task_id": "opt_task_037",
+      "kernel": "SOFT_MAX (soft_max_f32)",
+      "optimization": "Tiered block size selection to minimize reduce_over_group overhead for small ncols; fixed nd_range/block_size_template mismatch",
+      "timestamp": "2026-03-04T03:00:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": null,
+      "notes": "Fixed SOFT_MAX regressions from opt_task_030/031. Root cause: reduce_over_group overhead scales with sub-group count. Fix: compile-time block selection (ncols<=WARP_SIZE→block=ncols, ncols<=4*WARP_SIZE→block=WARP_SIZE, ncols<=256→block=ncols, else block=256). Also fixed critical bug: nd_range was using passed block_dims instead of compile-time block, causing OOB access. Fallback path capped at 256. 212/212 tests PASS.",
+      "benchmark_details": {
+        "test_config": "Intel Arc Pro B60 (Xe2), SOFT_MAX benchmark",
+        "regression_fixes": {
+          "[64,64,20,1]":     {"original_us": 6.51, "prev_opt_us": 9.11, "now_us": 6.03, "vs_original": "+7.9%", "vs_prev": "+51.1%"},
+          "[1024,1024,10,1]": {"original_us": 1096.28, "prev_opt_us": 1185.59, "now_us": 248.66, "vs_original": "4.41x", "vs_prev": "4.77x"},
+          "[77,4096,5,1]":    {"original_us": 213.02, "prev_opt_us": 227.17, "now_us": 207.57, "vs_original": "+2.6%", "vs_prev": "+9.4%"},
+          "[77,64,20,1]":     {"original_us": 14.56, "prev_opt_us": 15.39, "now_us": 14.16, "vs_original": "+2.8%", "vs_prev": "+8.7%"},
+          "[256,256,20,1]":   {"original_us": 96.87, "prev_opt_us": null, "now_us": 94.48, "vs_original": "+2.5%"}
+        },
+        "large_ncols_preserved": {
+          "[4096,4096,5,1]":  {"original_us": 2527.62, "now_us": 1762.03, "speedup": "1.43x"},
+          "[12888,256,5,1]":  {"original_us": 463.59, "now_us": 379.50, "speedup": "1.22x"},
+          "[32768,16,1,1]":   {"original_us": 17.75, "now_us": 8.25, "speedup": "2.15x"},
+          "[65536,16,1,1]":   {"original_us": 33.25, "now_us": 13.91, "speedup": "2.39x"}
+        }
+      }
     }
   ]
 }

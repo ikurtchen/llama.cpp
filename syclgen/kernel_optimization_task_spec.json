@@ -1173,6 +1173,29 @@
       "optimized_metric": "Same benchmark run (first measurement with reduce_over_group + native::rsqrt). No pre-optimization baseline available for direct comparison since these are the first measurements with both changes applied.",
       "actual_improvement": "Code quality: eliminated ~30 lines of manual dpct shuffle reduction in favor of 2 reduce_over_group calls per template. Fixed edge-case correctness bug at k=32. native::rsqrt provides lower-latency rsqrt on Intel GPU hardware. All 726/726 MUL_MAT + 8/8 norm tests PASS.",
       "blocked_reason": null
+    },
+    {
+      "id": "opt_task_037",
+      "priority": "high",
+      "complexity": "medium",
+      "category": "vectorization",
+      "status": "completed",
+      "description": "The SOFT_MAX benchmark for small dim has regression after introduce vectorization and reduction optimization. We need to investigate and fix the regression.",
+      "target_kernels": [
+        {
+          "kernel_id": "sk_001",
+          "file": "ggml/src/ggml-sycl/softmax.cpp"
+        }
+      ],
+      "optimization_ids": [],
+      "dependencies": [],
+      "risk": "medium",
+      "notes": "Fixed by tiered block size selection in launch_soft_max_kernels: ncols<=WARP_SIZE→block=ncols, ncols<=4*WARP_SIZE→block=WARP_SIZE, ncols<=256→block=ncols, else block=256. Also fixed nd_range/block_size_template mismatch (was causing OOB in template-specialized paths) and capped fallback path at 256 threads. 212/212 tests PASS. All regressions eliminated: [64,64,20,1] 9.11→6.03us, [1024,1024,10,1] 1185.59→248.66us, [77,4096,5,1] 227.17→207.57us. Large-ncols improvements preserved: [4096,4096,5,1] 1762us (1.43x vs baseline), [65536,16,1,1] 13.91us (2.39x vs baseline).",
+      "completed_at": "2026-03-04T03:00:00Z",
+      "baseline_metric": "[64,64,20,1]=6.51us, [1024,1024,10,1]=1096.28us, [77,4096,5,1]=213.02us, [77,64,20,1]=14.56us (original pre-optimization). Regressed: [64,64,20,1]=9.11us, [1024,1024,10,1]=1185.59us, [77,4096,5,1]=227.17us (after opt_task_030/031).",
+      "optimized_metric": "[64,64,20,1]=6.03us, [1024,1024,10,1]=248.66us, [77,4096,5,1]=207.57us, [77,64,20,1]=14.16us, [4096,4096,5,1]=1762.03us, [65536,16,1,1]=13.91us",
+      "actual_improvement": "All regressions fixed. [64,64] +7.9% vs original, [1024,1024] 4.41x vs original (was -7.5% regression), [77,4096] +2.6% vs original (was -6.2% regression), [77,64] +2.8% vs original. Large-ncols preserved: [4096,4096] 1.43x, [65536,16] 2.39x.",
+      "blocked_reason": null
     }
   ]
 }

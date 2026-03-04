@@ -358,3 +358,32 @@
     q4_0=593 GFLOPS, q4_1=512 GFLOPS, q5_0=162 GFLOPS, q5_1=422 GFLOPS, q8_0=136 GFLOPS
   - Benchmark (norm): RMS_NORM peak=184 GB/s, NORM peak=174 GB/s, GROUP_NORM peak=345 GB/s
   - Net: ~30 lines of manual shuffle reduction → 2 reduce_over_group calls per template
+
+[2026-03-04] opt_task_037 (SOFT_MAX small-ncols regression fix): COMPLETED.
+  - softmax.cpp: Fixed SOFT_MAX benchmark regressions for small column dimensions
+    introduced by vec4 vectorization (opt_task_031) and reduce_over_group (opt_task_030).
+  - Root cause: sycl::reduce_over_group overhead scales with sub-group count.
+    For small ncols (64, 128, 256), work-groups had too many sub-groups,
+    and the cross-sub-group coordination cost dominated kernel time.
+  - Fix 1 (launch_soft_max_kernels): Compile-time block size selection per ncols template:
+    - ncols <= 16 (WARP_SIZE): block = ncols (1 sub-group)
+    - ncols <= 64 (4*WARP_SIZE): block = WARP_SIZE=16 (1 sub-group, each thread does ncols/16 elements)
+    - ncols <= 256: block = ncols (reasonable sub-group count)
+    - ncols > 256: block = 256 (capped at 16 sub-groups)
+    Also fixed critical nd_range mismatch: the nd_range now uses the compile-time 'block'
+    (via opt_block) instead of the passed block_dims, preventing OOB access in
+    template-specialized loops that have no bounds checking.
+  - Fix 2 (soft_max_f32_sycl): Capped fallback path work-group size at 256 (nth_shared_fallback)
+    for the dynamic path (ncols_template=0), reducing reduce_over_group overhead for
+    non-template-specialized ncols values like 77.
+  - Build: SUCCESS on b60
+  - Tests: 212/212 SOFT_MAX tests PASS
+  - Benchmark results vs original baseline (pre-optimization):
+    [64,64,20,1]:     6.51 → 6.03 us (+7.9% FASTER than original, was -28.6% regression)
+    [1024,1024,10,1]: 1096.28 → 248.66 us (4.41x faster! block=256+vec4 vs old block=1024)
+    [77,4096,5,1]:    213.02 → 207.57 us (+2.6% faster, was -6.2% regression)
+    [77,64,20,1]:     14.56 → 14.16 us (+2.8% faster, was -5.4% regression)
+    [256,256,20,1]:   96.87 → 94.48 us (+2.5% faster)
+    [4096,4096,5,1]:  2527.62 → 1762.03 us (1.43x faster, vec4 gains preserved)
+    [65536,16,1,1]:   33.25 → 13.91 us (2.39x faster, large-ncols gains preserved)
+  - All regressions eliminated; all previous improvements preserved
