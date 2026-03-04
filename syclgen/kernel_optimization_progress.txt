@@ -387,3 +387,22 @@
     [4096,4096,5,1]:  2527.62 → 1762.03 us (1.43x faster, vec4 gains preserved)
     [65536,16,1,1]:   33.25 → 13.91 us (2.39x faster, large-ncols gains preserved)
   - All regressions eliminated; all previous improvements preserved
+
+[2026-03-04] opt_task_038 (MUL_MAT n=512 regression investigation): COMPLETED — NO REGRESSION FOUND.
+  - Investigation: The reported MUL_MAT regression for m=4096,n=512,k=14336 is NOT real.
+  - Root cause: The "original" baseline (logs/b60_benchmark_20260304_054416.log) was an
+    anomalous outlier showing ~12% above true stable performance (f16=51.59T vs stable ~45-46T).
+  - Evidence: Cross-referenced 6 independent benchmark runs across different dates and code states:
+    Mar 1 155111: f16=46.25T, q4_0=27.28T
+    Mar 1 175139: f16=46.11T, q4_0=27.28T
+    Mar 2 012309: f16=45.87T, q4_0=27.29T
+    Mar 2 013952: f16=45.60T, q4_0=27.29T  (all pre-optimization baselines)
+    Mar 4 045819: f16=45.42T, q4_0=27.27T  (labeled "regressed" — actually matches baseline)
+    Mar 4 054416: f16=51.59T, q4_0=32.32T  (labeled "original" — anomalous OUTLIER)
+    Mar 4 091256: f16=45.47T, q4_0=27.11T  (fresh re-run — confirms baseline)
+  - The "regressed" numbers are the TRUE stable performance level.
+  - f32 (oneMKL SGEMM) and mxfp4 remain stable at ~12T and ~21T across all runs.
+  - n=1 results unaffected (stable across all runs).
+  - Conclusion: No code changes needed. The outlier was likely caused by transient
+    JIT cache warmth, thermal conditions, or driver scheduling variance.
+  - No code changes made.

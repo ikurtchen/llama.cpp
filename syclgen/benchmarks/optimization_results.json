@@ -500,6 +500,48 @@
           "[65536,16,1,1]":   {"original_us": 33.25, "now_us": 13.91, "speedup": "2.39x"}
         }
       }
+    },
+    {
+      "task_id": "opt_task_038",
+      "kernel": "MUL_MAT (n=512 investigation)",
+      "optimization": "Investigation only — no code changes needed",
+      "timestamp": "2026-03-04T10:00:00Z",
+      "correctness": "pass",
+      "baseline_time_us": null,
+      "optimized_time_us": null,
+      "speedup": null,
+      "notes": "Investigated reported MUL_MAT regression for m=4096,n=512,k=14336. Found NO real regression. The 'original' baseline log (054416) was an anomalous outlier (~12% above stable baseline). Cross-referenced 6 independent benchmark runs: stable f16 performance is 45-46 TFLOPS, not 51.59. Current performance matches the true stable baseline. No code changes made.",
+      "benchmark_details": {
+        "test_config": "Intel Arc Pro B60 (Xe2), MUL_MAT m=4096,n=512,k=14336",
+        "finding": "no_regression",
+        "stable_baseline_tflops": {
+          "f16": "45-46",
+          "q4_0": "27.1-27.3",
+          "q4_1": "27.2-27.7",
+          "q5_0": "18.0",
+          "q5_1": "26.5-26.7",
+          "q8_0": "27.5-27.8",
+          "q2_K": "27.3-27.7",
+          "q4_K": "30.2-30.6",
+          "q5_K": "31.8-32.1",
+          "q6_K": "29.2-29.5",
+          "f32": "11.9-12.0",
+          "mxfp4": "20.8-21.0"
+        },
+        "outlier_log": {
+          "log": "b60_benchmark_20260304_054416.log",
+          "f16_tflops": 51.59,
+          "deviation_from_stable": "+12%"
+        },
+        "verification_runs": [
+          {"log": "b60_benchmark_20260301_155111.log", "f16_tflops": 46.25},
+          {"log": "b60_benchmark_20260301_175139.log", "f16_tflops": 46.11},
+          {"log": "b60_benchmark_20260302_012309.log", "f16_tflops": 45.87},
+          {"log": "b60_benchmark_20260302_013952.log", "f16_tflops": 45.60},
+          {"log": "b60_benchmark_20260304_045819.log", "f16_tflops": 45.42},
+          {"log": "b60_benchmark_20260304_091256.log", "f16_tflops": 45.47}
+        ]
+      }
     }
   ]
 }

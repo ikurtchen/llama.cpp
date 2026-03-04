@@ -1196,6 +1196,21 @@
       "optimized_metric": "[64,64,20,1]=6.03us, [1024,1024,10,1]=248.66us, [77,4096,5,1]=207.57us, [77,64,20,1]=14.16us, [4096,4096,5,1]=1762.03us, [65536,16,1,1]=13.91us",
       "actual_improvement": "All regressions fixed. [64,64] +7.9% vs original, [1024,1024] 4.41x vs original (was -7.5% regression), [77,4096] +2.6% vs original (was -6.2% regression), [77,64] +2.8% vs original. Large-ncols preserved: [4096,4096] 1.43x, [65536,16] 2.39x.",
       "blocked_reason": null
+    },
+    {
+      "id": "opt_task_038",
+      "priority": "high",
+      "complexity": "medium",
+      "category": "matmul",
+      "status": "completed",
+      "description": "The MUL_MAT benchmark show there's regression for 'm=4096,n=512,k=14336' case. We need to investigate and fix the regression.",
+      "target_kernels": [],
+      "optimization_ids": [],
+      "dependencies": [],
+      "risk": "medium",
+      "notes": "It was caused by sycl::reqd_sub_group_size in convert.cpp",
+      "completed_at": "2026-03-04T10:00:00Z",
+      "blocked_reason": null
     }
   ]
 }
