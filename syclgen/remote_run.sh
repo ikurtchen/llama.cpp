@@ -125,6 +125,13 @@ PROFILE_COMMANDS=(
     ["b60"]="echo \"not implemented\""
 )
 
+# Workload benchmark commands (model-level, delegates to benchmark_workload.sh)
+# The script is expected to reside next to the llama.cpp workdir or be uploaded.
+WORKLOAD_COMMANDS=(
+    ["h20"]="bash ./syclgen/benchmark_workload.sh -s h20"
+    ["b60"]="source /opt/intel/oneapi/setvars.sh && bash ./syclgen/benchmark_workload.sh -s b60"
+)
+
 ################################################################################
 # Helper Functions
 ################################################################################
@@ -151,7 +158,7 @@ Usage: $0 [OPTIONS]
 
 Required Arguments:
     -s, --server <name>      Server name (${!SERVER_IPS[@]})
-    -t, --task <name>        Task name(s), comma-separated (upload, download, clean, build, unit, run, accuracy, benchmark, profile, custom)
+    -t, --task <name>        Task name(s), comma-separated (upload, download, clean, build, unit, run, accuracy, benchmark, profile, workload, custom)
 
 Optional Arguments:
     -d, --workdir <path>        Remote working directory (overrides server default)
@@ -624,6 +631,46 @@ task_profile() {
     fi
 }
 
+task_workload() {
+    local server="$1"
+    local workdir="$2"
+    local container="$3"
+    local custom_cmd="$4"
+    local env_vars="$5"
+
+    local cmd="${custom_cmd:-${WORKLOAD_COMMANDS[$server]}}"
+
+    # Forward -e env vars as -e flags to benchmark_workload.sh
+    if [[ -n "$env_vars" ]]; then
+        local env_flags=""
+        while read -r pair; do
+            [[ -n "$pair" ]] && env_flags="$env_flags -e $pair"
+        done < <(echo "$env_vars" | grep -oP '(?<=export )\S+')
+        cmd="$cmd$env_flags"
+    fi
+
+    local log_file=$(generate_log_filename "workload" "$server")
+
+    print_info "Running workload benchmark on $server"
+    print_info "Working directory: $workdir"
+    print_info "Command: $cmd"
+
+    local full_cmd="cd $workdir && $env_vars $cmd"
+
+    if [[ -n "$container" ]]; then
+        full_cmd="docker exec $container bash -c 'cd $workdir && $env_vars $cmd'"
+    fi
+
+    execute_ssh_with_log "$server" "$full_cmd" "$log_file"
+
+    if [[ $? -eq 0 ]]; then
+        print_success "Workload benchmark completed successfully"
+    else
+        print_error "Workload benchmark failed. Check log: $log_file"
+        exit 1
+    fi
+}
+
 task_custom() {
     local server="$1"
     local workdir="$2"
@@ -852,12 +899,15 @@ main() {
             profile)
                 task_profile "$SERVER" "$WORKDIR" "$CONTAINER" "$CUSTOM_COMMAND" "$ENV_VARS"
                 ;;
+            workload)
+                task_workload "$SERVER" "$WORKDIR" "$CONTAINER" "$CUSTOM_COMMAND" "$ENV_VARS"
+                ;;
             custom)
                 task_custom "$SERVER" "$WORKDIR" "$CONTAINER" "$CUSTOM_COMMAND" "$ENV_VARS"
                 ;;
             *)
                 print_error "Unknown task: $current_task"
-                print_info "Available tasks: upload, download, clean, build, unit, run, accuracy, benchmark, profile, custom"
+                print_info "Available tasks: upload, download, clean, build, unit, run, accuracy, benchmark, profile, workload, custom"
                 exit 1
                 ;;
         esac
