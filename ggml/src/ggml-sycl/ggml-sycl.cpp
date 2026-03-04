@@ -1523,190 +1523,12 @@ static void mul_mat_vec_nc_f16_f32( // nc == non-contiguous
     }
 }
 
-static void k_sum_rows_f32(const float * x, float * dst, const int ncols,
-                           const sycl::nd_item<3> &item_ct1) {
-    const int row = item_ct1.get_group(1);
-    const int col = item_ct1.get_local_id(2);
-
-    float sum = 0.0f;
-    for (int i = col; i < ncols; i += item_ct1.get_local_range(2)) {
-        sum += x[row * ncols + i];
-    }
-
-    sum = warp_reduce_sum(sum, item_ct1);
-
-    if (col == 0) {
-        dst[row] = sum;
-    }
-}
-
-
 template<typename T>
 static inline void ggml_sycl_swap(T & a, T & b) {
     T tmp = a;
     a = b;
     b = tmp;
 }
-
-template <ggml_sort_order order>
-__dpct_inline__ static void
-k_argsort_f32_i32(const float *x, int *dst, const int ncols, int ncols_pad,
-                  const int tasks_per_thread, const sycl::nd_item<3> &item_ct1,
-                  uint8_t *dpct_local) {
-    // bitonic sort
-    int col_index =  item_ct1.get_local_id(2);
-    int row = item_ct1.get_group(1);
-
-    for (int i = 0; i < tasks_per_thread; i++) {
-        int col = col_index * tasks_per_thread + i;
-        if (col >= ncols_pad) {
-            return;
-        }
-    }
-
-    const float * x_row = x + row * ncols;
-    auto dst_row = (int *)dpct_local;
-
-    // initialize indices
-    for (int i=0;i<tasks_per_thread;i++){
-        int col = col_index*tasks_per_thread+i;
-        dst_row[col] = col;
-    }
-
-    item_ct1.barrier(sycl::access::fence_space::local_space);
-
-    for (int k = 2; k <= ncols_pad; k *= 2) {
-        for (int j = k / 2; j > 0; j /= 2) {
-            for (int i = 0; i < tasks_per_thread; i++) {
-                int col = col_index * tasks_per_thread + i;
-                int ixj = col ^ j;
-                if (ixj > col) {
-                    if ((col & k) == 0) {
-                        if (dst_row[col] >= ncols ||
-                            (dst_row[ixj] < ncols &&
-                             (order == GGML_SORT_ORDER_ASC
-                                  ? x_row[dst_row[col]] > x_row[dst_row[ixj]]
-                                  : x_row[dst_row[col]] <
-                                        x_row[dst_row[ixj]]))) {
-                            ggml_sycl_swap(dst_row[col], dst_row[ixj]);
-                        }
-                    } else {
-                        if (dst_row[ixj] >= ncols ||
-                            (dst_row[col] < ncols &&
-                             (order == GGML_SORT_ORDER_ASC
-                                  ? x_row[dst_row[col]] < x_row[dst_row[ixj]]
-                                  : x_row[dst_row[col]] >
-                                        x_row[dst_row[ixj]]))) {
-                            ggml_sycl_swap(dst_row[col], dst_row[ixj]);
-                        }
-                    }
-                }
-                item_ct1.barrier(sycl::access::fence_space::local_space);
-            }
-        }
-    }
-
-    // copy the result to dst without the padding
-    for (int i = 0; i < tasks_per_thread; i++) {
-        int col = col_index * tasks_per_thread + i;
-        if (col < ncols) {
-            dst[row * ncols + col] = dst_row[col];
-        }
-    }
-}
-
-static void diag_mask_inf_f32(const float * x, float * dst, const int ncols, const int rows_per_channel, const int n_past,
-                              const sycl::nd_item<3> &item_ct1) {
-    const int col = item_ct1.get_local_range(1) * item_ct1.get_group(1) +
-                    item_ct1.get_local_id(1);
-    const int row = item_ct1.get_local_range(2) * item_ct1.get_group(2) +
-                    item_ct1.get_local_id(2);
-
-    if (col >= ncols) {
-        return;
-    }
-
-    const int i = row*ncols + col;
-    //dst[i] = col > (n_past + row % rows_per_channel) ? -INFINITY : x[i];
-    //dst[i] = x[i] - (col > n_past + row % rows_per_channel) * INT_MAX; // equivalent within rounding error but slightly faster on GPU
-    dst[i] = x[i] - (col > n_past + row % rows_per_channel) * FLT_MAX;
-}
-
-static void scale_f32(const float * x, float * dst, const float scale, const float bias, const int k,
-                      const sycl::nd_item<3> &item_ct1) {
-    const int i = item_ct1.get_local_range(2) * item_ct1.get_group(2) +
-                  item_ct1.get_local_id(2);
-
-    if (i >= k) {
-        return;
-    }
-
-    dst[i] = scale * x[i] + bias;
-}
-
-
-template <typename Ti, typename To>
-static  void pool2d_nchw_kernel(
-        const int ih, const int iw, const int oh, const int ow,
-        const int kh, const int kw, const int sh, const int sw,
-        const int ph, const int pw, const int parallel_elements,
-        const Ti* src, To* dst, const enum ggml_op_pool op,
-        const sycl::nd_item<3> &item_ct1) {
-        int idx = item_ct1.get_local_id(2) +
-                  item_ct1.get_group(2) * item_ct1.get_local_range(2);
-        if (idx >= parallel_elements) {
-            return;
-        }
-
-        const int I_HW = ih * iw;
-        const int O_HW = oh * ow;
-        const int nc = idx / O_HW;
-        const int cur_oh = idx % O_HW / ow;
-        const int cur_ow = idx % O_HW % ow;
-        const Ti* i_ptr = src + nc * I_HW;
-        To* o_ptr = dst + nc * O_HW;
-        const int start_h = cur_oh * sh - ph;
-        const int bh = sycl::max(0, start_h);
-        const int eh = sycl::min(ih, start_h + kh);
-        const int start_w = cur_ow * sw - pw;
-        const int bw = sycl::max(0, start_w);
-        const int ew = sycl::min(iw, start_w + kw);
-
-        To res = 0;
-
-        switch (op) {
-            case GGML_OP_POOL_AVG: res = 0; break;
-            case GGML_OP_POOL_MAX: res = -FLT_MAX; break;
-            default:
-                res      = (To) sycl::nan(uint32_t(0));
-                break;
-        }
-
-        for (int i = bh; i < eh; i += 1) {
-            for (int j = bw; j < ew; j += 1) {
-#if DPCT_COMPATIBILITY_TEMP >= 350
-                /*
-                DPCT1098:106: The '*' expression is used instead of the __ldg
-                call. These two expressions do not provide the exact same
-                functionality. Check the generated code for potential precision
-                and/or performance issues.
-                */
-                Ti cur = *(i_ptr + i * iw + j);
-#else
-                Ti cur = i_ptr[i * iw + j];
-#endif
-                switch (op) {
-                    case GGML_OP_POOL_AVG: res += (cur / (kh * kw)); break;
-                    case GGML_OP_POOL_MAX: res = sycl::max(res, (To)cur); break;
-                    default:
-                        res = (To) sycl::nan(uint32_t(0));
-                        break;
-                }
-            }
-        }
-        o_ptr[cur_oh * ow + cur_ow] = res;
-}
-
 
 static void ggml_mul_mat_p021_f16_f32_sycl(const void *vx, const float *y,
                                            float *dst, const int ncols_x,
@@ -1751,264 +1573,12 @@ static void ggml_mul_mat_vec_nc_f16_f32_sycl(
     }
 }
 
-
-
-static void scale_f32_sycl(const float *x, float *dst, const float scale, const float bias,
-                           const int k, queue_ptr stream) {
-    const int num_blocks = (k + SYCL_SCALE_BLOCK_SIZE - 1) / SYCL_SCALE_BLOCK_SIZE;
-    stream->parallel_for(
-        sycl::nd_range<3>(sycl::range<3>(1, 1, num_blocks) *
-                              sycl::range<3>(1, 1, SYCL_SCALE_BLOCK_SIZE),
-                          sycl::range<3>(1, 1, SYCL_SCALE_BLOCK_SIZE)),
-        [=](sycl::nd_item<3> item_ct1) {
-            scale_f32(x, dst, scale, bias, k, item_ct1);
-        });
-}
-
-
-static void sum_rows_f32_sycl(const float *x, float *dst, const int ncols,
-                              const int nrows, queue_ptr stream) {
-    const sycl::range<3> block_dims(1, 1, WARP_SIZE);
-    const sycl::range<3> block_nums(1, nrows, 1);
-    stream->parallel_for(sycl::nd_range<3>(block_nums * block_dims, block_dims),
-                         [=](sycl::nd_item<3> item_ct1)
-                             [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
-                                 k_sum_rows_f32(x, dst, ncols, item_ct1);
-                             });
-}
-
 static int next_power_of_2(int x) {
     int n = 1;
     while (n < x) {
         n *= 2;
     }
     return n;
-}
-
-static void argsort_f32_i32_sycl(const float *x, int *dst, const int ncols,
-                                 const int nrows, ggml_sort_order order,
-                                 queue_ptr stream, int device) {
-    // bitonic sort requires ncols to be power of 2
-    const int ncols_pad = next_power_of_2(ncols);
-
-    int nth = 1;
-    int max_block_size = ggml_sycl_info().max_work_group_sizes[device];
-    while (nth < ncols_pad && nth < max_block_size)
-        nth *= 2;
-    if (nth > max_block_size)
-        nth = max_block_size;
-
-    const int tasks_per_thread = ncols_pad / nth;
-
-    const sycl::range<3> block_dims(1, 1, nth);
-    const sycl::range<3> block_nums(1, nrows, 1);
-    const size_t shared_mem = ncols_pad * sizeof(int);
-    GGML_ASSERT(shared_mem<=ggml_sycl_info().devices[device].smpbo);
-
-    if (order == GGML_SORT_ORDER_ASC) {
-        stream->submit([&](sycl::handler &cgh) {
-            sycl::local_accessor<uint8_t, 1> dpct_local_acc_ct1(
-                sycl::range<1>(shared_mem), cgh);
-
-            cgh.parallel_for(
-                sycl::nd_range<3>(block_nums * block_dims, block_dims),
-                [=](sycl::nd_item<3> item_ct1) {
-                    k_argsort_f32_i32<GGML_SORT_ORDER_ASC>(
-                        x, dst, ncols, ncols_pad, tasks_per_thread, item_ct1,
-                        dpct_local_acc_ct1
-                            .get_multi_ptr<sycl::access::decorated::no>()
-                            .get());
-                });
-        });
-    } else if (order == GGML_SORT_ORDER_DESC) {
-        stream->submit([&](sycl::handler &cgh) {
-            sycl::local_accessor<uint8_t, 1> dpct_local_acc_ct1(
-                sycl::range<1>(shared_mem), cgh);
-
-            cgh.parallel_for(
-                sycl::nd_range<3>(block_nums * block_dims, block_dims),
-                [=](sycl::nd_item<3> item_ct1) {
-                    k_argsort_f32_i32<GGML_SORT_ORDER_DESC>(
-                        x, dst, ncols, ncols_pad, tasks_per_thread, item_ct1,
-                        dpct_local_acc_ct1
-                            .get_multi_ptr<sycl::access::decorated::no>()
-                            .get());
-                });
-        });
-    } else {
-        GGML_ABORT("fatal error");
-    }
-}
-
-static void top_k_f32_sycl(
-    const float * src,
-    int32_t * dst_indices,
-    const int64_t ncols,
-    const int64_t nrows,
-    const int k,
-    dpct::queue_ptr main_stream
-) {
-    const int block_size = 128;
-
-    const sycl::range<1> block_dims(block_size);
-    const sycl::range<1> grid_dims(nrows);
-
-    main_stream->submit([&](sycl::handler &cgh) {
-        sycl::local_accessor<float, 1> shared_vals(sycl::range<1>(block_size * k), cgh);
-        sycl::local_accessor<int, 1> shared_idx(sycl::range<1>(block_size * k), cgh);
-
-        cgh.parallel_for(
-            sycl::nd_range<1>(grid_dims * block_dims, block_dims),
-            [=](sycl::nd_item<1> item_ct1) {
-                const int row = item_ct1.get_group(0);
-                const int tid = item_ct1.get_local_id(0);
-
-                if (row >= nrows) return;
-
-                const float * src_row = src + row * ncols;
-                int32_t * dst_idx_row = dst_indices + row * k;
-
-                float local_vals[32];
-                int local_idx[32];
-
-                for (int i = 0; i < k; i++) {
-                    local_vals[i] = -FLT_MAX;
-                    local_idx[i] = -1;
-                }
-
-                for (int col = tid; col < ncols; col += block_size) {
-                    float val = src_row[col];
-
-                    if (val > local_vals[k-1]) {
-                        int pos = k - 1;
-                        while (pos > 0 && val > local_vals[pos - 1]) {
-                            pos--;
-                        }
-
-                        for (int i = k - 1; i > pos; i--) {
-                            local_vals[i] = local_vals[i - 1];
-                            local_idx[i] = local_idx[i - 1];
-                        }
-                        local_vals[pos] = val;
-                        local_idx[pos] = col;
-                    }
-                }
-
-                for (int i = 0; i < k; i++) {
-                    shared_vals[tid * k + i] = local_vals[i];
-                    shared_idx[tid * k + i] = local_idx[i];
-                }
-                item_ct1.barrier(sycl::access::fence_space::local_space);
-
-                if (tid == 0) {
-                    float final_vals[32];
-                    int final_idx[32];
-
-                    for (int i = 0; i < k; i++) {
-                        final_vals[i] = -FLT_MAX;
-                        final_idx[i] = -1;
-                    }
-
-                    for (int t = 0; t < block_size; t++) {
-                        for (int i = 0; i < k; i++) {
-                            float val = shared_vals[t * k + i];
-                            int idx = shared_idx[t * k + i];
-
-                            if (val > final_vals[k-1]) {
-                                int pos = k - 1;
-                                while (pos > 0 && val > final_vals[pos - 1]) {
-                                    pos--;
-                                }
-
-                                for (int j = k - 1; j > pos; j--) {
-                                    final_vals[j] = final_vals[j - 1];
-                                    final_idx[j] = final_idx[j - 1];
-                                }
-                                final_vals[pos] = val;
-                                final_idx[pos] = idx;
-                            }
-                        }
-                    }
-
-                    for (int i = 0; i < k; i++) {
-                        dst_idx_row[i] = final_idx[i];
-                    }
-
-                    if (k > 1) {
-                        int32_t temp = dst_idx_row[0];
-                        dst_idx_row[0] = dst_idx_row[1];
-                        dst_idx_row[1] = temp;
-                    }
-                }
-            });
-    });
-}
-
-static void argmax_f32_i32_sycl(const float *x, int *dst, const int ncols,
-                               const int nrows, queue_ptr stream) {
-    const sycl::range<3> block_dims(1, 1, SYCL_ARGMAX_BLOCK_SIZE);
-    const sycl::range<3> block_nums(1, nrows, 1);
-    const size_t shared_mem = 256 * sizeof(float);
-
-    stream->submit([&](sycl::handler &cgh) {
-        sycl::local_accessor<float, 1> shared_data(
-            sycl::range<1>(shared_mem/sizeof(float)), cgh);
-        sycl::local_accessor<int, 1> shared_indices(
-            sycl::range<1>(shared_mem/sizeof(float)), cgh);
-
-        cgh.parallel_for(
-            sycl::nd_range<3>(block_nums * block_dims, block_dims),
-            [=](sycl::nd_item<3> item_ct1) {
-                const int tid = item_ct1.get_local_id(2);
-                const int row = item_ct1.get_global_id(1);
-
-                float max_val = -INFINITY;
-                int max_idx = -1;
-
-                for (int col = tid; col < ncols; col += 256) {
-                    float val = x[row * ncols + col];
-                    if (val > max_val) {
-                        max_val = val;
-                        max_idx = col;
-                    }
-                }
-
-                shared_data[tid] = max_val;
-                shared_indices[tid] = max_idx;
-                item_ct1.barrier(sycl::access::fence_space::local_space);
-
-                for (int stride = 256/2; stride > 0; stride >>= 1) {
-                    if (tid < stride) {
-                        float val1 = shared_data[tid];
-                        float val2 = shared_data[tid + stride];
-                        if (val2 > val1) {
-                            shared_data[tid] = val2;
-                            shared_indices[tid] = shared_indices[tid + stride];
-                        }
-                    }
-                    item_ct1.barrier(sycl::access::fence_space::local_space);
-                }
-
-
-                if (tid == 0) {
-                    dst[row] = shared_indices[0];
-                }
-            });
-    });
-}
-static void diag_mask_inf_f32_sycl(const float *x, float *dst,
-                                   const int ncols_x, const int nrows_x,
-                                   const int rows_per_channel, const int n_past,
-                                   queue_ptr stream) {
-    const sycl::range<3> block_dims(1, SYCL_DIAG_MASK_INF_BLOCK_SIZE, 1);
-    const int block_num_x = (ncols_x + SYCL_DIAG_MASK_INF_BLOCK_SIZE - 1) / SYCL_DIAG_MASK_INF_BLOCK_SIZE;
-    const sycl::range<3> block_nums(1, block_num_x, nrows_x);
-    stream->parallel_for(sycl::nd_range<3>(block_nums * block_dims, block_dims),
-                         [=](sycl::nd_item<3> item_ct1) {
-                             diag_mask_inf_f32(x, dst, ncols_x,
-                                               rows_per_channel, n_past,
-                                               item_ct1);
-                         });
 }
 
 static dpct::err0 ggml_sycl_cpy_tensor_2d(void *dst,
@@ -2225,250 +1795,6 @@ catch (sycl::exception const &exc) {
   std::cerr << exc.what() << "Exception caught at file:" << __FILE__
             << ", line:" << __LINE__ << std::endl;
   std::exit(1);
-}
-
-static void ggml_sycl_op_pool2d(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
-    GGML_ASSERT(dst->src[0]->type == GGML_TYPE_F32);
-    GGML_ASSERT( dst->type == GGML_TYPE_F32);
-    dpct::queue_ptr main_stream = ctx.stream();
-    SYCL_CHECK(ggml_sycl_set_device(ctx.device));
-    const float * src0_dd = static_cast<const float *>(dst->src[0]->data);
-    float *       dst_dd  = static_cast<float *>(dst->data);
-
-    const int32_t * opts = (const int32_t *)dst->op_params;
-    enum ggml_op_pool op = static_cast<ggml_op_pool>(opts[0]);
-    const int k0 = opts[1];
-    const int k1 = opts[2];
-    const int s0 = opts[3];
-    const int s1 = opts[4];
-    const int p0 = opts[5];
-    const int p1 = opts[6];
-
-    const int64_t IH = dst->src[0]->ne[1];
-    const int64_t IW = dst->src[0]->ne[0];
-
-    const int64_t N = dst->ne[3];
-    const int64_t OC = dst->ne[2];
-    const int64_t OH = dst->ne[1];
-    const int64_t OW = dst->ne[0];
-
-    const int parallel_elements = N * OC * OH * OW;
-    const int num_blocks = (parallel_elements + SYCL_POOL2D_BLOCK_SIZE - 1) / SYCL_POOL2D_BLOCK_SIZE;
-    sycl::range<3> block_nums(1, 1, num_blocks);
-    main_stream->parallel_for(
-        sycl::nd_range<3>(block_nums *
-                              sycl::range<3>(1, 1, SYCL_IM2COL_BLOCK_SIZE),
-                          sycl::range<3>(1, 1, SYCL_IM2COL_BLOCK_SIZE)),
-        [=](sycl::nd_item<3> item_ct1) {
-            pool2d_nchw_kernel(IH, IW, OH, OW, k1, k0, s1, s0, p1, p0,
-                               parallel_elements, src0_dd, dst_dd, op,
-                               item_ct1);
-        });
-}
-
-inline void ggml_sycl_op_sum(ggml_backend_sycl_context & ctx, ggml_tensor *dst) {
-    GGML_ASSERT(dst->src[0]->type == GGML_TYPE_F32);
-    GGML_ASSERT( dst->type == GGML_TYPE_F32);
-    dpct::queue_ptr main_stream = ctx.stream();
-    SYCL_CHECK(ggml_sycl_set_device(ctx.device));
-    const float * src0_dd = static_cast<const float *>(dst->src[0]->data);
-    float *       dst_dd  = static_cast<float *>(dst->data);
-
-    const int64_t ne = ggml_nelements(dst->src[0]);
-
-    sum_rows_f32_sycl(src0_dd, dst_dd, ne, 1, main_stream);
-}
-
-inline void ggml_sycl_op_sum_rows(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
-    GGML_ASSERT(dst->src[0]->type == GGML_TYPE_F32);
-    GGML_ASSERT( dst->type == GGML_TYPE_F32);
-    dpct::queue_ptr main_stream = ctx.stream();
-    SYCL_CHECK(ggml_sycl_set_device(ctx.device));
-    const float * src0_dd = static_cast<const float *>(dst->src[0]->data);
-    float *       dst_dd  = static_cast<float *>(dst->data);
-
-    const int64_t ncols = dst->src[0]->ne[0];
-    const int64_t nrows = ggml_nrows(dst->src[0]);
-
-    sum_rows_f32_sycl(src0_dd, dst_dd, ncols, nrows, main_stream);
-}
-
-inline void ggml_sycl_op_mean(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
-    GGML_ASSERT(dst->src[0]->type == GGML_TYPE_F32);
-    GGML_ASSERT(dst->type == GGML_TYPE_F32);
-
-    dpct::queue_ptr main_stream = ctx.stream();
-    SYCL_CHECK(ggml_sycl_set_device(ctx.device));
-
-    const float * src0_dd = static_cast<const float *>(dst->src[0]->data);
-    float *       dst_dd  = static_cast<float *>(dst->data);
-
-    const int64_t ncols = dst->src[0]->ne[0];
-    const int64_t nrows = ggml_nrows(dst->src[0]);
-
-    sum_rows_f32_sycl(src0_dd, dst_dd, ncols, nrows, main_stream);
-
-    main_stream->parallel_for(
-        sycl::range<1>(nrows),
-        [=](sycl::id<1> row) {
-            dst_dd[row] /= ncols;
-        }
-    );
-}
-
-
-inline void ggml_sycl_op_argsort(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
-    GGML_ASSERT(dst->src[0]->type == GGML_TYPE_F32);
-    GGML_ASSERT(dst->type == GGML_TYPE_I32);
-    dpct::queue_ptr main_stream = ctx.stream();
-    SYCL_CHECK(ggml_sycl_set_device(ctx.device));
-    const float * src0_dd = static_cast<const float *>(dst->src[0]->data);
-    int32_t *       dst_dd  = static_cast<int32_t *>(dst->data);
-
-
-    const int64_t ncols = dst->src[0]->ne[0];
-    const int64_t nrows = ggml_nrows(dst->src[0]);
-
-    enum ggml_sort_order order = (enum ggml_sort_order) dst->op_params[0];
-
-    argsort_f32_i32_sycl(src0_dd, (int *)dst_dd, ncols, nrows, order,
-                         main_stream, ctx.device);
-}
-
-static void ggml_sycl_op_top_k(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
-    const ggml_tensor * src0 = dst->src[0];
-
-    GGML_ASSERT(src0);
-    GGML_ASSERT(src0->type == GGML_TYPE_F32);
-    GGML_ASSERT(dst->type == GGML_TYPE_I32);
-    GGML_ASSERT(ggml_is_contiguous(src0));
-
-    dpct::queue_ptr main_stream = ctx.stream();
-    SYCL_CHECK(ggml_sycl_set_device(ctx.device));
-
-    const float * src0_dd = static_cast<const float *>(src0->data);
-    int32_t * dst_dd = static_cast<int32_t *>(dst->data);
-
-    const int k = dst->ne[0];
-    const int64_t ncols = src0->ne[0];
-    const int64_t nrows = ggml_nrows(src0);
-
-    GGML_ASSERT(k > 0 && k <= 32);
-    GGML_ASSERT(k <= ncols);
-
-    top_k_f32_sycl(src0_dd, dst_dd, ncols, nrows, k, main_stream);
-}
-
-inline void ggml_sycl_op_argmax(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
-    GGML_ASSERT(dst->src[0]->type == GGML_TYPE_F32);
-    GGML_ASSERT( dst->type == GGML_TYPE_I32);
-
-    dpct::queue_ptr main_stream = ctx.stream();
-    SYCL_CHECK(ggml_sycl_set_device(ctx.device));
-    const float * src0_dd = static_cast<const float *>(dst->src[0]->data);
-    int32_t *       dst_dd  = static_cast<int32_t *>(dst->data);
-
-    const int64_t ncols = dst->src[0]->ne[0];
-    const int64_t nrows = ggml_nrows(dst->src[0]);
-
-    argmax_f32_i32_sycl(src0_dd, dst_dd, ncols, nrows, main_stream);
-}
-
-inline void ggml_sycl_op_diag_mask_inf(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
-    GGML_ASSERT(dst->src[0]->type == GGML_TYPE_F32);
-    GGML_ASSERT( dst->type == GGML_TYPE_F32);
-    dpct::queue_ptr main_stream = ctx.stream();
-    SYCL_CHECK(ggml_sycl_set_device(ctx.device));
-    const float * src0_dd = static_cast<const float *>(dst->src[0]->data);
-    float *       dst_dd  = static_cast<float *>(dst->data);
-
-    const int64_t ne00 = dst->src[0]->ne[0];
-    const int64_t ne01 = dst->src[0]->ne[1];
-    const int nrows0 = ggml_nrows(dst->src[0]);
-
-    const int n_past = ((int32_t *) dst->op_params)[0];
-
-    diag_mask_inf_f32_sycl(src0_dd, dst_dd, ne00, nrows0, ne01, n_past, main_stream);
-}
-
-static void tri_f32_sycl(
-    const float * src,
-    float * dst,
-    const int64_t ne0,
-    const int64_t ne1,
-    const int64_t ne2,
-    const int64_t ne3,
-    const ggml_tri_type ttype,
-    dpct::queue_ptr main_stream
-) {
-    const size_t total = (size_t) ne0 * (size_t) ne1 * (size_t) ne2 * (size_t) ne3;
-
-    main_stream->parallel_for(sycl::range<1>(total), [=](sycl::id<1> tid) {
-        const int64_t idx = (int64_t) tid[0];
-
-        const int64_t i0 = idx % ne0;
-        const int64_t t1 = idx / ne0;
-        const int64_t i1 = t1 % ne1;
-
-        bool keep = false;
-        switch (ttype) {
-            case GGML_TRI_TYPE_LOWER:      keep = (i0 <  i1); break;
-            case GGML_TRI_TYPE_LOWER_DIAG: keep = (i0 <= i1); break;
-            case GGML_TRI_TYPE_UPPER:      keep = (i0 >  i1); break;
-            case GGML_TRI_TYPE_UPPER_DIAG: keep = (i0 >= i1); break;
-            default: keep = false; break;
-        }
-
-        dst[idx] = keep ? src[idx] : 0.0f;
-    });
-}
-
-static void ggml_sycl_op_tri(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
-    const ggml_tensor * src0 = dst->src[0];
-    GGML_ASSERT(src0);
-
-    GGML_ASSERT(src0->type == GGML_TYPE_F32);
-    GGML_ASSERT(dst->type  == GGML_TYPE_F32);
-    GGML_ASSERT(ggml_is_contiguous(src0));
-    GGML_ASSERT(ggml_is_contiguous(dst));
-    GGML_ASSERT(ggml_are_same_shape(src0, dst));
-
-    dpct::queue_ptr main_stream = ctx.stream();
-    SYCL_CHECK(ggml_sycl_set_device(ctx.device));
-
-    const float * src0_dd = static_cast<const float *>(src0->data);
-    float *       dst_dd  = static_cast<float *>(dst->data);
-
-    const ggml_tri_type ttype = (ggml_tri_type) ggml_get_op_params_i32(dst, 0);
-
-    const int64_t ne0 = src0->ne[0];
-    const int64_t ne1 = src0->ne[1];
-    const int64_t ne2 = src0->ne[2];
-    const int64_t ne3 = src0->ne[3];
-
-    tri_f32_sycl(src0_dd, dst_dd, ne0, ne1, ne2, ne3, ttype, main_stream);
-}
-
-
-inline void ggml_sycl_op_scale(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
-    GGML_ASSERT(dst->src[0]->type == GGML_TYPE_F32);
-    GGML_ASSERT( dst->type == GGML_TYPE_F32);
-    dpct::queue_ptr main_stream = ctx.stream();
-    SYCL_CHECK(ggml_sycl_set_device(ctx.device));
-    const float * src0_dd = static_cast<const float *>(dst->src[0]->data);
-    float *       dst_dd  = static_cast<float *>(dst->data);
-
-    float scale;
-    float bias;
-    memcpy(&scale, (float *) dst->op_params + 0, sizeof(float));
-    memcpy(&bias,  (float *) dst->op_params + 1, sizeof(float));
-
-    scale_f32_sycl(src0_dd, dst_dd, scale, bias, ggml_nelements(dst->src[0]), main_stream);
-    /*
-    DPCT1010:87: SYCL uses exceptions to report errors and does not use the
-    error codes. The call was replaced with 0. You need to rewrite this code.
-    */
-    SYCL_CHECK(0);
 }
 
 static void ggml_sycl_set_peer_access(const int n_tokens, int main_device) {
@@ -2822,40 +2148,6 @@ catch (sycl::exception const &exc) {
   std::exit(1);
 }
 
-static void ggml_sycl_repeat_back(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
-    scope_op_debug_print scope_dbg_print(__func__, dst, /*num_src=*/1);
-    ggml_sycl_op_repeat_back(ctx, dst);
-}
-
-static void ggml_sycl_get_rows(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
-    scope_op_debug_print scope_dbg_print(__func__, dst, /*num_src=*/2);
-    ggml_sycl_op_get_rows(ctx, dst);
-}
-
-static void ggml_sycl_norm(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
-    scope_op_debug_print scope_dbg_print(__func__, dst, /*num_src=*/1);
-    ggml_sycl_op_norm(ctx, dst);
-}
-
-static void ggml_sycl_rms_norm(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
-    scope_op_debug_print scope_dbg_print(__func__, dst, /*num_src=*/1);
-    ggml_sycl_op_rms_norm(ctx, dst);
-}
-
-static void ggml_sycl_rms_norm_back(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
-    scope_op_debug_print scope_dbg_print(__func__, dst, /*num_src=*/2);
-    ggml_sycl_op_rms_norm_back(ctx, dst);
-}
-
-static void ggml_sycl_l2_norm(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
-    scope_op_debug_print scope_dbg_print(__func__, dst, /*num_src=*/1);
-    ggml_sycl_op_l2_norm(ctx, dst);
-}
-
-static void ggml_sycl_group_norm(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
-    scope_op_debug_print scope_dbg_print(__func__, dst, /*num_src=*/1);
-    ggml_sycl_op_group_norm(ctx, dst);
-}
 
 static void ggml_sycl_mul_mat_vec_p021(ggml_backend_sycl_context & ctx, const ggml_tensor *src0,
                                        const ggml_tensor *src1,
@@ -3805,57 +3097,6 @@ catch (sycl::exception const &exc) {
   std::exit(1);
 }
 
-static void ggml_sycl_scale(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
-    scope_op_debug_print scope_dbg_print(__func__, dst, /*num_src=*/1);
-    ggml_sycl_op_scale(ctx, dst);
-}
-
-static void ggml_sycl_diag_mask_inf(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
-    scope_op_debug_print scope_dbg_print(__func__, dst, /*num_src=*/1);
-    ggml_sycl_op_diag_mask_inf(ctx, dst);
-}
-
-static void ggml_sycl_pool2d(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
-    scope_op_debug_print scope_dbg_print(__func__, dst, /*num_src=*/1);
-    ggml_sycl_op_pool2d(ctx, dst);
-}
-
-static void ggml_sycl_im2col(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
-    scope_op_debug_print scope_dbg_print(__func__, dst, /*num_src=*/2);
-    ggml_sycl_op_im2col(ctx, dst);
-}
-
-static void ggml_sycl_sum(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
-    scope_op_debug_print scope_dbg_print(__func__, dst, /*num_src=*/1);
-    GGML_ASSERT(ggml_is_contiguous(dst->src[0]));
-    ggml_sycl_op_sum(ctx, dst);
-}
-
-static void ggml_sycl_sum_rows(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
-    scope_op_debug_print scope_dbg_print(__func__, dst, /*num_src=*/1);
-    GGML_ASSERT(ggml_is_contiguous(dst->src[0]));
-    ggml_sycl_op_sum_rows(ctx, dst);
-}
-
-static void ggml_sycl_mean(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
-    scope_op_debug_print scope_dbg_print(__func__, dst, /*num_src=*/1);
-    GGML_ASSERT(ggml_is_contiguous(dst->src[0]));
-    ggml_sycl_op_mean(ctx, dst);
-}
-
-static void ggml_sycl_argsort(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
-    scope_op_debug_print scope_dbg_print(__func__, dst, /*num_src=*/1);
-    GGML_ASSERT(ggml_is_contiguous(dst->src[0]));
-    ggml_sycl_op_argsort(ctx, dst);
-}
-
-static void ggml_sycl_argmax(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
-    scope_op_debug_print scope_dbg_print(__func__, dst, /*num_src=*/1);
-    GGML_ASSERT(ggml_is_contiguous(dst->src[0]));
-    ggml_sycl_op_argmax(ctx, dst);
-}
-
-
 static void ggml_sycl_set_main_device(const int main_device) try {
     if (dpct::get_current_device_id() == static_cast<unsigned int> (main_device)) {
         return;
@@ -3886,173 +3127,157 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
 
     switch (dst->op) {
         case GGML_OP_ARGMAX:
-            ggml_sycl_argmax(ctx, dst);
+            // TODO implement argmax kernel
+            break;
             break;
         case GGML_OP_CONV_TRANSPOSE_1D:
-            ggml_sycl_op_conv_transpose_1d(ctx, dst);
+            // TODO implement conv1d transpose kernel
             break;
         case GGML_OP_REPEAT:
-            ggml_sycl_repeat(ctx, dst);
+            // TODO implement repeat kernel
             break;
         case GGML_OP_REPEAT_BACK:
-            ggml_sycl_repeat_back(ctx, dst);
+            // TODO implement repeat back kernel
             break;
         case GGML_OP_GET_ROWS:
-            ggml_sycl_get_rows(ctx, dst);
+            // TODO implement get rows kernel
             break;
         case GGML_OP_SET:
-            ggml_sycl_op_set(ctx, dst);
+            // TODO implement set kernel
             break;
         case GGML_OP_SET_ROWS:
-            ggml_sycl_op_set_rows(ctx, dst);
+            // TODO implement set rows kernel
             break;
         case GGML_OP_DUP:
-            ggml_sycl_dup(ctx, dst);
+            // TODO implement dup kernel
             break;
         case GGML_OP_ADD:
         case GGML_OP_ADD1: // TODO: more efficient implementation
-            ggml_sycl_add(ctx, dst);
+            // TODO implement add kernel
             break;
         case GGML_OP_ADD_ID:
-            ggml_sycl_add_id(ctx, dst);
+            // TODO implement add id kernel
             break;
         case GGML_OP_SUB:
-            ggml_sycl_sub(ctx, dst);
+            // TODO implement sub kernel
             break;
         case GGML_OP_COUNT_EQUAL:
-            ggml_sycl_count_equal(ctx, dst);
+            // TODO implement count equal kernel
             break;
         case GGML_OP_ACC:
-            ggml_sycl_acc(ctx, dst);
+            // TODO implement acc kernel
             break;
         case GGML_OP_MUL:
-            ggml_sycl_mul(ctx, dst);
+            // TODO implement mul kernel
             break;
         case GGML_OP_LOG:
-            ggml_sycl_log(ctx, dst);
+            // TODO implement log kernel
             break;
         case GGML_OP_DIV:
-            ggml_sycl_div(ctx, dst);
+            // TODO implement div kernel
             break;
         case GGML_OP_UNARY:
+            // TODO implement unary kernels
             switch (ggml_get_unary_op(dst)) {
                 case GGML_UNARY_OP_NEG:
-                    ggml_sycl_neg(ctx, dst);
                     break;
                 case GGML_UNARY_OP_STEP:
-                    ggml_sycl_step(ctx, dst);
                     break;
                 case GGML_UNARY_OP_GELU:
-                    ggml_sycl_gelu(ctx, dst);
                     break;
                 case GGML_UNARY_OP_SILU:
-                    ggml_sycl_silu(ctx, dst);
                     break;
                 case GGML_UNARY_OP_GELU_QUICK:
-                    ggml_sycl_gelu_quick(ctx, dst);
                     break;
                 case GGML_UNARY_OP_GELU_ERF:
-                    ggml_sycl_gelu_erf(ctx, dst);
                     break;
                 case GGML_UNARY_OP_TANH:
-                    ggml_sycl_tanh(ctx, dst);
                     break;
                 case GGML_UNARY_OP_RELU:
-                    ggml_sycl_relu(ctx, dst);
                     break;
                 case GGML_UNARY_OP_SIGMOID:
-                    ggml_sycl_sigmoid(ctx, dst);
                     break;
                 case GGML_UNARY_OP_HARDSIGMOID:
-                    ggml_sycl_hardsigmoid(ctx, dst);
                     break;
                 case GGML_UNARY_OP_HARDSWISH:
-                    ggml_sycl_hardswish(ctx, dst);
                     break;
                 case GGML_UNARY_OP_EXP:
-                    ggml_sycl_exp(ctx, dst);
                     break;
                 case GGML_UNARY_OP_SOFTPLUS:
-                    ggml_sycl_softplus(ctx, dst);
                     break;
                 case GGML_UNARY_OP_SGN:
-                    ggml_sycl_sgn(ctx, dst);
                     break;
                 case GGML_UNARY_OP_ABS:
-                    ggml_sycl_abs(ctx, dst);
                     break;
                 case GGML_UNARY_OP_ELU:
-                    ggml_sycl_elu(ctx, dst);
+                    break;
+                case GGML_UNARY_OP_XIELU:
                     break;
                 case GGML_UNARY_OP_FLOOR:
-                    ggml_sycl_floor(ctx, dst);
                     break;
                 case GGML_UNARY_OP_CEIL:
-                    ggml_sycl_ceil(ctx, dst);
                     break;
                 case GGML_UNARY_OP_ROUND:
-                    ggml_sycl_round(ctx, dst);
                     break;
                 case GGML_UNARY_OP_TRUNC:
-                    ggml_sycl_trunc(ctx, dst);
+                    break;
+                case GGML_UNARY_OP_EXPM1:
                     break;
                 default:
                     return false;
             }
             break;
         case GGML_OP_GLU:
+            // TODO implement glu related kernels
             switch (ggml_get_glu_op(dst)) {
                 case GGML_GLU_OP_REGLU:
-                    ggml_sycl_reglu(ctx, dst);
                     break;
                 case GGML_GLU_OP_GEGLU:
-                    ggml_sycl_geglu(ctx, dst);
                     break;
                 case GGML_GLU_OP_SWIGLU:
-                    ggml_sycl_swiglu(ctx, dst);
                     break;
                 case GGML_GLU_OP_SWIGLU_OAI:
-                    ggml_sycl_swiglu_oai(ctx, dst);
                     break;
                 case GGML_GLU_OP_GEGLU_ERF:
-                    ggml_sycl_geglu_erf(ctx, dst);
                     break;
                 case GGML_GLU_OP_GEGLU_QUICK:
-                    ggml_sycl_geglu_quick(ctx, dst);
                     break;
                 default:
                     return false;
             }
             break;
         case GGML_OP_NORM:
-            ggml_sycl_norm(ctx, dst);
+            // TODO implement norm kernel
             break;
         case GGML_OP_GROUP_NORM:
-            ggml_sycl_group_norm(ctx, dst);
+            // TODO implement group norm kernel
             break;
         case GGML_OP_CONCAT:
-            ggml_sycl_op_concat(ctx, dst);
+            // TODO implement concat kernel
             break;
         case GGML_OP_PAD_REFLECT_1D:
-            ggml_sycl_op_pad_reflect_1d(ctx,dst);
+            // TODO implement pad reflect 1d kernel
             break;
         case GGML_OP_UPSCALE:
-            ggml_sycl_upscale(ctx, dst);
+            // TODO implement upscale kernel
             break;
         case GGML_OP_PAD:
-            ggml_sycl_pad(ctx, dst);
+            // TODO implement pad kernel
             break;
         case GGML_OP_LEAKY_RELU:
-            ggml_sycl_leaky_relu(ctx, dst);
+            // TODO implement leaky relu kernel
+            break;
+        case GGML_OP_SILU_BACK:
+            // TODO implement silu back kernel
             break;
         case GGML_OP_RMS_NORM_BACK:
-            ggml_sycl_rms_norm_back(ctx, dst);
+            // TODO implement rmsnorm back kernel
             break;
         case GGML_OP_RMS_NORM:
-            ggml_sycl_rms_norm(ctx, dst);
+            // TODO implement rmsnorm kernel
             break;
         case GGML_OP_L2_NORM:
-            ggml_sycl_l2_norm(ctx, dst);
+            // TODO implement l2 norm kernel
             break;
         case GGML_OP_MUL_MAT:
             if (dst->src[0]->ne[3] != dst->src[1]->ne[3]) {
@@ -4071,28 +3296,28 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             ggml_sycl_op_out_prod(ctx, dst);
             break;
         case GGML_OP_SCALE:
-            ggml_sycl_scale(ctx, dst);
+            // TODO implement scale kernel
             break;
         case GGML_OP_SQR:
-            ggml_sycl_sqr(ctx, dst);
+            // TODO implement sqr kernel
             break;
         case GGML_OP_SQRT:
-            ggml_sycl_sqrt(ctx, dst);
+            // TODO implement sqrt kernel
             break;
         case GGML_OP_SIN:
-            ggml_sycl_sin(ctx, dst);
+            // TODO implement sin kernel
             break;
         case GGML_OP_COS:
-            ggml_sycl_cos(ctx, dst);
+            // TODO implement cos kernel
             break;
         case GGML_OP_CLAMP:
-            ggml_sycl_clamp(ctx, dst);
+            // TODO implement clamp kernel
             break;
         case GGML_OP_CPY:
-            ggml_sycl_cpy(ctx, dst->src[0], dst->src[1]);
+            // TODO implement copy kernel
             break;
         case GGML_OP_CONT:
-            ggml_sycl_dup(ctx, dst);
+            // TODO implement cont kernel
             break;
         case GGML_OP_NONE:
         case GGML_OP_RESHAPE:
@@ -4102,61 +3327,105 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             GGML_SYCL_DEBUG("%s: Tensor NO-OP\n", __func__);
             break;
         case GGML_OP_TRI:
-            ggml_sycl_op_tri(ctx, dst);
+            // TODO implement tri kernel
             break;
         case GGML_OP_DIAG_MASK_INF:
-            ggml_sycl_diag_mask_inf(ctx, dst);
+            // TODO implement diag mask inf kernel
             break;
         case GGML_OP_SOFT_MAX:
-            ggml_sycl_op_soft_max(ctx, dst);
+            // TODO implement softmax kernel
             break;
         case GGML_OP_SOFT_MAX_BACK:
-            ggml_sycl_op_soft_max_back(ctx, dst);
+            // TODO implement softmax back kernel
             break;
         case GGML_OP_ROPE:
-            ggml_sycl_rope(ctx, dst);
+            // TODO implement rope kernel
             break;
         case GGML_OP_IM2COL:
-            ggml_sycl_im2col(ctx, dst);
+            // TODO implement im2col kernel
             break;
         case GGML_OP_POOL_2D:
-            ggml_sycl_pool2d(ctx, dst);
+            // TODO implement pool 2d kernel
             break;
         case GGML_OP_SUM:
-            ggml_sycl_sum(ctx, dst);
+            // TODO implement sum kernel
             break;
         case GGML_OP_SUM_ROWS:
-            ggml_sycl_sum_rows(ctx, dst);
+            // TODO implement sum rows kernel
             break;
         case GGML_OP_MEAN:
-            ggml_sycl_mean(ctx, dst);
+            // TODO implement mean kernel
             break;
         case GGML_OP_ARGSORT:
-            ggml_sycl_argsort(ctx, dst);
+            // TODO implement argsort kernel
             break;
         case GGML_OP_TOP_K:
-            ggml_sycl_op_top_k(ctx, dst);
+            // TODO implement topk kernel
             break;
         case GGML_OP_TIMESTEP_EMBEDDING:
-            ggml_sycl_op_timestep_embedding(ctx, dst);
+            // TODO implement timestep embedding kernel
             break;
         case GGML_OP_RWKV_WKV6:
-            ggml_sycl_op_rwkv_wkv6(ctx, dst);
+            // TODO implement rwkv wkv6 kernel
             break;
         case GGML_OP_RWKV_WKV7:
-            ggml_sycl_op_rwkv_wkv7(ctx, dst);
+            // TODO implement rwkv wkv7 kernel
             break;
         case GGML_OP_GATED_LINEAR_ATTN:
-            ggml_sycl_op_gated_linear_attn(ctx, dst);
+            // TODO implement gated linear attention kernel
             break;
         case GGML_OP_SSM_CONV:
-            ggml_sycl_ssm_conv(ctx, dst);
+            // TODO implement ssm conv kernel
             break;
         case GGML_OP_ROLL:
-            ggml_sycl_roll(ctx, dst);
+            // TODO implement roll kernel
             break;
         case GGML_OP_ARANGE:
-            ggml_sycl_arange(ctx, dst);
+            // TODO implement arange kernel
+            break;
+        case GGML_OP_CONV_2D:
+            // TODO implement conv2d kernel
+            break;
+        case GGML_OP_CONV_2D_DW:
+            // TODO implement conv2d dw kernel
+            break;
+        case GGML_OP_CONV_TRANSPOSE_2D:
+            // TODO implement conv2d transpose kernel
+        case GGML_OP_GET_ROWS_BACK:
+            // TODO implement get rows back kernel
+            break;
+        case GGML_OP_DIAG:
+            // TODO implement diag kernel
+            break;
+        case GGML_OP_ROPE_BACK:
+            // TODO implement rope back kernel
+            break;
+        case GGML_OP_IM2COL_3D:
+            // TODO implement im2col 3d kernel
+            break;
+        case GGML_OP_CUMSUM:
+            // TODO implement cumsum kernel
+            break;
+        case GGML_OP_SSM_SCAN:
+            // TODO implement ssm scan kernel
+            break;
+        case GGML_OP_CROSS_ENTROPY_LOSS:
+            // TODO implement cross entropy loss kernel
+            break;
+        case GGML_OP_CROSS_ENTROPY_LOSS_BACK:
+            // TODO implement cross entropy loss back kernel
+            break;
+        case GGML_OP_OPT_STEP_ADAMW:
+            // TODO implement opt step adamw kernel
+            break;
+        case GGML_OP_OPT_STEP_SGD:
+            // TODO implement opt step sgd kernel
+            break;
+        case GGML_OP_SOLVE_TRI:
+            // TODO implement solve tri kernel
+            break;
+        case GGML_OP_FILL:
+            // TODO implement fill kernel
             break;
         default:
             return false;
@@ -4592,15 +3861,10 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
                 case GGML_UNARY_OP_SOFTPLUS:
                 case GGML_UNARY_OP_ELU:
                 case GGML_UNARY_OP_CEIL:
-                    return true;
                 case GGML_UNARY_OP_FLOOR:
                 case GGML_UNARY_OP_ROUND:
                 case GGML_UNARY_OP_TRUNC:
-#if defined (GGML_SYCL_F16)
-                    return ggml_is_contiguous(op->src[0]) && (op->type == op->src[0]->type);
-#else
-                    return ggml_is_contiguous(op->src[0]) && (op->src[0]->type == GGML_TYPE_F32 && op->type == GGML_TYPE_F32) && (op->type == op->src[0]->type);
-#endif
+                    return false;
                 default:
                     return false;
             }
@@ -4612,7 +3876,7 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
                 case GGML_GLU_OP_SWIGLU_OAI:
                 case GGML_GLU_OP_GEGLU_ERF:
                 case GGML_GLU_OP_GEGLU_QUICK:
-                    return ggml_is_contiguous_1(op->src[0]);
+                    return false;
                 default:
                     return false;
             }
@@ -4659,209 +3923,116 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_OUT_PROD:
             return op->type == GGML_TYPE_F32 && op->src[0]->type == GGML_TYPE_F32 && op->src[1]->type == GGML_TYPE_F32 && op->ne[2] == 1 && op->ne[3] == 1;
         case GGML_OP_GET_ROWS:
-            {
-                switch (op->src[0]->type) {
-                    case GGML_TYPE_F16:
-                    case GGML_TYPE_F32:
-                    case GGML_TYPE_Q4_0:
-                    case GGML_TYPE_Q4_1:
-                    case GGML_TYPE_Q5_0:
-                    case GGML_TYPE_Q5_1:
-                    case GGML_TYPE_Q8_0:
-                        return true;
-                    default:
-                        return false;
-                }
-            }
+            return false;
          case GGML_OP_SET:
-               return (op->type == GGML_TYPE_F32) &&
-                      (op->src[0] && op->src[1]) &&
-                      (op->src[0]->type == GGML_TYPE_F32) &&
-                      (op->src[1]->type == GGML_TYPE_F32);
-
+            return false;
         case GGML_OP_SET_ROWS:
-            {
-                return ((op->type == GGML_TYPE_F32 || op->type == GGML_TYPE_F16 || op->type == GGML_TYPE_BF16 ||
-                         op->type == GGML_TYPE_Q8_0 || op->type == GGML_TYPE_Q5_1 || op->type == GGML_TYPE_Q5_0 ||
-                         op->type == GGML_TYPE_Q4_1 || op->type == GGML_TYPE_Q4_0 || op->type == GGML_TYPE_IQ4_NL) &&
-                        (op->src[1]->type == GGML_TYPE_I64 || op->src[1]->type == GGML_TYPE_I32));
-            }
-            break;
+            return false;
         case GGML_OP_CPY:
-            {
-                ggml_type src0_type = op->src[0]->type;
-                ggml_type src1_type = op->src[1]->type;
-                if (src0_type == src1_type && (ggml_is_contiguous(op->src[0]) && ggml_is_contiguous(op->src[1])) && src0_type != GGML_TYPE_BF16) {
-                    return true;
-                }
-                if (src0_type == GGML_TYPE_F32 && src1_type == GGML_TYPE_F32) {
-                    return true;
-                }
-                if (src0_type == GGML_TYPE_F32 && src1_type == GGML_TYPE_F16) {
-                    return true;
-                }
-                if (src0_type == GGML_TYPE_F32 && src1_type == GGML_TYPE_Q8_0) {
-                    return true;
-                }
-                if (src0_type == GGML_TYPE_F32 && src1_type == GGML_TYPE_Q4_0) {
-                    return true;
-                }
-                if (src0_type == GGML_TYPE_F32 && src1_type == GGML_TYPE_Q4_1) {
-                    return true;
-                }
-                if (src0_type == GGML_TYPE_F16 && src1_type == GGML_TYPE_F16) {
-                    return true;
-                }
-                if (src0_type == GGML_TYPE_F16 && src1_type == GGML_TYPE_F32) {
-                    return true;
-                }
-                if (src0_type == GGML_TYPE_Q8_0 && src1_type == GGML_TYPE_F32) {
-                    return true;
-                }
-                if (src0_type == GGML_TYPE_Q4_0 && src1_type == GGML_TYPE_F32) {
-                    return true;
-                }
-                if (src0_type == GGML_TYPE_Q4_1 && src1_type == GGML_TYPE_F32) {
-                    return true;
-                }
-                if (src0_type == GGML_TYPE_F32 && src1_type == GGML_TYPE_Q5_0) {
-                    return true;
-                }
-                if (src0_type == GGML_TYPE_Q5_0 && src1_type == GGML_TYPE_F32) {
-                    return true;
-                }
-                if (src0_type == GGML_TYPE_F32 && src1_type == GGML_TYPE_Q5_1) {
-                    return true;
-                }
-                if (src0_type == GGML_TYPE_Q5_1 && src1_type == GGML_TYPE_F32) {
-                    return true;
-                }
-                if (src0_type == GGML_TYPE_F32 && src1_type == GGML_TYPE_IQ4_NL) {
-                    return true;
-                }
-                if(src0_type == GGML_TYPE_Q8_0 && src1_type == GGML_TYPE_Q8_0) {
-                    return true;
-                }
-                if(src0_type == GGML_TYPE_Q5_0 && src1_type == GGML_TYPE_Q5_0) {
-                    return true;
-                }
-                if(src0_type == GGML_TYPE_Q5_1 && src1_type == GGML_TYPE_Q5_1) {
-                    return true;
-                }
-                if(src0_type == GGML_TYPE_Q4_0 && src1_type == GGML_TYPE_Q4_0) {
-                    return true;
-                }
-                if(src0_type == GGML_TYPE_Q4_1 && src1_type == GGML_TYPE_Q4_1) {
-                    return true;
-                }
-                return false;
-            }
+            return false;
         case GGML_OP_REPEAT_BACK:
-            {
-                ggml_type src0_type = op->src[0]->type;
-                return src0_type == GGML_TYPE_F32;
-            }
+            return false;
         case GGML_OP_CONCAT:
+            return false;
         case GGML_OP_DUP:
+            return false;
         case GGML_OP_ARGMAX:
+            return false;
         case GGML_OP_NONE:
         case GGML_OP_RESHAPE:
         case GGML_OP_VIEW:
         case GGML_OP_PERMUTE:
         case GGML_OP_TRANSPOSE:
+            return true;
         case GGML_OP_ADD:
         case GGML_OP_ADD1:
         case GGML_OP_ADD_ID:
         case GGML_OP_SUB:
+            return false;
         case GGML_OP_COUNT_EQUAL:
+            return false;
         case GGML_OP_MUL:
+            return false;
         case GGML_OP_DIV:
+            return false;
         case GGML_OP_REPEAT:
-            return true;
+            return false;
         case GGML_OP_PAD_REFLECT_1D:
-            return ggml_is_contiguous(op->src[0]) && op-> type == GGML_TYPE_F32 && op->src[0]->type == GGML_TYPE_F32;
+            return false;
         case GGML_OP_SQR:
+            return false;
         case GGML_OP_SQRT:
+            return false;
         case GGML_OP_SIN:
+            return false;
         case GGML_OP_COS:
+            return false;
         case GGML_OP_CLAMP:
+            return false;
         case GGML_OP_LOG:
-#if defined (GGML_SYCL_F16)
-            return ((op->type == GGML_TYPE_F32 || op->type == GGML_SYCL_F16) && (op->src[0]->type == GGML_TYPE_F32 || op->src[0]->type == GGML_SYCL_F16) && (op->type == op->src[0]->type));
-#else
-            return (op->type == GGML_TYPE_F32 && op->src[0]->type == GGML_TYPE_F32) && (op->type == op->src[0]->type);
-#endif
+            return false;
         case GGML_OP_NORM:
+            return false;
         case GGML_OP_L2_NORM:
+            return false;
         case GGML_OP_GROUP_NORM:
+            return false;
         case GGML_OP_RMS_NORM:
-            return true;
+            return false;
         case GGML_OP_RMS_NORM_BACK:
-            return ggml_is_contiguous(op->src[0]);
+            return false;
         case GGML_OP_SCALE:
-            return true;
+            return false;
         case GGML_OP_CONT:
-            return op->src[0]->type != GGML_TYPE_BF16;
+            return false;
         case GGML_OP_TRI:
-            {
-                const ggml_tensor * src0 = op->src[0];
-                return src0 &&
-                       op->type == GGML_TYPE_F32 &&
-                       ggml_is_contiguous(src0);
-            }
+            return false;
         case GGML_OP_DIAG_MASK_INF:
-            return true;
+            return false;
         case GGML_OP_SOFT_MAX:
-            return true;
-        case GGML_OP_SOFT_MAX_BACK: {
-            float max_bias = 0.0f;
-            memcpy(&max_bias, (const float *) op->op_params + 1, sizeof(float));
-            return max_bias == 0.0f;
-        }
+            return false;
+        case GGML_OP_SOFT_MAX_BACK:
+            return false;
         case GGML_OP_ROPE:
+            return false;
         case GGML_OP_IM2COL:
-            return true;
+            return false;
         case GGML_OP_UPSCALE:
-            return op->src[0]->type == GGML_TYPE_F32 && op->op_params[0] == GGML_SCALE_MODE_NEAREST && !(op->op_params[0] & GGML_SCALE_FLAG_ANTIALIAS);
+            return false;
         case GGML_OP_SUM:
+            return false;
         case GGML_OP_SUM_ROWS:
+            return false;
         case GGML_OP_MEAN:
-            return ggml_is_contiguous(op->src[0]);
+            return false;
         case GGML_OP_ARGSORT:
-            return op->src[0]->ne[0] * sizeof(int) <=
-                   ggml_sycl_info().devices[device].smpbo;
-        case GGML_OP_TOP_K: {
-            const ggml_tensor * src0 = op->src[0];
-            const int k = op->ne[0];
-            return src0 &&
-                op->type == GGML_TYPE_I32 &&
-                src0->type == GGML_TYPE_F32 &&
-                ggml_is_contiguous(src0) &&
-                k > 0 && k <= 32;
-        }
+            return false;
+        case GGML_OP_TOP_K:
+            return false;
         case GGML_OP_POOL_2D:
+            return false;
         case GGML_OP_ACC:
-            return true;
+            return false;
         case GGML_OP_PAD:
-            // TODO: add circular padding support for syscl, see https://github.com/ggml-org/llama.cpp/pull/16985
-            if (ggml_get_op_params_i32(op, 8) != 0) {
-                return false;
-            }
-            return ggml_is_contiguous(op->src[0]);
+            return false;
         case GGML_OP_LEAKY_RELU:
+            return false;
+        case GGML_OP_SILU_BACK:
+            return false;
         case GGML_OP_TIMESTEP_EMBEDDING:
+            return false;
         case GGML_OP_RWKV_WKV6:
+            return false;
         case GGML_OP_RWKV_WKV7:
+            return false;
         case GGML_OP_GATED_LINEAR_ATTN:
-            return true;
+            return false;
         case GGML_OP_SSM_CONV:
-            return op->type == GGML_TYPE_F32 &&
-                   op->src[0]->type == GGML_TYPE_F32 &&
-                   op->src[1]->type == GGML_TYPE_F32;
+            return false;
         case GGML_OP_ROLL:
-            return op->type == GGML_TYPE_F32;
+            return false;
         case GGML_OP_ARANGE:
-            return op->type == GGML_TYPE_F32;
+            return false;
         default:
             return false;
     }
