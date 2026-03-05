@@ -3741,6 +3741,118 @@ static void ggml_sycl_op_argsort(ggml_backend_sycl_context & ctx, ggml_tensor * 
     });
 }
 
+// ---------------------------------------------------------------------------
+// TOP_K — bitonic argsort (descending) then copy first k indices per row
+// ---------------------------------------------------------------------------
+static void ggml_sycl_op_top_k(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
+    const ggml_tensor * src0 = dst->src[0];
+
+    GGML_ASSERT(src0->type == GGML_TYPE_F32);
+    GGML_ASSERT(dst->type  == GGML_TYPE_I32);
+    GGML_ASSERT(ggml_is_contiguous(src0));
+
+    const int64_t ncols = src0->ne[0];
+    const int64_t nrows = ggml_nrows(src0);
+    const int64_t k     = dst->ne[0];
+    const int ncols_pad = next_power_of_2((int) ncols);
+
+    GGML_ASSERT(ncols_pad <= 1024);
+
+    const float * src0_d = (const float *) src0->data;
+    int32_t *     dst_d  = (int32_t *)     dst->data;
+
+    sycl::queue & stream = *(ctx.stream());
+
+    // Temporary buffer for full argsort results (ncols per row)
+    ggml_sycl_pool_alloc<int> tmp_alloc(ctx.pool(), ncols * nrows);
+    int * tmp = tmp_alloc.get();
+
+    const int ncols_int = (int) ncols;
+    const int k_int     = (int) k;
+
+    // Step 1: Bitonic argsort in descending order into tmp
+    {
+        const sycl::range<1> global_range(nrows * ncols_pad);
+        const sycl::range<1> local_range(ncols_pad);
+
+        stream.submit([&](sycl::handler & h) {
+            sycl::local_accessor<int, 1> dst_row(ncols_pad, h);
+
+            h.parallel_for(
+                sycl::nd_range<1>(global_range, local_range),
+                [=](sycl::nd_item<1> item) {
+                    const int col = item.get_local_id(0);
+                    const int row = item.get_group(0);
+
+                    if (col >= ncols_pad) {
+                        return;
+                    }
+
+                    const float * x_row = src0_d + (int64_t) row * ncols_int;
+
+                    // Initialize indices
+                    dst_row[col] = col;
+
+                    sycl::group_barrier(item.get_group());
+
+                    // Bitonic sort network (descending)
+                    for (int bk = 2; bk <= ncols_pad; bk *= 2) {
+                        for (int j = bk / 2; j > 0; j /= 2) {
+                            const int ixj = col ^ j;
+                            if (ixj > col) {
+                                if ((col & bk) == 0) {
+                                    // Descending: swap if left < right (or left is out-of-bounds)
+                                    if (dst_row[col] >= ncols_int ||
+                                        (dst_row[ixj] < ncols_int &&
+                                         x_row[dst_row[col]] < x_row[dst_row[ixj]]))
+                                    {
+                                        const int t = dst_row[col];
+                                        dst_row[col] = dst_row[ixj];
+                                        dst_row[ixj] = t;
+                                    }
+                                } else {
+                                    if (dst_row[ixj] >= ncols_int ||
+                                        (dst_row[col] < ncols_int &&
+                                         x_row[dst_row[col]] > x_row[dst_row[ixj]]))
+                                    {
+                                        const int t = dst_row[col];
+                                        dst_row[col] = dst_row[ixj];
+                                        dst_row[ixj] = t;
+                                    }
+                                }
+                            }
+                            sycl::group_barrier(item.get_group());
+                        }
+                    }
+
+                    // Copy result to tmp without padding
+                    if (col < ncols_int) {
+                        tmp[(int64_t) row * ncols_int + col] = dst_row[col];
+                    }
+                });
+        });
+    }
+
+    // Step 2: Copy first k indices per row from tmp to dst
+    {
+        const int ne = (int)(nrows * k);
+        const int block_size = 256;
+        const int grid_size  = (ne + block_size - 1) / block_size;
+
+        stream.parallel_for(
+            sycl::nd_range<1>(grid_size * block_size, block_size),
+            [=](sycl::nd_item<1> item) {
+                const int idx = item.get_global_id(0);
+                if (idx >= ne) {
+                    return;
+                }
+                const int row = idx / k_int;
+                const int col = idx % k_int;
+                dst_d[row * k_int + col] = tmp[(int64_t) row * ncols_int + col];
+            });
+    }
+}
+
 static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct ggml_tensor * dst) try {
     if (!g_sycl_loaded) return false;
 
@@ -4008,7 +4120,7 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             ggml_sycl_op_argsort(ctx, dst);
             break;
         case GGML_OP_TOP_K:
-            // TODO implement topk kernel
+            ggml_sycl_op_top_k(ctx, dst);
             break;
         case GGML_OP_TIMESTEP_EMBEDDING:
             ggml_sycl_op_timestep_embedding(ctx, dst);
@@ -4726,7 +4838,7 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
             // Limit to 1024 columns, matching CUDA's non-CUB fallback.
             return op->src[0]->type == GGML_TYPE_F32 && ggml_is_contiguous(op->src[0]) && op->src[0]->ne[0] <= 1024;
         case GGML_OP_TOP_K:
-            return false;
+            return op->src[0]->type == GGML_TYPE_F32 && ggml_is_contiguous(op->src[0]) && op->src[0]->ne[0] <= 1024;
         case GGML_OP_POOL_2D:
             return false;
         case GGML_OP_ACC:

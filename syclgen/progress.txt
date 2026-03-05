@@ -1236,3 +1236,49 @@ Implemented SYCL ROPE (Rotary Position Embedding) kernels — all 4 variants (no
 **Issues:** None.
 **Next task:** task_033 (TOP_K) or next pending priority-4 task
 **Completion:** 32/48 tasks completed
+
+---
+
+## Session 33 — task_033: Migrate TOP_K op
+
+**Date:** 2026-03-05
+**Task:** Implement TOP_K kernel — select indices of top-k largest values per row.
+**CUDA ref:** `ggml/src/ggml-cuda/top-k.cu`
+
+### Implementation
+
+1. **Implemented `ggml_sycl_op_top_k`** inline in `ggml/src/ggml-sycl/ggml-sycl.cpp` (lines 3744-3854):
+   - Two-step approach matching CUDA's non-CUB fallback:
+   
+   **Step 1 — Bitonic argsort (descending):**
+   - Allocates temp buffer of `ncols * nrows` ints via `ggml_sycl_pool_alloc<int>`
+   - Runs bitonic sort network identical to existing ARGSORT kernel but hardcoded descending
+   - Each work-group handles one row, work-group size = ncols_pad (next power of 2)
+   - `sycl::local_accessor<int, 1>` for shared memory sort workspace
+   - Loop variable renamed from `k` to `bk` to avoid shadowing top-k parameter
+   - Results written to temp buffer
+   
+   **Step 2 — Copy first k indices per row:**
+   - Simple `parallel_for` with block_size=256
+   - Maps flat index to (row, col): `dst[row * k + col] = tmp[row * ncols + col]`
+
+2. **Wired into `ggml-sycl.cpp`:**
+   - compute_forward: GGML_OP_TOP_K → `ggml_sycl_op_top_k(ctx, dst)` (replaced TODO stub)
+   - supports_op: GGML_OP_TOP_K → returns F32 && contiguous && ne[0] <= 1024
+
+### Design Notes
+- Reuses exact same bitonic sort network as ARGSORT — no new algorithm needed
+- ncols > 1024 correctly rejected by supports_op (falls back to CPU), matching ARGSORT limit
+- Pool allocator manages temp buffer lifetime automatically
+
+**Build:** Compiles cleanly on b60 (icpx 2025.1.1, GGML_SYCL=ON, GGML_SYCL_F16=ON)
+**Tests:**
+| Op | Result | Tests |
+|---|---|---|
+| TOP_K (f32, k=1..1023, ties=0/1, ncols <= 1024, multi-dim) | PASS | 170/170 |
+| TOP_K (ncols > 1024) | not supported | (correctly rejected) |
+
+**Regression:** SCALE: 4/4 tests pass — no regressions
+**Issues:** None.
+**Next task:** task_034 (IM2COL) or next pending priority-4 task
+**Completion:** 33/48 tasks completed
