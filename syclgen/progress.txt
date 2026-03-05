@@ -1567,3 +1567,52 @@ Implemented SYCL ROPE (Rotary Position Embedding) kernels — all 4 variants (no
 **Issues:** None. All tests pass first try.
 **Next task:** task_040 (RWKV WKV6/WKV7) — WKV attention kernels
 **Completion:** 39/48 tasks completed (task_047 abandoned)
+
+---
+
+## Session 40 — task_040: RWKV WKV6/WKV7 attention kernels (2026-03-05)
+
+**Goal:** Migrate CUDA RWKV WKV6 and WKV7 attention kernels to SYCL.
+
+**CUDA reference:** `ggml/src/ggml-cuda/wkv.cu` (200 lines)
+- `rwkv_wkv_f32<head_size>` kernel (WKV6): k, v, r, tf (time_first), td (time_decay), s (state) → dst
+- `rwkv_wkv7_f32<head_size>` kernel (WKV7): r, w (decay), k, v, a, b, s → dst; extra `sa = dot(a, state)` step
+- Both use shared memory for per-timestep vectors, private register arrays for state (`float state[head_size]`)
+- Template parameter head_size = 64 or 128, CUDA_WKV_BLOCK_SIZE = 64
+- No warp-level operations (no shuffles needed)
+- WKV6 state indexing: column-major `s[batch*state_size + head*hs*hs + i*hs + tid]`
+- WKV7 state indexing: row-major `s[batch*state_size + head*hs*hs + tid*hs + i]`
+
+**Implementation:** `ggml/src/ggml-sycl/wkv.cpp` (220 lines, was 3-line stub)
+- Two template kernels: `rwkv_wkv6_f32_sycl<head_size>` and `rwkv_wkv7_f32_sycl<head_size>`
+- Two host dispatch functions: `ggml_sycl_op_rwkv_wkv6` and `ggml_sycl_op_rwkv_wkv7`
+- `sycl::nd_range<1>` launch: global = B*H*head_size, local = head_size
+- `sycl::local_accessor<float,1>` replaces CUDA `__shared__` for _k, _r, _tf/_w, _td/_a, _b
+- `sycl::group_barrier(item.get_group())` replaces CUDA `__syncthreads()`
+- Manual 4-wide loop unrolling replaces CUDA `float4` loads (SYCL doesn't guarantee float4 alignment)
+- No sub_group/warp operations needed — purely work-group parallel
+- Added `SYCL_WKV_BLOCK_SIZE 64` to `presets.hpp` (line 78)
+
+### Wiring changes in `ggml-sycl.cpp`:
+- Added `#include "ggml-sycl/wkv.hpp"` (line 71)
+- `compute_forward`: GGML_OP_RWKV_WKV6 → `ggml_sycl_op_rwkv_wkv6(ctx, dst)` (line 4470)
+- `compute_forward`: GGML_OP_RWKV_WKV7 → `ggml_sycl_op_rwkv_wkv7(ctx, dst)` (line 4473)
+- `supports_op`: Both RWKV_WKV6 and RWKV_WKV7 → `return true` (lines 5198-5201)
+
+**Build:** Compiles cleanly on b60 (icpx 2025.1, GGML_SYCL=ON, GGML_SYCL_F16=ON)
+**Tests:**
+| Op | Config | Result |
+|---|---|---|
+| RWKV_WKV6 | head_count=32,head_size=64,n_seq_tokens=1,n_seqs=1 | PASS |
+| RWKV_WKV6 | head_count=32,head_size=64,n_seq_tokens=32,n_seqs=1 | PASS |
+| RWKV_WKV6 | head_count=32,head_size=64,n_seq_tokens=32,n_seqs=4 | PASS |
+| RWKV_WKV6 | head_count=32,head_size=64,n_seq_tokens=128,n_seqs=4 | PASS |
+| RWKV_WKV7 | head_count=32,head_size=64,n_seq_tokens=1,n_seqs=1 | PASS |
+| RWKV_WKV7 | head_count=32,head_size=64,n_seq_tokens=32,n_seqs=1 | PASS |
+| RWKV_WKV7 | head_count=32,head_size=64,n_seq_tokens=32,n_seqs=4 | PASS |
+| RWKV_WKV7 | head_count=32,head_size=64,n_seq_tokens=128,n_seqs=4 | PASS |
+| **Total** | | **8/8 PASS** |
+
+**Issues:** None. All tests pass first try.
+**Next task:** task_041 (GATED_LINEAR_ATTN / GLA) — GLA attention kernel
+**Completion:** 40/48 tasks completed (task_047 abandoned)

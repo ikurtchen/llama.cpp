@@ -1048,7 +1048,9 @@
       "priority": 5,
       "name": "Migrate RWKV WKV6/WKV7 ops",
       "description": "Implement WKV attention kernels. Complex: shared memory, warp shuffle. Existing empty stub: wkv.cpp.",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-03-05",
+      "notes": "Both WKV6 and WKV7 SYCL kernels implemented with template head_size (64/128), local_accessor shared memory, group_barrier sync, manual 4-wide unrolling. 8/8 tests pass on b60.",
       "kernel_ids": [
         "ck_120",
         "ck_121"

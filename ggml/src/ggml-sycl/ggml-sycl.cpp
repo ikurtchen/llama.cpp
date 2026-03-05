@@ -68,6 +68,7 @@
 #include "ggml-sycl/sum.hpp"
 #include "ggml-sycl/count-equal.hpp"
 #include "ggml-sycl/im2col.hpp"
+#include "ggml-sycl/wkv.hpp"
 #include "ggml.h"
 
 static bool g_sycl_loaded = false;
@@ -4466,10 +4467,10 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             ggml_sycl_op_timestep_embedding(ctx, dst);
             break;
         case GGML_OP_RWKV_WKV6:
-            // TODO implement rwkv wkv6 kernel
+            ggml_sycl_op_rwkv_wkv6(ctx, dst);
             break;
         case GGML_OP_RWKV_WKV7:
-            // TODO implement rwkv wkv7 kernel
+            ggml_sycl_op_rwkv_wkv7(ctx, dst);
             break;
         case GGML_OP_GATED_LINEAR_ATTN:
             // TODO implement gated linear attention kernel
@@ -5195,9 +5196,9 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_TIMESTEP_EMBEDDING:
             return op->src[0]->type == GGML_TYPE_F32;
         case GGML_OP_RWKV_WKV6:
-            return false;
+            return true;
         case GGML_OP_RWKV_WKV7:
-            return false;
+            return true;
         case GGML_OP_GATED_LINEAR_ATTN:
             return false;
         case GGML_OP_SSM_CONV:
