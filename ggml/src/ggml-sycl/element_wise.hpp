@@ -93,4 +93,8 @@ void ggml_sycl_trunc(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
 
 void ggml_sycl_arange(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
 
+void ggml_sycl_expm1(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
+void ggml_sycl_silu_back(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
+void ggml_sycl_xielu(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
+
 #endif // GGML_SYCL_ELEMENTWISE_HPP

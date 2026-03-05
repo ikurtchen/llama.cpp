@@ -22,7 +22,7 @@ Migration tasks created: 48 (2 infrastructure + 39 kernel + 1 integration)
 | task_002  | 2        | infrastructure | Create SYCL helper utilities            | pending |
 | task_003  | 3        | kernel         | SCALE                                   | pending |
 | task_004  | 3        | kernel         | DIAG_MASK_INF                           | pending |
-| task_005  | 3        | kernel         | Unary ops (SILU, GELU, RELU, etc.)      | pending |
+| task_005  | 3        | kernel         | Unary ops (SILU, GELU, RELU, etc.)      | DONE    |
 | task_006  | 3        | kernel         | GLU ops (SWIGLU, GEGLU, REGLU)          | pending |
 | task_007  | 3        | kernel         | Binary broadcast (ADD, MUL, DIV, etc.)  | pending |
 | task_008  | 3        | kernel         | CONCAT                                  | pending |
@@ -197,3 +197,47 @@ clamp, arange, upscale (require specialized parameters beyond the template)
 **Issues:** None.
 **Next task:** task_005 (Migrate unary ops) or task_006 (Migrate GLU ops)
 **Completion:** 4/48 tasks completed
+
+### Session 5 — 2026-03-05: task_005 (Migrate unary ops)
+
+**Completed:** task_005 — Unary ops (element-wise activations) full migration
+**What was done:**
+
+1. **Wired 22 existing unary ops** from element_wise.cpp into compute_forward and supports_op:
+   - GGML_OP_UNARY sub-ops: NEG, STEP, GELU, SILU, GELU_QUICK, GELU_ERF, TANH, RELU,
+     SIGMOID, HARDSIGMOID, HARDSWISH, EXP, SOFTPLUS, SGN, ABS, ELU, XIELU, FLOOR, CEIL,
+     ROUND, TRUNC, EXPM1
+   - Standalone ops: SQR, SQRT, SIN, COS, LOG, LEAKY_RELU, SILU_BACK
+
+2. **Implemented 4 new kernels** in element_wise.cpp:
+   - `ggml_sycl_expm1` — simple wrapper using op_expm1
+   - `ggml_sycl_leaky_relu` — custom kernel with negative_slope from op_params
+   - `ggml_sycl_silu_back` — two-input kernel (grad + x) for backward pass
+   - `ggml_sycl_xielu` — custom kernel with 4 params (alpha_n, alpha_p, beta, eps)
+
+3. **Added declarations** in element_wise.hpp: ggml_sycl_expm1, ggml_sycl_silu_back, ggml_sycl_xielu
+
+4. **Found and fixed bug:** supports_op for GGML_OP_UNARY returned true unconditionally,
+   but kernels assert ggml_is_contiguous(src0). Non-contiguous tensors caused crashes.
+   Fix: `return ggml_is_contiguous(op->src[0]);` at ggml-sycl.cpp:3960, matching CUDA behavior.
+
+**Tests:**
+| Op | Result | Tests |
+|---|---|---|
+| SILU | PASS | 4/4 |
+| GELU | PASS | 4/4 |
+| RELU | PASS | 4/4 |
+| TANH | PASS | 4/4 |
+| SIGMOID | PASS | 4/4 |
+| SQR | PASS | 6/6 |
+| SQRT | PASS | 6/6 |
+| SIN | PASS | 6/6 |
+| COS | PASS | 6/6 |
+| LOG | PASS | 6/6 |
+| LEAKY_RELU | PASS | 7/7 |
+| SILU_BACK | PASS | 1/1 |
+
+**Regression:** SCALE 4/4 pass, MUL_MAT 729/729 pass — no regressions
+**Issues:** None.
+**Next task:** task_006 (GLU ops) or task_007 (Binary broadcast ADD/MUL/DIV)
+**Completion:** 5/48 tasks completed

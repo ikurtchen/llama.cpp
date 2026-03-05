@@ -1,4 +1,5 @@
 #include "element_wise.hpp"
+#include "ggml-impl.h"
 
 #include <cmath>
 #include <cstring>
@@ -339,4 +340,150 @@ void ggml_sycl_geglu_erf(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
 
 void ggml_sycl_geglu_quick(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
     ggml_sycl_op_unary_gated<op_gelu_quick>(ctx, dst);
+}
+
+// ============================================================================
+// Non-trivial unary ops (require extra parameters or multiple inputs)
+// ============================================================================
+
+void ggml_sycl_expm1(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
+    ggml_sycl_op_unary<op_expm1>(ctx, dst);
+}
+
+// leaky_relu: needs negative_slope from op_params
+
+template <typename T>
+static void leaky_relu_op_kernel(const T * x, T * dst, const int k, const float negative_slope,
+                                  const sycl::nd_item<1> & item) {
+    const int i = item.get_global_id(0);
+    if (i >= k) return;
+    float xi = (float)x[i];
+    dst[i] = (T)(fmaxf(xi, 0.0f) + fminf(xi, 0.0f) * negative_slope);
+}
+
+template <typename T>
+static void leaky_relu_sycl(const T * x, T * dst, const int k, const float negative_slope, sycl::queue & stream) {
+    const int num_blocks = (k + SYCL_NEG_BLOCK_SIZE - 1) / SYCL_NEG_BLOCK_SIZE;
+    stream.parallel_for(
+        sycl::nd_range<1>(num_blocks * SYCL_NEG_BLOCK_SIZE, SYCL_NEG_BLOCK_SIZE),
+        [=](sycl::nd_item<1> item) {
+            leaky_relu_op_kernel(x, dst, k, negative_slope, item);
+        });
+}
+
+void ggml_sycl_leaky_relu(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
+    const ggml_tensor * src0 = dst->src[0];
+    const void * src0_d = src0->data;
+    void * dst_d = dst->data;
+    sycl::queue & stream = *(ctx.stream());
+
+    GGML_ASSERT(ggml_is_contiguous(src0));
+    GGML_ASSERT(src0->type == GGML_TYPE_F32 || src0->type == GGML_TYPE_F16);
+    GGML_ASSERT(dst->type == GGML_TYPE_F32 || dst->type == GGML_TYPE_F16);
+    GGML_ASSERT(src0->type == dst->type);
+
+    float negative_slope;
+    memcpy(&negative_slope, dst->op_params, sizeof(float));
+
+    if (src0->type == GGML_TYPE_F16) {
+        leaky_relu_sycl((const sycl::half *)src0_d, (sycl::half *)dst_d, ggml_nelements(src0), negative_slope, stream);
+    } else {
+        leaky_relu_sycl((const float *)src0_d, (float *)dst_d, ggml_nelements(src0), negative_slope, stream);
+    }
+}
+
+// silu_back: needs two inputs (grad and x)
+
+template <typename T>
+static void silu_back_op_kernel(const T * grad, const T * xf, T * dst, const int k,
+                                 const sycl::nd_item<1> & item) {
+    const int i = item.get_global_id(0);
+    if (i >= k) return;
+    float g = (float)grad[i];
+    float x = (float)xf[i];
+    float s = 1.0f / (1.0f + expf(-x));
+    dst[i] = (T)(g * s * (1.0f + x * (1.0f - s)));
+}
+
+template <typename T>
+static void silu_back_sycl(const T * grad, const T * x, T * dst, const int k, sycl::queue & stream) {
+    const int num_blocks = (k + SYCL_NEG_BLOCK_SIZE - 1) / SYCL_NEG_BLOCK_SIZE;
+    stream.parallel_for(
+        sycl::nd_range<1>(num_blocks * SYCL_NEG_BLOCK_SIZE, SYCL_NEG_BLOCK_SIZE),
+        [=](sycl::nd_item<1> item) {
+            silu_back_op_kernel(grad, x, dst, k, item);
+        });
+}
+
+void ggml_sycl_silu_back(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
+    const ggml_tensor * src0 = dst->src[0]; // input from forward pass
+    const ggml_tensor * src1 = dst->src[1]; // grads of forward pass output
+
+    const void * src0_d = src0->data;
+    const void * src1_d = src1->data;
+    void * dst_d = dst->data;
+    sycl::queue & stream = *(ctx.stream());
+
+    GGML_ASSERT(ggml_is_contiguous(src0));
+    GGML_ASSERT(src0->type == GGML_TYPE_F32 || src0->type == GGML_TYPE_F16);
+    GGML_ASSERT(dst->type == GGML_TYPE_F32 || dst->type == GGML_TYPE_F16);
+    GGML_ASSERT(src0->type == dst->type);
+
+    if (src0->type == GGML_TYPE_F16) {
+        silu_back_sycl((const sycl::half *)src0_d, (const sycl::half *)src1_d, (sycl::half *)dst_d, ggml_nelements(src0), stream);
+    } else {
+        silu_back_sycl((const float *)src0_d, (const float *)src1_d, (float *)dst_d, ggml_nelements(src0), stream);
+    }
+}
+
+// xielu: needs parameters from op_params
+
+template <typename T>
+static void xielu_op_kernel(const T * x, T * dst, const int k,
+                             float alpha_n, float alpha_p, float beta, float eps,
+                             const sycl::nd_item<1> & item) {
+    const int i = item.get_global_id(0);
+    if (i >= k) return;
+    float xi = (float)x[i];
+    float gate_pos = (xi > 0.0f) ? 1.0f : 0.0f;
+    float y_pos = alpha_p * xi * xi + beta * xi;
+    float min_v_eps = fminf(xi, eps);
+    float y_neg = (expm1f(min_v_eps) - xi) * alpha_n + beta * xi;
+    float out = gate_pos * y_pos + (1.0f - gate_pos) * y_neg;
+    dst[i] = (T)out;
+}
+
+template <typename T>
+static void xielu_sycl(const T * x, T * dst, const int k,
+                        float alpha_n, float alpha_p, float beta, float eps,
+                        sycl::queue & stream) {
+    const int num_blocks = (k + SYCL_NEG_BLOCK_SIZE - 1) / SYCL_NEG_BLOCK_SIZE;
+    stream.parallel_for(
+        sycl::nd_range<1>(num_blocks * SYCL_NEG_BLOCK_SIZE, SYCL_NEG_BLOCK_SIZE),
+        [=](sycl::nd_item<1> item) {
+            xielu_op_kernel(x, dst, k, alpha_n, alpha_p, beta, eps, item);
+        });
+}
+
+void ggml_sycl_xielu(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
+    const ggml_tensor * src0 = dst->src[0];
+    const void * src0_d = src0->data;
+    void * dst_d = dst->data;
+    sycl::queue & stream = *(ctx.stream());
+
+    GGML_ASSERT(ggml_is_contiguous(src0));
+    GGML_ASSERT(src0->type == GGML_TYPE_F32 || src0->type == GGML_TYPE_F16);
+    GGML_ASSERT(dst->type == GGML_TYPE_F32 || dst->type == GGML_TYPE_F16);
+    GGML_ASSERT(src0->type == dst->type);
+
+    const float alpha_n = ggml_get_op_params_f32(dst, 1);
+    const float alpha_p = ggml_get_op_params_f32(dst, 2);
+    const float beta    = ggml_get_op_params_f32(dst, 3);
+    const float eps     = ggml_get_op_params_f32(dst, 4);
+
+    if (src0->type == GGML_TYPE_F16) {
+        xielu_sycl((const sycl::half *)src0_d, (sycl::half *)dst_d, ggml_nelements(src0), alpha_n, alpha_p, beta, eps, stream);
+    } else {
+        xielu_sycl((const float *)src0_d, (float *)dst_d, ggml_nelements(src0), alpha_n, alpha_p, beta, eps, stream);
+    }
 }

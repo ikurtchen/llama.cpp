@@ -3241,57 +3241,78 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             // TODO implement mul kernel
             break;
         case GGML_OP_LOG:
-            // TODO implement log kernel
+            ggml_sycl_log(ctx, dst);
             break;
         case GGML_OP_DIV:
             // TODO implement div kernel
             break;
         case GGML_OP_UNARY:
-            // TODO implement unary kernels
             switch (ggml_get_unary_op(dst)) {
                 case GGML_UNARY_OP_NEG:
+                    ggml_sycl_neg(ctx, dst);
                     break;
                 case GGML_UNARY_OP_STEP:
+                    ggml_sycl_step(ctx, dst);
                     break;
                 case GGML_UNARY_OP_GELU:
+                    ggml_sycl_gelu(ctx, dst);
                     break;
                 case GGML_UNARY_OP_SILU:
+                    ggml_sycl_silu(ctx, dst);
                     break;
                 case GGML_UNARY_OP_GELU_QUICK:
+                    ggml_sycl_gelu_quick(ctx, dst);
                     break;
                 case GGML_UNARY_OP_GELU_ERF:
+                    ggml_sycl_gelu_erf(ctx, dst);
                     break;
                 case GGML_UNARY_OP_TANH:
+                    ggml_sycl_tanh(ctx, dst);
                     break;
                 case GGML_UNARY_OP_RELU:
+                    ggml_sycl_relu(ctx, dst);
                     break;
                 case GGML_UNARY_OP_SIGMOID:
+                    ggml_sycl_sigmoid(ctx, dst);
                     break;
                 case GGML_UNARY_OP_HARDSIGMOID:
+                    ggml_sycl_hardsigmoid(ctx, dst);
                     break;
                 case GGML_UNARY_OP_HARDSWISH:
+                    ggml_sycl_hardswish(ctx, dst);
                     break;
                 case GGML_UNARY_OP_EXP:
+                    ggml_sycl_exp(ctx, dst);
                     break;
                 case GGML_UNARY_OP_SOFTPLUS:
+                    ggml_sycl_softplus(ctx, dst);
                     break;
                 case GGML_UNARY_OP_SGN:
+                    ggml_sycl_sgn(ctx, dst);
                     break;
                 case GGML_UNARY_OP_ABS:
+                    ggml_sycl_abs(ctx, dst);
                     break;
                 case GGML_UNARY_OP_ELU:
+                    ggml_sycl_elu(ctx, dst);
                     break;
                 case GGML_UNARY_OP_XIELU:
+                    ggml_sycl_xielu(ctx, dst);
                     break;
                 case GGML_UNARY_OP_FLOOR:
+                    ggml_sycl_floor(ctx, dst);
                     break;
                 case GGML_UNARY_OP_CEIL:
+                    ggml_sycl_ceil(ctx, dst);
                     break;
                 case GGML_UNARY_OP_ROUND:
+                    ggml_sycl_round(ctx, dst);
                     break;
                 case GGML_UNARY_OP_TRUNC:
+                    ggml_sycl_trunc(ctx, dst);
                     break;
                 case GGML_UNARY_OP_EXPM1:
+                    ggml_sycl_expm1(ctx, dst);
                     break;
                 default:
                     return false;
@@ -3335,10 +3356,10 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             // TODO implement pad kernel
             break;
         case GGML_OP_LEAKY_RELU:
-            // TODO implement leaky relu kernel
+            ggml_sycl_leaky_relu(ctx, dst);
             break;
         case GGML_OP_SILU_BACK:
-            // TODO implement silu back kernel
+            ggml_sycl_silu_back(ctx, dst);
             break;
         case GGML_OP_RMS_NORM_BACK:
             // TODO implement rmsnorm back kernel
@@ -3369,16 +3390,16 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             ggml_sycl_op_scale(ctx, dst);
             break;
         case GGML_OP_SQR:
-            // TODO implement sqr kernel
+            ggml_sycl_sqr(ctx, dst);
             break;
         case GGML_OP_SQRT:
-            // TODO implement sqrt kernel
+            ggml_sycl_sqrt(ctx, dst);
             break;
         case GGML_OP_SIN:
-            // TODO implement sin kernel
+            ggml_sycl_sin(ctx, dst);
             break;
         case GGML_OP_COS:
-            // TODO implement cos kernel
+            ggml_sycl_cos(ctx, dst);
             break;
         case GGML_OP_CLAMP:
             // TODO implement clamp kernel
@@ -3930,11 +3951,13 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
                 case GGML_UNARY_OP_EXP:
                 case GGML_UNARY_OP_SOFTPLUS:
                 case GGML_UNARY_OP_ELU:
+                case GGML_UNARY_OP_XIELU:
                 case GGML_UNARY_OP_CEIL:
                 case GGML_UNARY_OP_FLOOR:
                 case GGML_UNARY_OP_ROUND:
                 case GGML_UNARY_OP_TRUNC:
-                    return false;
+                case GGML_UNARY_OP_EXPM1:
+                    return ggml_is_contiguous(op->src[0]);
                 default:
                     return false;
             }
@@ -4030,17 +4053,17 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_PAD_REFLECT_1D:
             return false;
         case GGML_OP_SQR:
-            return false;
+            return true;
         case GGML_OP_SQRT:
-            return false;
+            return true;
         case GGML_OP_SIN:
-            return false;
+            return true;
         case GGML_OP_COS:
-            return false;
+            return true;
         case GGML_OP_CLAMP:
             return false;
         case GGML_OP_LOG:
-            return false;
+            return true;
         case GGML_OP_NORM:
             return false;
         case GGML_OP_L2_NORM:
@@ -4086,9 +4109,9 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_PAD:
             return false;
         case GGML_OP_LEAKY_RELU:
-            return false;
+            return true;
         case GGML_OP_SILU_BACK:
-            return false;
+            return true;
         case GGML_OP_TIMESTEP_EMBEDDING:
             return false;
         case GGML_OP_RWKV_WKV6:
