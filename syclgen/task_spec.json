@@ -817,7 +817,9 @@
       "priority": 4,
       "name": "Migrate COUNT_EQUAL op",
       "description": "Implement count_equal kernel. Requires warp reduction and atomics. Existing empty stub: count-equal.cpp.",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-03-05T21:30:00Z",
+      "notes": "Implemented count_equal_sycl template kernel in count-equal.cpp (81 lines). Uses nd_range<1> with WARP_SIZE threads per work-group, warp_reduce_sum for intra-warp reduction, sycl::atomic_ref for global accumulation. Host dispatch zeros dst with stream.memset, computes chunk sizing (nsm=64 default), dispatches I32 type. Wired into compute_forward and supports_op (I32 type check). COUNT_EQUAL: 2/2 tests passed. SCALE regression: 4/4 passed.",
       "kernel_ids": [
         "ck_040"
       ],

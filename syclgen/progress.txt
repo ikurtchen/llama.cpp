@@ -1150,3 +1150,43 @@ Implemented SYCL ROPE (Rotary Position Embedding) kernels — all 4 variants (no
 **Issues:** None.
 **Next task:** task_031 (COUNT_EQUAL)
 **Completion:** 30/48 tasks completed
+
+---
+
+## Session 31 — task_031: Migrate COUNT_EQUAL op
+
+**Date:** 2026-03-05
+**Task:** Implement count_equal kernel — counts the number of equal elements between two tensors.
+**CUDA ref:** `ggml/src/ggml-cuda/count-equal.cu`
+
+### Implementation
+
+1. **Implemented `ggml/src/ggml-sycl/count-equal.cpp`** (81 lines, was empty stub):
+   - `count_equal_sycl<T>` — template SYCL kernel using `sycl::nd_range<1>` with WARP_SIZE threads per work-group
+   - Each work-group processes a chunk of `dk` elements (SYCL_COUNT_EQUAL_CHUNK_SIZE=128 aligned)
+   - Per-thread strided loop counts equal elements between src0 and src1
+   - `warp_reduce_sum(nequal)` for intra-warp reduction
+   - `sycl::atomic_ref<int, relaxed, device, global_space>` for atomic accumulation to dst
+   - `[[sycl::reqd_sub_group_size(WARP_SIZE)]]` attribute for correct warp sizing
+
+2. **`ggml_sycl_count_equal` host dispatch:**
+   - Validates: src0->type == src1->type, dst->type == GGML_TYPE_I64, same shape, contiguous
+   - Zeros dst with `stream.memset`
+   - Computes chunk size `dne` and block count using nsm=64 (reasonable SYCL default)
+   - Type dispatch: currently I32 only (matching CUDA)
+
+3. **Wired into `ggml-sycl.cpp`:**
+   - Added `#include "ggml-sycl/count-equal.hpp"` (line 67)
+   - compute_forward: GGML_OP_COUNT_EQUAL → `ggml_sycl_count_equal(ctx, dst)` (replaced TODO stub)
+   - supports_op: GGML_OP_COUNT_EQUAL → returns `op->src[0]->type == GGML_TYPE_I32 && op->src[0]->type == op->src[1]->type`
+
+**Build:** Compiles cleanly on b60 (icpx 2025.1.1, GGML_SYCL=ON, GGML_SYCL_F16=ON)
+**Tests:**
+| Op | Result | Tests |
+|---|---|---|
+| COUNT_EQUAL (i32, various sizes) | PASS | 2/2 |
+
+**Regression:** SCALE: 4/4 tests pass — no regressions
+**Issues:** None.
+**Next task:** task_032 (ARGSORT)
+**Completion:** 31/48 tasks completed

@@ -64,6 +64,7 @@
 #include "ggml-sycl/rope.hpp"
 #include "ggml-sycl/sumrows.hpp"
 #include "ggml-sycl/sum.hpp"
+#include "ggml-sycl/count-equal.hpp"
 #include "ggml.h"
 
 static bool g_sycl_loaded = false;
@@ -3692,7 +3693,7 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             ggml_sycl_sub(ctx, dst);
             break;
         case GGML_OP_COUNT_EQUAL:
-            // TODO implement count equal kernel
+            ggml_sycl_count_equal(ctx, dst);
             break;
         case GGML_OP_ACC:
             ggml_sycl_op_acc(ctx, dst);
@@ -4567,7 +4568,7 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_SUB:
             return true;
         case GGML_OP_COUNT_EQUAL:
-            return false;
+            return op->src[0]->type == GGML_TYPE_I32 && op->src[0]->type == op->src[1]->type;
         case GGML_OP_MUL:
             return true;
         case GGML_OP_DIV:
