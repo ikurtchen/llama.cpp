@@ -62,6 +62,8 @@
 #include "ggml-sycl/tsembd.hpp"
 #include "ggml-sycl/softmax.hpp"
 #include "ggml-sycl/rope.hpp"
+#include "ggml-sycl/sumrows.hpp"
+#include "ggml-sycl/sum.hpp"
 #include "ggml.h"
 
 static bool g_sycl_loaded = false;
@@ -3795,13 +3797,13 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             // TODO implement pool 2d kernel
             break;
         case GGML_OP_SUM:
-            // TODO implement sum kernel
+            ggml_sycl_op_sum(ctx, dst);
             break;
         case GGML_OP_SUM_ROWS:
-            // TODO implement sum rows kernel
+            ggml_sycl_op_sum_rows(ctx, dst);
             break;
         case GGML_OP_MEAN:
-            // TODO implement mean kernel
+            ggml_sycl_op_mean(ctx, dst);
             break;
         case GGML_OP_ARGSORT:
             // TODO implement argsort kernel
@@ -4515,11 +4517,11 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_UPSCALE:
             return false;
         case GGML_OP_SUM:
-            return false;
+            return op->src[0]->type == GGML_TYPE_F32 && ggml_is_contiguous(op->src[0]);
         case GGML_OP_SUM_ROWS:
-            return false;
+            return op->src[0]->type == GGML_TYPE_F32 && ggml_is_contiguous(op->src[0]);
         case GGML_OP_MEAN:
-            return false;
+            return op->src[0]->type == GGML_TYPE_F32 && ggml_is_contiguous(op->src[0]);
         case GGML_OP_ARGSORT:
             return false;
         case GGML_OP_TOP_K:

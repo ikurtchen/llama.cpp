@@ -762,7 +762,9 @@
       "priority": 4,
       "name": "Migrate SUM, SUM_ROWS, MEAN ops",
       "description": "Implement reduction kernels. Requires warp reduction. No existing SYCL stubs.",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-03-05",
+      "notes": "Implemented sumrows.cpp (137 lines) with row-reduction kernel using block_reduce<SUM>, 256 work-items, 8x unrolling. sum.cpp (26 lines) calls row-reduction with nrows=1. Separate headers sumrows.hpp and sum.hpp. supports_op uses ggml_is_contiguous. SUM_ROWS: 4/4 pass, SUM: 4/4 pass, MEAN: 7/7 pass, SCALE regression: 4/4 pass.",
       "kernel_ids": [
         "ck_088",
         "ck_067"

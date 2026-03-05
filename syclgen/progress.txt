@@ -1069,3 +1069,48 @@ Implemented SYCL ROPE (Rotary Position Embedding) kernels — all 4 variants (no
 **Issues:** None.
 **Next task:** task_029 (SUM, SUM_ROWS, MEAN)
 **Completion:** 28/48 tasks completed
+
+---
+
+## Session 29 — task_029: Migrate SUM, SUM_ROWS, MEAN ops
+
+**Date:** 2026-03-05
+**Task:** Implement reduction kernels for SUM_ROWS, SUM, and MEAN operations.
+**CUDA refs:** `ggml/src/ggml-cuda/reduce_rows.cuh`, `sumrows.cu`, `sum.cu`, `mean.cu`
+
+### Implementation
+
+1. **sumrows.hpp** (15 lines): Header declaring `ggml_sycl_op_sum_rows`, `ggml_sycl_op_mean`, and shared helper `reduce_rows_f32_sycl`.
+
+2. **sumrows.cpp** (137 lines): Core row-reduction kernel ported from CUDA `reduce_rows.cuh`.
+   - Uses `sycl::nd_range<1>` with 256 work-items per group, one work-group per row
+   - 8x loop unrolling for accumulation phase
+   - `block_reduce<block_reduce_method::SUM>` for final reduction via local memory
+   - `norm` parameter resolved at host-side to avoid kernel branching (two separate `parallel_for` paths: one divides by ncols, one doesn't)
+   - `ggml_sycl_op_sum_rows` wraps with norm=false, `ggml_sycl_op_mean` wraps with norm=true
+
+3. **sum.hpp** (9 lines): Header declaring `ggml_sycl_op_sum`.
+
+4. **sum.cpp** (26 lines): Treats entire tensor as a single row of `ggml_nelements` columns, calls `reduce_rows_f32_sycl` with nrows=1.
+
+5. **Wired into `ggml-sycl.cpp`:**
+   - Added includes for `sumrows.hpp` and `sum.hpp`
+   - compute_forward: SUM_ROWS → `ggml_sycl_op_sum_rows`, SUM → `ggml_sycl_op_sum`, MEAN → `ggml_sycl_op_mean` (replaced TODO stubs)
+   - supports_op: SUM uses `ggml_is_contiguous` (rejects permuted tensors to match CPU accumulation order); SUM_ROWS and MEAN also use `ggml_is_contiguous`
+
+### Key discovery
+- For SUM op, `ggml_is_contiguously_allocated` allows permuted tensors through `supports_op`, but our linear-read kernel produces different floating-point accumulation order than CPU's strided read, causing NMSE failures. Solution: use `ggml_is_contiguous` instead (rejects permuted tensors, CPU handles them).
+
+**Build:** Compiles cleanly on b60 (icpx 2025.1.1, GGML_SYCL=ON, GGML_SYCL_F16=ON)
+**Tests:**
+| Op | Result | Tests |
+|---|---|---|
+| SUM_ROWS | PASS | 4/4 |
+| SUM | PASS | 4/4 |
+| MEAN | PASS | 7/7 |
+| **Total** | **PASS** | **15/15** |
+
+**Regression:** SCALE: 4/4 tests pass — no regressions
+**Issues:** None.
+**Next task:** task_030 (ARGMAX)
+**Completion:** 29/48 tasks completed
