@@ -261,6 +261,91 @@ void ggml_sycl_op_rms_norm(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
 }
 
 // ---------------------------------------------------------------------------
+// RMS_NORM_BACK (backward pass for RMS normalization)
+// ---------------------------------------------------------------------------
+void ggml_sycl_op_rms_norm_back(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
+    const ggml_tensor * grad  = dst->src[0]; // gradients (dy)
+    const ggml_tensor * src0f = dst->src[1]; // src0 from forward pass (x)
+
+    const float * grad_d  = (const float *) grad->data;
+    const float * src0f_d = (const float *) src0f->data;
+    float *       dst_d   = (float *) dst->data;
+
+    GGML_ASSERT(ggml_is_contiguous(grad));
+
+    GGML_ASSERT( grad->type == GGML_TYPE_F32);
+    GGML_ASSERT(src0f->type == GGML_TYPE_F32);
+    GGML_ASSERT(  dst->type == GGML_TYPE_F32);
+
+    const int64_t ne00  = src0f->ne[0];
+    const int64_t nrows = ggml_nrows(src0f);
+
+    float eps;
+    memcpy(&eps, dst->op_params, sizeof(float));
+    GGML_ASSERT(eps >= 0.0f);
+
+    queue_ptr stream = ctx.stream();
+
+    const int ncols = ne00;
+
+    const int block_size = 256;
+    const int num_warps  = block_size / WARP_SIZE;
+
+    sycl::range<1> global_range(nrows * block_size);
+    sycl::range<1> local_range(block_size);
+
+    stream->submit([&](sycl::handler & h) {
+        // float2 shared memory for the two-component reduction (sum_xx, sum_xg)
+        sycl::local_accessor<sycl::float2, 1> shared_vals(num_warps, h);
+
+        h.parallel_for(
+            sycl::nd_range<1>(global_range, local_range),
+            [=](sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                const int row = item.get_group(0);
+                const int tid = item.get_local_id(0);
+
+                const float * grad_row = grad_d  + static_cast<int64_t>(row) * ncols;
+                const float * x_row    = src0f_d + static_cast<int64_t>(row) * ncols;
+                float *       dst_row  = dst_d   + static_cast<int64_t>(row) * ncols;
+
+                // Pass 1: accumulate sum of squares (sum_xx) and sum of x*grad (sum_xg)
+                sycl::float2 sums(0.0f, 0.0f);
+                for (int col = tid; col < ncols; col += block_size) {
+                    const float xfi = x_row[col];
+                    sums.x() += xfi * xfi;
+                    sums.y() += xfi * grad_row[col];
+                }
+
+                // Block-wide float2 reduction
+                sycl::float2 * sh = shared_vals.get_multi_ptr<sycl::access::decorated::no>().get_raw();
+                sums = block_reduce<block_reduce_method::SUM>(sums, sh, item);
+
+                // Broadcast from work-item 0 to all work-items via shared memory
+                if (tid == 0) {
+                    sh[0] = sums;
+                }
+                item.barrier(sycl::access::fence_space::local_space);
+                sums = sh[0];
+
+                const float sum_xx = sums.x();
+                const float sum_xg = sums.y();
+
+                const float mean_eps   = sum_xx / ncols + eps;
+                const float sum_eps    = sum_xx + ncols * eps;
+
+                const float scale_grad = sycl::rsqrt(mean_eps);
+                const float scale_x    = -scale_grad * sum_xg / sum_eps;
+
+                // Pass 2: write gradient output
+                for (int col = tid; col < ncols; col += block_size) {
+                    dst_row[col] = scale_grad * grad_row[col] + scale_x * x_row[col];
+                }
+            }
+        );
+    });
+}
+
+// ---------------------------------------------------------------------------
 // L2_NORM
 // ---------------------------------------------------------------------------
 void ggml_sycl_op_l2_norm(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {

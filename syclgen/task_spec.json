@@ -619,7 +619,9 @@
       "priority": 4,
       "name": "Migrate NORM backward ops",
       "description": "Implement rms_norm_back_f32 kernel. Requires warp reduction. Existing empty stub: norm.cpp.",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-03-05T19:30:00Z",
+      "notes": "Implemented ggml_sycl_op_rms_norm_back in norm.cpp (lines 263-346). Uses 1D nd_range with block_size=256, one work-group per row. Backward formula: computes sum_xx and sum_xg via sycl::float2 block_reduce in a single pass, then dx = scale_grad * grad + scale_x * x. Uses shared memory broadcast pattern. Wired into compute_forward and supports_op (returns ggml_is_contiguous(src[0])). RMS_NORM_BACK: 8/8 tests passed. SCALE regression: 4/4 passed.",
       "kernel_ids": [
         "ck_078"
       ],

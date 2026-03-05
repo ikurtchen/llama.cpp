@@ -3716,7 +3716,7 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             ggml_sycl_silu_back(ctx, dst);
             break;
         case GGML_OP_RMS_NORM_BACK:
-            // TODO implement rmsnorm back kernel
+            ggml_sycl_op_rms_norm_back(ctx, dst);
             break;
         case GGML_OP_RMS_NORM:
             ggml_sycl_op_rms_norm(ctx, dst);
@@ -4459,7 +4459,7 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_RMS_NORM:
             return op->src[0]->type == GGML_TYPE_F32;
         case GGML_OP_RMS_NORM_BACK:
-            return false;
+            return ggml_is_contiguous(op->src[0]);
         case GGML_OP_SCALE:
             return true;
         case GGML_OP_CONT:

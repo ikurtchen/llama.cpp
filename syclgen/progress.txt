@@ -843,3 +843,37 @@ intentionally deferred — the scalar kernel handles all cases correctly.
 **Issues:** None — clean implementation following established RMS_NORM pattern.
 **Next task:** task_024 (RMS_NORM_BACK) or next pending priority-4 task
 **Completion:** 23/48 tasks completed
+
+### Session 24 — 2026-03-05: task_024 (Migrate RMS_NORM_BACK op)
+
+**Completed:** task_024 — RMS_NORM_BACK (backward pass for RMS normalization) kernel migration
+**What was done:**
+
+1. **Implemented `ggml_sycl_op_rms_norm_back`** in `ggml/src/ggml-sycl/norm.cpp` (lines 263-346):
+   - Uses 1D `nd_range<1>` with block_size=256, one work-group per row
+   - Inputs: src0 = grad (dy), src1 = forward input (x), eps from op_params
+   - Backward formula: computes `sum_xx = Σ(x²)` and `sum_xg = Σ(x * grad)` simultaneously
+     using `sycl::float2` packed reduction via `block_reduce<SUM>`
+   - Derives `mean_eps = sum_xx / ncols + eps`, `sum_eps = sum_xx + ncols * eps`
+   - `scale_grad = rsqrt(mean_eps)`, `scale_x = -scale_grad * sum_xg / sum_eps`
+   - Final: `dx[col] = scale_grad * grad[col] + scale_x * x[col]`
+   - Uses shared memory broadcast pattern (tid 0 writes, barrier, all read)
+   - `[[sycl::reqd_sub_group_size(WARP_SIZE)]]` attribute
+   - Both src0 (grad) and src1 (x) accessed via element strides for non-contiguous support
+
+2. **Wired into `ggml-sycl.cpp`:**
+   - compute_forward: GGML_OP_RMS_NORM_BACK → ggml_sycl_op_rms_norm_back(ctx, dst)
+   - supports_op: GGML_OP_RMS_NORM_BACK → returns `ggml_is_contiguous(op->src[0])` (matching CUDA)
+
+3. **Declaration already existed** in `norm.hpp` line 10 — no change needed.
+
+**Build:** Compiles cleanly on b60 (icpx 2025.1.1, GGML_SYCL=ON, GGML_SYCL_F16=ON)
+**Tests:**
+| Op | Result | Tests |
+|---|---|---|
+| RMS_NORM_BACK (f32, ne=64/1025, all eps values) | PASS | 8/8 |
+
+**Regression:** SCALE: 4/4 tests pass — no regressions
+**Issues:** None.
+**Next task:** task_025 (SOFT_MAX, SOFT_MAX_BACK) — requires warp reduction, mask, and ALiBi support
+**Completion:** 24/48 tasks completed
