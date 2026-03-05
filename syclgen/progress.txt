@@ -27,7 +27,7 @@ Migration tasks created: 48 (2 infrastructure + 39 kernel + 1 integration)
 | task_007  | 3        | kernel         | Binary broadcast (ADD, MUL, DIV, etc.)  | DONE    |
 | task_008  | 3        | kernel         | CONCAT                                  | DONE    |
 | task_009  | 3        | kernel         | CPY/DUP/CONT                            | pending |
-| task_010  | 3        | kernel         | FILL                                    | pending |
+| task_010  | 3        | kernel         | FILL                                    | DONE    |
 | task_011  | 3        | kernel         | ARANGE                                  | pending |
 | task_012  | 3        | kernel         | CLAMP                                   | pending |
 | task_013  | 3        | kernel         | PAD                                     | pending |
@@ -415,3 +415,28 @@ intentionally deferred — the scalar kernel handles all cases correctly.
 **Issues:** None.
 **Next task:** task_010 (FILL) or task_011 (PAD)
 **Completion:** 9/48 tasks completed
+
+### Session 10 — 2026-03-05: task_010 (Migrate FILL op)
+
+**Completed:** task_010 — FILL kernel migration
+**What was done:**
+
+1. **Implemented `ggml_sycl_op_fill`** in `ggml/src/ggml-sycl/ggml-sycl.cpp` (lines 3194-3244):
+   - Gets `dst->data` pointer and SYCL queue stream
+   - Asserts `ggml_is_contiguous(dst)` (matching CUDA)
+   - Extracts fill value from `dst->op_params` via memcpy
+   - Uses `parallel_for` with `nd_range<1>`, block_size=256, grid-stride loop
+   - Supports F32 (fill with float) and F16 (fill with sycl::half)
+   - GGML_ABORT for unsupported types
+
+2. **Wired into compute_forward:** `case GGML_OP_FILL -> ggml_sycl_op_fill(ctx, dst)`
+   (replaced existing TODO placeholder)
+
+3. **Wired into supports_op:** `case GGML_OP_FILL -> return ggml_is_contiguous(op)`
+
+**Build:** Compiles cleanly on b60 (icpx 2025.1.1, GGML_SYCL=ON, GGML_SYCL_F16=ON)
+**Tests:** FILL: 4/4 passed (f32, various ne shapes, fill values 0.0, 2.0, -152.0, 3.5)
+**Regression:** SCALE: 4/4 tests pass — no regressions
+**Issues:** None.
+**Next task:** task_011 (ARANGE) or task_012 (CLAMP)
+**Completion:** 10/48 tasks completed

@@ -3191,6 +3191,58 @@ static void ggml_sycl_op_diag_mask_inf(ggml_backend_sycl_context & ctx, ggml_ten
     );
 }
 
+static void ggml_sycl_op_fill(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
+    void * dst_d = dst->data;
+    sycl::queue & stream = *(ctx.stream());
+
+    GGML_ASSERT(ggml_is_contiguous(dst));
+
+    float value;
+    memcpy(&value, dst->op_params, sizeof(float));
+
+    const int64_t k = ggml_nelements(dst);
+    const int block_size = 256;
+    const int64_t num_blocks = (k + block_size - 1) / block_size;
+    const int64_t max_blocks = 0x7FFFFFFF;
+    const int64_t grid_size = std::min(max_blocks, num_blocks);
+
+    switch (dst->type) {
+        case GGML_TYPE_F32:
+            {
+                float * dst_f32 = (float *)dst_d;
+                stream.parallel_for(
+                    sycl::nd_range<1>(grid_size * block_size, block_size),
+                    [=](sycl::nd_item<1> item) {
+                        int64_t tid = item.get_global_id(0);
+                        int64_t stride = item.get_global_range(0);
+                        for (int64_t i = tid; i < k; i += stride) {
+                            dst_f32[i] = value;
+                        }
+                    }
+                );
+            }
+            break;
+        case GGML_TYPE_F16:
+            {
+                sycl::half * dst_f16 = (sycl::half *)dst_d;
+                sycl::half value_f16 = static_cast<sycl::half>(value);
+                stream.parallel_for(
+                    sycl::nd_range<1>(grid_size * block_size, block_size),
+                    [=](sycl::nd_item<1> item) {
+                        int64_t tid = item.get_global_id(0);
+                        int64_t stride = item.get_global_range(0);
+                        for (int64_t i = tid; i < k; i += stride) {
+                            dst_f16[i] = value_f16;
+                        }
+                    }
+                );
+            }
+            break;
+        default:
+            GGML_ABORT("unsupported type");
+    }
+}
+
 static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct ggml_tensor * dst) try {
     if (!g_sycl_loaded) return false;
 
@@ -3524,7 +3576,7 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             // TODO implement solve tri kernel
             break;
         case GGML_OP_FILL:
-            // TODO implement fill kernel
+            ggml_sycl_op_fill(ctx, dst);
             break;
         default:
             return false;
@@ -4166,6 +4218,8 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
             return false;
         case GGML_OP_ARANGE:
             return false;
+        case GGML_OP_FILL:
+            return ggml_is_contiguous(op);
         default:
             return false;
     }
