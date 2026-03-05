@@ -52,6 +52,7 @@
 #include "ggml-sycl/getrows.hpp"
 #include "ggml-sycl/binbcast.hpp"
 #include "ggml-sycl/repeat_back.hpp"
+#include "ggml-sycl/concat.hpp"
 #include "ggml-sycl/quantize.hpp"
 #include "ggml-sycl/ssm_conv.hpp"
 #include "ggml.h"
@@ -3350,7 +3351,7 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             // TODO implement group norm kernel
             break;
         case GGML_OP_CONCAT:
-            // TODO implement concat kernel
+            ggml_sycl_op_concat(ctx, dst);
             break;
         case GGML_OP_PAD_REFLECT_1D:
             // TODO implement pad reflect 1d kernel
@@ -4032,7 +4033,7 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_REPEAT_BACK:
             return op->type == GGML_TYPE_F32 && (op->src[0]->ne[2]*op->src[0]->ne[3]) <= (1 << 15);
         case GGML_OP_CONCAT:
-            return false;
+            return op->src[0]->type == GGML_TYPE_F32 && op->src[1]->type == GGML_TYPE_F32;
         case GGML_OP_DUP:
             return false;
         case GGML_OP_ARGMAX:

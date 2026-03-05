@@ -25,7 +25,7 @@ Migration tasks created: 48 (2 infrastructure + 39 kernel + 1 integration)
 | task_005  | 3        | kernel         | Unary ops (SILU, GELU, RELU, etc.)      | DONE    |
 | task_006  | 3        | kernel         | GLU ops (SWIGLU, GEGLU, REGLU)          | DONE    |
 | task_007  | 3        | kernel         | Binary broadcast (ADD, MUL, DIV, etc.)  | DONE    |
-| task_008  | 3        | kernel         | CONCAT                                  | pending |
+| task_008  | 3        | kernel         | CONCAT                                  | DONE    |
 | task_009  | 3        | kernel         | CPY/DUP/CONT                            | pending |
 | task_010  | 3        | kernel         | FILL                                    | pending |
 | task_011  | 3        | kernel         | ARANGE                                  | pending |
@@ -326,3 +326,43 @@ clamp, arange, upscale (require specialized parameters beyond the template)
 **Issues:** None.
 **Next task:** task_008 (CONCAT) or task_009 (CPY/DUP/CONT)
 **Completion:** 7/48 tasks completed
+
+### Session 8 — 2026-03-05: task_008 (Migrate CONCAT op)
+
+**Completed:** task_008 — CONCAT kernel migration (all 4 dimensions, contiguous + non-contiguous)
+**What was done:**
+
+1. **Implemented `concat.cpp`** (296 lines, was empty stub):
+   - `concat_f32_sycl_dim0` — contiguous concat along dim 0 (split on column index)
+   - `concat_f32_sycl_dim1` — contiguous concat along dim 1 (split on row index)
+   - `concat_f32_sycl_dim2` — contiguous concat along dim 2 (split on slice index)
+   - `concat_f32_sycl` — host dispatch for contiguous dim 0/1/2 using nd_range<3>
+   - `concat_f32_non_cont<dim>` — template non-contiguous kernel (dim 0-3) with byte-stride addressing
+   - `ggml_sycl_op_concat` — top-level host dispatch:
+     - Contiguous path: dim 0-2 use kernels, dim 3 uses queue.memcpy
+     - Non-contiguous path: dispatches template via std::integral_constant switch
+
+2. **Wired into `ggml-sycl.cpp`:**
+   - Added `#include "ggml-sycl/concat.hpp"` (line 55)
+   - compute_forward: GGML_OP_CONCAT → ggml_sycl_op_concat(ctx, dst)
+   - supports_op: GGML_OP_CONCAT → returns true when both srcs are F32
+
+3. **Bug found and fixed:** Non-contiguous kernel initially crashed with
+   `UR_RESULT_ERROR_DEVICE_LOST` (GPU hang). Root cause: the SYCL kernel lambda
+   captured `ggml_tensor*` host pointers and dereferenced them (accessing `->data`,
+   `->ne[]`, `->nb[]`) inside device code, causing illegal host memory access.
+   Fix: extracted all tensor fields (data pointers, ne, nb) into local variables
+   before the lambda, so only plain values are captured by `[=]`.
+
+**Tests:**
+| Op | Result | Tests |
+|---|---|---|
+| CONCAT (f32, contiguous, dim 0-3) | PASS | 4/4 |
+| CONCAT (f32, non-contiguous views, dim 0-3, v=1-3) | PASS | 12/12 |
+| CONCAT (i32) | skipped | 16 (expected — F32 only) |
+| **Total CONCAT** | **PASS** | **16/16** |
+
+**Regression:** SCALE 4/4 pass — no regressions
+**Issues:** None.
+**Next task:** task_009 (CPY/DUP/CONT) or task_010 (FILL)
+**Completion:** 8/48 tasks completed
