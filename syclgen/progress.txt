@@ -32,7 +32,7 @@ Migration tasks created: 48 (2 infrastructure + 39 kernel + 1 integration)
 | task_012  | 3        | kernel         | CLAMP                                   | DONE    |
 | task_013  | 3        | kernel         | PAD                                     | DONE    |
 | task_014  | 3        | kernel         | ACC                                     | DONE    |
-| task_015  | 3        | kernel         | ADD_ID                                  | pending |
+| task_015  | 3        | kernel         | ADD_ID                                  | DONE    |
 | task_016  | 3        | kernel         | DIAG                                    | pending |
 | task_017  | 3        | kernel         | TRI                                     | pending |
 | task_018  | 3        | kernel         | TIMESTEP_EMBEDDING                      | pending |
@@ -550,3 +550,32 @@ intentionally deferred — the scalar kernel handles all cases correctly.
 **Issues:** None.
 **Next task:** task_015 (ADD_ID) or task_016 (DIAG)
 **Completion:** 14/48 tasks completed
+
+### Session 15 — 2026-03-05: task_015 (Migrate ADD_ID op)
+
+**Completed:** task_015 — ADD_ID (scatter-add by index) kernel migration
+**What was done:**
+
+1. **Implemented `ggml/src/ggml-sycl/add-id.cpp`** (76 lines, was empty stub):
+   - `ggml_sycl_add_id` — SYCL port of CUDA `add_id_kernel`
+   - Uses GGML_TENSOR_TERNARY_OP_LOCALS for ne/nb extraction
+   - Asserts F32/F32/I32/F32 types and element-sized strides
+   - Launches 2D nd_range: dim0 = ne01 work-groups × min(ne00, 768) threads, dim1 = ne02
+   - Kernel: looks up src1 row index from src2, computes byte-offset row pointers,
+     strided loop computes `dst[i0] = src0[i0] + src1[i0]`
+   - All tensor fields captured by value (no host pointer captures)
+
+2. **Wired into `ggml-sycl.cpp`:**
+   - compute_forward: GGML_OP_ADD_ID → ggml_sycl_add_id(ctx, dst) (replaced TODO)
+   - supports_op: GGML_OP_ADD_ID → returns F32+F32+I32 type check
+
+**Build:** Compiles cleanly on b60 (icpx 2025.1.1, GGML_SYCL=ON, GGML_SYCL_F16=ON)
+**Tests:**
+| Op | Result | Tests |
+|---|---|---|
+| ADD_ID | PASS | 36/36 |
+
+**Regression:** SCALE: 4/4 tests pass — no regressions
+**Issues:** None.
+**Next task:** task_016 (DIAG) or task_017 (TRI)
+**Completion:** 15/48 tasks completed

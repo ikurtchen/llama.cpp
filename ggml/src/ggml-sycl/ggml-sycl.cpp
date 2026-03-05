@@ -3415,7 +3415,7 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             ggml_sycl_add(ctx, dst);
             break;
         case GGML_OP_ADD_ID:
-            // TODO implement add id kernel
+            ggml_sycl_add_id(ctx, dst);
             break;
         case GGML_OP_SUB:
             ggml_sycl_sub(ctx, dst);
@@ -4265,7 +4265,7 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_ADD1:
             return true;
         case GGML_OP_ADD_ID:
-            return false;
+            return op->src[0]->type == GGML_TYPE_F32 && op->src[1]->type == GGML_TYPE_F32 && op->src[2]->type == GGML_TYPE_I32;
         case GGML_OP_SUB:
             return true;
         case GGML_OP_COUNT_EQUAL:
