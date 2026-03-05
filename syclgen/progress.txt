@@ -1704,3 +1704,52 @@ Created new files:
 **Issues:** None. Also fixed missing `#include "ggml-sycl/gla.hpp"` from task_041.
 **Next task:** task_043 (CUMSUM) — cumulative sum kernel
 **Completion:** 42/48 tasks completed (task_047 abandoned)
+
+---
+
+## Session 43: task_043 — Migrate CUMSUM op
+**Date:** 2026-03-05
+**Task:** Implement cumulative sum (prefix sum) kernel for SYCL backend
+**Status:** COMPLETED
+
+### Implementation details:
+- Created `ggml/src/ggml-sycl/cumsum.hpp` and `ggml/src/ggml-sycl/cumsum.cpp`
+- Ported the CUDA manual fallback kernel (not CUB-based path, since CUB is unavailable in SYCL)
+- Algorithm: tiled prefix scan with 4x unrolling per thread
+  - One work-group per row, tiles of `4 * block_size` elements
+  - Thread-local sequential scan → warp inclusive scan via Hillis-Steele (`sycl::shift_group_right`)
+  - Inter-warp scan via shared memory → cross-tile carry accumulation
+- Block size: 256 (SYCL_CUMSUM_BLOCK_SIZE)
+- WARP_SIZE: 16 (Intel), sub-group size annotation `[[sycl::reqd_sub_group_size(WARP_SIZE)]]`
+- Proper barrier placement: `sycl::group_barrier(block)` for shared memory synchronization, only `sycl::group_barrier(sg)` for sub-group ops
+
+### Wiring changes in `ggml-sycl.cpp`:
+- Added `#include "ggml-sycl/cumsum.hpp"`
+- compute_forward: `GGML_OP_CUMSUM` → `ggml_sycl_op_cumsum(ctx, dst)`
+- supports_op: `GGML_OP_CUMSUM` → gated on `src[0]->type == GGML_TYPE_F32`
+
+**Build:** Compiles cleanly on b60 (icpx 2025.1, GGML_SYCL=ON, GGML_SYCL_F16=ON)
+**Tests:**
+| Op | Config | Result |
+|---|---|---|
+| CUMSUM | ne=[10,5,4,3] | PASS |
+| CUMSUM | ne=[127,5,4,3] | PASS |
+| CUMSUM | ne=[128,5,4,3] | PASS |
+| CUMSUM | ne=[128,128,4,4] | PASS |
+| CUMSUM | ne=[255,5,4,3] | PASS |
+| CUMSUM | ne=[256,5,4,3] | PASS |
+| CUMSUM | ne=[511,5,4,3] | PASS |
+| CUMSUM | ne=[512,5,4,3] | PASS |
+| CUMSUM | ne=[1023,5,4,3] | PASS |
+| CUMSUM | ne=[1024,5,4,3] | PASS |
+| CUMSUM | ne=[2047,5,4,3] | PASS |
+| CUMSUM | ne=[2048,5,4,3] | PASS |
+| CUMSUM | ne=[242004,1,1,1] | PASS |
+| CUMSUM | ne=[375960,1,1,1] | PASS |
+| CUMSUM | ne=[20481,4,1,1] | PASS |
+| **Total** | | **15/15 PASS** |
+
+**Regression:** SCALE: 4/4 tests pass — no regressions
+**Issues:** None
+**Next task:** Check remaining pending tasks
+**Completion:** 43/48 tasks completed (task_047 abandoned)

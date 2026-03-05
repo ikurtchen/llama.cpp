@@ -71,6 +71,7 @@
 #include "ggml-sycl/wkv.hpp"
 #include "ggml-sycl/gla.hpp"
 #include "ggml-sycl/cross-entropy-loss.hpp"
+#include "ggml-sycl/cumsum.hpp"
 #include "ggml.h"
 
 static bool g_sycl_loaded = false;
@@ -4508,7 +4509,7 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             ggml_sycl_op_im2col_3d(ctx, dst);
             break;
         case GGML_OP_CUMSUM:
-            // TODO implement cumsum kernel
+            ggml_sycl_op_cumsum(ctx, dst);
             break;
         case GGML_OP_SSM_SCAN:
             ggml_sycl_ssm_scan(ctx, dst);
@@ -5238,6 +5239,8 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
                    op->src[2]->type == GGML_TYPE_F32 &&
                    ggml_is_contiguous(op->src[1]) &&
                    ggml_is_contiguous(op->src[2]);
+        case GGML_OP_CUMSUM:
+            return op->src[0]->type == GGML_TYPE_F32;
         default:
             return false;
     }

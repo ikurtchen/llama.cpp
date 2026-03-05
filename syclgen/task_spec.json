@@ -1127,7 +1127,7 @@
       "priority": 5,
       "name": "Migrate CUMSUM op",
       "description": "Implement cumulative sum kernel. Complex: needs block-level scan (no CUB in SYCL). No existing SYCL stub.",
-      "status": "pending",
+      "status": "completed",
       "kernel_ids": [
         "ck_048",
         "ck_049"
