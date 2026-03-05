@@ -30,7 +30,7 @@ Migration tasks created: 48 (2 infrastructure + 39 kernel + 1 integration)
 | task_010  | 3        | kernel         | FILL                                    | DONE    |
 | task_011  | 3        | kernel         | ARANGE                                  | pending |
 | task_012  | 3        | kernel         | CLAMP                                   | DONE    |
-| task_013  | 3        | kernel         | PAD                                     | pending |
+| task_013  | 3        | kernel         | PAD                                     | DONE    |
 | task_014  | 3        | kernel         | ACC                                     | pending |
 | task_015  | 3        | kernel         | ADD_ID                                  | pending |
 | task_016  | 3        | kernel         | DIAG                                    | pending |
@@ -488,3 +488,36 @@ intentionally deferred — the scalar kernel handles all cases correctly.
 **Issues:** None.
 **Next task:** task_013 (PAD) or task_014 (ACC)
 **Completion:** 12/48 tasks completed
+
+### Session 13 — 2026-03-05: task_013 (Migrate PAD op)
+
+**Completed:** task_013 — PAD kernel migration (zero-pad and circular pad, all 4 dimensions)
+**What was done:**
+
+1. **Implemented `ggml/src/ggml-sycl/pad.cpp`** (90 lines, was empty stub):
+   - `ggml_sycl_op_pad` — full SYCL pad kernel with 3D nd_range
+   - Extracts 9 op_params: lp0, rp0, lp1, rp1, lp2, rp2, lp3, rp3, circular
+   - Computes element strides from byte strides (nb[i] / type_size)
+   - Launch: global_range(ne2*ne3, ne1, ceil(ne0/256)*256), local_range(1, 1, 256)
+   - Non-circular: copies src within bounds, fills 0.0f in padding regions
+   - Circular: uses `(coord + size) % size` wrap-around (torus semantics)
+   - All tensor fields captured by value (no host pointer captures)
+
+2. **Wired into `ggml-sycl.cpp`:**
+   - Added `#include "ggml-sycl/pad.hpp"` (line 59)
+   - compute_forward: GGML_OP_PAD → ggml_sycl_op_pad(ctx, dst)
+   - supports_op: GGML_OP_PAD → returns `op->src[0]->type == GGML_TYPE_F32`
+
+**Build:** Compiles cleanly on b60 (icpx 2025.1.1, GGML_SYCL=ON, GGML_SYCL_F16=ON)
+**Tests:**
+| Op | Result | Tests |
+|---|---|---|
+| PAD (zero-pad, legacy format) | PASS | various |
+| PAD (circular pad) | PASS | various |
+| PAD (asymmetric format, all tfrm modes) | PASS | various |
+| **Total PAD** | **PASS** | **15/15** |
+
+**Regression:** SCALE: 4/4 tests pass — no regressions
+**Issues:** None.
+**Next task:** task_014 (ACC) or task_015 (ADD_ID)
+**Completion:** 13/48 tasks completed

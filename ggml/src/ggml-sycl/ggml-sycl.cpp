@@ -56,6 +56,7 @@
 #include "ggml-sycl/quantize.hpp"
 #include "ggml-sycl/ssm_conv.hpp"
 #include "ggml-sycl/cpy.hpp"
+#include "ggml-sycl/pad.hpp"
 #include "ggml.h"
 
 static bool g_sycl_loaded = false;
@@ -3491,7 +3492,7 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             // TODO implement upscale kernel
             break;
         case GGML_OP_PAD:
-            // TODO implement pad kernel
+            ggml_sycl_op_pad(ctx, dst);
             break;
         case GGML_OP_LEAKY_RELU:
             ggml_sycl_leaky_relu(ctx, dst);
@@ -4277,7 +4278,7 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_ACC:
             return false;
         case GGML_OP_PAD:
-            return false;
+            return op->src[0]->type == GGML_TYPE_F32;
         case GGML_OP_LEAKY_RELU:
             return true;
         case GGML_OP_SILU_BACK:
