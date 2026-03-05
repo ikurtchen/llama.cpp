@@ -3325,6 +3325,80 @@ static void ggml_sycl_op_acc(ggml_backend_sycl_context & ctx, ggml_tensor * dst)
     );
 }
 
+static void ggml_sycl_op_diag(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
+    const ggml_tensor * src0 = dst->src[0];
+
+    GGML_ASSERT(ggml_is_contiguous(src0));
+    GGML_ASSERT(ggml_is_contiguous(dst));
+
+    const void  * src0_d = src0->data;
+    void        * dst_d  = dst->data;
+    sycl::queue & stream = *(ctx.stream());
+
+    const int64_t ne0 = dst->ne[0];
+    const int64_t ne1 = dst->ne[1];
+    const int64_t ne2 = dst->ne[2];
+    const int64_t ne3 = dst->ne[3];
+
+    const int64_t total_elements = ne0 * ne1 * ne2 * ne3;
+    const int block_size = 256;
+    const int64_t num_blocks = (total_elements + block_size - 1) / block_size;
+
+    if (dst->type == GGML_TYPE_F32) {
+        const float * src0_f32 = (const float *)src0_d;
+        float       * dst_f32  = (float *)dst_d;
+        stream.parallel_for(
+            sycl::nd_range<1>(sycl::range<1>(num_blocks * block_size), sycl::range<1>(block_size)),
+            [=](sycl::nd_item<1> item) {
+                const int64_t global_idx = item.get_global_id(0);
+                if (global_idx >= total_elements) return;
+
+                const int64_t i0 = global_idx % ne0;
+                const int64_t i1 = (global_idx / ne0) % ne1;
+                const int64_t i2 = (global_idx / (ne0 * ne1)) % ne2;
+                const int64_t i3 = global_idx / (ne0 * ne1 * ne2);
+
+                const int64_t dst_idx = ((i3 * ne2 + i2) * ne1 + i1) * ne0 + i0;
+
+                if (i0 == i1) {
+                    const int64_t batch_idx = i3 * ne2 + i2;
+                    const int64_t src_idx   = batch_idx * ne0 + i0;
+                    dst_f32[dst_idx]        = src0_f32[src_idx];
+                } else {
+                    dst_f32[dst_idx] = 0.0f;
+                }
+            }
+        );
+    } else if (dst->type == GGML_TYPE_F16) {
+        const sycl::half * src0_f16 = (const sycl::half *)src0_d;
+        sycl::half       * dst_f16  = (sycl::half *)dst_d;
+        stream.parallel_for(
+            sycl::nd_range<1>(sycl::range<1>(num_blocks * block_size), sycl::range<1>(block_size)),
+            [=](sycl::nd_item<1> item) {
+                const int64_t global_idx = item.get_global_id(0);
+                if (global_idx >= total_elements) return;
+
+                const int64_t i0 = global_idx % ne0;
+                const int64_t i1 = (global_idx / ne0) % ne1;
+                const int64_t i2 = (global_idx / (ne0 * ne1)) % ne2;
+                const int64_t i3 = global_idx / (ne0 * ne1 * ne2);
+
+                const int64_t dst_idx = ((i3 * ne2 + i2) * ne1 + i1) * ne0 + i0;
+
+                if (i0 == i1) {
+                    const int64_t batch_idx = i3 * ne2 + i2;
+                    const int64_t src_idx   = batch_idx * ne0 + i0;
+                    dst_f16[dst_idx]        = src0_f16[src_idx];
+                } else {
+                    dst_f16[dst_idx] = sycl::half(0);
+                }
+            }
+        );
+    } else {
+        GGML_ABORT("unsupported type");
+    }
+}
+
 static void ggml_sycl_op_fill(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
     void * dst_d = dst->data;
     sycl::queue & stream = *(ctx.stream());
@@ -3680,7 +3754,7 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             // TODO implement get rows back kernel
             break;
         case GGML_OP_DIAG:
-            // TODO implement diag kernel
+            ggml_sycl_op_diag(ctx, dst);
             break;
         case GGML_OP_ROPE_BACK:
             // TODO implement rope back kernel
@@ -4306,6 +4380,8 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
             return true;
         case GGML_OP_TRI:
             return false;
+        case GGML_OP_DIAG:
+            return (op->type == GGML_TYPE_F32 || op->type == GGML_TYPE_F16);
         case GGML_OP_DIAG_MASK_INF:
             return true;
         case GGML_OP_SOFT_MAX:

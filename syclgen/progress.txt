@@ -33,7 +33,7 @@ Migration tasks created: 48 (2 infrastructure + 39 kernel + 1 integration)
 | task_013  | 3        | kernel         | PAD                                     | DONE    |
 | task_014  | 3        | kernel         | ACC                                     | DONE    |
 | task_015  | 3        | kernel         | ADD_ID                                  | DONE    |
-| task_016  | 3        | kernel         | DIAG                                    | pending |
+| task_016  | 3        | kernel         | DIAG                                    | DONE    |
 | task_017  | 3        | kernel         | TRI                                     | pending |
 | task_018  | 3        | kernel         | TIMESTEP_EMBEDDING                      | pending |
 | task_019  | 3        | kernel         | ROLL                                    | pending |
@@ -579,3 +579,28 @@ intentionally deferred — the scalar kernel handles all cases correctly.
 **Issues:** None.
 **Next task:** task_016 (DIAG) or task_017 (TRI)
 **Completion:** 15/48 tasks completed
+
+### Session 16 — 2026-03-05: task_016 (Migrate DIAG op)
+
+**Completed:** task_016 — DIAG kernel migration
+**What was done:**
+
+1. **Implemented `ggml_sycl_op_diag`** in `ggml/src/ggml-sycl/ggml-sycl.cpp` (lines 3328-3400):
+   - Gets src0/dst data pointers and SYCL queue from context
+   - Asserts both src0 and dst are contiguous
+   - Supports F32 (float) and F16 (sycl::half) via type dispatch
+   - Uses `parallel_for` with `nd_range<1>`, block_size=256
+   - Kernel: decomposes global_idx into (i0, i1, i2, i3) via modular arithmetic
+   - If `i0 == i1`: copies from `src[batch_idx * ne0 + i0]` (diagonal element)
+   - Else: writes zero (off-diagonal)
+
+2. **Wired into compute_forward:** `case GGML_OP_DIAG -> ggml_sycl_op_diag(ctx, dst)` (replaced TODO)
+
+3. **Wired into supports_op:** `case GGML_OP_DIAG -> returns (F32 || F16)`
+
+**Build:** Compiles cleanly on b60 (icpx 2025.1.1, GGML_SYCL=ON, GGML_SYCL_F16=ON)
+**Tests:** DIAG: 3/3 passed (f32, various ne shapes: [10,1,4,3], [79,1,19,13], [256,1,8,16])
+**Regression:** SCALE: 4/4 tests pass — no regressions
+**Issues:** None.
+**Next task:** task_017 (TRI) or task_018 (TIMESTEP_EMBEDDING)
+**Completion:** 16/48 tasks completed
