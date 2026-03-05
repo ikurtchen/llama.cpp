@@ -1859,3 +1859,34 @@ Task was left as `in_progress` from a previous session — implementation existe
 **Issues:** None.
 **Next task:** task_046 (OPT_STEP_ADAMW/SGD) — optimizer step kernels
 **Completion:** 45/48 tasks completed (task_047 abandoned)
+
+---
+
+## Session 46 — task_046: OPT_STEP_ADAMW + OPT_STEP_SGD (2026-03-05)
+
+**Task:** Migrate GGML_OP_OPT_STEP_ADAMW and GGML_OP_OPT_STEP_SGD optimizer step kernels to SYCL.
+
+**Implementation:**
+- Created `opt-step-adamw.hpp` / `opt-step-adamw.cpp` — AdamW optimizer step kernel
+  - 7 parameters from `pars` tensor: alpha, beta1, beta2, eps, wd, beta1h, beta2h
+  - Updates first moment (g_m), second moment (g_v), and parameters (x) in-place
+  - Uses `sycl::sqrt` for bias-corrected second moment
+  - Simple element-wise `parallel_for` with block_size=256
+- Created `opt-step-sgd.hpp` / `opt-step-sgd.cpp` — SGD optimizer step kernel
+  - 2 parameters from `pars` tensor: learning_rate, weight_decay
+  - Updates parameters: x = x * (1 - lr * wd) - lr * g
+  - Simple element-wise `parallel_for` with block_size=256
+- Wired both ops into `ggml-sycl.cpp`:
+  - `compute_forward`: dispatch to `ggml_sycl_op_opt_step_adamw` / `ggml_sycl_op_opt_step_sgd`
+  - `supports_op`: type checks for F32 on all source tensors
+- Both kernels are direct ports from CUDA with SYCL-idiomatic patterns
+
+**Test results:**
+- OPT_STEP_ADAMW: 1/1 test passed
+- OPT_STEP_SGD: 1/1 test passed
+- SCALE regression: 4/4 tests pass — no regressions
+
+**Issues:** None. Both kernels passed on first run.
+**Notes:** These are the last kernel migration tasks. Only task_048 (integration test) remains.
+**Next task:** task_048 (Full model inference integration test)
+**Completion:** 46/48 tasks completed (task_047 abandoned)

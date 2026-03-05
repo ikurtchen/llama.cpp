@@ -73,6 +73,8 @@
 #include "ggml-sycl/cross-entropy-loss.hpp"
 #include "ggml-sycl/cumsum.hpp"
 #include "ggml-sycl/solve_tri.hpp"
+#include "ggml-sycl/opt-step-adamw.hpp"
+#include "ggml-sycl/opt-step-sgd.hpp"
 #include "ggml.h"
 
 static bool g_sycl_loaded = false;
@@ -4522,10 +4524,10 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             ggml_sycl_cross_entropy_loss_back(ctx, dst);
             break;
         case GGML_OP_OPT_STEP_ADAMW:
-            // TODO implement opt step adamw kernel
+            ggml_sycl_op_opt_step_adamw(ctx, dst);
             break;
         case GGML_OP_OPT_STEP_SGD:
-            // TODO implement opt step sgd kernel
+            ggml_sycl_op_opt_step_sgd(ctx, dst);
             break;
         case GGML_OP_SOLVE_TRI:
             ggml_sycl_op_solve_tri(ctx, dst);
@@ -5251,6 +5253,16 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
                    op->src[1]->type == GGML_TYPE_F32 &&
                    ggml_is_contiguous(op->src[0]) &&
                    ggml_is_contiguous(op->src[1]);
+        case GGML_OP_OPT_STEP_ADAMW:
+            return op->src[0]->type == GGML_TYPE_F32 &&
+                   op->src[1]->type == GGML_TYPE_F32 &&
+                   op->src[2]->type == GGML_TYPE_F32 &&
+                   op->src[3]->type == GGML_TYPE_F32 &&
+                   op->src[4]->type == GGML_TYPE_F32;
+        case GGML_OP_OPT_STEP_SGD:
+            return op->src[0]->type == GGML_TYPE_F32 &&
+                   op->src[1]->type == GGML_TYPE_F32 &&
+                   op->src[2]->type == GGML_TYPE_F32;
         default:
             return false;
     }

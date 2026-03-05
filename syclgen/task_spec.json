@@ -1208,7 +1208,7 @@
       "priority": 5,
       "name": "Migrate OPT_STEP_ADAMW and OPT_STEP_SGD ops",
       "description": "Implement optimizer step kernels. Medium complexity. No existing SYCL stubs.",
-      "status": "pending",
+      "status": "completed",
       "kernel_ids": [
         "ck_080",
         "ck_081"
@@ -1226,7 +1226,9 @@
         "Wire into compute_forward and supports_op",
         "Build and run unit tests: -k OPT_STEP_ADAMW, -k OPT_STEP_SGD",
         "Update syclgen/progress.txt"
-      ]
+      ],
+      "completed_at": "2026-03-05",
+      "notes": "Both OPT_STEP_ADAMW and OPT_STEP_SGD kernels implemented as simple element-wise parallel_for. All tests passed on first run."
     },
     {
       "id": "task_047",
