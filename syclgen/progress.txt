@@ -31,7 +31,7 @@ Migration tasks created: 48 (2 infrastructure + 39 kernel + 1 integration)
 | task_011  | 3        | kernel         | ARANGE                                  | pending |
 | task_012  | 3        | kernel         | CLAMP                                   | DONE    |
 | task_013  | 3        | kernel         | PAD                                     | DONE    |
-| task_014  | 3        | kernel         | ACC                                     | pending |
+| task_014  | 3        | kernel         | ACC                                     | DONE    |
 | task_015  | 3        | kernel         | ADD_ID                                  | pending |
 | task_016  | 3        | kernel         | DIAG                                    | pending |
 | task_017  | 3        | kernel         | TRI                                     | pending |
@@ -521,3 +521,32 @@ intentionally deferred — the scalar kernel handles all cases correctly.
 **Issues:** None.
 **Next task:** task_014 (ACC) or task_015 (ADD_ID)
 **Completion:** 13/48 tasks completed
+
+### Session 14 — 2026-03-05: task_014 (Migrate ACC op)
+
+**Completed:** task_014 — ACC (strided accumulation) kernel migration
+**What was done:**
+
+1. **Implemented `ggml_sycl_op_acc`** in `ggml/src/ggml-sycl/ggml-sycl.cpp` (lines 3273-3326):
+   - Gets src0, src1, dst data pointers as `const float *` / `float *`
+   - Asserts F32 types for all three tensors, contiguous src1, element-sized dst stride
+   - Extracts stride params s1, s2, s3 and offset from `dst->op_params[0..3]` (divided by sizeof(float))
+   - Gets src1 shape: ne10, ne11, ne12, ne13
+   - Launches `parallel_for` with `nd_range<1>`, block_size=256
+   - Kernel: computes multi-dimensional index decomposition from flat index,
+     bounds-checks against src1 dimensions, conditionally accumulates src1 into dst
+
+2. **Wired into compute_forward:** `case GGML_OP_ACC -> ggml_sycl_op_acc(ctx, dst)` (replaced TODO placeholder)
+
+3. **Wired into supports_op:** `case GGML_OP_ACC -> return F32 types && ggml_is_contiguous(src1)`
+
+4. **Bug fix:** Initial supports_op only checked F32 types but not contiguous src1.
+   This caused an assertion crash on non-contiguous test cases. Added `ggml_is_contiguous(op->src[1])`
+   check to match CUDA backend's assertion.
+
+**Build:** Compiles cleanly on b60 (icpx 2025.1.1, GGML_SYCL=ON, GGML_SYCL_F16=ON)
+**Tests:** ACC: 4/4 passed (3 contiguous cases OK, non-contiguous correctly reported "not supported")
+**Regression:** SCALE: 4/4 tests pass — no regressions
+**Issues:** None.
+**Next task:** task_015 (ADD_ID) or task_016 (DIAG)
+**Completion:** 14/48 tasks completed

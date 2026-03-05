@@ -3270,6 +3270,61 @@ static void ggml_sycl_op_clamp(ggml_backend_sycl_context & ctx, ggml_tensor * ds
     }
 }
 
+static void ggml_sycl_op_acc(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
+    const ggml_tensor * src0 = dst->src[0];
+    const ggml_tensor * src1 = dst->src[1];
+
+    const float * src0_d = (const float *) src0->data;
+    const float * src1_d = (const float *) src1->data;
+    float       * dst_d  = (float       *)  dst->data;
+
+    sycl::queue & stream = *(ctx.stream());
+
+    GGML_ASSERT(src0->type == GGML_TYPE_F32);
+    GGML_ASSERT(src1->type == GGML_TYPE_F32);
+    GGML_ASSERT( dst->type == GGML_TYPE_F32);
+    GGML_ASSERT(ggml_is_contiguous(src1));
+    GGML_ASSERT(dst->nb[0] == ggml_element_size(dst));
+
+    const int64_t ne   = ggml_nelements(dst);
+    const int64_t ne10 = src1->ne[0];
+    const int64_t ne11 = src1->ne[1];
+    const int64_t ne12 = src1->ne[2];
+    const int64_t ne13 = src1->ne[3];
+
+    const int64_t s1     = dst->op_params[0] / sizeof(float);
+    const int64_t s2     = dst->op_params[1] / sizeof(float);
+    const int64_t s3     = dst->op_params[2] / sizeof(float);
+    const int64_t offset = dst->op_params[3] / sizeof(float);
+
+    const int block_size = 256;
+    const int64_t num_blocks = (ne + block_size - 1) / block_size;
+
+    stream.parallel_for(
+        sycl::nd_range<1>(sycl::range<1>(num_blocks * block_size), sycl::range<1>(block_size)),
+        [=](sycl::nd_item<1> item) {
+            const int64_t i = item.get_global_id(0);
+            if (i >= ne) return;
+
+            int64_t src1_idx = i - offset;
+            int64_t tmp = src1_idx;
+            const int64_t i13 = tmp / s3;
+            tmp -= i13 * s3;
+            const int64_t i12 = tmp / s2;
+            tmp -= i12 * s2;
+            const int64_t i11 = tmp / s1;
+            tmp -= i11 * s1;
+            const int64_t i10 = tmp;
+
+            float val = src0_d[i];
+            if (src1_idx >= 0 && i10 < ne10 && i11 < ne11 && i12 < ne12 && i13 < ne13) {
+                val += src1_d[((i13*ne12 + i12) * ne11 + i11) * ne10 + i10];
+            }
+            dst_d[i] = val;
+        }
+    );
+}
+
 static void ggml_sycl_op_fill(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
     void * dst_d = dst->data;
     sycl::queue & stream = *(ctx.stream());
@@ -3369,7 +3424,7 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             // TODO implement count equal kernel
             break;
         case GGML_OP_ACC:
-            // TODO implement acc kernel
+            ggml_sycl_op_acc(ctx, dst);
             break;
         case GGML_OP_MUL:
             ggml_sycl_mul(ctx, dst);
@@ -4276,7 +4331,9 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_POOL_2D:
             return false;
         case GGML_OP_ACC:
-            return false;
+            return op->src[0]->type == GGML_TYPE_F32 &&
+                   op->src[1]->type == GGML_TYPE_F32 &&
+                   ggml_is_contiguous(op->src[1]);
         case GGML_OP_PAD:
             return op->src[0]->type == GGML_TYPE_F32;
         case GGML_OP_LEAKY_RELU:
