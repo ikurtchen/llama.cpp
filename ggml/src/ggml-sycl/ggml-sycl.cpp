@@ -3854,6 +3854,91 @@ static void ggml_sycl_op_top_k(ggml_backend_sycl_context & ctx, ggml_tensor * ds
     }
 }
 
+static void ggml_sycl_op_pool2d(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
+    const ggml_tensor * src0 = dst->src[0];
+    const float * src0_d = (const float *)src0->data;
+    float * dst_d = (float *)dst->data;
+    sycl::queue & stream = *ctx.stream();
+
+    GGML_ASSERT(src0->type == GGML_TYPE_F32);
+    GGML_ASSERT( dst->type == GGML_TYPE_F32);
+
+    const int32_t * opts = (const int32_t *)dst->op_params;
+    const enum ggml_op_pool op = static_cast<ggml_op_pool>(opts[0]);
+    const int k0 = opts[1];
+    const int k1 = opts[2];
+    const int s0 = opts[3];
+    const int s1 = opts[4];
+    const int p0 = opts[5];
+    const int p1 = opts[6];
+
+    const int IH = (int)src0->ne[1];
+    const int IW = (int)src0->ne[0];
+
+    const int64_t N  = dst->ne[3];
+    const int64_t OC = dst->ne[2];
+    const int OH = (int)dst->ne[1];
+    const int OW = (int)dst->ne[0];
+
+    // Note: CUDA pool2d passes (kh, kw, sh, sw, ph, pw) = (k1, k0, s1, s0, p1, p0)
+    // i.e. opts k0/s0/p0 correspond to width, k1/s1/p1 correspond to height
+    const int kh = k1, kw = k0;
+    const int sh = s1, sw = s0;
+    const int ph = p1, pw = p0;
+
+    const int parallel_elements = (int)(N * OC) * OH * OW;
+    const int block_size = SYCL_POOL2D_BLOCK_SIZE;
+    const int num_blocks = (parallel_elements + block_size - 1) / block_size;
+
+    const int I_HW = IH * IW;
+    const int O_HW = OH * OW;
+
+    const bool is_avg = (op == GGML_OP_POOL_AVG);
+
+    stream.parallel_for(
+        sycl::nd_range<1>(num_blocks * block_size, block_size),
+        [=](sycl::nd_item<1> item) {
+            const int idx = item.get_global_id(0);
+            if (idx >= parallel_elements) {
+                return;
+            }
+
+            const int nc     = idx / O_HW;
+            const int cur_oh = (idx % O_HW) / OW;
+            const int cur_ow = (idx % O_HW) % OW;
+
+            const float * i_ptr = src0_d + nc * I_HW;
+            float       * o_ptr = dst_d  + nc * O_HW;
+
+            const int start_h = cur_oh * sh - ph;
+            const int bh = sycl::max(0, start_h);
+            const int eh = sycl::min(IH, start_h + kh);
+            const int start_w = cur_ow * sw - pw;
+            const int bw = sycl::max(0, start_w);
+            const int ew = sycl::min(IW, start_w + kw);
+
+            float res;
+            if (is_avg) {
+                res = 0.0f;
+                const float scale = 1.0f / (float)(kh * kw);
+                for (int i = bh; i < eh; i++) {
+                    for (int j = bw; j < ew; j++) {
+                        res += i_ptr[i * IW + j] * scale;
+                    }
+                }
+            } else {
+                // GGML_OP_POOL_MAX
+                res = -FLT_MAX;
+                for (int i = bh; i < eh; i++) {
+                    for (int j = bw; j < ew; j++) {
+                        res = sycl::fmax(res, i_ptr[i * IW + j]);
+                    }
+                }
+            }
+            o_ptr[cur_oh * OW + cur_ow] = res;
+        });
+}
+
 static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct ggml_tensor * dst) try {
     if (!g_sycl_loaded) return false;
 
@@ -4106,7 +4191,7 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             ggml_sycl_op_im2col(ctx, dst);
             break;
         case GGML_OP_POOL_2D:
-            // TODO implement pool 2d kernel
+            ggml_sycl_op_pool2d(ctx, dst);
             break;
         case GGML_OP_SUM:
             ggml_sycl_op_sum(ctx, dst);
@@ -4842,7 +4927,7 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_TOP_K:
             return op->src[0]->type == GGML_TYPE_F32 && ggml_is_contiguous(op->src[0]) && op->src[0]->ne[0] <= 1024;
         case GGML_OP_POOL_2D:
-            return false;
+            return true;
         case GGML_OP_ACC:
             return op->src[0]->type == GGML_TYPE_F32 &&
                    op->src[1]->type == GGML_TYPE_F32 &&

@@ -918,7 +918,8 @@
       "priority": 4,
       "name": "Migrate POOL_2D op",
       "description": "Implement pool2d kernel. No existing SYCL stub.",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-03-05",
       "kernel_ids": [
         "ck_084"
       ],
@@ -933,7 +934,8 @@
         "Wire into compute_forward and supports_op",
         "Build and run unit test: -k POOL_2D",
         "Update syclgen/progress.txt"
-      ]
+      ],
+      "notes": "Inline kernel in ggml-sycl.cpp (lines 3857-3940). F32-only, supports AVG and MAX pooling in NCHW layout. 128/128 tests passed. Regression (SCALE) OK."
     },
     {
       "id": "task_036",
