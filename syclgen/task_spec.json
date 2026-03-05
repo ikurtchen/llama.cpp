@@ -996,7 +996,9 @@
       "priority": 5,
       "name": "Migrate SSM_CONV op",
       "description": "Implement Mamba SSM convolution kernels. Existing empty stub: ssm_conv.cpp.",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-03-05T23:55:00Z",
+      "notes": "Implemented two SYCL SSM_CONV kernels in ssm_conv.cpp (190 lines): short-token path (n_t <= 32, 2D nd_range) and long-token path (n_t > 32, 3D nd_range with time chunking). Each work-item processes one element of d_inner across time steps using a circular buffer of convolution weights in private registers. Fixed-size private arrays (max d_conv=9) avoid template dispatch. Block_size=128 matching CUDA. Wired into compute_forward and supports_op (F32 check). SSM_CONV: 27/27 tests passed. SCALE regression: 4/4 passed.",
       "kernel_ids": [
         "ck_103",
         "ck_104"

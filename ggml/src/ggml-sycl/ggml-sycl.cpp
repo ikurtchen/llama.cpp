@@ -4474,7 +4474,7 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             // TODO implement gated linear attention kernel
             break;
         case GGML_OP_SSM_CONV:
-            // TODO implement ssm conv kernel
+            ggml_sycl_ssm_conv(ctx, dst);
             break;
         case GGML_OP_ROLL:
             ggml_sycl_roll(ctx, dst);
@@ -5200,7 +5200,14 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_GATED_LINEAR_ATTN:
             return false;
         case GGML_OP_SSM_CONV:
-            return false;
+            {
+                ggml_type src0_type = op->src[0]->type;
+                ggml_type src1_type = op->src[1]->type;
+                if (src0_type == GGML_TYPE_F32 && src1_type == GGML_TYPE_F32) {
+                    return true;
+                }
+                return false;
+            }
         case GGML_OP_ROLL:
             return op->src[0]->type == GGML_TYPE_F32;
         case GGML_OP_ARANGE:
