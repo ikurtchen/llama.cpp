@@ -703,7 +703,7 @@
       "priority": 4,
       "name": "Migrate GET_ROWS op",
       "description": "Implement k_get_rows and k_get_rows_float for gathering rows by index. Existing empty stub: getrows.cpp.",
-      "status": "pending",
+      "status": "completed",
       "kernel_ids": [
         "ck_060",
         "ck_061",
@@ -723,7 +723,9 @@
         "Wire GET_ROWS and GET_ROWS_BACK into compute_forward and supports_op",
         "Build and run unit test: -k GET_ROWS",
         "Update syclgen/progress.txt"
-      ]
+      ],
+      "completed_at": "2026-03-05",
+      "notes": "GET_ROWS: 43/43 tests passed (f32/f16/bf16/q4_0/q4_1/q5_0/q5_1/q8_0/i32). GET_ROWS_BACK: 3/3 tests passed (f32). SCALE regression: 4/4 pass. Built cleanly on b60."
     },
     {
       "id": "task_028",

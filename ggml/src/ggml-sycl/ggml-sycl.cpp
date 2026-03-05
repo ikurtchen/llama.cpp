@@ -3561,7 +3561,7 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             ggml_sycl_op_repeat_back(ctx, dst);
             break;
         case GGML_OP_GET_ROWS:
-            // TODO implement get rows kernel
+            ggml_sycl_op_get_rows(ctx, dst);
             break;
         case GGML_OP_SET:
             // TODO implement set kernel
@@ -3838,8 +3838,9 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             break;
         case GGML_OP_CONV_TRANSPOSE_2D:
             // TODO implement conv2d transpose kernel
+            break;
         case GGML_OP_GET_ROWS_BACK:
-            // TODO implement get rows back kernel
+            ggml_sycl_op_get_rows_back(ctx, dst);
             break;
         case GGML_OP_DIAG:
             ggml_sycl_op_diag(ctx, dst);
@@ -4372,7 +4373,24 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_OUT_PROD:
             return op->type == GGML_TYPE_F32 && op->src[0]->type == GGML_TYPE_F32 && op->src[1]->type == GGML_TYPE_F32 && op->ne[2] == 1 && op->ne[3] == 1;
         case GGML_OP_GET_ROWS:
-            return false;
+        {
+            switch (op->src[0]->type) {
+                case GGML_TYPE_F16:
+                case GGML_TYPE_F32:
+                case GGML_TYPE_BF16:
+                case GGML_TYPE_I32:
+                case GGML_TYPE_Q4_0:
+                case GGML_TYPE_Q4_1:
+                case GGML_TYPE_Q5_0:
+                case GGML_TYPE_Q5_1:
+                case GGML_TYPE_Q8_0:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+        case GGML_OP_GET_ROWS_BACK:
+            return op->type == GGML_TYPE_F32 && op->src[0]->type == GGML_TYPE_F32 && op->ne[2] == 1 && op->ne[3] == 1;
          case GGML_OP_SET:
             return false;
         case GGML_OP_SET_ROWS:
