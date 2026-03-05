@@ -55,6 +55,7 @@
 #include "ggml-sycl/concat.hpp"
 #include "ggml-sycl/quantize.hpp"
 #include "ggml-sycl/ssm_conv.hpp"
+#include "ggml-sycl/cpy.hpp"
 #include "ggml.h"
 
 static bool g_sycl_loaded = false;
@@ -3221,7 +3222,7 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             // TODO implement set rows kernel
             break;
         case GGML_OP_DUP:
-            // TODO implement dup kernel
+            ggml_sycl_dup(ctx, dst);
             break;
         case GGML_OP_ADD:
         case GGML_OP_ADD1: // TODO: more efficient implementation
@@ -3412,10 +3413,10 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             // TODO implement clamp kernel
             break;
         case GGML_OP_CPY:
-            // TODO implement copy kernel
+            ggml_sycl_cpy(ctx, dst->src[0], dst->src[1]);
             break;
         case GGML_OP_CONT:
-            // TODO implement cont kernel
+            ggml_sycl_dup(ctx, dst);
             break;
         case GGML_OP_NONE:
         case GGML_OP_RESHAPE:
@@ -4029,13 +4030,43 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_SET_ROWS:
             return false;
         case GGML_OP_CPY:
+        {
+            ggml_type src0_type = op->src[0]->type;
+            ggml_type src1_type = op->src[1]->type;
+            // f32/f16/bf16 ↔ f32/f16/bf16 combinations
+            if ((src0_type == GGML_TYPE_F32 || src0_type == GGML_TYPE_F16 || src0_type == GGML_TYPE_BF16) &&
+                (src1_type == GGML_TYPE_F32 || src1_type == GGML_TYPE_F16 || src1_type == GGML_TYPE_BF16)) {
+                return true;
+            }
+            // f32 ↔ i32
+            if (src0_type == GGML_TYPE_F32 && src1_type == GGML_TYPE_I32) return true;
+            if (src0_type == GGML_TYPE_I32 && src1_type == GGML_TYPE_F32) return true;
+            if (src0_type == GGML_TYPE_I32 && src1_type == GGML_TYPE_I32) return true;
+            // same type + contiguous → memcpy
+            if (src0_type == src1_type && ggml_is_contiguous(op->src[0]) && ggml_is_contiguous(op->src[1])) {
+                return true;
+            }
             return false;
+        }
         case GGML_OP_REPEAT_BACK:
             return op->type == GGML_TYPE_F32 && (op->src[0]->ne[2]*op->src[0]->ne[3]) <= (1 << 15);
         case GGML_OP_CONCAT:
             return op->src[0]->type == GGML_TYPE_F32 && op->src[1]->type == GGML_TYPE_F32;
         case GGML_OP_DUP:
+        {
+            ggml_type src0_type = op->src[0]->type;
+            ggml_type dst_type  = op->type;
+            // f32/f16/bf16 ↔ f32/f16/bf16 combinations
+            if ((src0_type == GGML_TYPE_F32 || src0_type == GGML_TYPE_F16 || src0_type == GGML_TYPE_BF16) &&
+                (dst_type == GGML_TYPE_F32 || dst_type == GGML_TYPE_F16 || dst_type == GGML_TYPE_BF16)) {
+                return true;
+            }
+            if (src0_type == GGML_TYPE_F32 && dst_type == GGML_TYPE_I32) return true;
+            if (src0_type == GGML_TYPE_I32 && dst_type == GGML_TYPE_F32) return true;
+            if (src0_type == GGML_TYPE_I32 && dst_type == GGML_TYPE_I32) return true;
+            if (src0_type == dst_type && ggml_is_contiguous(op->src[0])) return true;
             return false;
+        }
         case GGML_OP_ARGMAX:
             return false;
         case GGML_OP_NONE:
@@ -4086,7 +4117,7 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_SCALE:
             return true;
         case GGML_OP_CONT:
-            return false;
+            return true;
         case GGML_OP_TRI:
             return false;
         case GGML_OP_DIAG_MASK_INF:

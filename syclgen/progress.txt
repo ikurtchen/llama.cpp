@@ -366,3 +366,52 @@ clamp, arange, upscale (require specialized parameters beyond the template)
 **Issues:** None.
 **Next task:** task_009 (CPY/DUP/CONT) or task_010 (FILL)
 **Completion:** 8/48 tasks completed
+
+---
+
+## Session 9 — task_009: Migrate CPY/DUP/CONT ops (2026-03-05)
+
+**Task:** Implement SYCL copy kernels for CPY, DUP, and CONT operations.
+
+**CUDA reference:** `ggml/src/ggml-cuda/cpy.cu`, `ggml/src/ggml-cuda/cpy-utils.cuh`
+
+**Changes:**
+
+1. **Implemented `ggml/src/ggml-sycl/cpy.cpp`** (~240 lines):
+   - `k_cpy_scalar` — generic 4D copy kernel with full index decomposition (ne/nb strides)
+   - `k_cpy_scalar_contiguous` — fast 1D path for contiguous same-type tensors
+   - `launch_k_cpy_scalar` / `launch_k_cpy_scalar_contiguous` — launch helpers
+   - `ggml_sycl_cpy` — type dispatch for all supported combinations:
+     f32↔f32, f32↔f16, f16↔f32, f32↔bf16, bf16↔f32, f16↔f16,
+     bf16↔bf16, bf16↔f16, f16↔bf16, i32↔i32
+   - `ggml_sycl_dup` — wrapper calling ggml_sycl_cpy
+   - `sycl_bf16` type alias for `sycl::ext::oneapi::bfloat16`
+
+2. **Wired into `ggml-sycl.cpp`:**
+   - Added `#include "ggml-sycl/cpy.hpp"` (line 58)
+   - compute_forward: GGML_OP_DUP → ggml_sycl_dup, GGML_OP_CPY/CONT → ggml_sycl_cpy
+   - supports_op: CPY/DUP checks all f32/f16/bf16/i32 type combinations + contiguous same-type
+   - supports_op: CONT returns true unconditionally
+
+3. **Fixed `presets.hpp` macro conflict:**
+   - `SYCL_CPY_BLOCK_SIZE` changed from 32 to 256 (line 35)
+   - cpy.cpp originally had a local `static constexpr` that conflicted with the macro
+
+4. **bf16 support added** after initial CONT tests crashed on bf16 non-contiguous tensors.
+   Added bf16↔bf16, bf16↔f32, f32↔bf16, bf16↔f16, f16↔bf16 dispatch cases.
+
+**Scope notes:** Transpose shared-memory optimization and quantized copies (f32→q4_0, etc.)
+intentionally deferred — the scalar kernel handles all cases correctly.
+
+**Tests:**
+| Op | Result | Tests |
+|---|---|---|
+| CPY (all type combos, contiguous + strided) | PASS | 108/108 |
+| DUP (contiguous + strided) | PASS | 8/8 |
+| CONT (all types incl. bf16 non-contiguous) | PASS | 36/36 |
+| **Total CPY/DUP/CONT** | **PASS** | **152/152** |
+
+**Regression:** SCALE 4/4 pass — no regressions
+**Issues:** None.
+**Next task:** task_010 (FILL) or task_011 (PAD)
+**Completion:** 9/48 tasks completed
