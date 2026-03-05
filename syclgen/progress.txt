@@ -49,7 +49,7 @@ Migration tasks created: 48 (2 infrastructure + 39 kernel + 1 integration)
 | task_029  | 4        | kernel         | SUM, SUM_ROWS, MEAN                     | pending |
 | task_030  | 4        | kernel         | ARGMAX                                  | pending |
 | task_031  | 4        | kernel         | COUNT_EQUAL                             | pending |
-| task_032  | 4        | kernel         | ARGSORT                                 | pending |
+| task_032  | 4        | kernel         | ARGSORT                                 | DONE    |
 | task_033  | 4        | kernel         | TOP_K                                   | pending |
 | task_034  | 4        | kernel         | IM2COL, IM2COL_3D                       | pending |
 | task_035  | 4        | kernel         | POOL_2D                                 | pending |
@@ -1190,3 +1190,49 @@ Implemented SYCL ROPE (Rotary Position Embedding) kernels — all 4 variants (no
 **Issues:** None.
 **Next task:** task_032 (ARGSORT)
 **Completion:** 31/48 tasks completed
+
+---
+
+## Session 32 — task_032: Migrate ARGSORT op
+
+**Date:** 2026-03-05
+**Task:** Implement bitonic sort kernel for ARGSORT operation — returns sorted indices per row.
+**CUDA ref:** `ggml/src/ggml-cuda/argsort.cu`
+
+### Implementation
+
+1. **Implemented `ggml_sycl_op_argsort`** inline in `ggml/src/ggml-sycl/ggml-sycl.cpp` (lines 3653-3742):
+   - Direct port of CUDA `k_argsort_f32_i32` bitonic sort kernel
+   - Uses `sycl::nd_range<1>` with `global_range = nrows * ncols_pad`, `local_range = ncols_pad`
+   - One work-group per row, work-group size = ncols_pad (next power of 2 of ncols)
+   - `sycl::local_accessor<int, 1>` replaces `extern __shared__ int dst_row[]`
+   - `sycl::group_barrier(item.get_group())` replaces `__syncthreads()` at each bitonic step
+   - Runtime `bool ascending` instead of template parameter (uniform branch, no divergence)
+   - Classic bitonic sort network: outer loop k=2..ncols_pad, inner loop j=k/2..1
+   - Padding indices beyond ncols sorted to end using same comparison logic as CUDA
+   - All tensor fields captured by value (no host pointer captures)
+
+2. **Wired into `ggml-sycl.cpp`:**
+   - compute_forward: `GGML_OP_ARGSORT → ggml_sycl_op_argsort(ctx, dst)` (replaced TODO stub)
+   - supports_op: `GGML_OP_ARGSORT → F32 && contiguous && ne[0] <= 1024`
+     (matches CUDA's non-CUB fallback limit)
+
+### Design Notes
+- CUDA has a CUB radix sort fallback for ncols > 1024. SYCL has no equivalent library,
+  so we limit to bitonic sort (ncols <= 1024). Cases with ncols > 1024 are correctly
+  rejected by supports_op and handled by the CPU backend.
+- The `next_power_of_2` helper was already defined earlier in the file (line 1588) — reused.
+- No `[[sycl::reqd_sub_group_size(WARP_SIZE)]]` needed since bitonic sort only uses
+  work-group barriers, not sub-group operations.
+
+**Build:** Compiles cleanly on b60 (icpx 2025.1.1, GGML_SYCL=ON, GGML_SYCL_F16=ON)
+**Tests:**
+| Op | Result | Tests |
+|---|---|---|
+| ARGSORT (f32, ncols <= 1024, ASC/DESC, various shapes) | PASS | 46/46 |
+| ARGSORT (ncols > 1024) | not supported | 46 (correctly rejected) |
+
+**Regression:** SCALE: 4/4 tests pass — no regressions
+**Issues:** None.
+**Next task:** task_033 (TOP_K) or next pending priority-4 task
+**Completion:** 32/48 tasks completed

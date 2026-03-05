@@ -842,7 +842,9 @@
       "priority": 4,
       "name": "Migrate ARGSORT op",
       "description": "Implement argsort kernels. Bitonic sort in shared memory. No existing SYCL stub.",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-03-05T22:00:00Z",
+      "notes": "Implemented ggml_sycl_op_argsort inline in ggml-sycl.cpp (lines 3653-3742). Uses bitonic sort in local memory with sycl::local_accessor<int>. One work-group per row, ncols_pad threads per group. supports_op limits ncols <= 1024 (matching CUDA non-CUB fallback). ARGSORT: 46/46 tests passed (ncols > 1024 correctly rejected as 'not supported'). SCALE regression: 4/4 passed.",
       "kernel_ids": [
         "ck_005",
         "ck_006",

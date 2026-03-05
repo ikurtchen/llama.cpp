@@ -3650,6 +3650,97 @@ static void ggml_sycl_op_argmax(ggml_backend_sycl_context & ctx, ggml_tensor * d
     });
 }
 
+// ---------------------------------------------------------------------------
+// ARGSORT — bitonic sort returning sorted indices per row
+// One work-group per row, work-group size = ncols_pad (next power of 2).
+// Uses local memory for the index array during the bitonic sort network.
+// ---------------------------------------------------------------------------
+static void ggml_sycl_op_argsort(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
+    const ggml_tensor * src0 = dst->src[0];
+
+    GGML_ASSERT(src0->type == GGML_TYPE_F32);
+    GGML_ASSERT(dst->type  == GGML_TYPE_I32);
+    GGML_ASSERT(ggml_is_contiguous(src0));
+
+    const int64_t ncols = src0->ne[0];
+    const int64_t nrows = ggml_nrows(src0);
+    const int ncols_pad = next_power_of_2((int) ncols);
+
+    // Bitonic sort in shared memory — ncols_pad must fit in local memory and work-group size limits
+    GGML_ASSERT(ncols_pad <= 1024);
+
+    const enum ggml_sort_order order = (enum ggml_sort_order) dst->op_params[0];
+
+    const float * src0_d = (const float *) src0->data;
+    int32_t *     dst_d  = (int32_t *)     dst->data;
+
+    sycl::queue & stream = *(ctx.stream());
+
+    const sycl::range<1> global_range(nrows * ncols_pad);
+    const sycl::range<1> local_range(ncols_pad);
+
+    const int ncols_int = (int) ncols;
+    const bool ascending = (order == GGML_SORT_ORDER_ASC);
+
+    stream.submit([&](sycl::handler & h) {
+        sycl::local_accessor<int, 1> dst_row(ncols_pad, h);
+
+        h.parallel_for(
+            sycl::nd_range<1>(global_range, local_range),
+            [=](sycl::nd_item<1> item) {
+                const int col = item.get_local_id(0);
+                const int row = item.get_group(0);
+
+                if (col >= ncols_pad) {
+                    return;
+                }
+
+                const float * x_row = src0_d + (int64_t) row * ncols_int;
+
+                // Initialize indices
+                dst_row[col] = col;
+
+                sycl::group_barrier(item.get_group());
+
+                // Bitonic sort network
+                for (int k = 2; k <= ncols_pad; k *= 2) {
+                    for (int j = k / 2; j > 0; j /= 2) {
+                        const int ixj = col ^ j;
+                        if (ixj > col) {
+                            if ((col & k) == 0) {
+                                if (dst_row[col] >= ncols_int ||
+                                    (dst_row[ixj] < ncols_int && (ascending ?
+                                        x_row[dst_row[col]] > x_row[dst_row[ixj]] :
+                                        x_row[dst_row[col]] < x_row[dst_row[ixj]])))
+                                {
+                                    const int tmp = dst_row[col];
+                                    dst_row[col] = dst_row[ixj];
+                                    dst_row[ixj] = tmp;
+                                }
+                            } else {
+                                if (dst_row[ixj] >= ncols_int ||
+                                    (dst_row[col] < ncols_int && (ascending ?
+                                        x_row[dst_row[col]] < x_row[dst_row[ixj]] :
+                                        x_row[dst_row[col]] > x_row[dst_row[ixj]])))
+                                {
+                                    const int tmp = dst_row[col];
+                                    dst_row[col] = dst_row[ixj];
+                                    dst_row[ixj] = tmp;
+                                }
+                            }
+                        }
+                        sycl::group_barrier(item.get_group());
+                    }
+                }
+
+                // Copy result to dst without padding
+                if (col < ncols_int) {
+                    dst_d[(int64_t) row * ncols_int + col] = dst_row[col];
+                }
+            });
+    });
+}
+
 static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct ggml_tensor * dst) try {
     if (!g_sycl_loaded) return false;
 
@@ -3914,7 +4005,7 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             ggml_sycl_op_mean(ctx, dst);
             break;
         case GGML_OP_ARGSORT:
-            // TODO implement argsort kernel
+            ggml_sycl_op_argsort(ctx, dst);
             break;
         case GGML_OP_TOP_K:
             // TODO implement topk kernel
@@ -4631,7 +4722,9 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_MEAN:
             return op->src[0]->type == GGML_TYPE_F32 && ggml_is_contiguous(op->src[0]);
         case GGML_OP_ARGSORT:
-            return false;
+            // Bitonic sort requires ncols_pad (next power of 2) to fit in local memory and work-group size.
+            // Limit to 1024 columns, matching CUDA's non-CUB fallback.
+            return op->src[0]->type == GGML_TYPE_F32 && ggml_is_contiguous(op->src[0]) && op->src[0]->ne[0] <= 1024;
         case GGML_OP_TOP_K:
             return false;
         case GGML_OP_POOL_2D:
