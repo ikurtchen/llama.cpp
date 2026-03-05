@@ -50,6 +50,7 @@
 #include "ggml-sycl/set.hpp"
 #include "ggml-sycl/sycl_hw.hpp"
 #include "ggml-sycl/getrows.hpp"
+#include "ggml-sycl/binbcast.hpp"
 #include "ggml-sycl/repeat_back.hpp"
 #include "ggml-sycl/quantize.hpp"
 #include "ggml-sycl/ssm_conv.hpp"
@@ -3204,10 +3205,10 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             // TODO implement conv1d transpose kernel
             break;
         case GGML_OP_REPEAT:
-            // TODO implement repeat kernel
+            ggml_sycl_repeat(ctx, dst);
             break;
         case GGML_OP_REPEAT_BACK:
-            // TODO implement repeat back kernel
+            ggml_sycl_op_repeat_back(ctx, dst);
             break;
         case GGML_OP_GET_ROWS:
             // TODO implement get rows kernel
@@ -3223,13 +3224,13 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             break;
         case GGML_OP_ADD:
         case GGML_OP_ADD1: // TODO: more efficient implementation
-            // TODO implement add kernel
+            ggml_sycl_add(ctx, dst);
             break;
         case GGML_OP_ADD_ID:
             // TODO implement add id kernel
             break;
         case GGML_OP_SUB:
-            // TODO implement sub kernel
+            ggml_sycl_sub(ctx, dst);
             break;
         case GGML_OP_COUNT_EQUAL:
             // TODO implement count equal kernel
@@ -3238,13 +3239,13 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             // TODO implement acc kernel
             break;
         case GGML_OP_MUL:
-            // TODO implement mul kernel
+            ggml_sycl_mul(ctx, dst);
             break;
         case GGML_OP_LOG:
             ggml_sycl_log(ctx, dst);
             break;
         case GGML_OP_DIV:
-            // TODO implement div kernel
+            ggml_sycl_div(ctx, dst);
             break;
         case GGML_OP_UNARY:
             switch (ggml_get_unary_op(dst)) {
@@ -4029,7 +4030,7 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_CPY:
             return false;
         case GGML_OP_REPEAT_BACK:
-            return false;
+            return op->type == GGML_TYPE_F32 && (op->src[0]->ne[2]*op->src[0]->ne[3]) <= (1 << 15);
         case GGML_OP_CONCAT:
             return false;
         case GGML_OP_DUP:
@@ -4044,17 +4045,19 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
             return true;
         case GGML_OP_ADD:
         case GGML_OP_ADD1:
+            return true;
         case GGML_OP_ADD_ID:
-        case GGML_OP_SUB:
             return false;
+        case GGML_OP_SUB:
+            return true;
         case GGML_OP_COUNT_EQUAL:
             return false;
         case GGML_OP_MUL:
-            return false;
+            return true;
         case GGML_OP_DIV:
-            return false;
+            return true;
         case GGML_OP_REPEAT:
-            return false;
+            return op->src[0]->type != GGML_TYPE_I32 && op->src[0]->type != GGML_TYPE_I16;
         case GGML_OP_PAD_REFLECT_1D:
             return false;
         case GGML_OP_SQR:

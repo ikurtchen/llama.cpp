@@ -24,7 +24,7 @@ Migration tasks created: 48 (2 infrastructure + 39 kernel + 1 integration)
 | task_004  | 3        | kernel         | DIAG_MASK_INF                           | pending |
 | task_005  | 3        | kernel         | Unary ops (SILU, GELU, RELU, etc.)      | DONE    |
 | task_006  | 3        | kernel         | GLU ops (SWIGLU, GEGLU, REGLU)          | DONE    |
-| task_007  | 3        | kernel         | Binary broadcast (ADD, MUL, DIV, etc.)  | pending |
+| task_007  | 3        | kernel         | Binary broadcast (ADD, MUL, DIV, etc.)  | DONE    |
 | task_008  | 3        | kernel         | CONCAT                                  | pending |
 | task_009  | 3        | kernel         | CPY/DUP/CONT                            | pending |
 | task_010  | 3        | kernel         | FILL                                    | pending |
@@ -280,3 +280,49 @@ clamp, arange, upscale (require specialized parameters beyond the template)
 **Issues:** None.
 **Next task:** task_007 (Binary broadcast ADD/MUL/DIV)
 **Completion:** 6/48 tasks completed
+
+### Session 7 — 2026-03-05: task_007 (Migrate binary broadcast ops)
+
+**Completed:** task_007 — Binary broadcast ops (ADD, SUB, MUL, DIV, REPEAT, REPEAT_BACK)
+**What was done:**
+
+1. **Implemented `binbcast.cpp`** (383 lines, was empty):
+   - `bin_op_type` enum with ADD, SUB, MUL, DIV, REPEAT
+   - `apply_bin_op<op>()` — template dispatch using `if constexpr`
+   - `k_bin_bcast()` — 3D broadcast kernel with `nd_item<3>` (maps z→dim0, y→dim1, x→dim2)
+   - `k_bin_bcast_unravel()` — 1D fallback kernel for grids exceeding 65535
+   - `launch_bin_bcast()` — host launch with dimension collapsing optimization (same as CUDA)
+   - `ggml_sycl_op_bin_bcast<op>()` — type dispatch for f32/f16 combinations
+   - Concrete wrappers: `ggml_sycl_repeat`, `ggml_sycl_add`, `ggml_sycl_sub`, `ggml_sycl_mul`, `ggml_sycl_div`
+
+2. **Implemented `repeat_back.cpp`** (96 lines, was empty):
+   - `k_repeat_back()` — 3D kernel summing over repeated dimensions
+   - `repeat_back_sycl()` — launch wrapper with WARP_SIZE block dim
+   - `ggml_sycl_op_repeat_back()` — host dispatch (f32-only, matching CUDA)
+
+3. **Wired into `ggml-sycl.cpp`**:
+   - Added `#include` for `binbcast.hpp` and `repeat_back.hpp`
+   - compute_forward: REPEAT, REPEAT_BACK, ADD/ADD1, SUB, MUL, DIV → call implementations
+   - supports_op: ADD/ADD1/SUB/MUL/DIV → true; REPEAT → non-I32/I16 check;
+     REPEAT_BACK → f32 && ne2*ne3 <= 2^15
+
+4. **Simplifications vs CUDA:**
+   - Used plain `%`/`/` instead of fastdiv/fastmodulo uint3 optimization
+   - Omitted fused_add (variadic template multi-source fusion) — not needed for basic ops
+   - Enum-based dispatch instead of function pointer templates
+
+**Tests:**
+| Op | Result | Tests |
+|---|---|---|
+| ADD | PASS | 99/99 |
+| SUB | PASS | 91/91 |
+| MUL | PASS | 91/91 |
+| DIV | PASS | 91/91 |
+| REPEAT | PASS | 10/10 |
+| REPEAT_BACK | PASS | 10/10 |
+| **Total** | **PASS** | **396/396** |
+
+**Regression:** SCALE 4/4 pass — no regressions
+**Issues:** None.
+**Next task:** task_008 (CONCAT) or task_009 (CPY/DUP/CONT)
+**Completion:** 7/48 tasks completed
