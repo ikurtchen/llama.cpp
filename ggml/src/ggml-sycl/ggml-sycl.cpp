@@ -61,6 +61,7 @@
 #include "ggml-sycl/roll.hpp"
 #include "ggml-sycl/tsembd.hpp"
 #include "ggml-sycl/softmax.hpp"
+#include "ggml-sycl/rope.hpp"
 #include "ggml.h"
 
 static bool g_sycl_loaded = false;
@@ -3785,7 +3786,7 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             ggml_sycl_op_soft_max_back(ctx, dst);
             break;
         case GGML_OP_ROPE:
-            // TODO implement rope kernel
+            ggml_sycl_rope(ctx, dst);
             break;
         case GGML_OP_IM2COL:
             // TODO implement im2col kernel
@@ -3844,7 +3845,7 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             ggml_sycl_op_diag(ctx, dst);
             break;
         case GGML_OP_ROPE_BACK:
-            // TODO implement rope back kernel
+            ggml_sycl_rope_back(ctx, dst);
             break;
         case GGML_OP_IM2COL_3D:
             // TODO implement im2col 3d kernel
@@ -4480,7 +4481,8 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_SOFT_MAX_BACK:
             return op->src[0]->type == GGML_TYPE_F32;
         case GGML_OP_ROPE:
-            return false;
+        case GGML_OP_ROPE_BACK:
+            return op->src[0]->nb[0] == ggml_type_size(op->src[0]->type) && ggml_is_contiguous_2(op->src[0]);
         case GGML_OP_IM2COL:
             return false;
         case GGML_OP_UPSCALE:
@@ -4547,6 +4549,7 @@ static int64_t get_op_batch_size(const ggml_tensor * op) {
             return op->ne[1];
         case GGML_OP_MUL_MAT_ID:
         case GGML_OP_ROPE:
+        case GGML_OP_ROPE_BACK:
             return op->ne[2];
         default:
             return ggml_nrows(op);

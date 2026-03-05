@@ -930,3 +930,56 @@ intentionally deferred — the scalar kernel handles all cases correctly.
 **Issues:** None.
 **Next task:** task_026 (ROPE, ROPE_BACK) — element-wise with trig, multiple kernel variants
 **Completion:** 25/48 tasks completed
+
+---
+
+## Session 26 — task_026: ROPE, ROPE_BACK
+**Date:** 2026-03-05
+
+### Summary
+Implemented SYCL ROPE (Rotary Position Embedding) kernels — all 4 variants (norm, neox, multi, vision) plus backward pass. This is a complex element-wise kernel with trigonometric computation, position-dependent frequency calculation, and YaRN scaling support.
+
+### Changes Made
+
+1. **Implemented `ggml/src/ggml-sycl/rope.cpp`** (~340 lines, was empty stub):
+   - `rope_corr_dims` and `mrope_sections` structs for parameter passing
+   - `rope_yarn_ramp()` — linear interpolation ramp for YaRN
+   - `rope_yarn<forward>()` — computes cos_theta/sin_theta with YaRN attn_factor scaling
+   - `rope_norm_sycl<forward, has_ff, T>()` — standard RoPE (adjacent pairs: i, i+1)
+   - `rope_neox_sycl<forward, has_ff, T>()` — NeoX-style RoPE (offset n_dims/2 pairs)
+   - `rope_multi_sycl<forward, has_ff, T>()` — M-RoPE with multi-position sections + imrope
+   - `rope_vision_sycl<forward, has_ff, T>()` — Vision RoPE with 2-section position lookup
+   - `ggml_sycl_op_rope_impl<forward>()` — host dispatch extracting all op_params, selecting kernel variant by ggml_rope_type
+   - `ggml_sycl_rope()` and `ggml_sycl_rope_back()` — public entry points
+   - All kernels use 2D `nd_range<2>` with `[[sycl::reqd_sub_group_size(WARP_SIZE)]]`
+   - Supports F32 and F16 types via DISPATCH_ROPE_FF macros
+   - Template parameter `forward` controls sign: forward uses cos+sin, backward uses cos-sin
+
+2. **Updated `ggml/src/ggml-sycl/rope.hpp`:**
+   - Added `ggml_sycl_rope_back()` declaration
+
+3. **Wired into `ggml/src/ggml-sycl/ggml-sycl.cpp`:**
+   - Added `#include "ggml-sycl/rope.hpp"` (line 64)
+   - compute_forward: GGML_OP_ROPE → `ggml_sycl_rope(ctx, dst)`
+   - compute_forward: GGML_OP_ROPE_BACK → `ggml_sycl_rope_back(ctx, dst)`
+   - supports_op: `case GGML_OP_ROPE: case GGML_OP_ROPE_BACK:` → contiguity check matching CUDA
+   - get_op_batch_size: added GGML_OP_ROPE_BACK → `return op->ne[2]`
+
+### Design Notes
+- Omitted CUDA's `set_rows` fusion and coalesced store optimization — not needed for standalone ROPE op
+- Forward/backward share the same kernel via template `<bool forward>` parameter
+- All freq_factors (ff) variants handled via template `<bool has_ff>` to avoid branch in inner loop
+- Mode bits decoded: bit 0 = neox, bit 1 = unused, bit 2 = GLM (unused), bit 3 = mrope, bit 4 = vision, bit 5 = codestral (unused)
+
+**Build:** Compiles cleanly on b60 (icpx 2025.1.1, GGML_SYCL=ON, GGML_SYCL_F16=ON)
+**Tests:**
+| Op | Result | Tests |
+|---|---|---|
+| ROPE (f32/f16, modes 0/2/8/24/40, YaRN, ff, inplace, vision) | PASS | 268/268 |
+| ROPE_BACK (f32/f16, modes 0/2/8/24/40, YaRN, ff) | PASS | 228/228 |
+| **Total** | **PASS** | **496/496** |
+
+**Regression:** SCALE: 4/4 tests pass — no regressions
+**Issues:** None.
+**Next task:** task_027 (GET_ROWS, GET_ROWS_BACK) — data lookup kernel
+**Completion:** 26/48 tasks completed

@@ -672,7 +672,9 @@
       "priority": 4,
       "name": "Migrate ROPE op",
       "description": "Implement rope_norm, rope_neox, rope_multi, rope_vision kernels. Existing empty stub: rope.cpp.",
-      "status": "pending",
+      "status": "done",
+      "completed_at": "2026-03-05",
+      "notes": "Implemented 4 SYCL rope kernel variants (norm, neox, multi, vision) + back pass in rope.cpp (~340 lines). Supports F32/F16, YaRN scaling, freq_factors. ROPE: 268/268 pass, ROPE_BACK: 228/228 pass, SCALE regression: 4/4 pass.",
       "kernel_ids": [
         "ck_090",
         "ck_091",
