@@ -732,3 +732,47 @@ intentionally deferred — the scalar kernel handles all cases correctly.
 **Issues:** None.
 **Next task:** task_021 (RMS_NORM) — first priority-4 kernel, requires warp-level reduction
 **Completion:** 20/48 tasks completed
+
+### Session 21 — 2026-03-05: task_021 (Migrate RMS_NORM op)
+
+**Completed:** task_021 — RMS_NORM (root mean square normalization) kernel migration
+**What was done:**
+
+1. **Implemented `ggml_sycl_op_rms_norm`** in `ggml/src/ggml-sycl/norm.cpp` (96 lines):
+   - Uses 1D `nd_range<1>` with block_size=256, one work-group per (row, channel, sample)
+   - Flat group_id decomposed into (sample, channel, row) via integer division
+   - Pass 1: accumulate sum of x[col]^2 across columns with stride loop
+   - `block_reduce<block_reduce_method::SUM>` for cross-warp reduction
+   - Broadcast reduced value to all work-items via shared memory (tid 0 writes, barrier, all read)
+   - Compute: `scale = rsqrt(mean + eps)` where `mean = sum / ncols`
+   - Pass 2: `dst[col] = scale * x[col]`
+   - Non-contiguous source via element strides (s01, s02, s03), contiguous destination
+   - `[[sycl::reqd_sub_group_size(WARP_SIZE)]]` attribute for correct warp sizing
+
+2. **Wired into `ggml-sycl.cpp`:**
+   - compute_forward: GGML_OP_RMS_NORM → ggml_sycl_op_rms_norm(ctx, dst)
+   - supports_op: GGML_OP_RMS_NORM → returns `op->src[0]->type == GGML_TYPE_F32`
+
+3. **Two bugs found and fixed:**
+   - **block_reduce broadcast:** block_reduce only returns the correct reduced value to
+     sub-group 0 (warp 0). All other sub-groups get sentinel (0.0f for SUM). Fix: added
+     shared memory broadcast — tid 0 writes result, barrier, all threads read.
+   - **block_size=1024 exceeds 2-level reduction capacity:** With WARP_SIZE=16 (Intel),
+     block_size=1024 produces 64 warps, but the second-level reduction in block_reduce
+     only reads 16 partial results (one warp's worth of lanes). Fix: always use
+     block_size=256 (16 warps fit exactly in one sub-group for the second pass).
+     This is a systemic issue that will affect any future kernel using block_reduce
+     with block_size > 256 on Intel GPUs.
+
+**Build:** Compiles cleanly on b60 (icpx 2025.1.1, GGML_SYCL=ON, GGML_SYCL_F16=ON)
+**Tests:**
+| Op | Result | Tests |
+|---|---|---|
+| RMS_NORM (f32, ne=64, all eps, v=0/1) | PASS | 9/9 |
+| RMS_NORM (f32, ne=1025, all eps, v=0/1) | PASS | 8/8 |
+| **Total RMS_NORM** | **PASS** | **17/17** |
+
+**Regression:** SCALE: 4/4 tests pass — no regressions
+**Issues:** block_reduce limitation documented (max block_size=256 with WARP_SIZE=16).
+**Next task:** task_022 (NORM, GROUP_NORM) — more norm variants using same pattern
+**Completion:** 21/48 tasks completed

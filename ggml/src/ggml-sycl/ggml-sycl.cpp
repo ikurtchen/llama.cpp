@@ -3719,7 +3719,7 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             // TODO implement rmsnorm back kernel
             break;
         case GGML_OP_RMS_NORM:
-            // TODO implement rmsnorm kernel
+            ggml_sycl_op_rms_norm(ctx, dst);
             break;
         case GGML_OP_L2_NORM:
             // TODO implement l2 norm kernel
@@ -4457,7 +4457,7 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_GROUP_NORM:
             return false;
         case GGML_OP_RMS_NORM:
-            return false;
+            return op->src[0]->type == GGML_TYPE_F32;
         case GGML_OP_RMS_NORM_BACK:
             return false;
         case GGML_OP_SCALE:
