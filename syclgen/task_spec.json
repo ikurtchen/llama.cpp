@@ -735,7 +735,7 @@
       "description": "Implement set and set_rows kernels. Existing empty stubs: set.cpp, set_rows.cpp.",
       "status": "completed",
       "completed_at": "2026-03-05T21:00:00Z",
-      "notes": "SET: Implemented ggml_sycl_op_set in set.cpp (42 lines) — leverages existing ggml_sycl_cpy for both full-tensor copy and strided view copy. Supports F32 and I32 types. SET: 12/12 tests passed. SET_ROWS: Implemented ggml_sycl_op_set_rows in set_rows.cpp (141 lines) — templated kernel k_set_rows with F32/F16/BF16 dst types, I32/I64 index types. Uses plain % and / for index decomposition. Quantized types deferred. SET_ROWS: 62/62 tests passed. SCALE regression: 4/4 passed.",
+      "notes": "SET: Implemented ggml_sycl_op_set in set.cpp (42 lines) \u2014 leverages existing ggml_sycl_cpy for both full-tensor copy and strided view copy. Supports F32 and I32 types. SET: 12/12 tests passed. SET_ROWS: Implemented ggml_sycl_op_set_rows in set_rows.cpp (141 lines) \u2014 templated kernel k_set_rows with F32/F16/BF16 dst types, I32/I64 index types. Uses plain % and / for index decomposition. Quantized types deferred. SET_ROWS: 62/62 tests passed. SCALE regression: 4/4 passed.",
       "kernel_ids": [
         "ck_095",
         "ck_096"
@@ -1100,7 +1100,7 @@
       "priority": 5,
       "name": "Migrate CROSS_ENTROPY_LOSS ops",
       "description": "Implement cross-entropy loss forward and backward. No existing SYCL stub.",
-      "status": "pending",
+      "status": "completed",
       "kernel_ids": [
         "ck_046",
         "ck_047"
@@ -1117,7 +1117,9 @@
         "Wire into compute_forward and supports_op",
         "Build and run unit test: -k CROSS_ENTROPY_LOSS",
         "Update syclgen/progress.txt"
-      ]
+      ],
+      "completed_at": "2026-03-05",
+      "notes": "Forward+backward kernels in cross-entropy-loss.cpp. Template on use_shared for local mem caching. Forward uses per-row temp buffer + reduce_rows_f32_sycl for final sum. CROSS_ENTROPY_LOSS: 2/2, CROSS_ENTROPY_LOSS_BACK: 2/2, SCALE regression: 4/4."
     },
     {
       "id": "task_043",

@@ -69,6 +69,8 @@
 #include "ggml-sycl/count-equal.hpp"
 #include "ggml-sycl/im2col.hpp"
 #include "ggml-sycl/wkv.hpp"
+#include "ggml-sycl/gla.hpp"
+#include "ggml-sycl/cross-entropy-loss.hpp"
 #include "ggml.h"
 
 static bool g_sycl_loaded = false;
@@ -4512,10 +4514,10 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             ggml_sycl_ssm_scan(ctx, dst);
             break;
         case GGML_OP_CROSS_ENTROPY_LOSS:
-            // TODO implement cross entropy loss kernel
+            ggml_sycl_cross_entropy_loss(ctx, dst);
             break;
         case GGML_OP_CROSS_ENTROPY_LOSS_BACK:
-            // TODO implement cross entropy loss back kernel
+            ggml_sycl_cross_entropy_loss_back(ctx, dst);
             break;
         case GGML_OP_OPT_STEP_ADAMW:
             // TODO implement opt step adamw kernel
@@ -5226,6 +5228,16 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
             return op->type == GGML_TYPE_F32;
         case GGML_OP_FILL:
             return ggml_is_contiguous(op);
+        case GGML_OP_CROSS_ENTROPY_LOSS:
+            return op->src[0]->type == GGML_TYPE_F32 &&
+                   op->src[1]->type == GGML_TYPE_F32 &&
+                   ggml_is_contiguous(op->src[0]) &&
+                   ggml_is_contiguous(op->src[1]);
+        case GGML_OP_CROSS_ENTROPY_LOSS_BACK:
+            return op->src[1]->type == GGML_TYPE_F32 &&
+                   op->src[2]->type == GGML_TYPE_F32 &&
+                   ggml_is_contiguous(op->src[1]) &&
+                   ggml_is_contiguous(op->src[2]);
         default:
             return false;
     }

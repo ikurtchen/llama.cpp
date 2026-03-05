@@ -1660,3 +1660,47 @@ Implemented SYCL ROPE (Rotary Position Embedding) kernels — all 4 variants (no
 **Issues:** None. All tests pass first try.
 **Next task:** task_042 (CROSS_ENTROPY_LOSS) — cross-entropy loss forward and backward
 **Completion:** 41/48 tasks completed (task_047 abandoned)
+
+---
+
+## Session 42 — task_042: CROSS_ENTROPY_LOSS, CROSS_ENTROPY_LOSS_BACK
+**Date:** 2026-03-05
+**Status:** COMPLETED
+
+### Implementation:
+Created new files:
+- `ggml/src/ggml-sycl/cross-entropy-loss.hpp` — declares `ggml_sycl_cross_entropy_loss` and `ggml_sycl_cross_entropy_loss_back`
+- `ggml/src/ggml-sycl/cross-entropy-loss.cpp` — 206 lines, two template kernels + two host functions
+
+### Forward kernel (`cross_entropy_loss_f32_sycl<use_shared>`):
+- One work-group of WARP_SIZE (16) per row, `sycl::nd_range<1>`
+- Three passes: find max logit (warp_reduce_max), compute log-sum-exp (warp_reduce_sum), cross-entropy loss
+- Template parameter `use_shared` controls local memory caching of logits via `sycl::local_accessor`
+- Per-row losses stored in temp buffer (`ggml_sycl_pool_alloc`), then summed via `reduce_rows_f32_sycl`
+- Shared memory threshold: 48KB (49152 bytes)
+
+### Backward kernel (`cross_entropy_loss_back_f32_sycl<use_shared>`):
+- Same WARP_SIZE-per-row layout
+- Two passes: compute softmax (max + exp + sum), output `(softmax - label) * grad[0] / nrows`
+- When `use_shared=false`, intermediate exp values stored directly in output buffer
+
+### Wiring changes in `ggml-sycl.cpp`:
+- Added `#include "ggml-sycl/gla.hpp"` (missing from task_041) and `#include "ggml-sycl/cross-entropy-loss.hpp"`
+- compute_forward: GGML_OP_CROSS_ENTROPY_LOSS → `ggml_sycl_cross_entropy_loss(ctx, dst)` (replaced TODO)
+- compute_forward: GGML_OP_CROSS_ENTROPY_LOSS_BACK → `ggml_sycl_cross_entropy_loss_back(ctx, dst)` (replaced TODO)
+- supports_op: both ops gated on F32 type + contiguous inputs
+
+**Build:** Compiles cleanly on b60 (icpx 2025.1, GGML_SYCL=ON, GGML_SYCL_F16=ON)
+**Tests:**
+| Op | Config | Result |
+|---|---|---|
+| CROSS_ENTROPY_LOSS | ne=[10,5,4,3] | PASS |
+| CROSS_ENTROPY_LOSS | ne=[30000,1,1,1] | PASS |
+| CROSS_ENTROPY_LOSS_BACK | ne=[10,5,4,3] | PASS |
+| CROSS_ENTROPY_LOSS_BACK | ne=[30000,1,1,1] | PASS |
+| **Total** | | **4/4 PASS** |
+
+**Regression:** SCALE: 4/4 tests pass — no regressions
+**Issues:** None. Also fixed missing `#include "ggml-sycl/gla.hpp"` from task_041.
+**Next task:** task_043 (CUMSUM) — cumulative sum kernel
+**Completion:** 42/48 tasks completed (task_047 abandoned)
