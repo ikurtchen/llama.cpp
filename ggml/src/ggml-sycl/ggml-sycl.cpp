@@ -3692,10 +3692,10 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             }
             break;
         case GGML_OP_NORM:
-            // TODO implement norm kernel
+            ggml_sycl_op_norm(ctx, dst);
             break;
         case GGML_OP_GROUP_NORM:
-            // TODO implement group norm kernel
+            ggml_sycl_op_group_norm(ctx, dst);
             break;
         case GGML_OP_CONCAT:
             ggml_sycl_op_concat(ctx, dst);
@@ -4451,11 +4451,11 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_LOG:
             return true;
         case GGML_OP_NORM:
-            return false;
+            return op->src[0]->type == GGML_TYPE_F32;
         case GGML_OP_L2_NORM:
             return false;
         case GGML_OP_GROUP_NORM:
-            return false;
+            return op->src[0]->type == GGML_TYPE_F32;
         case GGML_OP_RMS_NORM:
             return op->src[0]->type == GGML_TYPE_F32;
         case GGML_OP_RMS_NORM_BACK:

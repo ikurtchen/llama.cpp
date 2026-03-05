@@ -10,7 +10,6 @@
     "unit_test": "bash syclgen/remote_run.sh -s b60 -t unit -k <OP_NAME> -e ZES_ENABLE_SYSMAN=1",
     "list_ops": "bash syclgen/remote_run.sh -s b60 -t unit --list-ops -e ZES_ENABLE_SYSMAN=1"
   },
-
   "tasks": [
     {
       "id": "task_001",
@@ -57,10 +56,14 @@
       "status": "completed",
       "completed_at": "2026-03-05T17:30:00Z",
       "notes": "Implemented ggml_sycl_op_scale in ggml-sycl.cpp (lines 3121-3151). Uses parallel_for with nd_range, block_size=256, grid-stride loop. Wired into compute_forward and supports_op returns true. SCALE: 4/4 tests passed. MUL_MAT regression: 729/729 passed.",
-      "kernel_ids": ["ck_094"],
+      "kernel_ids": [
+        "ck_094"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/scale.cu",
       "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
-      "ops": ["GGML_OP_SCALE"],
+      "ops": [
+        "GGML_OP_SCALE"
+      ],
       "steps": [
         "Read CUDA scale.cu (19 lines of host wrapper + 14 line kernel) to understand logic",
         "Implement ggml_sycl_op_scale using sycl::parallel_for in ggml-sycl.cpp or a new scale.cpp",
@@ -81,10 +84,14 @@
       "status": "completed",
       "completed_at": "2026-03-05T18:30:00Z",
       "notes": "Implemented ggml_sycl_op_diag_mask_inf in ggml-sycl.cpp (lines 3153-3189). Uses 2D nd_range with local(1,32), global(nrows, ceil(ncols/32)*32). Kernel: dst[i] = src0[i] - (col > n_past + row % rows_per_channel) * FLT_MAX. Wired into compute_forward and supports_op. DIAG_MASK_INF: 3/3 tests passed. SCALE regression: 4/4 passed.",
-      "kernel_ids": ["ck_051"],
+      "kernel_ids": [
+        "ck_051"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/diagmask.cu",
       "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
-      "ops": ["GGML_OP_DIAG_MASK_INF"],
+      "ops": [
+        "GGML_OP_DIAG_MASK_INF"
+      ],
       "steps": [
         "Read CUDA diagmask.cu kernel logic",
         "Implement ggml_sycl_op_diag_mask_inf using sycl::parallel_for",
@@ -102,10 +109,24 @@
       "status": "completed",
       "completed_at": "2026-03-05T20:00:00Z",
       "notes": "Wired 22 unary ops from element_wise.cpp into compute_forward and supports_op. Added 4 new implementations: expm1, leaky_relu (with negative_slope param), silu_back (two-input), xielu (4 params). Fixed bug: added ggml_is_contiguous check to supports_op for GGML_OP_UNARY to match CUDA backend. Also wired standalone ops: SQR, SQRT, SIN, COS, LOG, LEAKY_RELU, SILU_BACK. Tests: SILU 4/4, GELU 4/4, RELU 4/4, TANH 4/4, SIGMOID 4/4, SQR 6/6, SQRT 6/6, SIN 6/6, COS 6/6, LOG 6/6, LEAKY_RELU 7/7, SILU_BACK 1/1. Regression: SCALE 4/4, MUL_MAT 729/729.",
-      "kernel_ids": ["ck_110", "ck_113", "ck_114", "ck_115"],
+      "kernel_ids": [
+        "ck_110",
+        "ck_113",
+        "ck_114",
+        "ck_115"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/unary.cu",
       "sycl_target": "ggml/src/ggml-sycl/element_wise.cpp",
-      "ops": ["GGML_OP_UNARY (all sub-ops)", "GGML_OP_SQR", "GGML_OP_SQRT", "GGML_OP_SIN", "GGML_OP_COS", "GGML_OP_LOG", "GGML_OP_LEAKY_RELU", "GGML_OP_SILU_BACK"],
+      "ops": [
+        "GGML_OP_UNARY (all sub-ops)",
+        "GGML_OP_SQR",
+        "GGML_OP_SQRT",
+        "GGML_OP_SIN",
+        "GGML_OP_COS",
+        "GGML_OP_LOG",
+        "GGML_OP_LEAKY_RELU",
+        "GGML_OP_SILU_BACK"
+      ],
       "steps": [
         "Read CUDA unary.cu: understand templated unary_op_kernel with function objects",
         "Implement SYCL equivalent in element_wise.cpp using parallel_for with functor dispatch",
@@ -127,10 +148,15 @@
       "status": "completed",
       "completed_at": "2026-03-05T21:00:00Z",
       "notes": "Wired 6 GLU sub-ops (REGLU, GEGLU, SWIGLU, SWIGLU_OAI, GEGLU_ERF, GEGLU_QUICK) into compute_forward and supports_op. Implemented swiglu_oai kernel (F32-only, special formula with alpha/limit params). All 128/128 GLU tests pass on b60 (f16+f32, swapped/split variants). SCALE regression 4/4 pass.",
-      "kernel_ids": ["ck_111", "ck_112"],
+      "kernel_ids": [
+        "ck_111",
+        "ck_112"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/unary.cu",
       "sycl_target": "ggml/src/ggml-sycl/element_wise.cpp",
-      "ops": ["GGML_OP_GLU (all sub-ops)"],
+      "ops": [
+        "GGML_OP_GLU (all sub-ops)"
+      ],
       "steps": [
         "Read CUDA unary.cu gated kernel section (unary_gated_op_kernel, swiglu_oai_kernel)",
         "Implement SYCL gated kernels in element_wise.cpp",
@@ -148,10 +174,22 @@
       "status": "completed",
       "completed_at": "2026-03-05T22:00:00Z",
       "notes": "Implemented k_bin_bcast (3D) and k_bin_bcast_unravel (1D fallback) SYCL kernels in binbcast.cpp using enum-based template dispatch (bin_op_type). Implemented k_repeat_back in repeat_back.cpp. Supports f32/f16 type combinations. Wired ADD, ADD1, SUB, MUL, DIV, REPEAT, REPEAT_BACK into compute_forward and supports_op. Tests: ADD 99/99, SUB 91/91, MUL 91/91, DIV 91/91, REPEAT 10/10, REPEAT_BACK 10/10. Total 396/396 passed. Regression: SCALE 4/4 pass.",
-      "kernel_ids": ["ck_008", "ck_009", "ck_010"],
+      "kernel_ids": [
+        "ck_008",
+        "ck_009",
+        "ck_010"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/binbcast.cu",
       "sycl_target": "ggml/src/ggml-sycl/binbcast.cpp",
-      "ops": ["GGML_OP_ADD", "GGML_OP_ADD1", "GGML_OP_SUB", "GGML_OP_MUL", "GGML_OP_DIV", "GGML_OP_REPEAT", "GGML_OP_REPEAT_BACK"],
+      "ops": [
+        "GGML_OP_ADD",
+        "GGML_OP_ADD1",
+        "GGML_OP_SUB",
+        "GGML_OP_MUL",
+        "GGML_OP_DIV",
+        "GGML_OP_REPEAT",
+        "GGML_OP_REPEAT_BACK"
+      ],
       "steps": [
         "Read CUDA binbcast.cu: understand broadcast index computation and template dispatch",
         "Implement SYCL k_bin_bcast equivalent with parallel_for",
@@ -172,10 +210,17 @@
       "status": "completed",
       "completed_at": "2026-03-05T23:00:00Z",
       "notes": "Implemented SYCL concat kernels in concat.cpp (296 lines). 3 contiguous kernels (dim0/dim1/dim2) + memcpy for dim3 + non-contiguous template kernel for all 4 dims. Used nd_range<3> with BLOCK_SIZE=256. Fixed bug: non-contiguous path initially crashed (UR_RESULT_ERROR_DEVICE_LOST) because kernel lambda captured host ggml_tensor* pointers and dereferenced them on device. Fix: extracted all tensor fields into local variables before lambda capture. Tests: CONCAT 16/16 passed (f32, all dims, contiguous and non-contiguous views). SCALE regression: 4/4 passed.",
-      "kernel_ids": ["ck_012", "ck_013", "ck_014", "ck_015"],
+      "kernel_ids": [
+        "ck_012",
+        "ck_013",
+        "ck_014",
+        "ck_015"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/concat.cu",
       "sycl_target": "ggml/src/ggml-sycl/concat.cpp",
-      "ops": ["GGML_OP_CONCAT"],
+      "ops": [
+        "GGML_OP_CONCAT"
+      ],
       "steps": [
         "Read CUDA concat.cu kernel logic for all dimension variants",
         "Implement SYCL concat kernels in concat.cpp",
@@ -192,10 +237,20 @@
       "description": "Implement copy kernels for tensor data movement. Handles strided, transposed, quantized copies. Existing empty stub: cpy.cpp.",
       "status": "completed",
       "completed_at": "2026-03-05",
-      "kernel_ids": ["ck_041", "ck_042", "ck_043", "ck_044", "ck_045"],
+      "kernel_ids": [
+        "ck_041",
+        "ck_042",
+        "ck_043",
+        "ck_044",
+        "ck_045"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/cpy.cu",
       "sycl_target": "ggml/src/ggml-sycl/cpy.cpp",
-      "ops": ["GGML_OP_CPY", "GGML_OP_DUP", "GGML_OP_CONT"],
+      "ops": [
+        "GGML_OP_CPY",
+        "GGML_OP_DUP",
+        "GGML_OP_CONT"
+      ],
       "notes": "Implemented scalar copy kernels (generic 4D + contiguous fast path) with f32/f16/bf16/i32 type dispatch. CPY 108/108 pass, DUP 8/8 pass, CONT 36/36 pass, SCALE 4/4 regression pass. Transpose optimization and quantized copies deferred.",
       "steps": [
         "Read CUDA cpy.cu: understand cpy_scalar, cpy_scalar_transpose, cpy_f32_q, cpy_q_f32, cpy_scalar_contiguous",
@@ -215,10 +270,14 @@
       "status": "completed",
       "completed_at": "2026-03-05",
       "notes": "Implemented ggml_sycl_op_fill in ggml-sycl.cpp (lines 3194-3244). Supports F32 and F16 types with grid-stride loop (block_size=256). Wired into compute_forward and supports_op (returns ggml_is_contiguous). FILL: 4/4 tests passed. SCALE regression: 4/4 passed.",
-      "kernel_ids": ["ck_059"],
+      "kernel_ids": [
+        "ck_059"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/fill.cu",
       "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
-      "ops": ["GGML_OP_FILL"],
+      "ops": [
+        "GGML_OP_FILL"
+      ],
       "steps": [
         "Read CUDA fill.cu kernel (7 lines)",
         "Implement ggml_sycl_op_fill using sycl::parallel_for or queue.fill",
@@ -236,10 +295,14 @@
       "status": "completed",
       "completed_at": "2026-03-05",
       "notes": "Implemented ggml_sycl_op_arange in ggml-sycl.cpp (lines 3194-3222). Simple parallel_for with nd_range, block_size=256, bounds check. Kernel: dst[i] = start + step * i. Extracts start/stop/step from op_params. Wired into compute_forward and supports_op (returns op->type == GGML_TYPE_F32). ARANGE: 2/2 tests passed. SCALE regression: 4/4 passed.",
-      "kernel_ids": ["ck_003"],
+      "kernel_ids": [
+        "ck_003"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/arange.cu",
       "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
-      "ops": ["GGML_OP_ARANGE"],
+      "ops": [
+        "GGML_OP_ARANGE"
+      ],
       "steps": [
         "Read CUDA arange.cu kernel logic",
         "Implement ggml_sycl_op_arange using sycl::parallel_for",
@@ -257,10 +320,14 @@
       "status": "completed",
       "completed_at": "2026-03-05",
       "notes": "Implemented ggml_sycl_op_clamp in ggml-sycl.cpp (lines 3224-3270). Supports F32 and F16 types. Uses sycl::fmin/fmax with parallel_for nd_range, block_size=256. Wired into compute_forward and supports_op. CLAMP: 6/6 tests passed (f16 and f32, various ne shapes). SCALE regression: 4/4 passed.",
-      "kernel_ids": ["ck_011"],
+      "kernel_ids": [
+        "ck_011"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/clamp.cu",
       "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
-      "ops": ["GGML_OP_CLAMP"],
+      "ops": [
+        "GGML_OP_CLAMP"
+      ],
       "steps": [
         "Read CUDA clamp.cu kernel logic",
         "Implement ggml_sycl_op_clamp using sycl::parallel_for",
@@ -278,10 +345,14 @@
       "status": "completed",
       "completed_at": "2026-03-05",
       "notes": "Implemented ggml_sycl_op_pad in pad.cpp (90 lines). Uses 3D nd_range with SYCL_PAD_BLOCK_SIZE=256. Supports both non-circular (zero-fill padding) and circular (torus wrap-around) modes. Extracts 9 op_params (lp0..rp3 + circular flag). Element strides computed from byte strides. Wired into compute_forward and supports_op (F32 only). PAD: 15/15 tests passed (legacy/asymmetric formats, all transform modes, circular and non-circular). SCALE regression: 4/4 passed.",
-      "kernel_ids": ["ck_082"],
+      "kernel_ids": [
+        "ck_082"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/pad.cu",
       "sycl_target": "ggml/src/ggml-sycl/pad.cpp",
-      "ops": ["GGML_OP_PAD"],
+      "ops": [
+        "GGML_OP_PAD"
+      ],
       "steps": [
         "Read CUDA pad.cu kernel logic",
         "Implement SYCL pad kernel in pad.cpp",
@@ -299,10 +370,14 @@
       "status": "completed",
       "completed_at": "2026-03-05",
       "notes": "Implemented ggml_sycl_op_acc in ggml-sycl.cpp (lines 3273-3326). Uses parallel_for with nd_range<1>, block_size=256. Kernel computes multi-dimensional index decomposition from flat index, bounds-checks against src1 dimensions, and conditionally accumulates. supports_op checks F32 types and contiguous src1 (matching CUDA). ACC: 4/4 tests passed (contiguous cases pass, non-contiguous correctly rejected). SCALE regression: 4/4 passed.",
-      "kernel_ids": ["ck_001"],
+      "kernel_ids": [
+        "ck_001"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/acc.cu",
       "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
-      "ops": ["GGML_OP_ACC"],
+      "ops": [
+        "GGML_OP_ACC"
+      ],
       "steps": [
         "Read CUDA acc.cu kernel logic",
         "Implement ggml_sycl_op_acc using sycl::parallel_for",
@@ -320,10 +395,14 @@
       "status": "completed",
       "completed_at": "2026-03-05",
       "notes": "Implemented ggml_sycl_add_id in add-id.cpp (76 lines). Uses 2D nd_range with local_range(threads, 1) where threads=min(ne00, 768). Kernel: looks up src1 row index from src2, computes byte-offset row pointers, strided loop adds src0+src1. Wired into compute_forward and supports_op (F32+F32+I32 type check). ADD_ID: 36/36 tests passed. SCALE regression: 4/4 passed.",
-      "kernel_ids": ["ck_002"],
+      "kernel_ids": [
+        "ck_002"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/add-id.cu",
       "sycl_target": "ggml/src/ggml-sycl/add-id.cpp",
-      "ops": ["GGML_OP_ADD_ID"],
+      "ops": [
+        "GGML_OP_ADD_ID"
+      ],
       "steps": [
         "Read CUDA add-id.cu kernel logic",
         "Implement SYCL add_id kernel in add-id.cpp",
@@ -341,10 +420,14 @@
       "status": "completed",
       "completed_at": "2026-03-05",
       "notes": "Implemented ggml_sycl_op_diag in ggml-sycl.cpp (lines 3328-3400). Uses parallel_for with nd_range<1>, block_size=256. Kernel decomposes global_idx into i0,i1,i2,i3; if i0==i1 copies from src (batch_idx*ne0+i0), else writes 0. Supports F32 and F16 types. Wired into compute_forward and supports_op. DIAG: 3/3 tests passed. SCALE regression: 4/4 passed.",
-      "kernel_ids": ["ck_050"],
+      "kernel_ids": [
+        "ck_050"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/diag.cu",
       "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
-      "ops": ["GGML_OP_DIAG"],
+      "ops": [
+        "GGML_OP_DIAG"
+      ],
       "steps": [
         "Read CUDA diag.cu kernel logic",
         "Implement ggml_sycl_op_diag using sycl::parallel_for",
@@ -362,10 +445,14 @@
       "status": "completed",
       "completed_at": "2026-03-05",
       "notes": "Implemented ggml_sycl_op_tri in ggml-sycl.cpp (lines 3402-3483). Uses 3D nd_range with grid(ne03,ne02,ne01) and block_size=256. Supports all 4 tri_types (UPPER, UPPER_DIAG, LOWER, LOWER_DIAG) via add_to_split and prefix_keep logic. Supports F32, F16, BF16 types via generic lambda dispatch. Wired into compute_forward and supports_op. TRI: 4/4 tests passed (all 4 tri_types). SCALE regression: 4/4 passed.",
-      "kernel_ids": ["ck_108"],
+      "kernel_ids": [
+        "ck_108"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/tri.cu",
       "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
-      "ops": ["GGML_OP_TRI"],
+      "ops": [
+        "GGML_OP_TRI"
+      ],
       "steps": [
         "Read CUDA tri.cu kernel logic",
         "Implement ggml_sycl_op_tri using sycl::parallel_for",
@@ -383,10 +470,14 @@
       "status": "completed",
       "completed_at": "2026-03-05",
       "notes": "Implemented ggml_sycl_op_timestep_embedding in tsembd.cpp (48 lines). Uses 2D nd_range with global_range(ne00, num_blocks_x * block_size) and local_range(1, 256). Kernel computes sinusoidal embeddings: freq = exp(-log(max_period) * j / half), writes cos(arg) and sin(arg). Handles odd dim zero-padding. Wired into compute_forward and supports_op (F32 check). TIMESTEP_EMBEDDING: 1/1 tests passed. SCALE regression: 4/4 passed.",
-      "kernel_ids": ["ck_109"],
+      "kernel_ids": [
+        "ck_109"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/tsembd.cu",
       "sycl_target": "ggml/src/ggml-sycl/tsembd.cpp",
-      "ops": ["GGML_OP_TIMESTEP_EMBEDDING"],
+      "ops": [
+        "GGML_OP_TIMESTEP_EMBEDDING"
+      ],
       "steps": [
         "Read CUDA tsembd.cu kernel logic",
         "Implement SYCL timestep_embedding kernel in tsembd.cpp",
@@ -404,10 +495,14 @@
       "status": "completed",
       "completed_at": "2026-03-05",
       "notes": "Implemented roll_f32_sycl in roll.cpp (67 lines). Uses nd_range<1> with SYCL_ROLL_BLOCK_SIZE=256. Kernel decomposes flat index into (i0,i1,i2,i3), subtracts shift amounts s0-s3 from op_params, wraps via wrap_index helper, copies from wrapped source position. F32-only. Wired into compute_forward and supports_op. Added SYCL_ROLL_BLOCK_SIZE to presets.hpp. ROLL: 1/1 tests passed. SCALE regression: 4/4 passed.",
-      "kernel_ids": ["ck_089"],
+      "kernel_ids": [
+        "ck_089"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/roll.cu",
       "sycl_target": "ggml/src/ggml-sycl/roll.cpp",
-      "ops": ["GGML_OP_ROLL"],
+      "ops": [
+        "GGML_OP_ROLL"
+      ],
       "steps": [
         "Read CUDA roll.cu kernel logic",
         "Implement SYCL roll kernel in roll.cpp",
@@ -425,10 +520,14 @@
       "status": "completed",
       "completed_at": "2026-03-05",
       "notes": "Implemented ggml_sycl_op_pad_reflect_1d in pad_reflect_1d.cpp (86 lines). Uses 3D nd_range with dim0=i3, dim1=i2, dim2=combined (i1*tiles0) using plain integer division. Reflection logic: left (-rel_i0), middle (rel_i0), right (2*ne00-2-rel_i0). Byte-stride addressing for non-contiguous tensors. F32 only. Wired into compute_forward (replaced TODO) and supports_op (returns F32 check). PAD_REFLECT_1D: 2/2 tests passed. SCALE regression: 4/4 passed.",
-      "kernel_ids": ["ck_083"],
+      "kernel_ids": [
+        "ck_083"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/pad_reflect_1d.cu",
       "sycl_target": "ggml/src/ggml-sycl/pad_reflect_1d.cpp",
-      "ops": ["GGML_OP_PAD_REFLECT_1D"],
+      "ops": [
+        "GGML_OP_PAD_REFLECT_1D"
+      ],
       "steps": [
         "Read CUDA pad_reflect_1d.cu kernel logic",
         "Implement SYCL reflection pad kernel in pad_reflect_1d.cpp",
@@ -445,11 +544,15 @@
       "description": "Implement rms_norm_f32 kernel. Requires warp-level reduction (sub_group). Existing empty stub: norm.cpp.",
       "status": "completed",
       "completed_at": "2026-03-05",
-      "notes": "Implemented ggml_sycl_op_rms_norm in norm.cpp (96 lines). Uses 1D nd_range with block_size=256, block_reduce<SUM> for cross-warp reduction + shared memory broadcast. Fixed two issues: (1) block_reduce only returns correct value to sub-group 0 — added broadcast via shared memory, (2) block_size=1024 exceeded the 2-level reduction capacity with WARP_SIZE=16 (64 warps > 16 lanes) — fixed by always using block_size=256 (16 warps = 1 warp of reduction). Supports non-contiguous source via element strides, contiguous destination. Wired into compute_forward and supports_op (F32 only). RMS_NORM: 17/17 tests passed. SCALE regression: 4/4 passed.",
-      "kernel_ids": ["ck_077"],
+      "notes": "Implemented ggml_sycl_op_rms_norm in norm.cpp (96 lines). Uses 1D nd_range with block_size=256, block_reduce<SUM> for cross-warp reduction + shared memory broadcast. Fixed two issues: (1) block_reduce only returns correct value to sub-group 0 \u2014 added broadcast via shared memory, (2) block_size=1024 exceeded the 2-level reduction capacity with WARP_SIZE=16 (64 warps > 16 lanes) \u2014 fixed by always using block_size=256 (16 warps = 1 warp of reduction). Supports non-contiguous source via element strides, contiguous destination. Wired into compute_forward and supports_op (F32 only). RMS_NORM: 17/17 tests passed. SCALE regression: 4/4 passed.",
+      "kernel_ids": [
+        "ck_077"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/norm.cu",
       "sycl_target": "ggml/src/ggml-sycl/norm.cpp",
-      "ops": ["GGML_OP_RMS_NORM"],
+      "ops": [
+        "GGML_OP_RMS_NORM"
+      ],
       "steps": [
         "Read CUDA norm.cu rms_norm_f32 kernel (uses warp shuffle for reduction)",
         "Implement SYCL RMS norm using sub_group::reduce for warp reduction (warp_size=16)",
@@ -464,18 +567,26 @@
       "priority": 4,
       "name": "Migrate NORM and GROUP_NORM ops",
       "description": "Implement norm_f32 and group_norm_f32 kernels. Requires warp reduction. Existing empty stub: norm.cpp.",
-      "status": "pending",
-      "kernel_ids": ["ck_075", "ck_076"],
+      "status": "completed",
+      "kernel_ids": [
+        "ck_075",
+        "ck_076"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/norm.cu",
       "sycl_target": "ggml/src/ggml-sycl/norm.cpp",
-      "ops": ["GGML_OP_NORM", "GGML_OP_GROUP_NORM"],
+      "ops": [
+        "GGML_OP_NORM",
+        "GGML_OP_GROUP_NORM"
+      ],
       "steps": [
         "Read CUDA norm.cu norm_f32 and group_norm_f32 kernels",
         "Implement SYCL versions using sub_group reduction",
         "Wire into compute_forward and supports_op",
         "Build and run unit tests: -k NORM, -k GROUP_NORM",
         "Update syclgen/progress.txt"
-      ]
+      ],
+      "completed_at": "2026-03-05T18:52:00Z",
+      "notes": "NORM 16/16 pass, GROUP_NORM 2/2 pass, SCALE regression 4/4 pass. Both kernels use block_size=256 with block_reduce+broadcast pattern. NORM uses sycl::float2 for simultaneous sum+sum-of-squares reduction."
     },
     {
       "id": "task_023",
@@ -484,10 +595,14 @@
       "name": "Migrate L2_NORM op",
       "description": "Implement l2_norm_f32 kernel. Requires warp reduction. Existing empty stub: norm.cpp.",
       "status": "pending",
-      "kernel_ids": ["ck_079"],
+      "kernel_ids": [
+        "ck_079"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/norm.cu",
       "sycl_target": "ggml/src/ggml-sycl/norm.cpp",
-      "ops": ["GGML_OP_L2_NORM"],
+      "ops": [
+        "GGML_OP_L2_NORM"
+      ],
       "steps": [
         "Read CUDA norm.cu l2_norm_f32 kernel",
         "Implement SYCL version using sub_group reduction",
@@ -503,10 +618,14 @@
       "name": "Migrate NORM backward ops",
       "description": "Implement rms_norm_back_f32 kernel. Requires warp reduction. Existing empty stub: norm.cpp.",
       "status": "pending",
-      "kernel_ids": ["ck_078"],
+      "kernel_ids": [
+        "ck_078"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/norm.cu",
       "sycl_target": "ggml/src/ggml-sycl/norm.cpp",
-      "ops": ["GGML_OP_RMS_NORM_BACK"],
+      "ops": [
+        "GGML_OP_RMS_NORM_BACK"
+      ],
       "steps": [
         "Read CUDA norm.cu rms_norm_back_f32 kernel",
         "Implement SYCL version using sub_group reduction",
@@ -522,10 +641,16 @@
       "name": "Migrate SOFT_MAX op",
       "description": "Implement soft_max_f32 kernel. Requires warp reduction, optional mask and ALiBi. Existing empty stub: softmax.cpp.",
       "status": "pending",
-      "kernel_ids": ["ck_098", "ck_099"],
+      "kernel_ids": [
+        "ck_098",
+        "ck_099"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/softmax.cu",
       "sycl_target": "ggml/src/ggml-sycl/softmax.cpp",
-      "ops": ["GGML_OP_SOFT_MAX", "GGML_OP_SOFT_MAX_BACK"],
+      "ops": [
+        "GGML_OP_SOFT_MAX",
+        "GGML_OP_SOFT_MAX_BACK"
+      ],
       "steps": [
         "Read CUDA softmax.cu soft_max_f32 kernel (warp shuffle, shared memory, mask, ALiBi)",
         "Implement SYCL softmax using sub_group reduction and local memory",
@@ -542,10 +667,18 @@
       "name": "Migrate ROPE op",
       "description": "Implement rope_norm, rope_neox, rope_multi, rope_vision kernels. Existing empty stub: rope.cpp.",
       "status": "pending",
-      "kernel_ids": ["ck_090", "ck_091", "ck_092", "ck_093"],
+      "kernel_ids": [
+        "ck_090",
+        "ck_091",
+        "ck_092",
+        "ck_093"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/rope.cu",
       "sycl_target": "ggml/src/ggml-sycl/rope.cpp",
-      "ops": ["GGML_OP_ROPE", "GGML_OP_ROPE_BACK"],
+      "ops": [
+        "GGML_OP_ROPE",
+        "GGML_OP_ROPE_BACK"
+      ],
       "steps": [
         "Read CUDA rope.cu: 4 kernel variants (norm, neox, multi, vision) + back pass",
         "Implement SYCL rope kernels in rope.cpp (element-wise with trig, position calculation)",
@@ -563,10 +696,17 @@
       "name": "Migrate GET_ROWS op",
       "description": "Implement k_get_rows and k_get_rows_float for gathering rows by index. Existing empty stub: getrows.cpp.",
       "status": "pending",
-      "kernel_ids": ["ck_060", "ck_061", "ck_062"],
+      "kernel_ids": [
+        "ck_060",
+        "ck_061",
+        "ck_062"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/getrows.cu",
       "sycl_target": "ggml/src/ggml-sycl/getrows.cpp",
-      "ops": ["GGML_OP_GET_ROWS", "GGML_OP_GET_ROWS_BACK"],
+      "ops": [
+        "GGML_OP_GET_ROWS",
+        "GGML_OP_GET_ROWS_BACK"
+      ],
       "steps": [
         "Read CUDA getrows.cu: k_get_rows (quantized), k_get_rows_float, k_get_rows_back_float",
         "Implement SYCL get_rows kernels in getrows.cpp (uses dequantize functions from dequantize.hpp)",
@@ -584,12 +724,18 @@
       "name": "Migrate SET and SET_ROWS ops",
       "description": "Implement set and set_rows kernels. Existing empty stubs: set.cpp, set_rows.cpp.",
       "status": "pending",
-      "kernel_ids": ["ck_095", "ck_096"],
+      "kernel_ids": [
+        "ck_095",
+        "ck_096"
+      ],
       "cuda_ref_1": "ggml/src/ggml-cuda/set.cu",
       "cuda_ref_2": "ggml/src/ggml-cuda/set-rows.cu",
       "sycl_target_1": "ggml/src/ggml-sycl/set.cpp",
       "sycl_target_2": "ggml/src/ggml-sycl/set_rows.cpp",
-      "ops": ["GGML_OP_SET", "GGML_OP_SET_ROWS"],
+      "ops": [
+        "GGML_OP_SET",
+        "GGML_OP_SET_ROWS"
+      ],
       "steps": [
         "Read CUDA set.cu (memcpy-based) and set-rows.cu (k_set_rows_quant, k_set_rows)",
         "Implement SYCL equivalents in set.cpp and set_rows.cpp",
@@ -605,12 +751,19 @@
       "name": "Migrate SUM, SUM_ROWS, MEAN ops",
       "description": "Implement reduction kernels. Requires warp reduction. No existing SYCL stubs.",
       "status": "pending",
-      "kernel_ids": ["ck_088", "ck_067"],
+      "kernel_ids": [
+        "ck_088",
+        "ck_067"
+      ],
       "cuda_ref_1": "ggml/src/ggml-cuda/sumrows.cu",
       "cuda_ref_2": "ggml/src/ggml-cuda/sum.cu",
       "cuda_ref_3": "ggml/src/ggml-cuda/mean.cu",
       "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
-      "ops": ["GGML_OP_SUM_ROWS", "GGML_OP_SUM", "GGML_OP_MEAN"],
+      "ops": [
+        "GGML_OP_SUM_ROWS",
+        "GGML_OP_SUM",
+        "GGML_OP_MEAN"
+      ],
       "steps": [
         "Read CUDA reduce_rows.cuh, sumrows.cu, sum.cu, mean.cu",
         "Implement SYCL row reduction kernel using sub_group reduction",
@@ -626,10 +779,14 @@
       "name": "Migrate ARGMAX op",
       "description": "Implement argmax kernel. Requires warp reduction. No existing SYCL stub.",
       "status": "pending",
-      "kernel_ids": ["ck_004"],
+      "kernel_ids": [
+        "ck_004"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/argmax.cu",
       "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
-      "ops": ["GGML_OP_ARGMAX"],
+      "ops": [
+        "GGML_OP_ARGMAX"
+      ],
       "steps": [
         "Read CUDA argmax.cu kernel (warp shuffle reduction for max)",
         "Implement SYCL argmax using sub_group reduction",
@@ -645,10 +802,14 @@
       "name": "Migrate COUNT_EQUAL op",
       "description": "Implement count_equal kernel. Requires warp reduction and atomics. Existing empty stub: count-equal.cpp.",
       "status": "pending",
-      "kernel_ids": ["ck_040"],
+      "kernel_ids": [
+        "ck_040"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/count-equal.cu",
       "sycl_target": "ggml/src/ggml-sycl/count-equal.cpp",
-      "ops": ["GGML_OP_COUNT_EQUAL"],
+      "ops": [
+        "GGML_OP_COUNT_EQUAL"
+      ],
       "steps": [
         "Read CUDA count-equal.cu kernel (warp shuffle + atomicAdd)",
         "Implement SYCL version using sub_group reduction + sycl::atomic_ref",
@@ -664,10 +825,16 @@
       "name": "Migrate ARGSORT op",
       "description": "Implement argsort kernels. Bitonic sort in shared memory. No existing SYCL stub.",
       "status": "pending",
-      "kernel_ids": ["ck_005", "ck_006", "ck_007"],
+      "kernel_ids": [
+        "ck_005",
+        "ck_006",
+        "ck_007"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/argsort.cu",
       "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
-      "ops": ["GGML_OP_ARGSORT"],
+      "ops": [
+        "GGML_OP_ARGSORT"
+      ],
       "steps": [
         "Read CUDA argsort.cu: bitonic sort kernel with shared memory",
         "Implement SYCL bitonic sort using local memory (CUB path not available, use bitonic fallback)",
@@ -686,7 +853,9 @@
       "kernel_ids": [],
       "cuda_ref": "ggml/src/ggml-cuda/top-k.cu",
       "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
-      "ops": ["GGML_OP_TOP_K"],
+      "ops": [
+        "GGML_OP_TOP_K"
+      ],
       "steps": [
         "Read CUDA top-k.cu kernel logic",
         "Implement SYCL top-k selection kernel",
@@ -702,10 +871,16 @@
       "name": "Migrate IM2COL op",
       "description": "Implement im2col kernels (2D and 3D). Existing empty stub: im2col.cpp.",
       "status": "pending",
-      "kernel_ids": ["ck_065", "ck_066"],
+      "kernel_ids": [
+        "ck_065",
+        "ck_066"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/im2col.cu",
       "sycl_target": "ggml/src/ggml-sycl/im2col.cpp",
-      "ops": ["GGML_OP_IM2COL", "GGML_OP_IM2COL_3D"],
+      "ops": [
+        "GGML_OP_IM2COL",
+        "GGML_OP_IM2COL_3D"
+      ],
       "steps": [
         "Read CUDA im2col.cu kernel logic (2D and 3D variants)",
         "Implement SYCL im2col kernels in im2col.cpp",
@@ -721,10 +896,14 @@
       "name": "Migrate POOL_2D op",
       "description": "Implement pool2d kernel. No existing SYCL stub.",
       "status": "pending",
-      "kernel_ids": ["ck_084"],
+      "kernel_ids": [
+        "ck_084"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/pool2d.cu",
       "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
-      "ops": ["GGML_OP_POOL_2D"],
+      "ops": [
+        "GGML_OP_POOL_2D"
+      ],
       "steps": [
         "Read CUDA pool2d.cu kernel logic (max and average pooling)",
         "Implement SYCL pool2d kernel",
@@ -740,10 +919,17 @@
       "name": "Migrate UPSCALE op",
       "description": "Implement upscale kernels (nearest, bilinear, bicubic). No existing SYCL stub.",
       "status": "pending",
-      "kernel_ids": ["ck_116", "ck_117", "ck_118", "ck_119"],
+      "kernel_ids": [
+        "ck_116",
+        "ck_117",
+        "ck_118",
+        "ck_119"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/upscale.cu",
       "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
-      "ops": ["GGML_OP_UPSCALE"],
+      "ops": [
+        "GGML_OP_UPSCALE"
+      ],
       "steps": [
         "Read CUDA upscale.cu: 4 kernel variants (nearest, bilinear, bilinear_antialias, bicubic)",
         "Implement SYCL upscale kernels",
@@ -759,10 +945,14 @@
       "name": "Migrate CONV_TRANSPOSE_1D op",
       "description": "Fix CONV_TRANSPOSE_1D: supports_op returns true but compute_forward is TODO. Existing empty stub: conv.cpp.",
       "status": "pending",
-      "kernel_ids": ["ck_019"],
+      "kernel_ids": [
+        "ck_019"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/conv-transpose-1d.cu",
       "sycl_target": "ggml/src/ggml-sycl/conv.cpp",
-      "ops": ["GGML_OP_CONV_TRANSPOSE_1D"],
+      "ops": [
+        "GGML_OP_CONV_TRANSPOSE_1D"
+      ],
       "steps": [
         "Read CUDA conv-transpose-1d.cu kernel logic",
         "Implement SYCL conv_transpose_1d in conv.cpp",
@@ -778,10 +968,15 @@
       "name": "Migrate SSM_CONV op",
       "description": "Implement Mamba SSM convolution kernels. Existing empty stub: ssm_conv.cpp.",
       "status": "pending",
-      "kernel_ids": ["ck_103", "ck_104"],
+      "kernel_ids": [
+        "ck_103",
+        "ck_104"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/ssm-conv.cu",
       "sycl_target": "ggml/src/ggml-sycl/ssm_conv.cpp",
-      "ops": ["GGML_OP_SSM_CONV"],
+      "ops": [
+        "GGML_OP_SSM_CONV"
+      ],
       "steps": [
         "Read CUDA ssm-conv.cu: two kernel variants (short and long token)",
         "Implement SYCL SSM conv kernels in ssm_conv.cpp",
@@ -797,10 +992,15 @@
       "name": "Migrate SSM_SCAN op",
       "description": "Implement Mamba selective scan kernels. Complex: shared memory, sequential recurrence. No existing SYCL stub.",
       "status": "pending",
-      "kernel_ids": ["ck_105", "ck_106"],
+      "kernel_ids": [
+        "ck_105",
+        "ck_106"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/ssm-scan.cu",
       "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
-      "ops": ["GGML_OP_SSM_SCAN"],
+      "ops": [
+        "GGML_OP_SSM_SCAN"
+      ],
       "steps": [
         "Read CUDA ssm-scan.cu: two kernel variants (standard and grouped)",
         "Implement SYCL selective scan using local memory for shared state",
@@ -816,10 +1016,16 @@
       "name": "Migrate RWKV WKV6/WKV7 ops",
       "description": "Implement WKV attention kernels. Complex: shared memory, warp shuffle. Existing empty stub: wkv.cpp.",
       "status": "pending",
-      "kernel_ids": ["ck_120", "ck_121"],
+      "kernel_ids": [
+        "ck_120",
+        "ck_121"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/wkv.cu",
       "sycl_target": "ggml/src/ggml-sycl/wkv.cpp",
-      "ops": ["GGML_OP_RWKV_WKV6", "GGML_OP_RWKV_WKV7"],
+      "ops": [
+        "GGML_OP_RWKV_WKV6",
+        "GGML_OP_RWKV_WKV7"
+      ],
       "steps": [
         "Read CUDA wkv.cu: rwkv_wkv_f32 (v6) and rwkv_wkv7_f32 kernels",
         "Implement SYCL WKV kernels using local memory and sub_group",
@@ -835,10 +1041,14 @@
       "name": "Migrate GATED_LINEAR_ATTN op",
       "description": "Implement GLA kernel. Complex: shared memory, warp shuffle. Existing empty stub: gla.cpp.",
       "status": "pending",
-      "kernel_ids": ["ck_064"],
+      "kernel_ids": [
+        "ck_064"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/gla.cu",
       "sycl_target": "ggml/src/ggml-sycl/gla.cpp",
-      "ops": ["GGML_OP_GATED_LINEAR_ATTN"],
+      "ops": [
+        "GGML_OP_GATED_LINEAR_ATTN"
+      ],
       "steps": [
         "Read CUDA gla.cu kernel logic",
         "Implement SYCL GLA kernel using local memory and sub_group",
@@ -854,10 +1064,16 @@
       "name": "Migrate CROSS_ENTROPY_LOSS ops",
       "description": "Implement cross-entropy loss forward and backward. No existing SYCL stub.",
       "status": "pending",
-      "kernel_ids": ["ck_046", "ck_047"],
+      "kernel_ids": [
+        "ck_046",
+        "ck_047"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/cross-entropy-loss.cu",
       "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
-      "ops": ["GGML_OP_CROSS_ENTROPY_LOSS", "GGML_OP_CROSS_ENTROPY_LOSS_BACK"],
+      "ops": [
+        "GGML_OP_CROSS_ENTROPY_LOSS",
+        "GGML_OP_CROSS_ENTROPY_LOSS_BACK"
+      ],
       "steps": [
         "Read CUDA cross-entropy-loss.cu: forward and backward kernels",
         "Implement SYCL versions using sub_group reduction and local memory",
@@ -873,10 +1089,15 @@
       "name": "Migrate CUMSUM op",
       "description": "Implement cumulative sum kernel. Complex: needs block-level scan (no CUB in SYCL). No existing SYCL stub.",
       "status": "pending",
-      "kernel_ids": ["ck_048", "ck_049"],
+      "kernel_ids": [
+        "ck_048",
+        "ck_049"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/cumsum.cu",
       "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
-      "ops": ["GGML_OP_CUMSUM"],
+      "ops": [
+        "GGML_OP_CUMSUM"
+      ],
       "steps": [
         "Read CUDA cumsum.cu: CUB-based and manual fallback variants",
         "Implement SYCL prefix sum using work-group scan (sycl::joint_exclusive_scan or manual)",
@@ -892,12 +1113,20 @@
       "name": "Migrate CONV_2D, CONV_2D_DW, CONV_TRANSPOSE_2D ops",
       "description": "Implement 2D convolution kernels. Complex: shared memory, templates. Existing empty stub: conv.cpp.",
       "status": "pending",
-      "kernel_ids": ["ck_016", "ck_017", "ck_018"],
+      "kernel_ids": [
+        "ck_016",
+        "ck_017",
+        "ck_018"
+      ],
       "cuda_ref_1": "ggml/src/ggml-cuda/conv2d.cu",
       "cuda_ref_2": "ggml/src/ggml-cuda/conv2d-dw.cu",
       "cuda_ref_3": "ggml/src/ggml-cuda/conv2d-transpose.cu",
       "sycl_target": "ggml/src/ggml-sycl/conv.cpp",
-      "ops": ["GGML_OP_CONV_2D", "GGML_OP_CONV_2D_DW", "GGML_OP_CONV_TRANSPOSE_2D"],
+      "ops": [
+        "GGML_OP_CONV_2D",
+        "GGML_OP_CONV_2D_DW",
+        "GGML_OP_CONV_TRANSPOSE_2D"
+      ],
       "steps": [
         "Read CUDA conv2d.cu, conv2d-dw.cu, conv2d-transpose.cu kernels",
         "Implement SYCL convolution kernels in conv.cpp using local memory",
@@ -913,10 +1142,15 @@
       "name": "Migrate SOLVE_TRI op",
       "description": "Implement triangular solve kernel. Complex: shared memory tiling. No existing SYCL stub.",
       "status": "pending",
-      "kernel_ids": ["ck_101", "ck_102"],
+      "kernel_ids": [
+        "ck_101",
+        "ck_102"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/solve_tri.cu",
       "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
-      "ops": ["GGML_OP_SOLVE_TRI"],
+      "ops": [
+        "GGML_OP_SOLVE_TRI"
+      ],
       "steps": [
         "Read CUDA solve_tri.cu: batch pointer setup + forward substitution kernel",
         "Implement SYCL version using local memory tiling",
@@ -932,11 +1166,17 @@
       "name": "Migrate OPT_STEP_ADAMW and OPT_STEP_SGD ops",
       "description": "Implement optimizer step kernels. Medium complexity. No existing SYCL stubs.",
       "status": "pending",
-      "kernel_ids": ["ck_080", "ck_081"],
+      "kernel_ids": [
+        "ck_080",
+        "ck_081"
+      ],
       "cuda_ref_1": "ggml/src/ggml-cuda/opt-step-adamw.cu",
       "cuda_ref_2": "ggml/src/ggml-cuda/opt-step-sgd.cu",
       "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
-      "ops": ["GGML_OP_OPT_STEP_ADAMW", "GGML_OP_OPT_STEP_SGD"],
+      "ops": [
+        "GGML_OP_OPT_STEP_ADAMW",
+        "GGML_OP_OPT_STEP_SGD"
+      ],
       "steps": [
         "Read CUDA opt-step-adamw.cu and opt-step-sgd.cu",
         "Implement SYCL versions using parallel_for",
@@ -952,7 +1192,15 @@
       "name": "Migrate FLASH_ATTN_EXT op",
       "description": "Implement flash attention. Most complex migration: multiple kernel variants (vec, tile, wmma, mma), stream-K, tensor cores. No existing SYCL stub. This is the highest-effort single task.",
       "status": "abandoned",
-      "kernel_ids": ["ck_052", "ck_053", "ck_054", "ck_055", "ck_056", "ck_057", "ck_058"],
+      "kernel_ids": [
+        "ck_052",
+        "ck_053",
+        "ck_054",
+        "ck_055",
+        "ck_056",
+        "ck_057",
+        "ck_058"
+      ],
       "cuda_ref": "ggml/src/ggml-cuda/fattn.cu",
       "cuda_ref_headers": [
         "ggml/src/ggml-cuda/fattn-common.cuh",
@@ -962,7 +1210,9 @@
         "ggml/src/ggml-cuda/fattn-mma-f16.cuh"
       ],
       "sycl_target": "ggml/src/ggml-sycl/fattn.cpp (new file)",
-      "ops": ["GGML_OP_FLASH_ATTN_EXT"],
+      "ops": [
+        "GGML_OP_FLASH_ATTN_EXT"
+      ],
       "steps": [
         "Study all CUDA fattn files: fattn-common.cuh, fattn-vec.cuh, fattn-tile.cuh, fattn-mma-f16.cuh, fattn-wmma-f16.cu",
         "Start with fattn-vec (simplest variant: single-query, vectorized loads)",

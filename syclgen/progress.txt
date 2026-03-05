@@ -776,3 +776,36 @@ intentionally deferred — the scalar kernel handles all cases correctly.
 **Issues:** block_reduce limitation documented (max block_size=256 with WARP_SIZE=16).
 **Next task:** task_022 (NORM, GROUP_NORM) — more norm variants using same pattern
 **Completion:** 21/48 tasks completed
+
+---
+
+## Session 22 — task_022: NORM & GROUP_NORM
+**Date:** 2026-03-05
+**Task:** Migrate NORM (LayerNorm) and GROUP_NORM ops from CUDA to SYCL
+**CUDA ref:** `ggml/src/ggml-cuda/norm.cu` (norm_f32, group_norm_f32 kernels)
+**SYCL target:** `ggml/src/ggml-sycl/norm.cpp`
+
+**Implementation:**
+- **NORM (LayerNorm):** 1D nd_range, block_size=256, uses `sycl::float2` for
+  simultaneous sum + sum-of-squares reduction via `block_reduce<SUM>`. Supports
+  non-contiguous source strides (s01, s02, s03), contiguous destination. Computes
+  mean and variance in a single pass, then normalizes with `(x - mean) * inv_std`.
+  Uses the standard block_reduce + broadcast pattern (write to sh[0], barrier, read back).
+- **GROUP_NORM:** 1D nd_range, block_size=256, flat indexing by group. Two separate
+  `block_reduce<SUM>` passes: first for mean, second for variance. Three loops:
+  (1) accumulate sum, (2) subtract mean + accumulate squared deviations, (3) scale
+  by `rsqrt(variance + eps)`. Each reduction uses broadcast pattern.
+- Wired both ops in `ggml-sycl.cpp`: `compute_forward` calls the implementations,
+  `supports_op` returns `op->src[0]->type == GGML_TYPE_F32`.
+
+**Build:** Compiles cleanly on b60 (icpx 2025.1.1, GGML_SYCL=ON, GGML_SYCL_F16=ON)
+**Tests:**
+| Op | Result | Tests |
+|---|---|---|
+| NORM (f32, ne=64/1025, all eps, v=0/1) | PASS | 16/16 |
+| GROUP_NORM (f32, various shapes) | PASS | 2/2 |
+
+**Regression:** SCALE: 4/4 tests pass — no regressions
+**Issues:** None — clean first-attempt pass for both kernels.
+**Next task:** task_023 or next pending priority-4 task
+**Completion:** 22/48 tasks completed
