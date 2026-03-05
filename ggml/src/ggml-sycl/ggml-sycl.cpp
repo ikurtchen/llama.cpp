@@ -3722,7 +3722,7 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             ggml_sycl_op_rms_norm(ctx, dst);
             break;
         case GGML_OP_L2_NORM:
-            // TODO implement l2 norm kernel
+            ggml_sycl_op_l2_norm(ctx, dst);
             break;
         case GGML_OP_MUL_MAT:
             if (dst->src[0]->ne[3] != dst->src[1]->ne[3]) {
@@ -4453,7 +4453,7 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_NORM:
             return op->src[0]->type == GGML_TYPE_F32;
         case GGML_OP_L2_NORM:
-            return false;
+            return op->src[0]->type == GGML_TYPE_F32;
         case GGML_OP_GROUP_NORM:
             return op->src[0]->type == GGML_TYPE_F32;
         case GGML_OP_RMS_NORM:

@@ -809,3 +809,37 @@ intentionally deferred — the scalar kernel handles all cases correctly.
 **Issues:** None — clean first-attempt pass for both kernels.
 **Next task:** task_023 or next pending priority-4 task
 **Completion:** 22/48 tasks completed
+
+### Session 23 — 2026-03-05: task_023 (Migrate L2_NORM op)
+
+**Completed:** task_023 — L2_NORM (L2 normalization) kernel migration
+**What was done:**
+
+1. **Implemented `ggml_sycl_op_l2_norm`** in `ggml/src/ggml-sycl/norm.cpp` (~95 lines):
+   - Follows same pattern as existing `ggml_sycl_op_rms_norm` in the same file
+   - Uses 1D `nd_range<1>` with block_size=256, one work-group per (row, channel, sample)
+   - Pass 1: accumulate sum of x[col]^2 across columns with stride loop
+   - `block_reduce<block_reduce_method::SUM>` for cross-warp reduction
+   - Broadcast reduced value via shared memory (tid 0 writes, barrier, all read)
+   - Key difference from RMS_NORM: computes `scale = rsqrt(fmax(sum_sq, eps*eps))`
+     instead of `rsqrt(sum_sq / ncols + eps)`. This matches the CUDA `l2_norm_f32`
+     kernel which follows PyTorch's normalize convention — clamps L2 norm to be at
+     least `eps` rather than adding `eps` to the mean.
+   - Pass 2: `dst[col] = scale * x[col]`
+   - Supports non-contiguous source via element strides (s01, s02, s03)
+   - Uses `[[sycl::reqd_sub_group_size(WARP_SIZE)]]`
+
+2. **Wired into `ggml-sycl.cpp`:**
+   - compute_forward: GGML_OP_L2_NORM → ggml_sycl_op_l2_norm(ctx, dst) (replaced TODO)
+   - supports_op: GGML_OP_L2_NORM → returns `op->src[0]->type == GGML_TYPE_F32`
+
+**Build:** Compiles cleanly on b60 (icpx 2025.1.1, GGML_SYCL=ON, GGML_SYCL_F16=ON)
+**Tests:**
+| Op | Result | Tests |
+|---|---|---|
+| L2_NORM (f32, ne=64/1025, all eps, v=0/1) | PASS | 16/16 |
+
+**Regression:** SCALE: 4/4 tests pass — no regressions
+**Issues:** None — clean implementation following established RMS_NORM pattern.
+**Next task:** task_024 (RMS_NORM_BACK) or next pending priority-4 task
+**Completion:** 23/48 tasks completed

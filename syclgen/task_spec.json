@@ -594,7 +594,9 @@
       "priority": 4,
       "name": "Migrate L2_NORM op",
       "description": "Implement l2_norm_f32 kernel. Requires warp reduction. Existing empty stub: norm.cpp.",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-03-05T19:15:00Z",
+      "notes": "Implemented ggml_sycl_op_l2_norm in norm.cpp following RMS_NORM pattern. Uses block_size=256, block_reduce<SUM> + broadcast. Key difference from RMS_NORM: uses sycl::rsqrt(sycl::fmax(sum_sq, eps*eps)) matching PyTorch normalize convention (clamps L2 norm >= eps). Supports non-contiguous source via element strides. Wired into compute_forward and supports_op (F32 only). L2_NORM: 16/16 tests passed. SCALE regression: 4/4 passed.",
       "kernel_ids": [
         "ck_079"
       ],
