@@ -1,0 +1,908 @@
+{
+  "version": "1.0",
+  "generated": "2026-03-05",
+  "description": "Ordered CUDA-to-SYCL migration task plan for llama.cpp ggml backend. Tasks are ordered by priority: infrastructure (1-2) -> simple kernels (3) -> medium kernels (4) -> complex kernels (5) -> integration test (6).",
+  "remote_testing": {
+    "server": "b60",
+    "script": "syclgen/remote_run.sh",
+    "env": "ZES_ENABLE_SYSMAN=1",
+    "remote_path": "/intel/kurt",
+    "unit_test": "bash syclgen/remote_run.sh -s b60 -t unit -k <OP_NAME> -e ZES_ENABLE_SYSMAN=1",
+    "list_ops": "bash syclgen/remote_run.sh -s b60 -t unit --list-ops -e ZES_ENABLE_SYSMAN=1"
+  },
+
+  "tasks": [
+    {
+      "id": "task_001",
+      "type": "infrastructure",
+      "priority": 1,
+      "name": "Verify SYCL build and existing backend",
+      "description": "Build llama.cpp with GGML_SYCL=ON on b60, verify existing MUL_MAT/MUL_MAT_ID/OUT_PROD ops pass unit tests, establish baseline.",
+      "kernel_ids": [],
+      "steps": [
+        "Remote build: cmake -B build -DGGML_SYCL=ON && cmake --build build -j",
+        "Run: bash syclgen/remote_run.sh -s b60 -t unit --list-ops -e ZES_ENABLE_SYSMAN=1",
+        "Run existing MUL_MAT test: bash syclgen/remote_run.sh -s b60 -t unit -k MUL_MAT -e ZES_ENABLE_SYSMAN=1",
+        "Run existing OUT_PROD test: bash syclgen/remote_run.sh -s b60 -t unit -k OUT_PROD -e ZES_ENABLE_SYSMAN=1",
+        "Document baseline results in syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_002",
+      "type": "infrastructure",
+      "priority": 2,
+      "name": "Create SYCL helper utilities and common patterns",
+      "description": "Establish common SYCL warp-reduction helpers, sub-group shuffle wrappers, and element-wise kernel dispatch templates in common.hpp/common.cpp that will be reused across all migrated kernels. Warp size = 16 for Intel.",
+      "kernel_ids": [],
+      "steps": [
+        "Audit ggml/src/ggml-sycl/common.hpp for existing sub_group reduction helpers",
+        "Add warp_reduce_sum, warp_reduce_max sub-group helpers if not present",
+        "Add element_wise_kernel_1src and element_wise_kernel_2src SYCL templates",
+        "Build and verify no compilation errors",
+        "Document new utilities in syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_003",
+      "type": "kernel",
+      "priority": 3,
+      "name": "Migrate SCALE op",
+      "description": "Implement ggml_sycl_op_scale. Simple element-wise: dst = x * scale + bias. No existing SYCL stub file.",
+      "kernel_ids": ["ck_094"],
+      "cuda_ref": "ggml/src/ggml-cuda/scale.cu",
+      "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "ops": ["GGML_OP_SCALE"],
+      "steps": [
+        "Read CUDA scale.cu (19 lines of host wrapper + 14 line kernel) to understand logic",
+        "Implement ggml_sycl_op_scale using sycl::parallel_for in ggml-sycl.cpp or a new scale.cpp",
+        "Wire into compute_forward switch: case GGML_OP_SCALE -> call ggml_sycl_op_scale",
+        "Add GGML_OP_SCALE to supports_op returning true",
+        "Build with GGML_SYCL=ON",
+        "Check op name with --list-ops",
+        "Run unit test: bash syclgen/remote_run.sh -s b60 -t unit -k SCALE -e ZES_ENABLE_SYSMAN=1",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_004",
+      "type": "kernel",
+      "priority": 3,
+      "name": "Migrate DIAG_MASK_INF op",
+      "description": "Implement ggml_sycl_op_diag_mask_inf. Simple element-wise conditional: set to -inf above diagonal. No existing SYCL stub.",
+      "kernel_ids": ["ck_051"],
+      "cuda_ref": "ggml/src/ggml-cuda/diagmask.cu",
+      "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "ops": ["GGML_OP_DIAG_MASK_INF"],
+      "steps": [
+        "Read CUDA diagmask.cu kernel logic",
+        "Implement ggml_sycl_op_diag_mask_inf using sycl::parallel_for",
+        "Wire into compute_forward and supports_op",
+        "Build and run unit test: -k DIAG_MASK_INF",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_005",
+      "type": "kernel",
+      "priority": 3,
+      "name": "Migrate unary ops (element-wise activations)",
+      "description": "Implement the generic unary_op_kernel in SYCL. Single kernel handles all simple activations: SILU, GELU, RELU, TANH, SIGMOID, EXP, ABS, NEG, STEP, etc. Existing empty stub: element_wise.cpp.",
+      "kernel_ids": ["ck_110", "ck_113", "ck_114", "ck_115"],
+      "cuda_ref": "ggml/src/ggml-cuda/unary.cu",
+      "sycl_target": "ggml/src/ggml-sycl/element_wise.cpp",
+      "ops": ["GGML_OP_UNARY (all sub-ops)", "GGML_OP_SQR", "GGML_OP_SQRT", "GGML_OP_SIN", "GGML_OP_COS", "GGML_OP_LOG", "GGML_OP_LEAKY_RELU", "GGML_OP_SILU_BACK"],
+      "steps": [
+        "Read CUDA unary.cu: understand templated unary_op_kernel with function objects",
+        "Implement SYCL equivalent in element_wise.cpp using parallel_for with functor dispatch",
+        "Implement all 22+ unary sub-ops: ABS, SGN, NEG, STEP, GELU, SILU, GELU_ERF, GELU_QUICK, TANH, RELU, SIGMOID, HARDSIGMOID, HARDSWISH, EXP, ELU, XIELU, FLOOR, CEIL, ROUND, TRUNC, EXPM1, SOFTPLUS",
+        "Also implement SQR, SQRT, SIN, COS, LOG as they use the same kernel pattern",
+        "Implement leaky_relu_kernel and silu_back_kernel",
+        "Wire all ops into compute_forward switch and supports_op",
+        "Build with GGML_SYCL=ON",
+        "Run unit tests for key ops: -k SILU, -k GELU, -k RELU, -k TANH, -k SQR, -k SQRT",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_006",
+      "type": "kernel",
+      "priority": 3,
+      "name": "Migrate GLU ops (gated activations)",
+      "description": "Implement gated unary ops: REGLU, GEGLU, SWIGLU, SWIGLU_OAI, GEGLU_ERF, GEGLU_QUICK. Existing empty stub: element_wise.cpp.",
+      "kernel_ids": ["ck_111", "ck_112"],
+      "cuda_ref": "ggml/src/ggml-cuda/unary.cu",
+      "sycl_target": "ggml/src/ggml-sycl/element_wise.cpp",
+      "ops": ["GGML_OP_GLU (all sub-ops)"],
+      "steps": [
+        "Read CUDA unary.cu gated kernel section (unary_gated_op_kernel, swiglu_oai_kernel)",
+        "Implement SYCL gated kernels in element_wise.cpp",
+        "Wire GLU ops into compute_forward and supports_op",
+        "Build and run unit tests: -k SWIGLU, -k GEGLU, -k REGLU",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_007",
+      "type": "kernel",
+      "priority": 3,
+      "name": "Migrate binary broadcast ops (ADD, SUB, MUL, DIV, REPEAT)",
+      "description": "Implement k_bin_bcast and k_bin_bcast_unravel in SYCL. These handle ADD, SUB, MUL, DIV with broadcasting. Existing empty stub: binbcast.cpp.",
+      "kernel_ids": ["ck_008", "ck_009", "ck_010"],
+      "cuda_ref": "ggml/src/ggml-cuda/binbcast.cu",
+      "sycl_target": "ggml/src/ggml-sycl/binbcast.cpp",
+      "ops": ["GGML_OP_ADD", "GGML_OP_ADD1", "GGML_OP_SUB", "GGML_OP_MUL", "GGML_OP_DIV", "GGML_OP_REPEAT", "GGML_OP_REPEAT_BACK"],
+      "steps": [
+        "Read CUDA binbcast.cu: understand broadcast index computation and template dispatch",
+        "Implement SYCL k_bin_bcast equivalent with parallel_for",
+        "Handle both contiguous (k_bin_bcast) and non-contiguous (k_bin_bcast_unravel) paths",
+        "Implement k_repeat_back for REPEAT_BACK",
+        "Wire ADD, ADD1, SUB, MUL, DIV, REPEAT, REPEAT_BACK into compute_forward and supports_op",
+        "Build with GGML_SYCL=ON",
+        "Run unit tests: -k ADD, -k MUL, -k DIV, -k REPEAT",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_008",
+      "type": "kernel",
+      "priority": 3,
+      "name": "Migrate CONCAT op",
+      "description": "Implement concat kernels for dim0, dim1, dim2, non-contiguous. Existing empty stub: concat.cpp.",
+      "kernel_ids": ["ck_012", "ck_013", "ck_014", "ck_015"],
+      "cuda_ref": "ggml/src/ggml-cuda/concat.cu",
+      "sycl_target": "ggml/src/ggml-sycl/concat.cpp",
+      "ops": ["GGML_OP_CONCAT"],
+      "steps": [
+        "Read CUDA concat.cu kernel logic for all dimension variants",
+        "Implement SYCL concat kernels in concat.cpp",
+        "Wire CONCAT into compute_forward and supports_op",
+        "Build and run unit test: -k CONCAT",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_009",
+      "type": "kernel",
+      "priority": 3,
+      "name": "Migrate CPY/DUP/CONT ops",
+      "description": "Implement copy kernels for tensor data movement. Handles strided, transposed, quantized copies. Existing empty stub: cpy.cpp.",
+      "kernel_ids": ["ck_041", "ck_042", "ck_043", "ck_044", "ck_045"],
+      "cuda_ref": "ggml/src/ggml-cuda/cpy.cu",
+      "sycl_target": "ggml/src/ggml-sycl/cpy.cpp",
+      "ops": ["GGML_OP_CPY", "GGML_OP_DUP", "GGML_OP_CONT"],
+      "steps": [
+        "Read CUDA cpy.cu: understand cpy_scalar, cpy_scalar_transpose, cpy_f32_q, cpy_q_f32, cpy_scalar_contiguous",
+        "Implement SYCL copy kernels in cpy.cpp with parallel_for",
+        "Support all type combinations present in CUDA (f32->f32, f32->f16, f16->f32, f32->q, q->f32)",
+        "Wire CPY, DUP, CONT into compute_forward and supports_op",
+        "Build and run unit tests: -k CPY, -k DUP, -k CONT",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_010",
+      "type": "kernel",
+      "priority": 3,
+      "name": "Migrate FILL op",
+      "description": "Implement fill kernel. Simple: fill buffer with constant value. No existing SYCL stub.",
+      "kernel_ids": ["ck_059"],
+      "cuda_ref": "ggml/src/ggml-cuda/fill.cu",
+      "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "ops": ["GGML_OP_FILL"],
+      "steps": [
+        "Read CUDA fill.cu kernel (7 lines)",
+        "Implement ggml_sycl_op_fill using sycl::parallel_for or queue.fill",
+        "Wire into compute_forward and supports_op",
+        "Build and run unit test: -k FILL",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_011",
+      "type": "kernel",
+      "priority": 3,
+      "name": "Migrate ARANGE op",
+      "description": "Implement arange kernel. Simple: generate range of values. No existing SYCL stub.",
+      "kernel_ids": ["ck_003"],
+      "cuda_ref": "ggml/src/ggml-cuda/arange.cu",
+      "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "ops": ["GGML_OP_ARANGE"],
+      "steps": [
+        "Read CUDA arange.cu kernel logic",
+        "Implement ggml_sycl_op_arange using sycl::parallel_for",
+        "Wire into compute_forward and supports_op",
+        "Build and run unit test: -k ARANGE",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_012",
+      "type": "kernel",
+      "priority": 3,
+      "name": "Migrate CLAMP op",
+      "description": "Implement clamp kernel. Simple element-wise min/max clamping. No existing SYCL stub.",
+      "kernel_ids": ["ck_011"],
+      "cuda_ref": "ggml/src/ggml-cuda/clamp.cu",
+      "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "ops": ["GGML_OP_CLAMP"],
+      "steps": [
+        "Read CUDA clamp.cu kernel logic",
+        "Implement ggml_sycl_op_clamp using sycl::parallel_for",
+        "Wire into compute_forward and supports_op",
+        "Build and run unit test: -k CLAMP",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_013",
+      "type": "kernel",
+      "priority": 3,
+      "name": "Migrate PAD op",
+      "description": "Implement pad kernel. Zero-padding across 4 dimensions. Existing empty stub: pad.cpp.",
+      "kernel_ids": ["ck_082"],
+      "cuda_ref": "ggml/src/ggml-cuda/pad.cu",
+      "sycl_target": "ggml/src/ggml-sycl/pad.cpp",
+      "ops": ["GGML_OP_PAD"],
+      "steps": [
+        "Read CUDA pad.cu kernel logic",
+        "Implement SYCL pad kernel in pad.cpp",
+        "Wire into compute_forward and supports_op",
+        "Build and run unit test: -k PAD",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_014",
+      "type": "kernel",
+      "priority": 3,
+      "name": "Migrate ACC op",
+      "description": "Implement acc kernel. Strided accumulation. No existing SYCL stub.",
+      "kernel_ids": ["ck_001"],
+      "cuda_ref": "ggml/src/ggml-cuda/acc.cu",
+      "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "ops": ["GGML_OP_ACC"],
+      "steps": [
+        "Read CUDA acc.cu kernel logic",
+        "Implement ggml_sycl_op_acc using sycl::parallel_for",
+        "Wire into compute_forward and supports_op",
+        "Build and run unit test: -k ACC",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_015",
+      "type": "kernel",
+      "priority": 3,
+      "name": "Migrate ADD_ID op",
+      "description": "Implement add_id kernel. Scatter-add by index. Existing empty stub: add-id.cpp.",
+      "kernel_ids": ["ck_002"],
+      "cuda_ref": "ggml/src/ggml-cuda/add-id.cu",
+      "sycl_target": "ggml/src/ggml-sycl/add-id.cpp",
+      "ops": ["GGML_OP_ADD_ID"],
+      "steps": [
+        "Read CUDA add-id.cu kernel logic",
+        "Implement SYCL add_id kernel in add-id.cpp",
+        "Wire into compute_forward and supports_op",
+        "Build and run unit test: -k ADD_ID",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_016",
+      "type": "kernel",
+      "priority": 3,
+      "name": "Migrate DIAG op",
+      "description": "Implement diag kernel. Extract diagonal, zero off-diagonal. No existing SYCL stub.",
+      "kernel_ids": ["ck_050"],
+      "cuda_ref": "ggml/src/ggml-cuda/diag.cu",
+      "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "ops": ["GGML_OP_DIAG"],
+      "steps": [
+        "Read CUDA diag.cu kernel logic",
+        "Implement ggml_sycl_op_diag using sycl::parallel_for",
+        "Wire into compute_forward and supports_op",
+        "Build and run unit test: -k DIAG",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_017",
+      "type": "kernel",
+      "priority": 3,
+      "name": "Migrate TRI op",
+      "description": "Implement tri kernel. Extract triangular portion of matrix. No existing SYCL stub.",
+      "kernel_ids": ["ck_108"],
+      "cuda_ref": "ggml/src/ggml-cuda/tri.cu",
+      "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "ops": ["GGML_OP_TRI"],
+      "steps": [
+        "Read CUDA tri.cu kernel logic",
+        "Implement ggml_sycl_op_tri using sycl::parallel_for",
+        "Wire into compute_forward and supports_op",
+        "Build and run unit test: -k TRI",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_018",
+      "type": "kernel",
+      "priority": 3,
+      "name": "Migrate TIMESTEP_EMBEDDING op",
+      "description": "Implement timestep embedding kernel. Sinusoidal embeddings. Existing empty stub: tsembd.cpp.",
+      "kernel_ids": ["ck_109"],
+      "cuda_ref": "ggml/src/ggml-cuda/tsembd.cu",
+      "sycl_target": "ggml/src/ggml-sycl/tsembd.cpp",
+      "ops": ["GGML_OP_TIMESTEP_EMBEDDING"],
+      "steps": [
+        "Read CUDA tsembd.cu kernel logic",
+        "Implement SYCL timestep_embedding kernel in tsembd.cpp",
+        "Wire into compute_forward and supports_op",
+        "Build and run unit test: -k TIMESTEP_EMBEDDING",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_019",
+      "type": "kernel",
+      "priority": 3,
+      "name": "Migrate ROLL op",
+      "description": "Implement roll kernel. Cyclic shift along dimensions. Existing empty stub: roll.cpp.",
+      "kernel_ids": ["ck_089"],
+      "cuda_ref": "ggml/src/ggml-cuda/roll.cu",
+      "sycl_target": "ggml/src/ggml-sycl/roll.cpp",
+      "ops": ["GGML_OP_ROLL"],
+      "steps": [
+        "Read CUDA roll.cu kernel logic",
+        "Implement SYCL roll kernel in roll.cpp",
+        "Wire into compute_forward and supports_op",
+        "Build and run unit test: -k ROLL",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_020",
+      "type": "kernel",
+      "priority": 3,
+      "name": "Migrate PAD_REFLECT_1D op",
+      "description": "Implement pad_reflect_1d kernel. Reflection padding. Existing empty stub: pad_reflect_1d.cpp.",
+      "kernel_ids": ["ck_083"],
+      "cuda_ref": "ggml/src/ggml-cuda/pad_reflect_1d.cu",
+      "sycl_target": "ggml/src/ggml-sycl/pad_reflect_1d.cpp",
+      "ops": ["GGML_OP_PAD_REFLECT_1D"],
+      "steps": [
+        "Read CUDA pad_reflect_1d.cu kernel logic",
+        "Implement SYCL reflection pad kernel in pad_reflect_1d.cpp",
+        "Wire into compute_forward and supports_op",
+        "Build and run unit test: -k PAD_REFLECT_1D",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_021",
+      "type": "kernel",
+      "priority": 4,
+      "name": "Migrate RMS_NORM op",
+      "description": "Implement rms_norm_f32 kernel. Requires warp-level reduction (sub_group). Existing empty stub: norm.cpp.",
+      "kernel_ids": ["ck_077"],
+      "cuda_ref": "ggml/src/ggml-cuda/norm.cu",
+      "sycl_target": "ggml/src/ggml-sycl/norm.cpp",
+      "ops": ["GGML_OP_RMS_NORM"],
+      "steps": [
+        "Read CUDA norm.cu rms_norm_f32 kernel (uses warp shuffle for reduction)",
+        "Implement SYCL RMS norm using sub_group::reduce for warp reduction (warp_size=16)",
+        "Wire into compute_forward and supports_op",
+        "Build and run unit test: -k RMS_NORM",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_022",
+      "type": "kernel",
+      "priority": 4,
+      "name": "Migrate NORM and GROUP_NORM ops",
+      "description": "Implement norm_f32 and group_norm_f32 kernels. Requires warp reduction. Existing empty stub: norm.cpp.",
+      "kernel_ids": ["ck_075", "ck_076"],
+      "cuda_ref": "ggml/src/ggml-cuda/norm.cu",
+      "sycl_target": "ggml/src/ggml-sycl/norm.cpp",
+      "ops": ["GGML_OP_NORM", "GGML_OP_GROUP_NORM"],
+      "steps": [
+        "Read CUDA norm.cu norm_f32 and group_norm_f32 kernels",
+        "Implement SYCL versions using sub_group reduction",
+        "Wire into compute_forward and supports_op",
+        "Build and run unit tests: -k NORM, -k GROUP_NORM",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_023",
+      "type": "kernel",
+      "priority": 4,
+      "name": "Migrate L2_NORM op",
+      "description": "Implement l2_norm_f32 kernel. Requires warp reduction. Existing empty stub: norm.cpp.",
+      "kernel_ids": ["ck_079"],
+      "cuda_ref": "ggml/src/ggml-cuda/norm.cu",
+      "sycl_target": "ggml/src/ggml-sycl/norm.cpp",
+      "ops": ["GGML_OP_L2_NORM"],
+      "steps": [
+        "Read CUDA norm.cu l2_norm_f32 kernel",
+        "Implement SYCL version using sub_group reduction",
+        "Wire into compute_forward and supports_op",
+        "Build and run unit test: -k L2_NORM",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_024",
+      "type": "kernel",
+      "priority": 4,
+      "name": "Migrate NORM backward ops",
+      "description": "Implement rms_norm_back_f32 kernel. Requires warp reduction. Existing empty stub: norm.cpp.",
+      "kernel_ids": ["ck_078"],
+      "cuda_ref": "ggml/src/ggml-cuda/norm.cu",
+      "sycl_target": "ggml/src/ggml-sycl/norm.cpp",
+      "ops": ["GGML_OP_RMS_NORM_BACK"],
+      "steps": [
+        "Read CUDA norm.cu rms_norm_back_f32 kernel",
+        "Implement SYCL version using sub_group reduction",
+        "Wire into compute_forward and supports_op",
+        "Build and run unit test: -k RMS_NORM_BACK",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_025",
+      "type": "kernel",
+      "priority": 4,
+      "name": "Migrate SOFT_MAX op",
+      "description": "Implement soft_max_f32 kernel. Requires warp reduction, optional mask and ALiBi. Existing empty stub: softmax.cpp.",
+      "kernel_ids": ["ck_098", "ck_099"],
+      "cuda_ref": "ggml/src/ggml-cuda/softmax.cu",
+      "sycl_target": "ggml/src/ggml-sycl/softmax.cpp",
+      "ops": ["GGML_OP_SOFT_MAX", "GGML_OP_SOFT_MAX_BACK"],
+      "steps": [
+        "Read CUDA softmax.cu soft_max_f32 kernel (warp shuffle, shared memory, mask, ALiBi)",
+        "Implement SYCL softmax using sub_group reduction and local memory",
+        "Also implement soft_max_back_f32",
+        "Wire SOFT_MAX and SOFT_MAX_BACK into compute_forward and supports_op",
+        "Build and run unit test: -k SOFT_MAX",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_026",
+      "type": "kernel",
+      "priority": 4,
+      "name": "Migrate ROPE op",
+      "description": "Implement rope_norm, rope_neox, rope_multi, rope_vision kernels. Existing empty stub: rope.cpp.",
+      "kernel_ids": ["ck_090", "ck_091", "ck_092", "ck_093"],
+      "cuda_ref": "ggml/src/ggml-cuda/rope.cu",
+      "sycl_target": "ggml/src/ggml-sycl/rope.cpp",
+      "ops": ["GGML_OP_ROPE", "GGML_OP_ROPE_BACK"],
+      "steps": [
+        "Read CUDA rope.cu: 4 kernel variants (norm, neox, multi, vision) + back pass",
+        "Implement SYCL rope kernels in rope.cpp (element-wise with trig, position calculation)",
+        "Support all rope types dispatched by ggml_rope_type",
+        "Also implement rope_back (same kernel with negate flag)",
+        "Wire ROPE and ROPE_BACK into compute_forward and supports_op",
+        "Build and run unit test: -k ROPE",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_027",
+      "type": "kernel",
+      "priority": 4,
+      "name": "Migrate GET_ROWS op",
+      "description": "Implement k_get_rows and k_get_rows_float for gathering rows by index. Existing empty stub: getrows.cpp.",
+      "kernel_ids": ["ck_060", "ck_061", "ck_062"],
+      "cuda_ref": "ggml/src/ggml-cuda/getrows.cu",
+      "sycl_target": "ggml/src/ggml-sycl/getrows.cpp",
+      "ops": ["GGML_OP_GET_ROWS", "GGML_OP_GET_ROWS_BACK"],
+      "steps": [
+        "Read CUDA getrows.cu: k_get_rows (quantized), k_get_rows_float, k_get_rows_back_float",
+        "Implement SYCL get_rows kernels in getrows.cpp (uses dequantize functions from dequantize.hpp)",
+        "Support all quantized types present in CUDA version",
+        "Also implement get_rows_back (atomic add scatter)",
+        "Wire GET_ROWS and GET_ROWS_BACK into compute_forward and supports_op",
+        "Build and run unit test: -k GET_ROWS",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_028",
+      "type": "kernel",
+      "priority": 4,
+      "name": "Migrate SET and SET_ROWS ops",
+      "description": "Implement set and set_rows kernels. Existing empty stubs: set.cpp, set_rows.cpp.",
+      "kernel_ids": ["ck_095", "ck_096"],
+      "cuda_ref_1": "ggml/src/ggml-cuda/set.cu",
+      "cuda_ref_2": "ggml/src/ggml-cuda/set-rows.cu",
+      "sycl_target_1": "ggml/src/ggml-sycl/set.cpp",
+      "sycl_target_2": "ggml/src/ggml-sycl/set_rows.cpp",
+      "ops": ["GGML_OP_SET", "GGML_OP_SET_ROWS"],
+      "steps": [
+        "Read CUDA set.cu (memcpy-based) and set-rows.cu (k_set_rows_quant, k_set_rows)",
+        "Implement SYCL equivalents in set.cpp and set_rows.cpp",
+        "Wire SET and SET_ROWS into compute_forward and supports_op",
+        "Build and run unit tests: -k SET, -k SET_ROWS",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_029",
+      "type": "kernel",
+      "priority": 4,
+      "name": "Migrate SUM, SUM_ROWS, MEAN ops",
+      "description": "Implement reduction kernels. Requires warp reduction. No existing SYCL stubs.",
+      "kernel_ids": ["ck_088", "ck_067"],
+      "cuda_ref_1": "ggml/src/ggml-cuda/sumrows.cu",
+      "cuda_ref_2": "ggml/src/ggml-cuda/sum.cu",
+      "cuda_ref_3": "ggml/src/ggml-cuda/mean.cu",
+      "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "ops": ["GGML_OP_SUM_ROWS", "GGML_OP_SUM", "GGML_OP_MEAN"],
+      "steps": [
+        "Read CUDA reduce_rows.cuh, sumrows.cu, sum.cu, mean.cu",
+        "Implement SYCL row reduction kernel using sub_group reduction",
+        "Wire SUM_ROWS, SUM, MEAN into compute_forward and supports_op",
+        "Build and run unit tests: -k SUM_ROWS, -k SUM, -k MEAN",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_030",
+      "type": "kernel",
+      "priority": 4,
+      "name": "Migrate ARGMAX op",
+      "description": "Implement argmax kernel. Requires warp reduction. No existing SYCL stub.",
+      "kernel_ids": ["ck_004"],
+      "cuda_ref": "ggml/src/ggml-cuda/argmax.cu",
+      "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "ops": ["GGML_OP_ARGMAX"],
+      "steps": [
+        "Read CUDA argmax.cu kernel (warp shuffle reduction for max)",
+        "Implement SYCL argmax using sub_group reduction",
+        "Wire into compute_forward and supports_op",
+        "Build and run unit test: -k ARGMAX",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_031",
+      "type": "kernel",
+      "priority": 4,
+      "name": "Migrate COUNT_EQUAL op",
+      "description": "Implement count_equal kernel. Requires warp reduction and atomics. Existing empty stub: count-equal.cpp.",
+      "kernel_ids": ["ck_040"],
+      "cuda_ref": "ggml/src/ggml-cuda/count-equal.cu",
+      "sycl_target": "ggml/src/ggml-sycl/count-equal.cpp",
+      "ops": ["GGML_OP_COUNT_EQUAL"],
+      "steps": [
+        "Read CUDA count-equal.cu kernel (warp shuffle + atomicAdd)",
+        "Implement SYCL version using sub_group reduction + sycl::atomic_ref",
+        "Wire into compute_forward and supports_op",
+        "Build and run unit test: -k COUNT_EQUAL",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_032",
+      "type": "kernel",
+      "priority": 4,
+      "name": "Migrate ARGSORT op",
+      "description": "Implement argsort kernels. Bitonic sort in shared memory. No existing SYCL stub.",
+      "kernel_ids": ["ck_005", "ck_006", "ck_007"],
+      "cuda_ref": "ggml/src/ggml-cuda/argsort.cu",
+      "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "ops": ["GGML_OP_ARGSORT"],
+      "steps": [
+        "Read CUDA argsort.cu: bitonic sort kernel with shared memory",
+        "Implement SYCL bitonic sort using local memory (CUB path not available, use bitonic fallback)",
+        "Wire into compute_forward and supports_op",
+        "Build and run unit test: -k ARGSORT",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_033",
+      "type": "kernel",
+      "priority": 4,
+      "name": "Migrate TOP_K op",
+      "description": "Implement top-k kernel. No existing SYCL stub.",
+      "kernel_ids": [],
+      "cuda_ref": "ggml/src/ggml-cuda/top-k.cu",
+      "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "ops": ["GGML_OP_TOP_K"],
+      "steps": [
+        "Read CUDA top-k.cu kernel logic",
+        "Implement SYCL top-k selection kernel",
+        "Wire into compute_forward and supports_op",
+        "Build and run unit test: -k TOP_K",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_034",
+      "type": "kernel",
+      "priority": 4,
+      "name": "Migrate IM2COL op",
+      "description": "Implement im2col kernels (2D and 3D). Existing empty stub: im2col.cpp.",
+      "kernel_ids": ["ck_065", "ck_066"],
+      "cuda_ref": "ggml/src/ggml-cuda/im2col.cu",
+      "sycl_target": "ggml/src/ggml-sycl/im2col.cpp",
+      "ops": ["GGML_OP_IM2COL", "GGML_OP_IM2COL_3D"],
+      "steps": [
+        "Read CUDA im2col.cu kernel logic (2D and 3D variants)",
+        "Implement SYCL im2col kernels in im2col.cpp",
+        "Wire IM2COL and IM2COL_3D into compute_forward and supports_op",
+        "Build and run unit test: -k IM2COL",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_035",
+      "type": "kernel",
+      "priority": 4,
+      "name": "Migrate POOL_2D op",
+      "description": "Implement pool2d kernel. No existing SYCL stub.",
+      "kernel_ids": ["ck_084"],
+      "cuda_ref": "ggml/src/ggml-cuda/pool2d.cu",
+      "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "ops": ["GGML_OP_POOL_2D"],
+      "steps": [
+        "Read CUDA pool2d.cu kernel logic (max and average pooling)",
+        "Implement SYCL pool2d kernel",
+        "Wire into compute_forward and supports_op",
+        "Build and run unit test: -k POOL_2D",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_036",
+      "type": "kernel",
+      "priority": 4,
+      "name": "Migrate UPSCALE op",
+      "description": "Implement upscale kernels (nearest, bilinear, bicubic). No existing SYCL stub.",
+      "kernel_ids": ["ck_116", "ck_117", "ck_118", "ck_119"],
+      "cuda_ref": "ggml/src/ggml-cuda/upscale.cu",
+      "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "ops": ["GGML_OP_UPSCALE"],
+      "steps": [
+        "Read CUDA upscale.cu: 4 kernel variants (nearest, bilinear, bilinear_antialias, bicubic)",
+        "Implement SYCL upscale kernels",
+        "Wire UPSCALE into compute_forward and supports_op",
+        "Build and run unit test: -k UPSCALE",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_037",
+      "type": "kernel",
+      "priority": 4,
+      "name": "Migrate CONV_TRANSPOSE_1D op",
+      "description": "Fix CONV_TRANSPOSE_1D: supports_op returns true but compute_forward is TODO. Existing empty stub: conv.cpp.",
+      "kernel_ids": ["ck_019"],
+      "cuda_ref": "ggml/src/ggml-cuda/conv-transpose-1d.cu",
+      "sycl_target": "ggml/src/ggml-sycl/conv.cpp",
+      "ops": ["GGML_OP_CONV_TRANSPOSE_1D"],
+      "steps": [
+        "Read CUDA conv-transpose-1d.cu kernel logic",
+        "Implement SYCL conv_transpose_1d in conv.cpp",
+        "Fix compute_forward to call the implementation instead of just break",
+        "Build and run unit test: -k CONV_TRANSPOSE_1D",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_038",
+      "type": "kernel",
+      "priority": 5,
+      "name": "Migrate SSM_CONV op",
+      "description": "Implement Mamba SSM convolution kernels. Existing empty stub: ssm_conv.cpp.",
+      "kernel_ids": ["ck_103", "ck_104"],
+      "cuda_ref": "ggml/src/ggml-cuda/ssm-conv.cu",
+      "sycl_target": "ggml/src/ggml-sycl/ssm_conv.cpp",
+      "ops": ["GGML_OP_SSM_CONV"],
+      "steps": [
+        "Read CUDA ssm-conv.cu: two kernel variants (short and long token)",
+        "Implement SYCL SSM conv kernels in ssm_conv.cpp",
+        "Wire into compute_forward and supports_op",
+        "Build and run unit test: -k SSM_CONV",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_039",
+      "type": "kernel",
+      "priority": 5,
+      "name": "Migrate SSM_SCAN op",
+      "description": "Implement Mamba selective scan kernels. Complex: shared memory, sequential recurrence. No existing SYCL stub.",
+      "kernel_ids": ["ck_105", "ck_106"],
+      "cuda_ref": "ggml/src/ggml-cuda/ssm-scan.cu",
+      "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "ops": ["GGML_OP_SSM_SCAN"],
+      "steps": [
+        "Read CUDA ssm-scan.cu: two kernel variants (standard and grouped)",
+        "Implement SYCL selective scan using local memory for shared state",
+        "Wire into compute_forward and supports_op",
+        "Build and run unit test: -k SSM_SCAN",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_040",
+      "type": "kernel",
+      "priority": 5,
+      "name": "Migrate RWKV WKV6/WKV7 ops",
+      "description": "Implement WKV attention kernels. Complex: shared memory, warp shuffle. Existing empty stub: wkv.cpp.",
+      "kernel_ids": ["ck_120", "ck_121"],
+      "cuda_ref": "ggml/src/ggml-cuda/wkv.cu",
+      "sycl_target": "ggml/src/ggml-sycl/wkv.cpp",
+      "ops": ["GGML_OP_RWKV_WKV6", "GGML_OP_RWKV_WKV7"],
+      "steps": [
+        "Read CUDA wkv.cu: rwkv_wkv_f32 (v6) and rwkv_wkv7_f32 kernels",
+        "Implement SYCL WKV kernels using local memory and sub_group",
+        "Wire RWKV_WKV6 and RWKV_WKV7 into compute_forward and supports_op",
+        "Build and run unit tests: -k RWKV_WKV6, -k RWKV_WKV7",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_041",
+      "type": "kernel",
+      "priority": 5,
+      "name": "Migrate GATED_LINEAR_ATTN op",
+      "description": "Implement GLA kernel. Complex: shared memory, warp shuffle. Existing empty stub: gla.cpp.",
+      "kernel_ids": ["ck_064"],
+      "cuda_ref": "ggml/src/ggml-cuda/gla.cu",
+      "sycl_target": "ggml/src/ggml-sycl/gla.cpp",
+      "ops": ["GGML_OP_GATED_LINEAR_ATTN"],
+      "steps": [
+        "Read CUDA gla.cu kernel logic",
+        "Implement SYCL GLA kernel using local memory and sub_group",
+        "Wire into compute_forward and supports_op",
+        "Build and run unit test: -k GATED_LINEAR_ATTN",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_042",
+      "type": "kernel",
+      "priority": 5,
+      "name": "Migrate CROSS_ENTROPY_LOSS ops",
+      "description": "Implement cross-entropy loss forward and backward. No existing SYCL stub.",
+      "kernel_ids": ["ck_046", "ck_047"],
+      "cuda_ref": "ggml/src/ggml-cuda/cross-entropy-loss.cu",
+      "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "ops": ["GGML_OP_CROSS_ENTROPY_LOSS", "GGML_OP_CROSS_ENTROPY_LOSS_BACK"],
+      "steps": [
+        "Read CUDA cross-entropy-loss.cu: forward and backward kernels",
+        "Implement SYCL versions using sub_group reduction and local memory",
+        "Wire into compute_forward and supports_op",
+        "Build and run unit test: -k CROSS_ENTROPY_LOSS",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_043",
+      "type": "kernel",
+      "priority": 5,
+      "name": "Migrate CUMSUM op",
+      "description": "Implement cumulative sum kernel. Complex: needs block-level scan (no CUB in SYCL). No existing SYCL stub.",
+      "kernel_ids": ["ck_048", "ck_049"],
+      "cuda_ref": "ggml/src/ggml-cuda/cumsum.cu",
+      "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "ops": ["GGML_OP_CUMSUM"],
+      "steps": [
+        "Read CUDA cumsum.cu: CUB-based and manual fallback variants",
+        "Implement SYCL prefix sum using work-group scan (sycl::joint_exclusive_scan or manual)",
+        "Wire into compute_forward and supports_op",
+        "Build and run unit test: -k CUMSUM",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_044",
+      "type": "kernel",
+      "priority": 5,
+      "name": "Migrate CONV_2D, CONV_2D_DW, CONV_TRANSPOSE_2D ops",
+      "description": "Implement 2D convolution kernels. Complex: shared memory, templates. Existing empty stub: conv.cpp.",
+      "kernel_ids": ["ck_016", "ck_017", "ck_018"],
+      "cuda_ref_1": "ggml/src/ggml-cuda/conv2d.cu",
+      "cuda_ref_2": "ggml/src/ggml-cuda/conv2d-dw.cu",
+      "cuda_ref_3": "ggml/src/ggml-cuda/conv2d-transpose.cu",
+      "sycl_target": "ggml/src/ggml-sycl/conv.cpp",
+      "ops": ["GGML_OP_CONV_2D", "GGML_OP_CONV_2D_DW", "GGML_OP_CONV_TRANSPOSE_2D"],
+      "steps": [
+        "Read CUDA conv2d.cu, conv2d-dw.cu, conv2d-transpose.cu kernels",
+        "Implement SYCL convolution kernels in conv.cpp using local memory",
+        "Wire CONV_2D, CONV_2D_DW, CONV_TRANSPOSE_2D into compute_forward and supports_op",
+        "Build and run unit tests: -k CONV_2D, -k CONV_2D_DW",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_045",
+      "type": "kernel",
+      "priority": 5,
+      "name": "Migrate SOLVE_TRI op",
+      "description": "Implement triangular solve kernel. Complex: shared memory tiling. No existing SYCL stub.",
+      "kernel_ids": ["ck_101", "ck_102"],
+      "cuda_ref": "ggml/src/ggml-cuda/solve_tri.cu",
+      "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "ops": ["GGML_OP_SOLVE_TRI"],
+      "steps": [
+        "Read CUDA solve_tri.cu: batch pointer setup + forward substitution kernel",
+        "Implement SYCL version using local memory tiling",
+        "Wire into compute_forward and supports_op",
+        "Build and run unit test: -k SOLVE_TRI",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_046",
+      "type": "kernel",
+      "priority": 5,
+      "name": "Migrate OPT_STEP_ADAMW and OPT_STEP_SGD ops",
+      "description": "Implement optimizer step kernels. Medium complexity. No existing SYCL stubs.",
+      "kernel_ids": ["ck_080", "ck_081"],
+      "cuda_ref_1": "ggml/src/ggml-cuda/opt-step-adamw.cu",
+      "cuda_ref_2": "ggml/src/ggml-cuda/opt-step-sgd.cu",
+      "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "ops": ["GGML_OP_OPT_STEP_ADAMW", "GGML_OP_OPT_STEP_SGD"],
+      "steps": [
+        "Read CUDA opt-step-adamw.cu and opt-step-sgd.cu",
+        "Implement SYCL versions using parallel_for",
+        "Wire into compute_forward and supports_op",
+        "Build and run unit tests: -k OPT_STEP_ADAMW, -k OPT_STEP_SGD",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_047",
+      "type": "kernel",
+      "priority": 5,
+      "name": "Migrate FLASH_ATTN_EXT op",
+      "description": "Implement flash attention. Most complex migration: multiple kernel variants (vec, tile, wmma, mma), stream-K, tensor cores. No existing SYCL stub. This is the highest-effort single task.",
+      "kernel_ids": ["ck_052", "ck_053", "ck_054", "ck_055", "ck_056", "ck_057", "ck_058"],
+      "cuda_ref": "ggml/src/ggml-cuda/fattn.cu",
+      "cuda_ref_headers": [
+        "ggml/src/ggml-cuda/fattn-common.cuh",
+        "ggml/src/ggml-cuda/fattn-vec.cuh",
+        "ggml/src/ggml-cuda/fattn-tile.cuh",
+        "ggml/src/ggml-cuda/fattn-wmma-f16.cu",
+        "ggml/src/ggml-cuda/fattn-mma-f16.cuh"
+      ],
+      "sycl_target": "ggml/src/ggml-sycl/fattn.cpp (new file)",
+      "ops": ["GGML_OP_FLASH_ATTN_EXT"],
+      "steps": [
+        "Study all CUDA fattn files: fattn-common.cuh, fattn-vec.cuh, fattn-tile.cuh, fattn-mma-f16.cuh, fattn-wmma-f16.cu",
+        "Start with fattn-vec (simplest variant: single-query, vectorized loads)",
+        "Implement SYCL flash_attn_ext_vec using sub_group and local memory",
+        "Implement combine_results and stream-K fixup helper kernels",
+        "Implement fattn-tile variant for multi-query batch inference",
+        "For MMA/WMMA variants: evaluate if Intel Xe2 has XMX (it does) and implement using joint_matrix or inline XMX",
+        "Wire FLASH_ATTN_EXT into compute_forward and supports_op",
+        "Build and run unit test: -k FLASH_ATTN_EXT",
+        "Performance benchmark: bash syclgen/benchmark_workload.sh",
+        "Update syclgen/progress.txt"
+      ]
+    },
+    {
+      "id": "task_048",
+      "type": "integration",
+      "priority": 6,
+      "name": "Full model inference integration test",
+      "description": "Run a complete Llama model inference on b60 using the SYCL backend with all migrated ops. Verify correctness against CPU backend.",
+      "kernel_ids": [],
+      "steps": [
+        "Build full llama.cpp with GGML_SYCL=ON",
+        "Run llama-cli with a small quantized model (e.g., TinyLlama Q4_0) on SYCL backend",
+        "Compare output with CPU backend for same prompt/seed",
+        "Run full backend-ops test suite: bash syclgen/remote_run.sh -s b60 -t unit -e ZES_ENABLE_SYSMAN=1",
+        "Run benchmark workload: bash syclgen/benchmark_workload.sh",
+        "Document results in syclgen/progress.txt",
+        "Create final migration report"
+      ]
+    }
+  ]
+}
