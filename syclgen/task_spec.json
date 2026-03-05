@@ -1182,13 +1182,15 @@
       "priority": 5,
       "name": "Migrate SOLVE_TRI op",
       "description": "Implement triangular solve kernel. Complex: shared memory tiling. No existing SYCL stub.",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-03-05T23:59:30Z",
+      "notes": "Implemented solve_tri.cpp (236 lines) with forward-substitution kernel for lower-triangular solve A*X=B. Uses shared memory for A when n<=128 (64KB limit), global memory fallback for larger n. Work-group per (batch, col) pair, cooperative forward substitution with warp-level reduction. Block size adaptive: 16-256 based on n. Uses fast_div_modulo for batch index decomposition. Wired into compute_forward and supports_op (F32 + contiguous check). SOLVE_TRI: 24/24 tests passed. SCALE regression: 4/4 passed.",
       "kernel_ids": [
         "ck_101",
         "ck_102"
       ],
       "cuda_ref": "ggml/src/ggml-cuda/solve_tri.cu",
-      "sycl_target": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "sycl_target": "ggml/src/ggml-sycl/solve_tri.cpp",
       "ops": [
         "GGML_OP_SOLVE_TRI"
       ],

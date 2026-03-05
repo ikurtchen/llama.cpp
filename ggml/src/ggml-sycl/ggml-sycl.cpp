@@ -72,6 +72,7 @@
 #include "ggml-sycl/gla.hpp"
 #include "ggml-sycl/cross-entropy-loss.hpp"
 #include "ggml-sycl/cumsum.hpp"
+#include "ggml-sycl/solve_tri.hpp"
 #include "ggml.h"
 
 static bool g_sycl_loaded = false;
@@ -4527,7 +4528,7 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             // TODO implement opt step sgd kernel
             break;
         case GGML_OP_SOLVE_TRI:
-            // TODO implement solve tri kernel
+            ggml_sycl_op_solve_tri(ctx, dst);
             break;
         case GGML_OP_FILL:
             ggml_sycl_op_fill(ctx, dst);
@@ -5245,6 +5246,11 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
                    ggml_is_contiguous(op->src[2]);
         case GGML_OP_CUMSUM:
             return op->src[0]->type == GGML_TYPE_F32;
+        case GGML_OP_SOLVE_TRI:
+            return op->src[0]->type == GGML_TYPE_F32 &&
+                   op->src[1]->type == GGML_TYPE_F32 &&
+                   ggml_is_contiguous(op->src[0]) &&
+                   ggml_is_contiguous(op->src[1]);
         default:
             return false;
     }

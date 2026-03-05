@@ -62,7 +62,7 @@ Migration tasks created: 48 (2 infrastructure + 39 kernel + 1 integration)
 | task_042  | 5        | kernel         | CROSS_ENTROPY_LOSS                      | pending |
 | task_043  | 5        | kernel         | CUMSUM                                  | pending |
 | task_044  | 5        | kernel         | CONV_2D, CONV_2D_DW, CONV_TRANSPOSE_2D | pending |
-| task_045  | 5        | kernel         | SOLVE_TRI                               | pending |
+| task_045  | 5        | kernel         | SOLVE_TRI                               | DONE    |
 | task_046  | 5        | kernel         | OPT_STEP_ADAMW, OPT_STEP_SGD           | pending |
 | task_047  | 5        | kernel         | FLASH_ATTN_EXT                          | pending |
 | task_048  | 6        | integration    | Full model inference test               | pending |
@@ -1819,3 +1819,43 @@ Created new files:
 **Issues:** None — clean first-attempt pass for all three kernels.
 **Next task:** task_045 (SOLVE_TRI) or task_046 (OPT_STEP_ADAMW/SGD)
 **Completion:** 44/48 tasks completed (task_047 abandoned)
+
+---
+
+## Session 45 — task_045: Migrate SOLVE_TRI op (2026-03-05)
+**Date:** 2026-03-05
+**Task:** Verify and complete SOLVE_TRI (triangular solve) kernel migration
+**CUDA ref:** `ggml/src/ggml-cuda/solve_tri.cu`
+**Status:** COMPLETED
+
+### Context
+Task was left as `in_progress` from a previous session — implementation existed but was never tested or committed. This session verified the implementation and completed the task.
+
+### Implementation (done by prior session):
+1. **Created `ggml/src/ggml-sycl/solve_tri.cpp`** (236 lines):
+   - `solve_tri_f32_kernel` — forward-substitution kernel for lower-triangular solve A*X=B
+   - One work-group per (batch, column) pair
+   - Shared memory for A matrix when n <= MAX_N_SHARED (128), global memory fallback for larger n
+   - Cooperative forward substitution: rows processed sequentially (data dependency), dot product within each row parallelized across threads
+   - Intra-sub-group reduction via `warp_reduce_sum`, inter-sub-group reduction via shared `reduce_buf`
+   - B column loaded into shared memory `sX[n]`, result written back strided
+   - Block size adaptive: WARP_SIZE (16) for small n, up to 256 for large n
+   - Uses `fast_div_modulo` for batch index decomposition from flat work-group ID
+
+2. **Created `ggml/src/ggml-sycl/solve_tri.hpp`** — header declaring `ggml_sycl_op_solve_tri`
+
+3. **Wired into `ggml-sycl.cpp`:**
+   - Added `#include "ggml-sycl/solve_tri.hpp"` (line 75)
+   - compute_forward: GGML_OP_SOLVE_TRI → `ggml_sycl_op_solve_tri(ctx, dst)`
+   - supports_op: F32 types + contiguous check for both src0 and src1
+
+**Build:** Compiles cleanly on b60 (icpx 2025.1.1, GGML_SYCL=ON, GGML_SYCL_F16=ON)
+**Tests:**
+| Op | Result | Tests |
+|---|---|---|
+| SOLVE_TRI (f32, n=10..128, various k, batch sizes) | PASS | 24/24 |
+
+**Regression:** SCALE: 4/4 tests pass — no regressions
+**Issues:** None.
+**Next task:** task_046 (OPT_STEP_ADAMW/SGD) — optimizer step kernels
+**Completion:** 45/48 tasks completed (task_047 abandoned)
