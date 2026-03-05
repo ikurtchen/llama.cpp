@@ -3118,6 +3118,38 @@ catch (sycl::exception const &exc) {
   std::exit(1);
 }
 
+static void ggml_sycl_op_scale(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
+    const ggml_tensor * src0 = dst->src[0];
+    const float * src0_d = (const float *)src0->data;
+    float * dst_d = (float *)dst->data;
+    sycl::queue & stream = *(ctx.stream());
+
+    GGML_ASSERT(src0->type == GGML_TYPE_F32);
+    GGML_ASSERT( dst->type == GGML_TYPE_F32);
+
+    float scale;
+    float bias;
+    memcpy(&scale, (float *) dst->op_params + 0, sizeof(float));
+    memcpy(&bias,  (float *) dst->op_params + 1, sizeof(float));
+
+    const int64_t nelements = ggml_nelements(src0);
+    const int block_size = 256;
+    const int64_t num_blocks = (nelements + block_size - 1) / block_size;
+    const int64_t max_blocks = 0x7FFFFFFF;
+    const int64_t grid_size = std::min(max_blocks, num_blocks);
+
+    stream.parallel_for(
+        sycl::nd_range<1>(grid_size * block_size, block_size),
+        [=](sycl::nd_item<1> item) {
+            int64_t tid = item.get_global_id(0);
+            int64_t stride = item.get_global_range(0);
+            for (int64_t i = tid; i < nelements; i += stride) {
+                dst_d[i] = scale * src0_d[i] + bias;
+            }
+        }
+    );
+}
+
 static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct ggml_tensor * dst) try {
     if (!g_sycl_loaded) return false;
 
@@ -3296,7 +3328,7 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             ggml_sycl_op_out_prod(ctx, dst);
             break;
         case GGML_OP_SCALE:
-            // TODO implement scale kernel
+            ggml_sycl_op_scale(ctx, dst);
             break;
         case GGML_OP_SQR:
             // TODO implement sqr kernel
@@ -3982,7 +4014,7 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_RMS_NORM_BACK:
             return false;
         case GGML_OP_SCALE:
-            return false;
+            return true;
         case GGML_OP_CONT:
             return false;
         case GGML_OP_TRI:

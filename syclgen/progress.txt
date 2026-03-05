@@ -151,3 +151,26 @@ clamp, arange, upscale (require specialized parameters beyond the template)
 **Issues:** None
 **Next task:** task_003 (Migrate SCALE) — simplest kernel, good first op wiring test
 **Completion:** 2/48 tasks completed
+
+### Session 3 — 2026-03-05: task_003 (Migrate SCALE op)
+
+**Completed:** task_003 — SCALE kernel migration
+**What was done:**
+
+1. Implemented `ggml_sycl_op_scale` in `ggml/src/ggml-sycl/ggml-sycl.cpp` (lines 3121-3151):
+   - Gets src0/dst data pointers as float*
+   - Extracts scale and bias from `dst->op_params` via memcpy
+   - Asserts both types are GGML_TYPE_F32
+   - Launches SYCL parallel_for with nd_range (block_size=256, grid-stride loop)
+   - Kernel: `dst[i] = scale * src0[i] + bias`
+
+2. Wired into compute_forward switch: `case GGML_OP_SCALE -> ggml_sycl_op_scale(ctx, dst)`
+
+3. Enabled in supports_op: `GGML_OP_SCALE` now returns `true`
+
+**Build:** Compiles cleanly on b60 (icpx 2025.1.1, GGML_SYCL=ON, GGML_SYCL_F16=ON)
+**Tests:** SCALE: 4/4 passed (f32, various ne shapes, scale=2.0, bias=0.0 and 1.0, inplace variants)
+**Regression:** MUL_MAT 729/729 tests pass — no regressions
+**Issues:** None. One minor unused variable warning at ggml-sycl.cpp:3866 (pre-existing).
+**Next task:** task_004 (Migrate DIAG_MASK_INF) or task_005 (Migrate unary ops)
+**Completion:** 3/48 tasks completed
