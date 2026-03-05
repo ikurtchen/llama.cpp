@@ -440,3 +440,27 @@ intentionally deferred — the scalar kernel handles all cases correctly.
 **Issues:** None.
 **Next task:** task_011 (ARANGE) or task_012 (CLAMP)
 **Completion:** 10/48 tasks completed
+
+### Session 11 — 2026-03-05: task_011 (Migrate ARANGE op)
+
+**Completed:** task_011 — ARANGE kernel migration
+**What was done:**
+
+1. **Implemented `ggml_sycl_op_arange`** in `ggml/src/ggml-sycl/ggml-sycl.cpp` (lines 3194-3222):
+   - Gets `dst->data` as float pointer and SYCL queue from context
+   - Asserts `dst->type == GGML_TYPE_F32`
+   - Extracts `start`, `stop`, `step` from `dst->op_params` via memcpy
+   - Validates `ggml_nelements(dst) == ceil((stop - start) / step)`
+   - Launches `parallel_for` with `nd_range<1>`, block_size=256
+   - Kernel: `dst[nidx] = start + step * nidx` with bounds check
+
+2. **Wired into compute_forward:** `case GGML_OP_ARANGE -> ggml_sycl_op_arange(ctx, dst)`
+
+3. **Wired into supports_op:** `case GGML_OP_ARANGE -> return op->type == GGML_TYPE_F32`
+
+**Build:** Compiles cleanly on b60 (icpx 2025.1.1, GGML_SYCL=ON, GGML_SYCL_F16=ON)
+**Tests:** ARANGE: 2/2 passed
+**Regression:** SCALE: 4/4 tests pass — no regressions
+**Issues:** None.
+**Next task:** task_012 (CLAMP) or task_013 (PAD)
+**Completion:** 11/48 tasks completed

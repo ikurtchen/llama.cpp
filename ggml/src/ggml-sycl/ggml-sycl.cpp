@@ -3191,6 +3191,36 @@ static void ggml_sycl_op_diag_mask_inf(ggml_backend_sycl_context & ctx, ggml_ten
     );
 }
 
+static void ggml_sycl_op_arange(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
+    float * dst_d = (float *)dst->data;
+    sycl::queue & stream = *(ctx.stream());
+
+    GGML_ASSERT(dst->type == GGML_TYPE_F32);
+
+    float start, stop, step;
+    memcpy(&start, (float *)dst->op_params + 0, sizeof(float));
+    memcpy(&stop,  (float *)dst->op_params + 1, sizeof(float));
+    memcpy(&step,  (float *)dst->op_params + 2, sizeof(float));
+
+    int64_t steps = (int64_t)std::ceil((stop - start) / step);
+    GGML_ASSERT(ggml_nelements(dst) == steps);
+
+    const int ne0 = (int)dst->ne[0];
+    const int block_size = 256;
+    const int num_blocks = (ne0 + block_size - 1) / block_size;
+
+    stream.parallel_for(
+        sycl::nd_range<1>(num_blocks * block_size, block_size),
+        [=](sycl::nd_item<1> item) {
+            const int nidx = item.get_global_id(0);
+            if (nidx >= ne0) {
+                return;
+            }
+            dst_d[nidx] = start + step * nidx;
+        }
+    );
+}
+
 static void ggml_sycl_op_fill(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
     void * dst_d = dst->data;
     sycl::queue & stream = *(ctx.stream());
@@ -3532,7 +3562,7 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             // TODO implement roll kernel
             break;
         case GGML_OP_ARANGE:
-            // TODO implement arange kernel
+            ggml_sycl_op_arange(ctx, dst);
             break;
         case GGML_OP_CONV_2D:
             // TODO implement conv2d kernel
@@ -4217,7 +4247,7 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_ROLL:
             return false;
         case GGML_OP_ARANGE:
-            return false;
+            return op->type == GGML_TYPE_F32;
         case GGML_OP_FILL:
             return ggml_is_contiguous(op);
         default:
