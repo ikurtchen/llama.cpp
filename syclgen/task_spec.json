@@ -792,7 +792,9 @@
       "priority": 4,
       "name": "Migrate ARGMAX op",
       "description": "Implement argmax kernel. Requires warp reduction. No existing SYCL stub.",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-03-05",
+      "notes": "Implemented ggml_sycl_op_argmax in ggml-sycl.cpp. Custom (value, index) pair reduction via sub-group shuffles + local memory for cross-warp reduction. Block_size=256, one work-group per row. supports_op checks F32 src and ggml_is_contiguous. ARGMAX: 7/7 tests passed. SCALE regression: 4/4 passed.",
       "kernel_ids": [
         "ck_004"
       ],

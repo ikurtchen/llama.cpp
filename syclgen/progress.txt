@@ -1114,3 +1114,39 @@ Implemented SYCL ROPE (Rotary Position Embedding) kernels — all 4 variants (no
 **Issues:** None.
 **Next task:** task_030 (ARGMAX)
 **Completion:** 29/48 tasks completed
+
+---
+
+## Session 30 — task_030: Migrate ARGMAX op
+
+**Date:** 2026-03-05
+**Task:** Implement argmax kernel — find index of maximum value per row.
+**CUDA ref:** `ggml/src/ggml-cuda/argmax.cu`
+
+### Implementation
+
+1. **ggml_sycl_op_argmax** added inline to `ggml-sycl.cpp` (~90 lines):
+   - One work-group per row, block_size = 256 (capped and rounded to WARP_SIZE multiples)
+   - Per-thread strided scan: each thread finds local max value + index across its columns
+   - Intra-warp (value, index) pair reduction via `sycl::permute_group_by_xor` — tracks both maxval and argmax simultaneously
+   - Cross-warp reduction via local memory: `shared_maxval[max_warps]` + `shared_argmax[max_warps]`
+   - Lane 0 of each warp writes partial, first warp reads all partials and reduces again
+   - Final result written by warp 0, lane 0: `dst[row] = argmax`
+
+2. **Wired into `ggml-sycl.cpp`:**
+   - compute_forward: GGML_OP_ARGMAX → `ggml_sycl_op_argmax(ctx, dst)` (replaced TODO stub)
+   - supports_op: returns `src0->type == GGML_TYPE_F32 && ggml_is_contiguous(src0)`
+
+### Notes
+- Cannot use existing `block_reduce<MAX>` because it only tracks the scalar max value, not the (value, index) pair needed for argmax. Custom reduction was necessary.
+
+**Build:** Compiles cleanly on b60 (icpx 2025.1.1, GGML_SYCL=ON, GGML_SYCL_F16=ON)
+**Tests:**
+| Op | Result | Tests |
+|---|---|---|
+| ARGMAX (ne=[32..5438], various nrows) | PASS | 7/7 |
+
+**Regression:** SCALE: 4/4 tests pass — no regressions
+**Issues:** None.
+**Next task:** task_031 (COUNT_EQUAL)
+**Completion:** 30/48 tasks completed
