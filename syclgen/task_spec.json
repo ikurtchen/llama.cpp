@@ -36,7 +36,9 @@
       "priority": 2,
       "name": "Create SYCL helper utilities and common patterns",
       "description": "Establish common SYCL warp-reduction helpers, sub-group shuffle wrappers, and element-wise kernel dispatch templates in common.hpp/common.cpp that will be reused across all migrated kernels. Warp size = 16 for Intel.",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-03-05T16:30:00Z",
+      "notes": "Added block_reduce framework (SUM/MAX) to common.hpp (lines 505-624). Added unary kernel dispatch templates (unary_op_kernel, unary_sycl, ggml_sycl_op_unary) and gated variants to element_wise.cpp. Implemented 24 activation functions and 30 concrete wrapper functions. Build succeeds on b60 with icpx. MUL_MAT 729/729 regression test passes.",
       "kernel_ids": [],
       "steps": [
         "Audit ggml/src/ggml-sycl/common.hpp for existing sub_group reduction helpers",

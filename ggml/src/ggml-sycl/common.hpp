@@ -502,6 +502,127 @@ static __dpct_inline__ float warp_reduce_max(float x,
     return x;
 }
 
+// --------------------------------------------------------------------------
+// Block-level reduction framework
+// Mirrors the CUDA block_reduce pattern from ggml-cuda/common.cuh.
+// Uses the template warp_reduce_sum / warp_reduce_max (no nd_item param)
+// for the intra-warp pass, then shared local memory for inter-warp exchange.
+// --------------------------------------------------------------------------
+
+enum class block_reduce_method {
+    MAX,
+    SUM,
+};
+
+template <typename T, typename... Ts>
+inline constexpr bool is_any_of = (std::is_same_v<T, Ts> || ...);
+
+template <typename...>
+inline constexpr bool ggml_sycl_dependent_false_v = false;
+
+template <block_reduce_method method_t, typename T>
+struct block_reduce_policy;
+
+template <typename T>
+struct block_reduce_policy<block_reduce_method::SUM, T> {
+    static T reduce(T val) {
+        if constexpr (is_any_of<T, float, sycl::float2, sycl::half2, int>) {
+            return warp_reduce_sum(val);
+        } else {
+            static_assert(ggml_sycl_dependent_false_v<T>,
+                          "Unsupported type for block reduce sum");
+        }
+    }
+
+    static T sentinel() {
+        if constexpr (std::is_same_v<T, float>) {
+            return 0.0f;
+        } else if constexpr (std::is_same_v<T, sycl::float2>) {
+            return sycl::float2(0.0f, 0.0f);
+        } else if constexpr (std::is_same_v<T, sycl::half2>) {
+            return sycl::half2(sycl::half(0.0f), sycl::half(0.0f));
+        } else if constexpr (std::is_same_v<T, int>) {
+            return 0;
+        } else {
+            static_assert(ggml_sycl_dependent_false_v<T>,
+                          "Unsupported type for block reduce sum sentinel");
+        }
+    }
+};
+
+template <typename T>
+struct block_reduce_policy<block_reduce_method::MAX, T> {
+    static T reduce(T val) {
+        if constexpr (is_any_of<T, float>) {
+            return warp_reduce_max(val);
+        } else {
+            static_assert(ggml_sycl_dependent_false_v<T>,
+                          "Unsupported type for block reduce max");
+        }
+    }
+
+    static T sentinel() {
+        if constexpr (std::is_same_v<T, float>) {
+            return -INFINITY;
+        } else {
+            static_assert(ggml_sycl_dependent_false_v<T>,
+                          "Unsupported type for block reduce max sentinel");
+        }
+    }
+};
+
+// block_reduce: two-pass reduction across all work-items in a work-group.
+//   1. Intra-warp (sub-group) reduction via warp_reduce_sum / warp_reduce_max.
+//   2. Inter-warp reduction through local (shared) memory.
+//
+// Template parameters:
+//   reduce_method_t  - block_reduce_method::SUM or block_reduce_method::MAX
+//   block_size_t     - compile-time block size (0 = use runtime value)
+//   ItemT            - nd_item type (nd_item<1> or nd_item<3>)
+//   T                - value type
+//
+// Parameters:
+//   val         - per-work-item value to reduce
+//   shared_vals - pointer into local memory with at least
+//                 (block_size / WARP_SIZE) elements of type T
+//   item        - sycl::nd_item used for local id and barrier
+//
+// Returns the fully reduced value (valid in work-item 0 / lane 0 of
+// each work-group; other work-items get an unspecified value).
+template <block_reduce_method reduce_method_t, unsigned int block_size_t = 0,
+          typename ItemT, typename T>
+static T block_reduce(T val, T * shared_vals, const ItemT & item) {
+    // Intra-warp reduction (uses this_work_item sub-group, no item needed)
+    val = block_reduce_policy<reduce_method_t, T>::reduce(val);
+
+    const unsigned int block_size =
+        block_size_t == 0 ? static_cast<unsigned int>(item.get_local_range(0))
+                          : block_size_t;
+
+    if (block_size > WARP_SIZE) {
+        assert((block_size <= 1024) && (block_size % WARP_SIZE) == 0);
+
+        const int local_id = static_cast<int>(item.get_local_id(0));
+        const int warp_id  = local_id / WARP_SIZE;
+        const int lane_id  = local_id % WARP_SIZE;
+
+        // Lane 0 of each warp writes its partial result
+        if (lane_id == 0) {
+            shared_vals[warp_id] = val;
+        }
+        item.barrier(sycl::access::fence_space::local_space);
+
+        // First warp reads all partial results and reduces again
+        val = block_reduce_policy<reduce_method_t, T>::sentinel();
+        if (lane_id < static_cast<int>(block_size / WARP_SIZE)) {
+            val = shared_vals[lane_id];
+        }
+        return block_reduce_policy<reduce_method_t, T>::reduce(val);
+    }
+
+    return val;
+}
+
 /* Helper for Computing the linear offset of a ggml_tensor given
 per-dimension sizes, strides, and indices */
 template<int N>

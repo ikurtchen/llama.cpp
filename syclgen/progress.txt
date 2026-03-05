@@ -107,3 +107,47 @@ List ops:  bash syclgen/remote_run.sh -s b60 -t unit --list-ops -e ZES_ENABLE_SY
 **Issues:** None — baseline is clean.
 **Next task:** task_002 (Create SYCL helper utilities) or task_003 (Migrate SCALE)
 **Completion:** 1/48 tasks completed
+
+### Session 2 — 2026-03-05: task_002 (Create SYCL helper utilities)
+
+**Completed:** task_002 — SYCL helper utilities and common patterns
+**What was done:**
+
+1. **Block-level reduction framework** added to `common.hpp` (lines 505-624):
+   - `enum class block_reduce_method { SUM, MAX }`
+   - `block_reduce_policy<method, T>` specializations with reduce() and sentinel()
+   - `block_reduce<method, block_size, ItemT, T>(val, shared_vals, item)` — two-pass:
+     intra-warp via template warp_reduce, inter-warp via local memory + barrier
+   - Works with both `nd_item<1>` and `nd_item<3>`
+   - Supports float, float2, half2, int for SUM; float for MAX
+
+2. **Unary kernel dispatch templates** added to `element_wise.cpp` (lines 72-120):
+   - `unary_op_kernel<op, T>` — generic per-element kernel using nd_item<1>
+   - `unary_sycl<op, T>` — launch wrapper with 256 work-group size
+   - `ggml_sycl_op_unary<op>` — host dispatch with F16/F32 branching
+
+3. **24 activation device functions** (lines 11-70):
+   - op_abs, op_sgn, op_neg, op_step, op_gelu, op_gelu_erf, op_gelu_quick,
+     op_silu, op_tanh, op_relu, op_sigmoid, op_hardsigmoid, op_hardswish,
+     op_exp, op_sqr, op_sqrt, op_sin, op_cos, op_log, op_expm1, op_softplus,
+     op_elu, op_floor, op_ceil, op_round, op_trunc
+
+4. **Gated kernel dispatch templates** (lines 122-215):
+   - `unary_gated_op_kernel<op, T>` — with stride-based offset indexing
+   - `unary_gated_sycl<op, T>` — launch wrapper
+   - `ggml_sycl_op_unary_gated<op>` — host dispatch with swap support
+
+5. **30 concrete wrapper functions** (lines 222-342):
+   - 25 unary: abs, sgn, neg, step, gelu, gelu_erf, gelu_quick, silu, tanh,
+     relu, sigmoid, hardsigmoid, hardswish, exp, sqr, sqrt, sin, cos, log,
+     softplus, elu, floor, ceil, round, trunc
+   - 5 gated: geglu, reglu, swiglu, geglu_erf, geglu_quick
+
+**Deferred to later tasks:** leaky_relu, swiglu_oai, xielu, silu_back, acc,
+clamp, arange, upscale (require specialized parameters beyond the template)
+
+**Build:** Compiles cleanly with icpx on b60 (GGML_SYCL=ON, GGML_SYCL_F16=ON)
+**Regression:** MUL_MAT 729/729 tests pass — no regressions
+**Issues:** None
+**Next task:** task_003 (Migrate SCALE) — simplest kernel, good first op wiring test
+**Completion:** 2/48 tasks completed
