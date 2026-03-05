@@ -3221,6 +3221,54 @@ static void ggml_sycl_op_arange(ggml_backend_sycl_context & ctx, ggml_tensor * d
     );
 }
 
+static void ggml_sycl_op_clamp(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
+    const ggml_tensor * src0 = dst->src[0];
+    const void * src0_d = src0->data;
+    void * dst_d = dst->data;
+    sycl::queue & stream = *(ctx.stream());
+
+    GGML_ASSERT(src0->type == GGML_TYPE_F32 || src0->type == GGML_TYPE_F16);
+    GGML_ASSERT(dst->type == GGML_TYPE_F32 || dst->type == GGML_TYPE_F16);
+    GGML_ASSERT(src0->type == dst->type);
+
+    float min_val;
+    float max_val;
+    memcpy(&min_val, dst->op_params, sizeof(float));
+    memcpy(&max_val, (float *)dst->op_params + 1, sizeof(float));
+
+    const int64_t k = ggml_nelements(src0);
+    const int block_size = 256;
+    const int num_blocks = (k + block_size - 1) / block_size;
+
+    if (src0->type == GGML_TYPE_F16) {
+        const sycl::half * src_f16 = (const sycl::half *)src0_d;
+        sycl::half * dst_f16 = (sycl::half *)dst_d;
+        sycl::half min_h = static_cast<sycl::half>(min_val);
+        sycl::half max_h = static_cast<sycl::half>(max_val);
+        stream.parallel_for(
+            sycl::nd_range<1>(num_blocks * block_size, block_size),
+            [=](sycl::nd_item<1> item) {
+                const int i = item.get_global_id(0);
+                if (i >= k) return;
+                float x = static_cast<float>(src_f16[i]);
+                x = sycl::fmin(sycl::fmax(x, static_cast<float>(min_h)), static_cast<float>(max_h));
+                dst_f16[i] = static_cast<sycl::half>(x);
+            }
+        );
+    } else {
+        const float * src_f32 = (const float *)src0_d;
+        float * dst_f32 = (float *)dst_d;
+        stream.parallel_for(
+            sycl::nd_range<1>(num_blocks * block_size, block_size),
+            [=](sycl::nd_item<1> item) {
+                const int i = item.get_global_id(0);
+                if (i >= k) return;
+                dst_f32[i] = sycl::fmin(sycl::fmax(src_f32[i], min_val), max_val);
+            }
+        );
+    }
+}
+
 static void ggml_sycl_op_fill(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
     void * dst_d = dst->data;
     sycl::queue & stream = *(ctx.stream());
@@ -3492,7 +3540,7 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             ggml_sycl_cos(ctx, dst);
             break;
         case GGML_OP_CLAMP:
-            // TODO implement clamp kernel
+            ggml_sycl_op_clamp(ctx, dst);
             break;
         case GGML_OP_CPY:
             ggml_sycl_cpy(ctx, dst->src[0], dst->src[1]);
@@ -4183,7 +4231,7 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_COS:
             return true;
         case GGML_OP_CLAMP:
-            return false;
+            return op->src[0]->type == GGML_TYPE_F32 || op->src[0]->type == GGML_TYPE_F16;
         case GGML_OP_LOG:
             return true;
         case GGML_OP_NORM:

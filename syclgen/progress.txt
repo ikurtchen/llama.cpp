@@ -29,7 +29,7 @@ Migration tasks created: 48 (2 infrastructure + 39 kernel + 1 integration)
 | task_009  | 3        | kernel         | CPY/DUP/CONT                            | pending |
 | task_010  | 3        | kernel         | FILL                                    | DONE    |
 | task_011  | 3        | kernel         | ARANGE                                  | pending |
-| task_012  | 3        | kernel         | CLAMP                                   | pending |
+| task_012  | 3        | kernel         | CLAMP                                   | DONE    |
 | task_013  | 3        | kernel         | PAD                                     | pending |
 | task_014  | 3        | kernel         | ACC                                     | pending |
 | task_015  | 3        | kernel         | ADD_ID                                  | pending |
@@ -464,3 +464,27 @@ intentionally deferred — the scalar kernel handles all cases correctly.
 **Issues:** None.
 **Next task:** task_012 (CLAMP) or task_013 (PAD)
 **Completion:** 11/48 tasks completed
+
+### Session 12 — 2026-03-05: task_012 (Migrate CLAMP op)
+
+**Completed:** task_012 — CLAMP kernel migration
+**What was done:**
+
+1. **Implemented `ggml_sycl_op_clamp`** in `ggml/src/ggml-sycl/ggml-sycl.cpp` (lines 3224-3270):
+   - Gets src0/dst data pointers and SYCL queue from context
+   - Asserts both types are F32 or F16, and types match
+   - Extracts min_val and max_val from `dst->op_params` via memcpy
+   - Uses `parallel_for` with `nd_range<1>`, block_size=256
+   - F32 path: `dst[i] = sycl::fmin(sycl::fmax(src[i], min_val), max_val)`
+   - F16 path: casts to float for clamp, casts back to sycl::half
+
+2. **Wired into compute_forward:** `case GGML_OP_CLAMP -> ggml_sycl_op_clamp(ctx, dst)`
+
+3. **Wired into supports_op:** `case GGML_OP_CLAMP -> return op->src[0]->type == F32 || F16`
+
+**Build:** Compiles cleanly on b60 (icpx 2025.1.1, GGML_SYCL=ON, GGML_SYCL_F16=ON)
+**Tests:** CLAMP: 6/6 passed (f16 and f32, various ne shapes)
+**Regression:** SCALE: 4/4 tests pass — no regressions
+**Issues:** None.
+**Next task:** task_013 (PAD) or task_014 (ACC)
+**Completion:** 12/48 tasks completed
