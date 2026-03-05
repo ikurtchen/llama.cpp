@@ -1368,3 +1368,61 @@ Implemented SYCL ROPE (Rotary Position Embedding) kernels — all 4 variants (no
 **Issues:** None.
 **Next task:** task_036 (UPSCALE) or next pending priority-4 task
 **Completion:** 35/48 tasks completed
+
+---
+
+## Session 36 — task_036: Migrate UPSCALE op (2026-03-05)
+
+### Changes
+1. **Implemented `ggml_sycl_op_upscale` inline in `ggml/src/ggml-sycl/ggml-sycl.cpp` (lines 3945-4192):**
+   Four kernel variants ported from CUDA `upscale.cu`:
+
+   **Nearest (`GGML_SCALE_MODE_NEAREST`):**
+   - Maps each output pixel to nearest input pixel via integer division of index by scale factor
+   - Simple inverse mapping with floor semantics
+   - Uses 1D nd_range with grid-stride loop
+
+   **Bilinear (`GGML_SCALE_MODE_BILINEAR`):**
+   - Maps output position to fractional input position
+   - Samples 4 neighboring pixels (2×2 grid) with linear weights: `(1-dx)(1-dy)`, `dx(1-dy)`, `(1-dx)dy`, `dxdy`
+   - Clamps source coordinates to edge
+
+   **Bilinear + antialias (`GGML_SCALE_MODE_BILINEAR | GGML_SCALE_FLAG_ANTIALIAS`):**
+   - When downscaling, expands support window beyond 1 pixel
+   - Uses triangle (tent) filter over variable-size neighborhood
+   - Accumulates weighted pixel contributions and normalizes by total weight
+   - Matches PyTorch's `F.interpolate(antialias=True)`
+
+   **Bicubic (`GGML_SCALE_MODE_BICUBIC`):**
+   - Cubic Hermite spline convolution (alpha = -0.75, Keys/Catmull-Rom variant)
+   - Samples 4×4 grid of neighbors, applies separable cubic weights in x then y
+   - Clamps source coordinates to edge
+
+   All variants support `GGML_SCALE_FLAG_ALIGN_CORNERS` which recomputes scale factors and sets pixel_offset=0.
+
+2. **Wiring in `ggml-sycl.cpp`:**
+   - compute_forward: `GGML_OP_UPSCALE → ggml_sycl_op_upscale(ctx, dst)` (line 4359)
+   - supports_op: `GGML_OP_UPSCALE → return true` (line 5167, matching CUDA)
+
+### Design Notes
+- Uses `SYCL_UPSCALE_BLOCK_SIZE` (256) from presets.hpp
+- All tensor fields extracted to local variables before lambda capture — never dereferences ggml_tensor* on device
+- F32 input/output only, matching CUDA reference
+- No sub-group operations needed — pure element-wise kernels
+
+**Build:** Compiles cleanly on b60 (icpx 2025.1.1, GGML_SYCL=ON, GGML_SYCL_F16=ON)
+**Tests:**
+| Op | Result | Tests |
+|---|---|---|
+| UPSCALE (nearest, various ne/scale_factor, transpose 0/1) | PASS | 4/4 |
+| UPSCALE (bilinear, various shapes) | PASS | 4/4 |
+| UPSCALE (bicubic, various shapes) | PASS | 4/4 |
+| UPSCALE (bilinear+antialias) | PASS | 4/4 |
+| UPSCALE (bilinear+align_corners) | PASS | 3/3 |
+| UPSCALE (bicubic+align_corners) | PASS | 3/3 |
+| **Total UPSCALE** | **PASS** | **22/22** |
+
+**Regression:** SCALE: 4/4 tests pass — no regressions
+**Issues:** None.
+**Next task:** task_037 (CONV_TRANSPOSE_1D) or next pending priority-4 task
+**Completion:** 36/48 tasks completed

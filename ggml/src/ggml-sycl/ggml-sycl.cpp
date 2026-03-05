@@ -3939,6 +3939,258 @@ static void ggml_sycl_op_pool2d(ggml_backend_sycl_context & ctx, ggml_tensor * d
         });
 }
 
+// ============================================================
+// UPSCALE (nearest, bilinear, bilinear+antialias, bicubic)
+// ============================================================
+static void ggml_sycl_op_upscale(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
+    const ggml_tensor * src0 = dst->src[0];
+    const float * src0_d = (const float *)src0->data;
+    float * dst_d = (float *)dst->data;
+    sycl::queue & stream = *ctx.stream();
+
+    GGML_ASSERT(src0->type == GGML_TYPE_F32);
+    GGML_ASSERT( dst->type == GGML_TYPE_F32);
+
+    // Extract op_params on host
+    const int mode_flags = dst->op_params[0];
+    const ggml_scale_mode mode = (ggml_scale_mode)(mode_flags & 0xFF);
+
+    // Source dimensions / strides (extracted before lambda)
+    const int nb00 = (int)src0->nb[0];
+    const int nb01 = (int)src0->nb[1];
+    const int nb02 = (int)src0->nb[2];
+    const int nb03 = (int)src0->nb[3];
+    const int ne00_src = (int)src0->ne[0];
+    const int ne01_src = (int)src0->ne[1];
+
+    // Destination dimensions
+    const int ne10 = (int)dst->ne[0];
+    const int ne11 = (int)dst->ne[1];
+    const int ne12 = (int)dst->ne[2];
+    const int ne13 = (int)dst->ne[3];
+
+    // Scale factors
+    float sf0 = (float)dst->ne[0] / src0->ne[0];
+    float sf1 = (float)dst->ne[1] / src0->ne[1];
+    const float sf2 = (float)dst->ne[2] / src0->ne[2];
+    const float sf3 = (float)dst->ne[3] / src0->ne[3];
+
+    float pixel_offset = 0.5f;
+    if (mode_flags & GGML_SCALE_FLAG_ALIGN_CORNERS) {
+        sf0          = dst->ne[0] > 1 && src0->ne[0] > 1 ? (float)(dst->ne[0] - 1) / (src0->ne[0] - 1) : sf0;
+        sf1          = dst->ne[1] > 1 && src0->ne[1] > 1 ? (float)(dst->ne[1] - 1) / (src0->ne[1] - 1) : sf1;
+        pixel_offset = 0.0f;
+    }
+
+    const int64_t dst_total = (int64_t)ne10 * ne11 * ne12 * ne13;
+    const int block_size = SYCL_UPSCALE_BLOCK_SIZE;
+    const int num_blocks = (int)((dst_total + block_size - 1) / block_size);
+
+    if (mode == GGML_SCALE_MODE_NEAREST) {
+        // ---- Nearest-neighbor upscale ----
+        const float sf0_ = sf0, sf1_ = sf1, sf2_ = sf2, sf3_ = sf3;
+        stream.parallel_for(
+            sycl::nd_range<1>(num_blocks * block_size, block_size),
+            [=](sycl::nd_item<1> item) {
+                const int index = (int)item.get_global_id(0);
+                if (index >= ne10 * ne11 * ne12 * ne13) {
+                    return;
+                }
+
+                const int i10 = index % ne10;
+                const int i11 = (index / ne10) % ne11;
+                const int i12 = (index / (ne10 * ne11)) % ne12;
+                const int i13 = (index / (ne10 * ne11 * ne12)) % ne13;
+
+                const int i00 = (int)(i10 / sf0_);
+                const int i01 = (int)(i11 / sf1_);
+                const int i02 = (int)(i12 / sf2_);
+                const int i03 = (int)(i13 / sf3_);
+
+                dst_d[index] = *((const float *)((const char *)src0_d + i03 * nb03 + i02 * nb02 + i01 * nb01 + i00 * nb00));
+            });
+    } else if (mode == GGML_SCALE_MODE_BILINEAR) {
+        const bool antialias = (mode_flags & GGML_SCALE_FLAG_ANTIALIAS);
+        const float sf0_ = sf0, sf1_ = sf1, sf2_ = sf2, sf3_ = sf3;
+        const float poff = pixel_offset;
+
+        if (antialias) {
+            // ---- Bilinear with anti-aliasing ----
+            stream.parallel_for(
+                sycl::nd_range<1>(num_blocks * block_size, block_size),
+                [=](sycl::nd_item<1> item) {
+                    const int64_t index = (int64_t)item.get_global_id(0);
+                    const int64_t dst_total_elements = (int64_t)ne10 * ne11 * ne12 * ne13;
+                    if (index >= dst_total_elements) {
+                        return;
+                    }
+
+                    const int i10_dst = (int)(index % ne10);
+                    const int i11_dst = (int)((index / ne10) % ne11);
+                    const int i12_dst = (int)((index / ((int64_t)ne10 * ne11)) % ne12);
+                    const int i13_dst = (int)(index / ((int64_t)ne10 * ne11 * ne12));
+
+                    const int i02_src = (int)(i12_dst / sf2_);
+                    const int i03_src = (int)(i13_dst / sf3_);
+
+                    const float y = ((float)i11_dst + poff) / sf1_;
+                    const float x = ((float)i10_dst + poff) / sf0_;
+
+                    // support and invscale, minimum 1 pixel for bilinear
+                    const float support1  = sycl::fmax(1.0f / sf1_, 1.0f);
+                    const float invscale1 = 1.0f / support1;
+                    const float support0  = sycl::fmax(1.0f / sf0_, 1.0f);
+                    const float invscale0 = 1.0f / support0;
+
+                    // the range of source pixels that contribute
+                    const int64_t x_min = sycl::max((int64_t)0, (int64_t)(x - support0 + poff));
+                    const int64_t x_max = sycl::min((int64_t)ne00_src, (int64_t)(x + support0 + poff));
+                    const int64_t y_min = sycl::max((int64_t)0, (int64_t)(y - support1 + poff));
+                    const int64_t y_max = sycl::min((int64_t)ne01_src, (int64_t)(y + support1 + poff));
+
+                    float val = 0.0f;
+                    float total_weight = 0.0f;
+
+                    for (int64_t sy = y_min; sy < y_max; sy++) {
+                        const float wy_arg = (sy - y + poff) * invscale1;
+                        const float weight_y = sycl::fmax(1.0f - sycl::fabs(wy_arg), 0.0f);
+
+                        for (int64_t sx = x_min; sx < x_max; sx++) {
+                            const float wx_arg = (sx - x + poff) * invscale0;
+                            const float weight_x = sycl::fmax(1.0f - sycl::fabs(wx_arg), 0.0f);
+                            const float weight = weight_x * weight_y;
+
+                            if (weight <= 0.0f) {
+                                continue;
+                            }
+
+                            const float pixel = *(const float *)((const char *)src0_d +
+                                sx * nb00 + sy * nb01 + i02_src * nb02 + i03_src * nb03);
+                            val += pixel * weight;
+                            total_weight += weight;
+                        }
+                    }
+
+                    if (total_weight > 0.0f) {
+                        val /= total_weight;
+                    }
+
+                    dst_d[index] = val;
+                });
+        } else {
+            // ---- Bilinear (no anti-aliasing) ----
+            stream.parallel_for(
+                sycl::nd_range<1>(num_blocks * block_size, block_size),
+                [=](sycl::nd_item<1> item) {
+                    const int64_t index = (int64_t)item.get_global_id(0);
+                    const int64_t dst_total_elements = (int64_t)ne10 * ne11 * ne12 * ne13;
+                    if (index >= dst_total_elements) {
+                        return;
+                    }
+
+                    const int i10_dst = (int)(index % ne10);
+                    const int i11_dst = (int)((index / ne10) % ne11);
+                    const int i12_dst = (int)((index / ((int64_t)ne10 * ne11)) % ne12);
+                    const int i13_dst = (int)(index / ((int64_t)ne10 * ne11 * ne12));
+
+                    const int i02_src = (int)(i12_dst / sf2_);
+                    const int i03_src = (int)(i13_dst / sf3_);
+
+                    const float y_src_f = ((float)i11_dst + poff) / sf1_ - poff;
+                    int y0_src    = (int)sycl::floor(y_src_f);
+                    int y1_src    = y0_src + 1;
+                    y0_src = sycl::max(0, sycl::min(y0_src, ne01_src - 1));
+                    y1_src = sycl::max(0, sycl::min(y1_src, ne01_src - 1));
+                    float dy = y_src_f - (float)(int)sycl::floor(y_src_f);
+                    dy = sycl::fmax(0.0f, sycl::fmin(dy, 1.0f));
+
+                    const float x_src_f = ((float)i10_dst + poff) / sf0_ - poff;
+                    int x0_src    = (int)sycl::floor(x_src_f);
+                    int x1_src    = x0_src + 1;
+                    x0_src = sycl::max(0, sycl::min(x0_src, ne00_src - 1));
+                    x1_src = sycl::max(0, sycl::min(x1_src, ne00_src - 1));
+                    float dx = x_src_f - (float)(int)sycl::floor(x_src_f);
+                    dx = sycl::fmax(0.0f, sycl::fmin(dx, 1.0f));
+
+                    const float val_a = *(const float *)((const char *)src0_d +
+                        (int64_t)x0_src * nb00 + (int64_t)y0_src * nb01 + (int64_t)i02_src * nb02 + (int64_t)i03_src * nb03);
+                    const float val_b = *(const float *)((const char *)src0_d +
+                        (int64_t)x1_src * nb00 + (int64_t)y0_src * nb01 + (int64_t)i02_src * nb02 + (int64_t)i03_src * nb03);
+                    const float val_c = *(const float *)((const char *)src0_d +
+                        (int64_t)x0_src * nb00 + (int64_t)y1_src * nb01 + (int64_t)i02_src * nb02 + (int64_t)i03_src * nb03);
+                    const float val_d = *(const float *)((const char *)src0_d +
+                        (int64_t)x1_src * nb00 + (int64_t)y1_src * nb01 + (int64_t)i02_src * nb02 + (int64_t)i03_src * nb03);
+
+                    const float result = val_a * (1.0f - dx) * (1.0f - dy) +
+                                         val_b * dx * (1.0f - dy) +
+                                         val_c * (1.0f - dx) * dy +
+                                         val_d * dx * dy;
+
+                    dst_d[index] = result;
+                });
+        }
+    } else if (mode == GGML_SCALE_MODE_BICUBIC) {
+        // ---- Bicubic interpolation ----
+        const float sf0_ = sf0, sf1_ = sf1, sf2_ = sf2, sf3_ = sf3;
+        const float poff = pixel_offset;
+
+        stream.parallel_for(
+            sycl::nd_range<1>(num_blocks * block_size, block_size),
+            [=](sycl::nd_item<1> item) {
+                const int64_t index = (int64_t)item.get_global_id(0);
+                const int64_t dst_total_elements = (int64_t)ne10 * ne11 * ne12 * ne13;
+                if (index >= dst_total_elements) {
+                    return;
+                }
+
+                const int i10_dst = (int)(index % ne10);
+                const int i11_dst = (int)((index / ne10) % ne11);
+                const int i12_dst = (int)((index / ((int64_t)ne10 * ne11)) % ne12);
+                const int i13_dst = (int)(index / ((int64_t)ne10 * ne11 * ne12));
+
+                const int i02_src = (int)(i12_dst / sf2_);
+                const int i03_src = (int)(i13_dst / sf3_);
+
+                const float y_src_f = ((float)i11_dst + poff) / sf1_ - poff;
+                const int y0_src    = (int)sycl::floor(y_src_f);
+                const float dy      = y_src_f - (float)y0_src;
+
+                const float x_src_f = ((float)i10_dst + poff) / sf0_ - poff;
+                const int x0_src    = (int)sycl::floor(x_src_f);
+                const float dx      = x_src_f - (float)x0_src;
+
+                const char * x_base = (const char *)src0_d + (int64_t)i02_src * nb02 + (int64_t)i03_src * nb03;
+
+                // Bicubic convolution weights (alpha = -0.75, same as PyTorch)
+                constexpr float a = -0.75f;
+                auto weight1 = [a](float t) -> float { return ((a + 2) * t - (a + 3)) * t * t + 1; };
+                auto weight2 = [a](float t) -> float { return ((a * t - 5 * a) * t + 8 * a) * t - 4 * a; };
+
+                auto bicubic_interp = [&](float p0, float p1, float p2, float p3, float t) -> float {
+                    const float w0 = weight2(t + 1);
+                    const float w1 = weight1(t + 0);
+                    const float w2 = weight1(1 - t);
+                    const float w3 = weight2(2 - t);
+                    return p0 * w0 + p1 * w1 + p2 * w2 + p3 * w3;
+                };
+
+                auto load = [&](int x_off, int y_off) -> float {
+                    int i00 = sycl::max(0, sycl::min(x0_src + x_off, ne00_src - 1));
+                    int i01 = sycl::max(0, sycl::min(y0_src + y_off, ne01_src - 1));
+                    return *(const float *)(x_base + (int64_t)i00 * nb00 + (int64_t)i01 * nb01);
+                };
+
+                const float result = bicubic_interp(
+                    bicubic_interp(load(-1,-1), load(0,-1), load(1,-1), load(2,-1), dx),
+                    bicubic_interp(load(-1, 0), load(0, 0), load(1, 0), load(2, 0), dx),
+                    bicubic_interp(load(-1, 1), load(0, 1), load(1, 1), load(2, 1), dx),
+                    bicubic_interp(load(-1, 2), load(0, 2), load(1, 2), load(2, 2), dx), dy);
+
+                dst_d[index] = result;
+            });
+    }
+}
+
 static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct ggml_tensor * dst) try {
     if (!g_sycl_loaded) return false;
 
@@ -4105,7 +4357,7 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             ggml_sycl_op_pad_reflect_1d(ctx, dst);
             break;
         case GGML_OP_UPSCALE:
-            // TODO implement upscale kernel
+            ggml_sycl_op_upscale(ctx, dst);
             break;
         case GGML_OP_PAD:
             ggml_sycl_op_pad(ctx, dst);
@@ -4913,7 +5165,7 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_IM2COL_3D:
             return true;
         case GGML_OP_UPSCALE:
-            return false;
+            return true;
         case GGML_OP_SUM:
             return op->src[0]->type == GGML_TYPE_F32 && ggml_is_contiguous(op->src[0]);
         case GGML_OP_SUM_ROWS:

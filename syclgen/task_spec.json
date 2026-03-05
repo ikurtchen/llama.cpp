@@ -943,7 +943,9 @@
       "priority": 4,
       "name": "Migrate UPSCALE op",
       "description": "Implement upscale kernels (nearest, bilinear, bicubic). No existing SYCL stub.",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-03-05T23:45:00Z",
+      "notes": "Implemented ggml_sycl_op_upscale inline in ggml-sycl.cpp (lines 3945-4192). All 4 kernel variants ported: nearest (integer division inverse mapping), bilinear (2x2 linear interpolation with edge clamping), bilinear_antialias (variable-size triangle filter for downscale, matching PyTorch antialias=True), bicubic (4x4 cubic Hermite spline, alpha=-0.75 Keys/Catmull-Rom). Supports ALIGN_CORNERS flag. Block_size=256, nd_range<1>. F32-only. Wired into compute_forward and supports_op (returns true, matching CUDA). UPSCALE: 22/22 tests passed (nearest/bilinear/bicubic/antialias/align_corners). SCALE regression: 4/4 passed.",
       "kernel_ids": [
         "ck_116",
         "ck_117",
