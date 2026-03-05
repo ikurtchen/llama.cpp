@@ -174,3 +174,26 @@ clamp, arange, upscale (require specialized parameters beyond the template)
 **Issues:** None. One minor unused variable warning at ggml-sycl.cpp:3866 (pre-existing).
 **Next task:** task_004 (Migrate DIAG_MASK_INF) or task_005 (Migrate unary ops)
 **Completion:** 3/48 tasks completed
+
+### Session 4 — 2026-03-05: task_004 (Migrate DIAG_MASK_INF op)
+
+**Completed:** task_004 — DIAG_MASK_INF kernel migration
+**What was done:**
+
+1. Implemented `ggml_sycl_op_diag_mask_inf` in `ggml/src/ggml-sycl/ggml-sycl.cpp` (lines 3153-3189):
+   - Gets src0/dst data pointers as float*
+   - Extracts ncols from ne[0], rows_per_channel from ne[1], nrows via ggml_nrows, n_past from op_params
+   - Uses 2D nd_range: local(1, 32), global(nrows, ceil(ncols/32)*32)
+   - Kernel: `dst[i] = src0[i] - (col > n_past + row % rows_per_channel) * FLT_MAX`
+   - Bounds check: `if (col >= ncols) return;`
+
+2. Wired into compute_forward switch: `case GGML_OP_DIAG_MASK_INF -> ggml_sycl_op_diag_mask_inf(ctx, dst)`
+
+3. Enabled in supports_op: `GGML_OP_DIAG_MASK_INF` now returns `true`
+
+**Build:** Compiles cleanly on b60 (icpx, GGML_SYCL=ON, GGML_SYCL_F16=ON)
+**Tests:** DIAG_MASK_INF: 3/3 passed (f32, various ne shapes)
+**Regression:** SCALE: 4/4 tests pass — no regressions
+**Issues:** None.
+**Next task:** task_005 (Migrate unary ops) or task_006 (Migrate GLU ops)
+**Completion:** 4/48 tasks completed

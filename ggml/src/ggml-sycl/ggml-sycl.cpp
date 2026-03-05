@@ -3150,6 +3150,44 @@ static void ggml_sycl_op_scale(ggml_backend_sycl_context & ctx, ggml_tensor * ds
     );
 }
 
+static void ggml_sycl_op_diag_mask_inf(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
+    const ggml_tensor * src0 = dst->src[0];
+    const float * src0_d = (const float *)src0->data;
+    float * dst_d = (float *)dst->data;
+    sycl::queue & stream = *(ctx.stream());
+
+    GGML_ASSERT(src0->type == GGML_TYPE_F32);
+    GGML_ASSERT( dst->type == GGML_TYPE_F32);
+
+    const int ncols            = src0->ne[0];
+    const int rows_per_channel = src0->ne[1];
+    const int nrows            = ggml_nrows(src0);
+
+    int n_past;
+    memcpy(&n_past, (int32_t *) dst->op_params, sizeof(int));
+
+    const int block_size = 32;
+    const int num_blocks_x = (ncols + block_size - 1) / block_size;
+
+    sycl::range<2> global_range(nrows, num_blocks_x * block_size);
+    sycl::range<2> local_range(1, block_size);
+
+    stream.parallel_for(
+        sycl::nd_range<2>(global_range, local_range),
+        [=](sycl::nd_item<2> item) {
+            const int row = item.get_global_id(0);
+            const int col = item.get_global_id(1);
+
+            if (col >= ncols) {
+                return;
+            }
+
+            const int i = row * ncols + col;
+            dst_d[i] = src0_d[i] - (col > n_past + row % rows_per_channel) * FLT_MAX;
+        }
+    );
+}
+
 static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct ggml_tensor * dst) try {
     if (!g_sycl_loaded) return false;
 
@@ -3362,7 +3400,7 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             // TODO implement tri kernel
             break;
         case GGML_OP_DIAG_MASK_INF:
-            // TODO implement diag mask inf kernel
+            ggml_sycl_op_diag_mask_inf(ctx, dst);
             break;
         case GGML_OP_SOFT_MAX:
             // TODO implement softmax kernel
@@ -4020,7 +4058,7 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_TRI:
             return false;
         case GGML_OP_DIAG_MASK_INF:
-            return false;
+            return true;
         case GGML_OP_SOFT_MAX:
             return false;
         case GGML_OP_SOFT_MAX_BACK:
