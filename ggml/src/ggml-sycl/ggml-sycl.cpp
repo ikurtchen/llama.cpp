@@ -57,6 +57,7 @@
 #include "ggml-sycl/ssm_conv.hpp"
 #include "ggml-sycl/cpy.hpp"
 #include "ggml-sycl/pad.hpp"
+#include "ggml-sycl/roll.hpp"
 #include "ggml-sycl/tsembd.hpp"
 #include "ggml.h"
 
@@ -3821,7 +3822,7 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             // TODO implement ssm conv kernel
             break;
         case GGML_OP_ROLL:
-            // TODO implement roll kernel
+            ggml_sycl_roll(ctx, dst);
             break;
         case GGML_OP_ARANGE:
             ggml_sycl_op_arange(ctx, dst);
@@ -4511,7 +4512,7 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_SSM_CONV:
             return false;
         case GGML_OP_ROLL:
-            return false;
+            return op->src[0]->type == GGML_TYPE_F32;
         case GGML_OP_ARANGE:
             return op->type == GGML_TYPE_F32;
         case GGML_OP_FILL:

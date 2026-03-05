@@ -36,7 +36,7 @@ Migration tasks created: 48 (2 infrastructure + 39 kernel + 1 integration)
 | task_016  | 3        | kernel         | DIAG                                    | DONE    |
 | task_017  | 3        | kernel         | TRI                                     | DONE    |
 | task_018  | 3        | kernel         | TIMESTEP_EMBEDDING                      | DONE    |
-| task_019  | 3        | kernel         | ROLL                                    | pending |
+| task_019  | 3        | kernel         | ROLL                                    | DONE    |
 | task_020  | 3        | kernel         | PAD_REFLECT_1D                          | pending |
 | task_021  | 4        | kernel         | RMS_NORM                                | pending |
 | task_022  | 4        | kernel         | NORM, GROUP_NORM                        | pending |
@@ -668,3 +668,30 @@ intentionally deferred — the scalar kernel handles all cases correctly.
 **Issues:** None.
 **Next task:** task_019 (ROLL) or task_020 (PAD_REFLECT_1D)
 **Completion:** 18/48 tasks completed
+
+### Session 19 — 2026-03-05: task_019 (Migrate ROLL op)
+
+**Completed:** task_019 — ROLL (cyclic shift) kernel migration
+**What was done:**
+
+1. **Implemented `ggml/src/ggml-sycl/roll.cpp`** (67 lines, was empty stub):
+   - `wrap_index()` — static inline helper that wraps index cyclically: if idx<0 return idx+ne, if idx>=ne return idx-ne
+   - `roll_f32_sycl()` — SYCL kernel launcher using `nd_range<1>` with SYCL_ROLL_BLOCK_SIZE=256
+     - Each work-item decomposes flat global_id into (i0,i1,i2,i3) via modular arithmetic
+     - Subtracts shift amounts (s0,s1,s2,s3), wraps via wrap_index
+     - Copies from source at wrapped position to destination at original position
+   - `ggml_sycl_roll()` — host dispatch: extracts shift params from op_params[0..3], asserts F32 type and same shape, gets SYCL queue, calls kernel
+
+2. **Added `SYCL_ROLL_BLOCK_SIZE 256`** to presets.hpp (line 54)
+
+3. **Wired into `ggml-sycl.cpp`:**
+   - Added `#include "ggml-sycl/roll.hpp"` (line 60)
+   - compute_forward: GGML_OP_ROLL → ggml_sycl_roll(ctx, dst)
+   - supports_op: GGML_OP_ROLL → returns `op->src[0]->type == GGML_TYPE_F32`
+
+**Build:** Compiles cleanly on b60 (icpx 2025.1.1, GGML_SYCL=ON, GGML_SYCL_F16=ON)
+**Tests:** ROLL: 1/1 passed (shift0=3, shift1=-2, shift3=1, shift4=-1)
+**Regression:** SCALE: 4/4 tests pass — no regressions
+**Issues:** None.
+**Next task:** task_020 (PAD_REFLECT_1D) or task_021 (RMS_NORM)
+**Completion:** 19/48 tasks completed
