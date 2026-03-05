@@ -1616,3 +1616,47 @@ Implemented SYCL ROPE (Rotary Position Embedding) kernels — all 4 variants (no
 **Issues:** None. All tests pass first try.
 **Next task:** task_041 (GATED_LINEAR_ATTN / GLA) — GLA attention kernel
 **Completion:** 40/48 tasks completed (task_047 abandoned)
+
+---
+
+## Session 41 — task_041: GATED_LINEAR_ATTN (GLA) attention kernel (2026-03-05)
+
+**Goal:** Migrate CUDA Gated Linear Attention kernel to SYCL.
+
+**CUDA reference:** `ggml/src/ggml-cuda/gla.cu` (94 lines)
+- `gated_linear_attn_f32<HEAD_SIZE>` kernel: k, v, r, td (time_decay), s (state) → dst
+- Template parameter HEAD_SIZE = 64 or 128
+- Uses shared memory for per-timestep k, r, td vectors
+- Private register array for state (HEAD_SIZE floats per thread)
+- Sequential recurrence: state[j] = state[j] * td[j] + k[j] * v, y += r[j] * state[j]
+- 4-wide unrolled inner loop (float4 in CUDA)
+- One block per (batch, head) pair, blockDim = HEAD_SIZE
+
+**Implementation:** `ggml/src/ggml-sycl/gla.cpp` (103 lines, was 3-line stub)
+- `gated_linear_attn_f32_sycl<head_size>` — templated SYCL kernel launcher
+- `sycl::nd_range<1>(B*H*head_size, head_size)` — one work-group per (batch, head)
+- `sycl::local_accessor<float, 1>` for _k, _r, _td shared memory arrays
+- `sycl::group_barrier(item.get_group())` for synchronization
+- Private `float state[head_size]` array for per-thread state
+- 4-wide scalar unrolling (no float4 — matching project convention)
+- `ggml_sycl_op_gated_linear_attn` — host dispatch with C/H == 64/128 template branch
+- No sub-group operations needed — purely work-group parallel
+
+### Wiring changes in `ggml-sycl.cpp`:
+- compute_forward: GGML_OP_GATED_LINEAR_ATTN → `ggml_sycl_op_gated_linear_attn(ctx, dst)` (replaced TODO)
+- supports_op: GGML_OP_GATED_LINEAR_ATTN → `return true` (was `return false`)
+
+**Build:** Compiles cleanly on b60 (icpx 2025.1.1, GGML_SYCL=ON, GGML_SYCL_F16=ON)
+**Tests:**
+| Op | Config | Result |
+|---|---|---|
+| GATED_LINEAR_ATTN | head_count=32,head_size=64,n_seq_tokens=1,n_seqs=1 | PASS |
+| GATED_LINEAR_ATTN | head_count=32,head_size=64,n_seq_tokens=32,n_seqs=1 | PASS |
+| GATED_LINEAR_ATTN | head_count=32,head_size=64,n_seq_tokens=32,n_seqs=4 | PASS |
+| GATED_LINEAR_ATTN | head_count=32,head_size=64,n_seq_tokens=128,n_seqs=4 | PASS |
+| **Total** | | **4/4 PASS** |
+
+**Regression:** SCALE: 4/4 tests pass — no regressions
+**Issues:** None. All tests pass first try.
+**Next task:** task_042 (CROSS_ENTROPY_LOSS) — cross-entropy loss forward and backward
+**Completion:** 41/48 tasks completed (task_047 abandoned)

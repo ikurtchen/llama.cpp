@@ -1075,7 +1075,9 @@
       "priority": 5,
       "name": "Migrate GATED_LINEAR_ATTN op",
       "description": "Implement GLA kernel. Complex: shared memory, warp shuffle. Existing empty stub: gla.cpp.",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-03-05T22:30:00Z",
+      "notes": "Implemented gated_linear_attn_f32_sycl<head_size> template kernel in gla.cpp (103 lines). One work-group per (batch, head) pair, local_accessor shared memory for k/r/td, private register array for state. 4-wide scalar unrolling. Supports head_size=64 and 128. Wired into compute_forward and supports_op (returns true). GATED_LINEAR_ATTN: 4/4 tests passed. SCALE regression: 4/4 passed.",
       "kernel_ids": [
         "ck_064"
       ],

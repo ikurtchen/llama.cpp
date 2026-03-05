@@ -4473,7 +4473,7 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             ggml_sycl_op_rwkv_wkv7(ctx, dst);
             break;
         case GGML_OP_GATED_LINEAR_ATTN:
-            // TODO implement gated linear attention kernel
+            ggml_sycl_op_gated_linear_attn(ctx, dst);
             break;
         case GGML_OP_SSM_CONV:
             ggml_sycl_ssm_conv(ctx, dst);
@@ -5200,7 +5200,7 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_RWKV_WKV7:
             return true;
         case GGML_OP_GATED_LINEAR_ATTN:
-            return false;
+            return true;
         case GGML_OP_SSM_CONV:
             {
                 ggml_type src0_type = op->src[0]->type;
