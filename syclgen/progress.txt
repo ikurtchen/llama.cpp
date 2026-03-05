@@ -35,7 +35,7 @@ Migration tasks created: 48 (2 infrastructure + 39 kernel + 1 integration)
 | task_015  | 3        | kernel         | ADD_ID                                  | DONE    |
 | task_016  | 3        | kernel         | DIAG                                    | DONE    |
 | task_017  | 3        | kernel         | TRI                                     | DONE    |
-| task_018  | 3        | kernel         | TIMESTEP_EMBEDDING                      | pending |
+| task_018  | 3        | kernel         | TIMESTEP_EMBEDDING                      | DONE    |
 | task_019  | 3        | kernel         | ROLL                                    | pending |
 | task_020  | 3        | kernel         | PAD_REFLECT_1D                          | pending |
 | task_021  | 4        | kernel         | RMS_NORM                                | pending |
@@ -639,3 +639,32 @@ intentionally deferred — the scalar kernel handles all cases correctly.
 **Issues:** None.
 **Next task:** task_018 (TIMESTEP_EMBEDDING) or task_019 (ROLL)
 **Completion:** 17/48 tasks completed
+
+### Session 18 — 2026-03-05: task_018 (Migrate TIMESTEP_EMBEDDING op)
+
+**Completed:** task_018 — TIMESTEP_EMBEDDING kernel migration
+**What was done:**
+
+1. **Implemented `ggml/src/ggml-sycl/tsembd.cpp`** (48 lines, was empty stub):
+   - `ggml_sycl_op_timestep_embedding` — SYCL port of CUDA `timestep_embedding_f32`
+   - Extracts `ne00` (batch count), `nb1` (byte stride), `dim`, `max_period` from tensor metadata
+   - Uses `sycl::nd_range<2>` with global_range(ne00, num_blocks_x * block_size) and local_range(1, 256):
+     - Dimension 0 (y-axis) = batch index `i` via `item.get_group(0)`
+     - Dimension 1 (x-axis) = embedding index `j` via `item.get_group(1) * local_range(1) + item.get_local_id(1)`
+   - Byte-stride addressing: `(float *)((char *) dst + i * nb1)`
+   - Handles odd `dim` zero-padding: if `dim % 2 != 0 && j == half`, sets `embed_data[2*half] = 0.0f`
+   - Kernel: `freq = exp(-log(max_period) * j / half)`, `arg = timestep * freq`
+   - Writes `cos(arg)` at index `j` and `sin(arg)` at index `j + half`
+   - Uses `sycl::cos`, `sycl::sin`, `sycl::exp`, `sycl::log`
+
+2. **Wired into `ggml-sycl.cpp`:**
+   - Added `#include "ggml-sycl/tsembd.hpp"` (line 60)
+   - compute_forward: GGML_OP_TIMESTEP_EMBEDDING → ggml_sycl_op_timestep_embedding(ctx, dst)
+   - supports_op: GGML_OP_TIMESTEP_EMBEDDING → returns `op->src[0]->type == GGML_TYPE_F32`
+
+**Build:** Compiles cleanly on b60 (icpx, GGML_SYCL=ON, GGML_SYCL_F16=ON)
+**Tests:** TIMESTEP_EMBEDDING: 1/1 passed
+**Regression:** SCALE: 4/4 tests pass — no regressions
+**Issues:** None.
+**Next task:** task_019 (ROLL) or task_020 (PAD_REFLECT_1D)
+**Completion:** 18/48 tasks completed

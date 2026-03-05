@@ -57,6 +57,7 @@
 #include "ggml-sycl/ssm_conv.hpp"
 #include "ggml-sycl/cpy.hpp"
 #include "ggml-sycl/pad.hpp"
+#include "ggml-sycl/tsembd.hpp"
 #include "ggml.h"
 
 static bool g_sycl_loaded = false;
@@ -3805,7 +3806,7 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             // TODO implement topk kernel
             break;
         case GGML_OP_TIMESTEP_EMBEDDING:
-            // TODO implement timestep embedding kernel
+            ggml_sycl_op_timestep_embedding(ctx, dst);
             break;
         case GGML_OP_RWKV_WKV6:
             // TODO implement rwkv wkv6 kernel
@@ -4500,7 +4501,7 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_SILU_BACK:
             return true;
         case GGML_OP_TIMESTEP_EMBEDDING:
-            return false;
+            return op->src[0]->type == GGML_TYPE_F32;
         case GGML_OP_RWKV_WKV6:
             return false;
         case GGML_OP_RWKV_WKV7:
