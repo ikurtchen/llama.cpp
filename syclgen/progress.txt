@@ -3,8 +3,8 @@ SYCL Migration Progress Tracker
 Generated: 2026-03-05
 Project: llama.cpp ggml SYCL backend
 
-Phase: INIT (catalog and plan)
-Status: COMPLETE
+Phase: MIGRATION (kernel implementation)
+Status: IN PROGRESS
 
 ## Summary
 
@@ -18,7 +18,7 @@ Migration tasks created: 48 (2 infrastructure + 39 kernel + 1 integration)
 
 | Task ID   | Priority | Type           | Name                                    | Status  |
 |-----------|----------|----------------|-----------------------------------------|---------|
-| task_001  | 1        | infrastructure | Verify SYCL build and existing backend  | pending |
+| task_001  | 1        | infrastructure | Verify SYCL build and existing backend  | DONE    |
 | task_002  | 2        | infrastructure | Create SYCL helper utilities            | pending |
 | task_003  | 3        | kernel         | SCALE                                   | pending |
 | task_004  | 3        | kernel         | DIAG_MASK_INF                           | pending |
@@ -83,3 +83,27 @@ Server: b60
 Script: syclgen/remote_run.sh
 Unit test: bash syclgen/remote_run.sh -s b60 -t unit -k <OP_NAME> -e ZES_ENABLE_SYSMAN=1
 List ops:  bash syclgen/remote_run.sh -s b60 -t unit --list-ops -e ZES_ENABLE_SYSMAN=1
+
+## Session Log
+
+### Session 1 — 2026-03-05: task_001 (Verify SYCL build and existing backend)
+
+**Completed:** task_001 — infrastructure baseline verification
+**What was done:**
+- Uploaded code to b60, built with GGML_SYCL=ON (icx/icpx, GGML_SYCL_F16=ON)
+- Build succeeds cleanly
+- 122 ops listed by test-backend-ops
+- MUL_MAT: 729/729 tests passed
+- MUL_MAT_ID: 576/576 tests passed
+- OUT_PROD: 4/4 tests passed (very limited — only f32×f32, no batching)
+- bf16 type_a not supported on this device
+- Some iq2_xxs multi-token variants not supported for MUL_MAT_ID
+
+**Device info:**
+- Intel Graphics [0xe211] (BMG/Battlemage)
+- 160 compute units, ~24 GB VRAM
+- Level Zero driver 1.13.35563+7
+
+**Issues:** None — baseline is clean.
+**Next task:** task_002 (Create SYCL helper utilities) or task_003 (Migrate SCALE)
+**Completion:** 1/48 tasks completed

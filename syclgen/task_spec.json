@@ -18,7 +18,9 @@
       "priority": 1,
       "name": "Verify SYCL build and existing backend",
       "description": "Build llama.cpp with GGML_SYCL=ON on b60, verify existing MUL_MAT/MUL_MAT_ID/OUT_PROD ops pass unit tests, establish baseline.",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-03-05T15:00:00Z",
+      "notes": "Build succeeds with SYCL ON (icx/icpx, GGML_SYCL_F16=ON). 122 ops listed. MUL_MAT: 729/729 pass. MUL_MAT_ID: 576/576 pass. OUT_PROD: 4/4 pass. bf16 and some iq2_xxs not supported. Intel BMG GPU (0xe211), 160 CUs, 24GB VRAM, driver 1.13.35563+7.",
       "kernel_ids": [],
       "steps": [
         "Remote build: ",
