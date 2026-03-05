@@ -892,7 +892,7 @@
       "priority": 4,
       "name": "Migrate IM2COL op",
       "description": "Implement im2col kernels (2D and 3D). Existing empty stub: im2col.cpp.",
-      "status": "pending",
+      "status": "completed",
       "kernel_ids": [
         "ck_065",
         "ck_066"
@@ -909,7 +909,8 @@
         "Wire IM2COL and IM2COL_3D into compute_forward and supports_op",
         "Build and run unit test: -k IM2COL",
         "Update syclgen/progress.txt"
-      ]
+      ],
+      "notes": "IM2COL: 88/88 passed, IM2COL_3D: 2051/2051 passed. Both 2D and 3D im2col kernels implemented with F16/F32 type dispatch. SCALE regression: 4/4 passed."
     },
     {
       "id": "task_035",

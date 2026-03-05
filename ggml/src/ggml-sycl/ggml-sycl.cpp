@@ -65,6 +65,7 @@
 #include "ggml-sycl/sumrows.hpp"
 #include "ggml-sycl/sum.hpp"
 #include "ggml-sycl/count-equal.hpp"
+#include "ggml-sycl/im2col.hpp"
 #include "ggml.h"
 
 static bool g_sycl_loaded = false;
@@ -4102,7 +4103,7 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             ggml_sycl_rope(ctx, dst);
             break;
         case GGML_OP_IM2COL:
-            // TODO implement im2col kernel
+            ggml_sycl_op_im2col(ctx, dst);
             break;
         case GGML_OP_POOL_2D:
             // TODO implement pool 2d kernel
@@ -4162,7 +4163,7 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             ggml_sycl_rope_back(ctx, dst);
             break;
         case GGML_OP_IM2COL_3D:
-            // TODO implement im2col 3d kernel
+            ggml_sycl_op_im2col_3d(ctx, dst);
             break;
         case GGML_OP_CUMSUM:
             // TODO implement cumsum kernel
@@ -4824,7 +4825,8 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_ROPE_BACK:
             return op->src[0]->nb[0] == ggml_type_size(op->src[0]->type) && ggml_is_contiguous_2(op->src[0]);
         case GGML_OP_IM2COL:
-            return false;
+        case GGML_OP_IM2COL_3D:
+            return true;
         case GGML_OP_UPSCALE:
             return false;
         case GGML_OP_SUM:
