@@ -3399,6 +3399,89 @@ static void ggml_sycl_op_diag(ggml_backend_sycl_context & ctx, ggml_tensor * dst
     }
 }
 
+static void ggml_sycl_op_tri(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
+    const ggml_tensor * src0 = dst->src[0];
+    sycl::queue & stream = *(ctx.stream());
+
+    GGML_ASSERT(src0->type == dst->type);
+
+    const ggml_tri_type ttype = static_cast<ggml_tri_type>(ggml_get_op_params_i32(dst, 0));
+
+    const int64_t ne00 = src0->ne[0];
+    const int64_t ne01 = src0->ne[1];
+    const int64_t ne02 = src0->ne[2];
+    const int64_t ne03 = src0->ne[3];
+
+    const int add_to_split = (ttype == GGML_TRI_TYPE_LOWER_DIAG || ttype == GGML_TRI_TYPE_UPPER) ? 1 : 0;
+    const bool prefix_keep = (ttype == GGML_TRI_TYPE_LOWER || ttype == GGML_TRI_TYPE_LOWER_DIAG);
+
+    constexpr int block_size = 256;
+    const sycl::range<3> grid(ne03, ne02, ne01);
+    const sycl::range<3> block(1, 1, block_size);
+
+    auto launch = [&](auto * src_ptr, auto * dst_ptr) {
+        using T = std::remove_const_t<std::remove_pointer_t<decltype(src_ptr)>>;
+        const size_t type_size = sizeof(T);
+
+        const int64_t s_nb1 = (int64_t)(src0->nb[1] / type_size);
+        const int64_t s_nb2 = (int64_t)(src0->nb[2] / type_size);
+        const int64_t s_nb3 = (int64_t)(src0->nb[3] / type_size);
+        const int64_t d_nb1 = (int64_t)(dst->nb[1] / type_size);
+        const int64_t d_nb2 = (int64_t)(dst->nb[2] / type_size);
+        const int64_t d_nb3 = (int64_t)(dst->nb[3] / type_size);
+
+        stream.parallel_for(
+            sycl::nd_range<3>(grid * block, block),
+            [=](sycl::nd_item<3> item) {
+                const int64_t i3 = item.get_group(0);
+                const int64_t i2 = item.get_group(1);
+                const int64_t i1 = item.get_group(2);
+
+                if (i3 >= ne03 || i2 >= ne02 || i1 >= ne01) return;
+
+                const int64_t split_point = i1 + add_to_split;
+
+                const T * src_row = src_ptr + i1*s_nb1 + i2*s_nb2 + i3*s_nb3;
+                T       * dst_row = dst_ptr + i1*d_nb1 + i2*d_nb2 + i3*d_nb3;
+
+                const int tid = item.get_local_id(2);
+                const int bsz = item.get_local_range(2);
+
+                if (prefix_keep) {
+                    for (int64_t i0 = tid; i0 < split_point; i0 += bsz) {
+                        dst_row[i0] = src_row[i0];
+                    }
+                    for (int64_t i0 = tid + split_point; i0 < ne00; i0 += bsz) {
+                        dst_row[i0] = static_cast<T>(0.0f);
+                    }
+                } else {
+                    for (int64_t i0 = tid; i0 < split_point; i0 += bsz) {
+                        dst_row[i0] = static_cast<T>(0.0f);
+                    }
+                    for (int64_t i0 = tid + split_point; i0 < ne00; i0 += bsz) {
+                        dst_row[i0] = src_row[i0];
+                    }
+                }
+            }
+        );
+    };
+
+    switch (src0->type) {
+        case GGML_TYPE_F32:
+            launch((const float *)src0->data, (float *)dst->data);
+            break;
+        case GGML_TYPE_F16:
+            launch((const sycl::half *)src0->data, (sycl::half *)dst->data);
+            break;
+        case GGML_TYPE_BF16:
+            launch((const sycl::ext::oneapi::bfloat16 *)src0->data,
+                   (sycl::ext::oneapi::bfloat16 *)dst->data);
+            break;
+        default:
+            GGML_ABORT("ggml_sycl_op_tri: unsupported type");
+    }
+}
+
 static void ggml_sycl_op_fill(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
     void * dst_d = dst->data;
     sycl::queue & stream = *(ctx.stream());
@@ -3686,7 +3769,7 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             GGML_SYCL_DEBUG("%s: Tensor NO-OP\n", __func__);
             break;
         case GGML_OP_TRI:
-            // TODO implement tri kernel
+            ggml_sycl_op_tri(ctx, dst);
             break;
         case GGML_OP_DIAG_MASK_INF:
             ggml_sycl_op_diag_mask_inf(ctx, dst);
@@ -4379,7 +4462,7 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_CONT:
             return true;
         case GGML_OP_TRI:
-            return false;
+            return (op->type == GGML_TYPE_F32 || op->type == GGML_TYPE_F16 || op->type == GGML_TYPE_BF16);
         case GGML_OP_DIAG:
             return (op->type == GGML_TYPE_F32 || op->type == GGML_TYPE_F16);
         case GGML_OP_DIAG_MASK_INF:

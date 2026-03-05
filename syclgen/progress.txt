@@ -34,7 +34,7 @@ Migration tasks created: 48 (2 infrastructure + 39 kernel + 1 integration)
 | task_014  | 3        | kernel         | ACC                                     | DONE    |
 | task_015  | 3        | kernel         | ADD_ID                                  | DONE    |
 | task_016  | 3        | kernel         | DIAG                                    | DONE    |
-| task_017  | 3        | kernel         | TRI                                     | pending |
+| task_017  | 3        | kernel         | TRI                                     | DONE    |
 | task_018  | 3        | kernel         | TIMESTEP_EMBEDDING                      | pending |
 | task_019  | 3        | kernel         | ROLL                                    | pending |
 | task_020  | 3        | kernel         | PAD_REFLECT_1D                          | pending |
@@ -602,5 +602,40 @@ intentionally deferred — the scalar kernel handles all cases correctly.
 **Tests:** DIAG: 3/3 passed (f32, various ne shapes: [10,1,4,3], [79,1,19,13], [256,1,8,16])
 **Regression:** SCALE: 4/4 tests pass — no regressions
 **Issues:** None.
-**Next task:** task_017 (TRI) or task_018 (TIMESTEP_EMBEDDING)
+**Next task:** task_018 (TIMESTEP_EMBEDDING) or task_019 (ROLL)
 **Completion:** 16/48 tasks completed
+
+### Session 17 — 2026-03-05: task_017 (Migrate TRI op)
+
+**Completed:** task_017 — TRI (triangular extraction) kernel migration
+**What was done:**
+
+1. **Implemented `ggml_sycl_op_tri`** in `ggml/src/ggml-sycl/ggml-sycl.cpp` (lines 3402-3483):
+   - Gets src0/dst data pointers and SYCL queue from context
+   - Extracts tri_type from op_params via `ggml_get_op_params_i32(dst, 0)`
+   - Computes `add_to_split` (1 for LOWER_DIAG/UPPER, 0 otherwise) and `prefix_keep` (true for LOWER/LOWER_DIAG)
+   - Uses 3D nd_range: grid(ne03, ne02, ne01), block(1, 1, 256)
+   - Each work-group handles one row; threads stride along dim0
+   - If prefix_keep: copies elements before split_point, zeros the rest
+   - If not prefix_keep: zeros elements before split_point, copies the rest
+   - Generic lambda with type deduction supports F32, F16, BF16
+   - Converts byte strides to element strides (nb / sizeof(T))
+
+2. **Wired into compute_forward:** `case GGML_OP_TRI -> ggml_sycl_op_tri(ctx, dst)` (replaced TODO placeholder)
+
+3. **Wired into supports_op:** `case GGML_OP_TRI -> returns (F32 || F16 || BF16)`
+
+**Build:** Compiles cleanly on b60 (icpx 2025.1.1, GGML_SYCL=ON, GGML_SYCL_F16=ON)
+**Tests:**
+| Op | Result | Tests |
+|---|---|---|
+| TRI (tri_type=0, UPPER_DIAG) | PASS | 1/1 |
+| TRI (tri_type=1, UPPER) | PASS | 1/1 |
+| TRI (tri_type=2, LOWER_DIAG) | PASS | 1/1 |
+| TRI (tri_type=3, LOWER) | PASS | 1/1 |
+| **Total TRI** | **PASS** | **4/4** |
+
+**Regression:** SCALE: 4/4 tests pass — no regressions
+**Issues:** None.
+**Next task:** task_018 (TIMESTEP_EMBEDDING) or task_019 (ROLL)
+**Completion:** 17/48 tasks completed
