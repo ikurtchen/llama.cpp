@@ -54,7 +54,7 @@ Migration tasks created: 48 (2 infrastructure + 39 kernel + 1 integration)
 | task_034  | 4        | kernel         | IM2COL, IM2COL_3D                       | pending |
 | task_035  | 4        | kernel         | POOL_2D                                 | pending |
 | task_036  | 4        | kernel         | UPSCALE                                 | pending |
-| task_037  | 4        | kernel         | CONV_TRANSPOSE_1D (fix bug)             | pending |
+| task_037  | 4        | kernel         | CONV_TRANSPOSE_1D (fix bug)             | DONE    |
 | task_038  | 5        | kernel         | SSM_CONV                                | pending |
 | task_039  | 5        | kernel         | SSM_SCAN                                | pending |
 | task_040  | 5        | kernel         | RWKV_WKV6, RWKV_WKV7                   | pending |
@@ -1426,3 +1426,41 @@ Implemented SYCL ROPE (Rotary Position Embedding) kernels — all 4 variants (no
 **Issues:** None.
 **Next task:** task_037 (CONV_TRANSPOSE_1D) or next pending priority-4 task
 **Completion:** 36/48 tasks completed
+
+---
+
+## Session 37 — task_037: Migrate CONV_TRANSPOSE_1D op (2026-03-05)
+
+**Completed:** task_037 — CONV_TRANSPOSE_1D (1D transposed convolution) kernel migration
+**What was done:**
+
+1. **Implemented `ggml/src/ggml-sycl/conv.cpp`** (68 lines, was empty stub):
+   - `ggml_sycl_op_conv_transpose_1d` — direct SYCL port of CUDA `conv_transpose_1d_kernel`
+   - Asserts F32 types for src0 (weight), src1 (input), dst (output) and contiguous layout
+   - Extracts stride s0 from `dst->op_params[0]` (p0=0, d0=1 hardcoded, matching CUDA)
+   - All tensor dimensions (src0_ne0, src0_ne1, src0_ne2, src1_ne0, dst_ne0) extracted
+     to local variables before lambda capture — no host pointer captures
+   - Uses `sycl::nd_range<1>` with `SYCL_CONV_TRANPOSE_1D_BLOCK_SIZE` (256) from presets.hpp
+   - Each work-item computes one output element:
+     - Loops over input channels (c = 0..src0_ne2)
+     - For each channel, loops over input positions (i = 0..src1_ne0)
+     - Checks if output index falls in strided kernel window: `idx >= i*s0 && idx < i*s0 + src0_ne0`
+     - Accumulates: `kernel_weight * input_value`
+
+2. **Fixed pre-existing bug in `ggml-sycl.cpp`:**
+   - `supports_op` already returned true for CONV_TRANSPOSE_1D (line 4936)
+   - But `compute_forward` had a TODO placeholder that did nothing (line 4206-4207)
+   - Replaced with: `ggml_sycl_op_conv_transpose_1d(ctx, dst);` call
+
+3. **Added `#include "ggml-sycl/conv.hpp"`** to ggml-sycl.cpp (line 56)
+
+**Build:** Compiles cleanly on b60 (icpx 2025.1.1, GGML_SYCL=ON, GGML_SYCL_F16=ON)
+**Tests:**
+| Op | Result | Tests |
+|---|---|---|
+| CONV_TRANSPOSE_1D (f32, various input/kernel sizes, s0=1/2/3, multi-channel) | PASS | 116/116 |
+
+**Regression:** SCALE: 4/4 tests pass — no regressions
+**Issues:** None.
+**Next task:** task_038 (SSM_CONV) — first priority-5 kernel
+**Completion:** 37/48 tasks completed

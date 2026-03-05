@@ -971,7 +971,9 @@
       "priority": 4,
       "name": "Migrate CONV_TRANSPOSE_1D op",
       "description": "Fix CONV_TRANSPOSE_1D: supports_op returns true but compute_forward is TODO. Existing empty stub: conv.cpp.",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-03-05T23:50:00Z",
+      "notes": "Implemented ggml_sycl_op_conv_transpose_1d in conv.cpp (68 lines). Direct port of CUDA kernel using sycl::nd_range<1> with SYCL_CONV_TRANPOSE_1D_BLOCK_SIZE=256. Each work-item computes one output element by looping over input channels and positions. Fixed pre-existing bug: supports_op returned true but compute_forward was TODO. Wired into compute_forward (replaced TODO). Added #include conv.hpp. CONV_TRANSPOSE_1D: 116/116 tests passed. SCALE regression: 4/4 passed.",
       "kernel_ids": [
         "ck_019"
       ],

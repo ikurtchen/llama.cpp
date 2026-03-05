@@ -53,6 +53,7 @@
 #include "ggml-sycl/binbcast.hpp"
 #include "ggml-sycl/repeat_back.hpp"
 #include "ggml-sycl/concat.hpp"
+#include "ggml-sycl/conv.hpp"
 #include "ggml-sycl/quantize.hpp"
 #include "ggml-sycl/ssm_conv.hpp"
 #include "ggml-sycl/cpy.hpp"
@@ -4203,7 +4204,7 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             ggml_sycl_op_argmax(ctx, dst);
             break;
         case GGML_OP_CONV_TRANSPOSE_1D:
-            // TODO implement conv1d transpose kernel
+            ggml_sycl_op_conv_transpose_1d(ctx, dst);
             break;
         case GGML_OP_REPEAT:
             ggml_sycl_repeat(ctx, dst);
