@@ -37,7 +37,7 @@ Migration tasks created: 48 (2 infrastructure + 39 kernel + 1 integration)
 | task_017  | 3        | kernel         | TRI                                     | DONE    |
 | task_018  | 3        | kernel         | TIMESTEP_EMBEDDING                      | DONE    |
 | task_019  | 3        | kernel         | ROLL                                    | DONE    |
-| task_020  | 3        | kernel         | PAD_REFLECT_1D                          | pending |
+| task_020  | 3        | kernel         | PAD_REFLECT_1D                          | DONE    |
 | task_021  | 4        | kernel         | RMS_NORM                                | pending |
 | task_022  | 4        | kernel         | NORM, GROUP_NORM                        | pending |
 | task_023  | 4        | kernel         | L2_NORM                                 | pending |
@@ -695,3 +695,40 @@ intentionally deferred — the scalar kernel handles all cases correctly.
 **Issues:** None.
 **Next task:** task_020 (PAD_REFLECT_1D) or task_021 (RMS_NORM)
 **Completion:** 19/48 tasks completed
+
+### Session 20 — 2026-03-05: task_020 (Migrate PAD_REFLECT_1D op)
+
+**Completed:** task_020 — PAD_REFLECT_1D (reflection padding) kernel migration
+**What was done:**
+
+1. **Implemented `ggml/src/ggml-sycl/pad_reflect_1d.cpp`** (86 lines, was empty stub):
+   - `ggml_sycl_op_pad_reflect_1d` — SYCL port of CUDA `pad_reflect_1d_kernel_f32`
+   - Asserts F32 types for src0 and dst
+   - Extracts p0, p1 from `dst->op_params`, all ne/nb values from src0 and dst
+   - Sanity check: `ne0 == ne00 + p0 + p1`
+   - Uses 3D `nd_range<3>` with global_range(ne03, ne02, ne01 * tiles0 * bx), local_range(1, 1, 256)
+   - Grid mapping: dim0=i3, dim1=i2, dim2=combined (i1, tile0) via plain integer division
+   - Reflection logic: left reflect (`-rel_i0`), middle copy (`rel_i0`), right reflect (`2*ne00-2-rel_i0`)
+   - Byte-stride addressing for non-contiguous tensor support
+   - All tensor metadata captured by value before lambda — no host pointer captures
+
+2. **Wired into `ggml-sycl.cpp`:**
+   - Added `#include "ggml-sycl/pad_reflect_1d.hpp"` (line 60)
+   - compute_forward: GGML_OP_PAD_REFLECT_1D → ggml_sycl_op_pad_reflect_1d(ctx, dst) (replaced TODO)
+   - supports_op: GGML_OP_PAD_REFLECT_1D → returns `op->src[0]->type == GGML_TYPE_F32`
+
+3. **Simplification vs CUDA:** Used plain integer division for i1/tile decomposition
+   instead of CUDA's fastdiv_modulo optimization.
+
+**Build:** Compiles cleanly on b60 (icpx 2025.1.1, GGML_SYCL=ON, GGML_SYCL_F16=ON)
+**Tests:**
+| Op | Result | Tests |
+|---|---|---|
+| PAD_REFLECT_1D (f32, ne=[512,34,2,1], pad=10,9) | PASS | 1/1 |
+| PAD_REFLECT_1D (f32, ne=[3000,384,4,1], pad=10,9) | PASS | 1/1 |
+| **Total PAD_REFLECT_1D** | **PASS** | **2/2** |
+
+**Regression:** SCALE: 4/4 tests pass — no regressions
+**Issues:** None.
+**Next task:** task_021 (RMS_NORM) — first priority-4 kernel, requires warp-level reduction
+**Completion:** 20/48 tasks completed

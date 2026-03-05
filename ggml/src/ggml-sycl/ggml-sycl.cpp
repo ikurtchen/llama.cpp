@@ -57,6 +57,7 @@
 #include "ggml-sycl/ssm_conv.hpp"
 #include "ggml-sycl/cpy.hpp"
 #include "ggml-sycl/pad.hpp"
+#include "ggml-sycl/pad_reflect_1d.hpp"
 #include "ggml-sycl/roll.hpp"
 #include "ggml-sycl/tsembd.hpp"
 #include "ggml.h"
@@ -3700,7 +3701,7 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             ggml_sycl_op_concat(ctx, dst);
             break;
         case GGML_OP_PAD_REFLECT_1D:
-            // TODO implement pad reflect 1d kernel
+            ggml_sycl_op_pad_reflect_1d(ctx, dst);
             break;
         case GGML_OP_UPSCALE:
             // TODO implement upscale kernel
@@ -4436,7 +4437,7 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_REPEAT:
             return op->src[0]->type != GGML_TYPE_I32 && op->src[0]->type != GGML_TYPE_I16;
         case GGML_OP_PAD_REFLECT_1D:
-            return false;
+            return op->src[0]->type == GGML_TYPE_F32;
         case GGML_OP_SQR:
             return true;
         case GGML_OP_SQRT:
