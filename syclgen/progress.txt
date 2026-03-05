@@ -1753,3 +1753,69 @@ Created new files:
 **Issues:** None
 **Next task:** Check remaining pending tasks
 **Completion:** 43/48 tasks completed (task_047 abandoned)
+
+---
+
+## Session 44 — task_044: Migrate CONV_2D, CONV_2D_DW, CONV_TRANSPOSE_2D ops
+**Date:** 2026-03-05
+**Task:** Implement 2D convolution family kernels (standard, depthwise, transposed)
+**CUDA refs:** `ggml/src/ggml-cuda/conv2d.cu`, `conv2d-dw.cu`, `conv2d-transpose.cu`
+**Status:** COMPLETED
+
+### Implementation
+
+1. **Extended `ggml/src/ggml-sycl/conv.cpp`** (~400 lines added to existing file):
+
+   **CONV_2D (`ggml_sycl_op_conv2d`):**
+   - Templated `conv2d_sycl<T>` for F16 and F32 kernel weights (input always F32)
+   - Extracts conv2d_params struct: s0, s1, p0, p1, d0, d1, layout flags
+   - Asserts WHCN layout (`p[6] == false`), matching CUDA
+   - Each work-item computes one output element: loops over input channels and kernel window
+   - Uses stride, padding, and dilation support
+   - `sycl_max64`/`sycl_min64` helper functions for int64_t bounds computation
+   - `sycl::nd_range<1>` with SYCL_CONV2D_BLOCK_SIZE=256
+
+   **CONV_2D_DW (`ggml_sycl_op_conv2d_dw`):**
+   - Depthwise convolution: each channel convolved independently (no cross-channel mixing)
+   - Two separate kernel paths:
+     - `conv2d_dw_whcn_sycl` for standard WHCN layout (when `ggml_is_contiguous()`)
+     - `conv2d_dw_cwhn_sycl` for channel-last CWHN layout (when `ggml_is_contiguous_channels()`)
+   - F32 only (input, kernel, output), matching CUDA
+   - Same stride/padding/dilation support
+   - `sycl::nd_range<1>` with SYCL_CONV2D_DW_BLOCK_SIZE=256
+
+   **CONV_TRANSPOSE_2D (`ggml_sycl_op_conv2d_transpose`):**
+   - Transposed 2D convolution (deconvolution)
+   - F16 kernel weights, F32 input/output (matching CUDA exactly)
+   - For each output position, finds contributing input positions by checking stride alignment
+   - Stride-only support (no padding/dilation)
+   - `sycl::nd_range<1>` with SYCL_CONV2D_TRANSPOSE_BLOCK_SIZE=256
+
+2. **Updated `ggml/src/ggml-sycl/conv.hpp`:**
+   - Added 3 function declarations
+
+3. **Updated `ggml/src/ggml-sycl/presets.hpp`:**
+   - Added SYCL_CONV2D_BLOCK_SIZE, SYCL_CONV2D_DW_BLOCK_SIZE, SYCL_CONV2D_TRANSPOSE_BLOCK_SIZE macros
+
+4. **Wired into `ggml/src/ggml-sycl/ggml-sycl.cpp`:**
+   - compute_forward: replaced TODO stubs with actual function calls for all 3 ops
+   - supports_op: returns true unconditionally for all 3 ops (matching CUDA)
+
+### Key Design Decisions
+- All tensor metadata extracted to local variables before SYCL lambda capture (no host pointer captures)
+- Matches CUDA kernel logic exactly — no algorithmic changes
+- Type assertions within kernels catch unsupported combinations at runtime
+
+**Build:** Compiles cleanly on b60 (icpx 2025.1.1, GGML_SYCL=ON, GGML_SYCL_F16=ON)
+**Tests:**
+| Op | Result | Tests |
+|---|---|---|
+| CONV_2D (F16/F32 kernels, various shapes, stride/pad/dilation) | PASS | 1568/1568 |
+| CONV_2D_DW (F32, WHCN layout) | PASS | 4/4 |
+| CONV_TRANSPOSE_2D (F16 kernel, F32 in/out) | PASS | 3/3 |
+| **Total** | **PASS** | **1575/1575** |
+
+**Regression:** SCALE: 4/4 tests pass — no regressions
+**Issues:** None — clean first-attempt pass for all three kernels.
+**Next task:** task_045 (SOLVE_TRI) or task_046 (OPT_STEP_ADAMW/SGD)
+**Completion:** 44/48 tasks completed (task_047 abandoned)

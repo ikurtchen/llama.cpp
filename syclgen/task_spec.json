@@ -1151,7 +1151,9 @@
       "priority": 5,
       "name": "Migrate CONV_2D, CONV_2D_DW, CONV_TRANSPOSE_2D ops",
       "description": "Implement 2D convolution kernels. Complex: shared memory, templates. Existing empty stub: conv.cpp.",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-03-05T23:59:00Z",
+      "notes": "Implemented 3 SYCL convolution kernels in conv.cpp (~400 lines added): conv2d (templated F16/F32 kernel weights, stride/padding/dilation), conv2d_dw (depthwise with WHCN and CWHN layout support), conv2d_transpose (F16 kernel weights, F32 input/output, stride-only). Added block size macros to presets.hpp. Wired all 3 ops into compute_forward and supports_op. CONV_2D: 1568/1568 pass, CONV_2D_DW: 4/4 pass, CONV_TRANSPOSE_2D: 3/3 pass. SCALE regression: 4/4 pass.",
       "kernel_ids": [
         "ck_016",
         "ck_017",

@@ -4488,13 +4488,13 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             ggml_sycl_op_arange(ctx, dst);
             break;
         case GGML_OP_CONV_2D:
-            // TODO implement conv2d kernel
+            ggml_sycl_op_conv2d(ctx, dst);
             break;
         case GGML_OP_CONV_2D_DW:
-            // TODO implement conv2d dw kernel
+            ggml_sycl_op_conv2d_dw(ctx, dst);
             break;
         case GGML_OP_CONV_TRANSPOSE_2D:
-            // TODO implement conv2d transpose kernel
+            ggml_sycl_op_conv2d_transpose(ctx, dst);
             break;
         case GGML_OP_GET_ROWS_BACK:
             ggml_sycl_op_get_rows_back(ctx, dst);
@@ -4947,6 +4947,10 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
                 }
                 return false;
             }
+        case GGML_OP_CONV_2D:
+        case GGML_OP_CONV_2D_DW:
+        case GGML_OP_CONV_TRANSPOSE_2D:
+            return true;
         case GGML_OP_UNARY:
             switch (ggml_get_unary_op(op)) {
                 case GGML_UNARY_OP_SGN:
