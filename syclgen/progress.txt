@@ -23,7 +23,7 @@ Migration tasks created: 48 (2 infrastructure + 39 kernel + 1 integration)
 | task_003  | 3        | kernel         | SCALE                                   | pending |
 | task_004  | 3        | kernel         | DIAG_MASK_INF                           | pending |
 | task_005  | 3        | kernel         | Unary ops (SILU, GELU, RELU, etc.)      | DONE    |
-| task_006  | 3        | kernel         | GLU ops (SWIGLU, GEGLU, REGLU)          | pending |
+| task_006  | 3        | kernel         | GLU ops (SWIGLU, GEGLU, REGLU)          | DONE    |
 | task_007  | 3        | kernel         | Binary broadcast (ADD, MUL, DIV, etc.)  | pending |
 | task_008  | 3        | kernel         | CONCAT                                  | pending |
 | task_009  | 3        | kernel         | CPY/DUP/CONT                            | pending |
@@ -241,3 +241,42 @@ clamp, arange, upscale (require specialized parameters beyond the template)
 **Issues:** None.
 **Next task:** task_006 (GLU ops) or task_007 (Binary broadcast ADD/MUL/DIV)
 **Completion:** 5/48 tasks completed
+
+### Session 6 — 2026-03-05: task_006 (Migrate GLU ops)
+
+**Completed:** task_006 — GLU ops (gated activations) full migration
+**What was done:**
+
+1. **Wired 6 GLU sub-ops** into compute_forward and supports_op in ggml-sycl.cpp:
+   - GGML_GLU_OP_REGLU → ggml_sycl_reglu
+   - GGML_GLU_OP_GEGLU → ggml_sycl_geglu
+   - GGML_GLU_OP_SWIGLU → ggml_sycl_swiglu
+   - GGML_GLU_OP_SWIGLU_OAI → ggml_sycl_swiglu_oai
+   - GGML_GLU_OP_GEGLU_ERF → ggml_sycl_geglu_erf
+   - GGML_GLU_OP_GEGLU_QUICK → ggml_sycl_geglu_quick
+
+2. **Implemented swiglu_oai kernel** in element_wise.cpp:
+   - `swiglu_oai_single()` — host-side helper mirroring CUDA: clamps x/g, applies
+     `x / (1 + exp(-x * alpha)) * (1 + g)`
+   - `swiglu_oai_op_kernel<T>()` — SYCL device kernel with stride-based indexing
+   - `swiglu_oai_sycl<T>()` — launch wrapper using nd_range
+   - `ggml_sycl_swiglu_oai()` — host dispatch (F32-only, reads alpha/limit from op_params)
+
+3. **supports_op**: All 6 GLU sub-ops return `ggml_is_contiguous_1(op->src[0])`,
+   matching CUDA behavior.
+
+**Tests:**
+| Op | Result | Tests |
+|---|---|---|
+| REGLU | PASS | 24/24 |
+| GEGLU | PASS | 24/24 |
+| GEGLU_ERF | PASS | 24/24 |
+| GEGLU_QUICK | PASS | 24/24 |
+| SWIGLU | PASS | 24/24 |
+| SWIGLU_OAI | PASS | 8/8 |
+| **Total** | **PASS** | **128/128** |
+
+**Regression:** SCALE 4/4 pass — no regressions
+**Issues:** None.
+**Next task:** task_007 (Binary broadcast ADD/MUL/DIV)
+**Completion:** 6/48 tasks completed
