@@ -1022,7 +1022,9 @@
       "priority": 5,
       "name": "Migrate SSM_SCAN op",
       "description": "Implement Mamba selective scan kernels. Complex: shared memory, sequential recurrence. No existing SYCL stub.",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-03-05T21:55:00Z",
+      "notes": "Implemented ssm_scan.cpp (291 lines) with two kernel variants: ssm_scan_f32_sycl (Mamba-1: d_state=16, shared memory B/C, private register A/state) and ssm_scan_f32_group_sycl (Mamba-2: d_state=128/256, warp-level reduction, c_factor=d_state/WARP_SIZE). WARP_SIZE=16 gives c_factor=8 for d_state=128, c_factor=16 for d_state=256. All 3/3 tests pass on b60: Mamba-1 (d_state=16,head_dim=1,n_head=1024), Mamba-2 (d_state=128,head_dim=64,n_head=16), Mamba-2 (d_state=256,head_dim=64,n_head=8).",
       "kernel_ids": [
         "ck_105",
         "ck_106"

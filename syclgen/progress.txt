@@ -1505,3 +1505,65 @@ Implemented SYCL ROPE (Rotary Position Embedding) kernels — all 4 variants (no
 **Issues:** None.
 **Next task:** task_039 (SSM_SCAN) — Mamba selective scan kernel
 **Completion:** 38/48 tasks completed (task_047 abandoned)
+
+---
+
+## Session 39 — task_039: Migrate SSM_SCAN op (Mamba selective scan)
+**Date:** 2026-03-05
+**Task:** task_039 — Migrate SSM_SCAN op (kernel_ids: ck_105, ck_106)
+**CUDA ref:** ggml/src/ggml-cuda/ssm-scan.cu
+**Status:** COMPLETED
+
+### Files created:
+- `ggml/src/ggml-sycl/ssm_scan.cpp` (291 lines) — two kernel variants + host dispatch
+- `ggml/src/ggml-sycl/ssm_scan.hpp` — header declaring ggml_sycl_ssm_scan()
+
+### Files modified:
+- `ggml/src/ggml-sycl/ggml-sycl.cpp`:
+  - Added `#include "ggml-sycl/ssm_scan.hpp"` (line 59)
+  - compute_forward: GGML_OP_SSM_SCAN → ggml_sycl_ssm_scan(ctx, dst)
+  - supports_op: GGML_OP_SSM_SCAN — Mamba-1 requires d_state==16 && head_dim==1 && n_head%128==0 && n_group==1; Mamba-2 requires d_state∈{128,256} && head_dim%WARP_SIZE==0
+
+### Implementation details:
+
+1. **Mamba-1 kernel (`ssm_scan_f32_sycl`):**
+   - Template: splitD=128, N=16
+   - Grid: nd_range<1>(n_head * splitD, splitD) — one workgroup per head
+   - Shared memory: B[N] and C[N] arrays via `sycl::local_accessor`
+   - Private registers: A[N] and state[N] for per-thread recurrence
+   - Sequential loop over time steps: for each t, load A/B/C/D/x/dt, compute softplus(dt), update state = state*dA + dB*x, output = state*C + D*x
+   - Non-CUB path from CUDA — simple strided reads for A and s0
+
+2. **Mamba-2 grouped kernel (`ssm_scan_f32_group_sycl`):**
+   - Template parameters: c_factor, d_state (instantiated for d_state=128 and d_state=256)
+   - c_factor = d_state / WARP_SIZE: 8 for d_state=128, 16 for d_state=256 (differs from CUDA which uses WARP_SIZE=32)
+   - Grid: nd_range<1>(n_head * WARP_SIZE, WARP_SIZE) — one warp per head
+   - Each thread handles c_factor states in private register arrays
+   - `[[sycl::reqd_sub_group_size(WARP_SIZE)]]` attribute for sub-group operations
+   - warp_reduce_sum() from common.hpp for cross-thread reduction of y values
+   - Sequential recurrence over time steps with state[c_factor] private array
+
+3. **Host dispatch (`ggml_sycl_ssm_scan`):**
+   - Branches on src3_nb1 to distinguish Mamba-2 (d_state > 1) vs Mamba-1
+   - For Mamba-2: further branches on d_state (128 or 256) for template instantiation
+   - For Mamba-1: launches ssm_scan_f32_sycl<128, 16>
+
+### Key SYCL adaptations:
+- WARP_SIZE=16 on Intel (vs 32 on CUDA) → c_factor doubles for Mamba-2 kernels
+- sycl::local_accessor replaces CUDA __shared__ memory
+- sub_group.get_local_linear_id() replaces threadIdx.x % warpSize
+- warp_reduce_sum() free function from common.hpp:444 replaces CUDA warp shuffle reduction
+- No CUB equivalent needed — Mamba-1 uses simple strided reads
+
+**Build:** Compiles cleanly on b60 (icpx 2025.1, GGML_SYCL=ON, GGML_SYCL_F16=ON)
+**Tests:**
+| Op | Result | Tests |
+|---|---|---|
+| SSM_SCAN (d_state=16, head_dim=1, n_head=1024, Mamba-1) | PASS | 1/1 |
+| SSM_SCAN (d_state=128, head_dim=64, n_head=16, Mamba-2) | PASS | 1/1 |
+| SSM_SCAN (d_state=256, head_dim=64, n_head=8, Mamba-2) | PASS | 1/1 |
+| **Total** | **PASS** | **3/3** |
+
+**Issues:** None. All tests pass first try.
+**Next task:** task_040 (RWKV WKV6/WKV7) — WKV attention kernels
+**Completion:** 39/48 tasks completed (task_047 abandoned)
