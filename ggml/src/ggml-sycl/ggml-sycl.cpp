@@ -60,6 +60,7 @@
 #include "ggml-sycl/pad_reflect_1d.hpp"
 #include "ggml-sycl/roll.hpp"
 #include "ggml-sycl/tsembd.hpp"
+#include "ggml-sycl/softmax.hpp"
 #include "ggml.h"
 
 static bool g_sycl_loaded = false;
@@ -3778,10 +3779,10 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             ggml_sycl_op_diag_mask_inf(ctx, dst);
             break;
         case GGML_OP_SOFT_MAX:
-            // TODO implement softmax kernel
+            ggml_sycl_op_soft_max(ctx, dst);
             break;
         case GGML_OP_SOFT_MAX_BACK:
-            // TODO implement softmax back kernel
+            ggml_sycl_op_soft_max_back(ctx, dst);
             break;
         case GGML_OP_ROPE:
             // TODO implement rope kernel
@@ -4471,9 +4472,13 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_DIAG_MASK_INF:
             return true;
         case GGML_OP_SOFT_MAX:
-            return false;
+        {
+            // Match CUDA: F32 source, optional F16/F32 mask
+            return op->src[0]->type == GGML_TYPE_F32 &&
+                   (!op->src[1] || op->src[1]->type == GGML_TYPE_F16 || op->src[1]->type == GGML_TYPE_F32);
+        }
         case GGML_OP_SOFT_MAX_BACK:
-            return false;
+            return op->src[0]->type == GGML_TYPE_F32;
         case GGML_OP_ROPE:
             return false;
         case GGML_OP_IM2COL:

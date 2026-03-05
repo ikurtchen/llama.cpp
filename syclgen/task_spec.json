@@ -644,7 +644,9 @@
       "priority": 4,
       "name": "Migrate SOFT_MAX op",
       "description": "Implement soft_max_f32 kernel. Requires warp reduction, optional mask and ALiBi. Existing empty stub: softmax.cpp.",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-03-05T20:30:00Z",
+      "notes": "Implemented soft_max_f32_sycl (forward) and soft_max_back_f32 (backward) in softmax.cpp (251 lines). Forward: block_size=256, nd_range<1>, 3-pass (load+max, exp+sum, normalize) with block_reduce<MAX/SUM> + broadcast. Supports F16/F32 mask, optional sinks, ALiBi via get_alibi_slope. Uses local memory cache when row fits in 48KB, falls back to dst buffer otherwise. Backward: WARP_SIZE threads per row, warp_reduce_sum for dot product. Tests: SOFT_MAX 212/212 pass, SOFT_MAX_BACK 24/24 pass, SCALE regression 4/4 pass.",
       "kernel_ids": [
         "ck_098",
         "ck_099"

@@ -42,7 +42,7 @@ Migration tasks created: 48 (2 infrastructure + 39 kernel + 1 integration)
 | task_022  | 4        | kernel         | NORM, GROUP_NORM                        | pending |
 | task_023  | 4        | kernel         | L2_NORM                                 | pending |
 | task_024  | 4        | kernel         | RMS_NORM_BACK                           | pending |
-| task_025  | 4        | kernel         | SOFT_MAX, SOFT_MAX_BACK                 | pending |
+| task_025  | 4        | kernel         | SOFT_MAX, SOFT_MAX_BACK                 | DONE    |
 | task_026  | 4        | kernel         | ROPE, ROPE_BACK                         | pending |
 | task_027  | 4        | kernel         | GET_ROWS, GET_ROWS_BACK                 | pending |
 | task_028  | 4        | kernel         | SET, SET_ROWS                           | pending |
@@ -877,3 +877,56 @@ intentionally deferred — the scalar kernel handles all cases correctly.
 **Issues:** None.
 **Next task:** task_025 (SOFT_MAX, SOFT_MAX_BACK) — requires warp reduction, mask, and ALiBi support
 **Completion:** 24/48 tasks completed
+
+### Session 25 — 2026-03-05: task_025 (Migrate SOFT_MAX and SOFT_MAX_BACK ops)
+
+**Completed:** task_025 — SOFT_MAX forward and backward kernel migration
+**What was done:**
+
+1. **Implemented `ggml/src/ggml-sycl/softmax.cpp`** (251 lines, was empty stub):
+
+   **soft_max_f32_sycl<T, use_shared>** — templated forward kernel:
+   - `nd_range<1>` with block_size=256, one work-group per row
+   - Decomposes flat group_id into (i01, i02, i03) for mask addressing and ALiBi slope
+   - 3-pass algorithm:
+     1. Load + scale + mask + track max per work-item
+     2. `block_reduce<MAX>` + broadcast → exp(val - max) + accumulate sum
+     3. `block_reduce<SUM>` + broadcast → normalize by 1/sum
+   - Supports optional mask (F16 or F32 via template T)
+   - Supports optional attention sinks (src2)
+   - ALiBi slope via existing `get_alibi_slope()` from common.hpp
+   - `use_shared=true`: caches intermediate values in local memory (WARP_SIZE + padded_ncols floats)
+   - `use_shared=false`: uses dst buffer as scratch when row too large for 48KB local memory
+   - `[[sycl::reqd_sub_group_size(WARP_SIZE)]]` attribute
+
+   **ggml_sycl_op_soft_max** — host dispatch:
+   - Extracts scale, max_bias from op_params, computes ALiBi params (n_head_log2, m0, m1)
+   - Selects use_shared based on 48KB local memory limit
+   - Dispatches to 4 template variants: {float, sycl::half} × {true, false}
+
+   **ggml_sycl_op_soft_max_back** — backward kernel:
+   - block_size = WARP_SIZE (single warp per row)
+   - Computes `dgf_dot = sum(dstf[col] * grad[col])` via `warp_reduce_sum`
+   - Output: `scale * (grad[col] - dgf_dot) * dstf[col]`
+
+2. **Wired into `ggml-sycl.cpp`:**
+   - Added `#include "ggml-sycl/softmax.hpp"` (line 63)
+   - compute_forward: SOFT_MAX → ggml_sycl_op_soft_max, SOFT_MAX_BACK → ggml_sycl_op_soft_max_back
+   - supports_op: SOFT_MAX → F32 source + optional F16/F32 mask; SOFT_MAX_BACK → F32
+
+3. **Build fix:** `ctx.stream()` returns `queue_ptr` (pointer), changed to `*ctx.stream()` for reference binding.
+
+4. **Skipped:** Cooperative groups "parallelize_cols" path for very large rows — not needed for typical LLM workloads and not available in SYCL.
+
+**Build:** Compiles cleanly on b60 (icpx 2025.1.1, GGML_SYCL=ON, GGML_SYCL_F16=ON)
+**Tests:**
+| Op | Result | Tests |
+|---|---|---|
+| SOFT_MAX (f32, mask/no-mask, sinks, f16/f32 mask, various scales, max_bias, inplace) | PASS | 212/212 |
+| SOFT_MAX_BACK (f32, max_bias=0.0) | PASS | 24/24 |
+| **Total** | **PASS** | **236/236** |
+
+**Regression:** SCALE: 4/4 tests pass — no regressions
+**Issues:** None.
+**Next task:** task_026 (ROPE, ROPE_BACK) — element-wise with trig, multiple kernel variants
+**Completion:** 25/48 tasks completed
