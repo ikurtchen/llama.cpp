@@ -1027,3 +1027,45 @@ Implemented SYCL ROPE (Rotary Position Embedding) kernels — all 4 variants (no
 **Issues:** None.
 **Next task:** task_028
 **Completion:** 27/48 tasks completed
+
+### Session 28 — 2026-03-05: task_028 (Migrate SET and SET_ROWS ops)
+
+**Completed:** task_028 — SET (strided tensor write) and SET_ROWS (scatter write by index) kernel migration
+**What was done:**
+
+1. **Implemented `ggml/src/ggml-sycl/set.cpp`** (42 lines, was empty stub):
+   - `ggml_sycl_op_set` — direct port of CUDA `ggml_cuda_op_set`
+   - Leverages existing `ggml_sycl_cpy` for both operations:
+     - If not inplace: copies src0 → dst
+     - Creates a `ggml_tensor dst_view` struct pointing into dst at offset, with src1's shape and custom strides (nb1, nb2, nb3 from op_params)
+     - Copies src1 → dst_view
+   - Supports F32 and I32 types
+   - All three tensors required to be contiguous
+
+2. **Implemented `ggml/src/ggml-sycl/set_rows.cpp`** (141 lines, was empty stub):
+   - `k_set_rows<src_t, idx_t, dst_t>` — templated SYCL kernel for scatter-write by index
+   - Flat index decomposition via plain `%` and `/` (no fast_div_modulo)
+   - Maps to src1 indices with modular wrapping (i12 = i03 % ne12, i11 = i02 % ne11)
+   - Looks up `dst_row` from index tensor, reads from src0_row, writes to dst_row_ptr
+   - `set_rows_sycl<idx_t>` — dispatch over dst type (F32/F16/BF16)
+   - `ggml_sycl_op_set_rows` — entry point dispatching I64 vs I32 index types
+   - Uses `SYCL_SET_BLOCK_SIZE` (256) from presets.hpp
+
+3. **Wired into `ggml-sycl.cpp`:**
+   - compute_forward: SET → `ggml_sycl_op_set(ctx, dst)`, SET_ROWS → `ggml_sycl_op_set_rows(ctx, dst)` (replaced TODO stubs)
+   - supports_op: SET → returns (F32 || I32) && all same type; SET_ROWS → returns (F32 || F16 || BF16) dst + F32 src + (I64 || I32) idx
+
+4. **Deferred:** Quantized SET_ROWS types (Q4_0, Q4_1, Q5_0, Q5_1, Q8_0, IQ4_NL) — requires quantize_func device code
+
+**Build:** Compiles cleanly on b60 (icpx 2025.1.1, GGML_SYCL=ON, GGML_SYCL_F16=ON)
+**Tests:**
+| Op | Result | Tests |
+|---|---|---|
+| SET (f32/i32, dims 1-3, inplace/non-inplace) | PASS | 12/12 |
+| SET_ROWS (f32/f16/bf16 dst, i32/i64 idx) | PASS | 62/62 |
+| **Total** | **PASS** | **74/74** |
+
+**Regression:** SCALE: 4/4 tests pass — no regressions
+**Issues:** None.
+**Next task:** task_029 (SUM, SUM_ROWS, MEAN)
+**Completion:** 28/48 tasks completed

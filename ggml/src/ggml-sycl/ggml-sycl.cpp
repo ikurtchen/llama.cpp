@@ -3564,10 +3564,10 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
             ggml_sycl_op_get_rows(ctx, dst);
             break;
         case GGML_OP_SET:
-            // TODO implement set kernel
+            ggml_sycl_op_set(ctx, dst);
             break;
         case GGML_OP_SET_ROWS:
-            // TODO implement set rows kernel
+            ggml_sycl_op_set_rows(ctx, dst);
             break;
         case GGML_OP_DUP:
             ggml_sycl_dup(ctx, dst);
@@ -4392,9 +4392,18 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_GET_ROWS_BACK:
             return op->type == GGML_TYPE_F32 && op->src[0]->type == GGML_TYPE_F32 && op->ne[2] == 1 && op->ne[3] == 1;
          case GGML_OP_SET:
-            return false;
+        {
+            const ggml_type t = op->type;
+            return (t == GGML_TYPE_F32 || t == GGML_TYPE_I32) &&
+                t == op->src[0]->type &&
+                t == op->src[1]->type;
+        }
         case GGML_OP_SET_ROWS:
-            return false;
+        {
+            return (op->type == GGML_TYPE_F32 || op->type == GGML_TYPE_F16 || op->type == GGML_TYPE_BF16) &&
+                   op->src[0]->type == GGML_TYPE_F32 &&
+                   (op->src[1]->type == GGML_TYPE_I64 || op->src[1]->type == GGML_TYPE_I32);
+        }
         case GGML_OP_CPY:
         {
             ggml_type src0_type = op->src[0]->type;

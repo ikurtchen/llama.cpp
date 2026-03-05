@@ -733,7 +733,9 @@
       "priority": 4,
       "name": "Migrate SET and SET_ROWS ops",
       "description": "Implement set and set_rows kernels. Existing empty stubs: set.cpp, set_rows.cpp.",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-03-05T21:00:00Z",
+      "notes": "SET: Implemented ggml_sycl_op_set in set.cpp (42 lines) — leverages existing ggml_sycl_cpy for both full-tensor copy and strided view copy. Supports F32 and I32 types. SET: 12/12 tests passed. SET_ROWS: Implemented ggml_sycl_op_set_rows in set_rows.cpp (141 lines) — templated kernel k_set_rows with F32/F16/BF16 dst types, I32/I64 index types. Uses plain % and / for index decomposition. Quantized types deferred. SET_ROWS: 62/62 tests passed. SCALE regression: 4/4 passed.",
       "kernel_ids": [
         "ck_095",
         "ck_096"
