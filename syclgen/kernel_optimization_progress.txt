@@ -5,9 +5,9 @@
 
 ## Summary
 - Total SYCL kernels to analyze: 54
-- Kernels analyzed so far: 8
+- Kernels analyzed so far: 9
 - Analysis complete: No
-- Kernels with optimization potential: 8
+- Kernels with optimization potential: 9
 - Optimization tasks created: 0 (pending finalization)
 
 ## Kernels Analyzed
@@ -19,7 +19,7 @@
 - [x] sk_006: MUL_MAT_ID kernels — high potential
 - [x] sk_007: quantize_sycl — low potential
 - [x] sk_008: vecdotq — medium potential
-- [ ] sk_009: dequantize device functions — pending
+- [x] sk_009: dequantize device functions — medium potential
 - [ ] sk_010: element_wise (unary ops) — pending
 - [ ] sk_011: element_wise (GLU ops) — pending
 - [ ] sk_012: element_wise (special unary) — pending
@@ -67,6 +67,7 @@
 - [ ] sk_054: upscale (inline) — pending
 
 ## Recent Activity
+[2026-03-06] Analyzed dequantize device functions (sk_009). Found 5 optimization opportunities (medium potential). Key findings: Mix of per-element helpers (6 functions) and block dequantization kernel bodies (17 functions). Purely memory-bandwidth bound. Strided output writes (stride 32) waste bandwidth. Only Q4_K reorder uses vectorized loads. Only 3/17+ formats have SoA reorder variants. Inconsistent #pragma unroll. nd_item<3> DPCT artifacts pervasive.
 [2026-03-06] Analyzed vecdotq device functions (sk_008). Found 5 optimization opportunities (medium potential). Key findings: 1361 lines of device helper functions (NOT kernels) called by MMVQ/DMMV. Heavy DPCT artifacts (dp4a, vectorized_binary, byte_level_permute). Inconsistent get_int_from_* helpers (non-aligned 4-byte-load vs aligned single-load). Only 3/20+ formats have reorder (SoA) variants. IQ format loops missing #pragma unroll. DPCT_COMPATIBILITY_TEMP CUDA artifact may incorrectly gate IQ format support.
 [2026-03-06] Analyzed kernel quantize_sycl Q8_1 (sk_007). Found 3 optimization opportunities (low potential). Key findings: Already well-implemented with correct sub-group size (16), vectorized vec2 loads/stores, and proper sycl::reduce_over_group reductions. Purely memory-bandwidth bound (0.16 ops/byte). WG size 16 is suboptimal but hardware compensates via concurrent WG scheduling. SoA reorder variant enables cache-friendly layout for downstream matmul. This is a utility kernel with low optimization ROI.
 [2026-03-06] Analyzed kernel MUL_MAT_ID (sk_006). Found 5 optimization opportunities (high potential). Key findings: CRITICAL blocking D2H copy of ids tensor creates pipeline stall (30-60% latency). ne12==1 path launches individual MUL_MAT per token-expert pair instead of batched compaction. No GPU-side mm_ids_helper equivalent — host-side sequential expert processing. k_copy_src1_to_contiguous/k_copy_dst_from_contiguous are simple copy kernels but are launched per-expert serially. ~10-20% hardware efficiency.
