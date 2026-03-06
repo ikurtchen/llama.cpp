@@ -5,14 +5,14 @@
 
 ## Summary
 - Total SYCL kernels to analyze: 54
-- Kernels analyzed so far: 1
+- Kernels analyzed so far: 2
 - Analysis complete: No
-- Kernels with optimization potential: 1
+- Kernels with optimization potential: 2
 - Optimization tasks created: 0 (pending finalization)
 
 ## Kernels Analyzed
 - [x] sk_001: mul_mat_q (MMQ) — high potential
-- [ ] sk_002: mul_mat_vec_q (MMVQ) — pending
+- [x] sk_002: mul_mat_vec_q (MMVQ) — high potential
 - [ ] sk_003: dequantize_mul_mat_vec (DMMV) — pending
 - [ ] sk_004: dequantize_block_sycl (convert) — pending
 - [ ] sk_005: outprod (oneMKL GEMM) — pending
@@ -67,4 +67,5 @@
 - [ ] sk_054: upscale (inline) — pending
 
 ## Recent Activity
+[2026-03-06] Analyzed kernel mul_mat_vec_q (MMVQ) (sk_002). Found 7 optimization opportunities (high potential). Key findings: legacy kernels use work-group size of only 16 (should be 256), no SLM caching of shared Y vector, manual shuffle reduction (DPCT artifact), no vectorized loads, reorder support limited to 3/20 formats. This kernel is critical for single-token inference latency.
 [2026-03-06] Analyzed kernel mul_mat_q (MMQ) (sk_001). Found 8 optimization opportunities (high potential). Key findings: work-group size 64 (should be 256+), missing reqd_sub_group_size, no XMX/joint_matrix usage, no vectorized loads, CUDA SLM padding patterns.

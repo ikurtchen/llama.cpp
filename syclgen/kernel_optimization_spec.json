@@ -179,11 +179,165 @@
       "overall_optimization_potential": "high",
       "estimated_current_efficiency": "15-25%",
       "efficiency_notes": "This is a DPCT-migrated kernel running with CUDA-optimized tile sizes (optimized for NVIDIA Ampere with warp size 32, then scaled down to warp size 16). The work-group size of 64 is far below Intel's preferred 256-512. No XMX utilization despite having 160 XMX engines. Scalar dp4a instead of hardware matrix multiply. Minimal SLM utilization (3-5 KB of 64 KB available). No vectorized loads. The kernel functions correctly but is leaving substantial performance on the table."
+    },
+    {
+      "kernel_id": "sk_002",
+      "name": "mul_mat_vec_q (MMVQ)",
+      "file": "ggml/src/ggml-sycl/mmvq.cpp",
+      "source_cuda_ids": ["ck_074"],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size_legacy": [1, 1, 16],
+          "work_group_size_legacy_total": 16,
+          "work_group_size_reordered": [1, 1, 256],
+          "work_group_size_reordered_total": 256,
+          "sub_group_size": 16,
+          "sub_group_size_specified": true,
+          "sub_group_size_attribute": "[[sycl::reqd_sub_group_size(WARP_SIZE)]]",
+          "global_size_expression": "Legacy: (1, 1, ceil(nrows/MMV_Y)) * (1, 1, WARP_SIZE). Reordered: (1, 1, block_num_y * WARP_SIZE) with WG=(1, 1, num_subgroups*WARP_SIZE)",
+          "notes": "Two distinct launch patterns: legacy kernels (used for 17 of 20 formats) have a work-group size of only 16 (1 sub-group), which is far below Intel's recommended 256-512. Reordered kernels (Q4_0, Q4_K, Q6_K only) use 256 work-items (16 sub-groups per work-group), which is properly tuned. GGML_SYCL_MMV_Y=1 means only 1 row per sub-group. All launches correctly specify [[sycl::reqd_sub_group_size(WARP_SIZE)]]."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": false,
+          "coalesced_notes": "Legacy kernels use AoS (array-of-structures) block layout where adjacent sub-group lanes read different offsets within the same quantization block — not truly coalesced across blocks. Reordered kernels use SoA (structure-of-arrays) layout with contiguous quants separated from scales, providing much better coalescing.",
+          "strided_accesses": ["Legacy: x[ibx] indexed by row*blocks_per_row + i — AoS layout means quantization block fields (qs, d, qh, sc) are interleaved, causing strided access to each field", "Legacy: y[iby] indexed similarly with interleaved q8_1 block fields"],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "All loads use scalar 4-byte helpers: get_int_from_uint8() reconstructs ints from bytes, get_int_from_int8_aligned() does direct 4-byte cast. No sycl::vec types for memory loads. The reordered kernels access contiguous quant/scale regions via separated pointers, which is more bandwidth-efficient."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes": 0,
+          "potential_bank_conflicts": false,
+          "notes": "No SLM (shared local memory) is used by any MMVQ kernel variant. All communication is done via sub-group shuffles (dpct::permute_sub_group_by_xor in legacy, sycl::reduce_over_group in reordered). This means the Y vector data — shared across all sub-groups in a work-group — is redundantly loaded from global memory by each sub-group in the reordered kernels."
+        },
+        "reduction_pattern": {
+          "has_reduction": true,
+          "uses_sub_group_reduce": true,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "reduction_details": "Legacy: manual butterfly reduction via dpct::permute_sub_group_by_xor (DPCT artifact of CUDA __shfl_xor_sync), #pragma unroll for log2(WARP_SIZE)=4 iterations. Reordered: proper sycl::reduce_over_group(sub_group, val, std::plus<>()). Each sub-group reduces its partial dot product to a single scalar for one output row."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "accumulator_type": "float",
+          "dot_product_type": "int32 (via dpct::dp4a)",
+          "scale_type": "sycl::half2 -> float",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "FP32 accumulation is appropriate for numerical stability. Integer dp4a for quantized dot products. Optional GGML_SYCL_F16 build flag enables half-precision scale arithmetic in some vec_dot functions. joint_matrix is not directly applicable to matrix-vector (single vector) but could be used if multiple vectors were batched."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [],
+          "notes": "No transcendental math functions. All compute is integer bitwise ops, dp4a, and float multiply-add."
+        },
+        "loop_analysis": {
+          "hot_loops": [
+            "Main block loop (line ~80): iterates blocks_per_row/blocks_per_warp times, NOT unrolled (dynamic trip count based on ncols)",
+            "Inner elem loop (line ~84): iterates qi/vdr/WARP_SIZE times — typically 0 or 1 iterations for most formats, NOT unrolled in legacy (but IS unrolled in reordered kernels)",
+            "Reduction loop (line ~93): log2(WARP_SIZE)=4 iterations, UNROLLED via #pragma unroll",
+            "vecdotq.hpp inner loops: all short constant-trip-count loops with #pragma unroll (e.g., QR2_K=4, QR4_K=2 iterations)"
+          ],
+          "unrolled": true,
+          "notes": "Inner loops in vecdotq.hpp are properly unrolled. The main block loop cannot be unrolled (dynamic). The reordered kernels are better optimized with #pragma unroll on the inner element loop."
+        },
+        "estimated_bottleneck": "memory",
+        "bottleneck_notes": "Matrix-vector multiplication is inherently memory-bandwidth bound: each weight element is loaded once and used for exactly one multiply-add (arithmetic intensity ~0.5 ops/byte for Q4 formats). The B60's compute intensity threshold is ~27 ops/byte, so MMVQ is far below — it needs maximum memory bandwidth utilization. The legacy kernel's 16-thread work-group and AoS layout hurt bandwidth efficiency.",
+        "anti_patterns": [
+          "Legacy kernels: work-group size of 16 (1 sub-group) — far below Intel's recommended 256-512, poor occupancy and latency hiding",
+          "Legacy kernels: manual butterfly shuffle reduction (dpct::permute_sub_group_by_xor) instead of sycl::reduce_over_group — DPCT artifact",
+          "DPCT artifacts throughout: dpct::dp4a, dpct::vectorized_binary, dpct::permute_sub_group_by_xor, __dpct_inline__, DPCT_COMPATIBILITY_TEMP guards",
+          "3D nd_range with 2 unused dimensions (both dim0 and dim1 are trivially 1) — should be 1D",
+          "No SLM caching of Y vector — in reordered kernels with 16 sub-groups, each sub-group redundantly loads the same Y data from global memory (16x bandwidth waste for Y)",
+          "No vectorized loads — all scalar 4-byte loads via get_int_from_uint8/get_int_from_int8_aligned",
+          "Reorder support limited to 3 of 20 quantization formats (Q4_0, Q4_K, Q6_K) — other formats stuck with legacy AoS layout",
+          "Massive code duplication: 10 IQ-specific kernel functions nearly identical to the generic mul_mat_vec_q template (~430 lines of duplicate code)",
+          "~20 nearly-identical launcher functions differing only in template parameters (~500 lines)"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_002_001",
+          "category": "work_group_size",
+          "priority": "high",
+          "description": "Increase legacy kernel work-group size from 16 to 256 by adopting the reordered kernel's multi-sub-group pattern (16 sub-groups per work-group). Currently 17 of 20 formats use the legacy launch with only 16 work-items per work-group, resulting in severely underutilized Intel GPU hardware. Each sub-group still computes one row independently, but grouping 16 sub-groups into one work-group enables better scheduling and occupancy.",
+          "expected_improvement": "25-50% throughput improvement from better occupancy and memory-level parallelism. This is the single highest-impact optimization for MMVQ on Intel GPUs. The reordered kernel paths already demonstrate this pattern works correctly.",
+          "implementation_notes": "Change the legacy launcher from block_dims=(1,1,WARP_SIZE) to block_dims=(1,1,num_subgroups*WARP_SIZE) with num_subgroups=16. Adjust block_nums accordingly: block_num_z = ceil(nrows / (GGML_SYCL_MMV_Y * num_subgroups)). Each sub-group uses its sub-group ID to compute a different row. The reordered kernels (lines 537-554) serve as the template.",
+          "risk": "low",
+          "risk_notes": "The reordered kernels already prove this pattern works for Q4_0, Q4_K, Q6_K. The same pattern is straightforward to apply to all other formats since sub-groups are independent. Only risk is if nrows is not a multiple of 16 — need bounds checking (already present in the kernel via row < nrows guard)."
+        },
+        {
+          "id": "opt_002_002",
+          "category": "slm_tuning",
+          "priority": "high",
+          "description": "Cache Y vector data in SLM for the multi-sub-group work-groups. In the reordered kernels (and the proposed multi-sub-group legacy kernels), all 16 sub-groups in a work-group iterate over the same Y vector. Currently each sub-group independently loads Y from global memory, wasting 16x bandwidth on Y. By loading Y once per work-group into SLM and sharing it, Y-related global memory traffic drops by ~16x.",
+          "expected_improvement": "15-30% overall throughput improvement for memory-bound MMVQ. Y vector is typically ncols/QK8_1 blocks of 36 bytes each. For a 4096-column matrix with Q4_0: ncols/32 * 36 = 4608 bytes — easily fits in the 64KB SLM budget.",
+          "implementation_notes": "Allocate sycl::local_accessor for Y data. Have sub-group 0 (or all sub-groups cooperatively) load Y into SLM. Insert group_barrier(). Then all sub-groups read Y from SLM instead of global memory. For the main loop, load the next tile of Y data in a double-buffered fashion to overlap global loads with SLM reads.",
+          "risk": "medium",
+          "risk_notes": "Adds SLM pressure and barriers. For very large ncols, Y may not fit in SLM entirely — need tiled loading. The barrier overhead must not exceed the bandwidth savings. For small nrows (few sub-groups active), the benefit diminishes."
+        },
+        {
+          "id": "opt_002_003",
+          "category": "sub_group_ops",
+          "priority": "medium",
+          "description": "Replace all 10 instances of manual dpct::permute_sub_group_by_xor butterfly reduction in legacy kernels with sycl::reduce_over_group(sub_group, val, sycl::plus<float>()). The reordered kernels already use the correct SYCL idiom. The manual shuffle reduction is a DPCT artifact and may not compile to optimal code on Intel GPUs.",
+          "expected_improvement": "3-8% improvement. The compiler may generate better reduction code from the high-level reduce_over_group API than from the manual butterfly pattern. More importantly, it removes a DPCT dependency.",
+          "implementation_notes": "In each of the 10 IQ-variant kernels and the generic mul_mat_vec_q, replace the '#pragma unroll for (mask = WARP_SIZE/2; ...) { tmp += dpct::permute_sub_group_by_xor(sg, tmp, mask); }' with 'tmp = sycl::reduce_over_group(item_ct1.get_sub_group(), tmp, sycl::plus<float>());'. Alternatively, use the existing warp_reduce_sum() helper from common.hpp.",
+          "risk": "low",
+          "risk_notes": "Direct replacement with standard SYCL API. The reordered kernels already prove this works correctly. No algorithmic change — same mathematical result."
+        },
+        {
+          "id": "opt_002_004",
+          "category": "vectorization",
+          "priority": "medium",
+          "description": "Use vectorized 8-byte or 16-byte loads (sycl::vec<uint32_t, 2> or sycl::vec<uint32_t, 4>) for loading quantization blocks from global memory. Currently all loads are scalar 4-byte via get_int_from_uint8/get_int_from_int8_aligned. Wider loads reduce the number of memory transactions and better utilize the memory bus.",
+          "expected_improvement": "10-20% improvement in memory throughput for the weight loading phase. Impact is higher for simpler formats (Q4_0, Q8_0) where the quant data is more regular.",
+          "implementation_notes": "In vecdotq.hpp vec_dot functions, replace pairs of sequential get_int calls with a single sycl::vec<uint32_t, 2> load. For Q4_0: currently loads v.x and v.y separately — load as sycl::vec<uint32_t, 2>. Must verify 8-byte alignment of quantization block qs fields. The reordered layout (contiguous quants) is more amenable to vectorization than the AoS layout.",
+          "risk": "medium",
+          "risk_notes": "Alignment requirements must be verified per format. IQ formats have irregular layouts that may not support aligned wide loads. Need to handle the tail case when the quant data size is not a multiple of the vector width."
+        },
+        {
+          "id": "opt_002_005",
+          "category": "memory_coalescing",
+          "priority": "medium",
+          "description": "Extend the reordered (SoA) data layout support from the current 3 formats (Q4_0, Q4_K, Q6_K) to all commonly-used quantization formats, particularly Q8_0, Q5_0, Q5_1, Q4_1, Q2_K, Q3_K, Q5_K. The reordered layout separates quant bytes from scale factors into contiguous regions, enabling coalesced memory access patterns that dramatically improve memory bandwidth utilization.",
+          "expected_improvement": "20-40% throughput improvement for each newly-supported format. The existing Q4_0/Q4_K/Q6_K reordered paths demonstrate the performance benefit. Most LLM models use Q4_K or Q6_K, but Q8_0 and Q5_K are also common.",
+          "implementation_notes": "For each new format: 1) Add reorder_tensor support in quants.hpp/cpp (SoA packing). 2) Implement reorder_mul_mat_vec_<fmt>_q8_1_sycl launcher. 3) Implement the reordered kernel using block_type::get_block_offset(). 4) Wire into the dispatch switch in ggml_sycl_op_mul_mat_vec_q. The existing Q4_0 reorder implementation serves as a template.",
+          "risk": "medium",
+          "risk_notes": "Each format has a different block structure, so the reordering logic must be format-specific. Complex formats like Q3_K and Q5_K have multiple sub-fields (qs, qh, scales, d) that all need separate contiguous regions. Must ensure the reorder/dereorder is compatible with other kernel paths that may access the same tensor."
+        },
+        {
+          "id": "opt_002_006",
+          "category": "data_type",
+          "priority": "low",
+          "description": "Enable GGML_SYCL_F16 build flag to use half-precision arithmetic for scale factor multiplication in vec_dot functions. Several vecdotq.hpp functions (Q4_0, Q4_1, Q5_0, Q5_1) have conditional FP16 paths under #ifdef GGML_SYCL_F16 that perform dm4 * ds8 in half precision before converting to float.",
+          "expected_improvement": "5-10% for applicable formats. FP16 compute is 2x faster than FP32 on Xe2. However, the scale multiplication is a small fraction of the total compute (dominated by dp4a integer ops), so the overall impact is modest.",
+          "implementation_notes": "Add -DGGML_SYCL_F16=ON to the CMake build flags. Verify numerical accuracy by running the full test suite with this flag enabled. The GGML_SYCL_F16 paths in vecdotq.hpp (lines ~532, ~614, ~666) are already implemented but disabled by default.",
+          "risk": "medium",
+          "risk_notes": "FP16 has lower precision (~3.3 decimal digits vs ~7 for FP32). For some quantization formats with large scale factors, the reduced precision could introduce noticeable numerical errors. Must validate with accuracy tests, especially for larger models."
+        },
+        {
+          "id": "opt_002_007",
+          "category": "reduction",
+          "priority": "low",
+          "description": "Clean up DPCT artifacts: replace dpct::dp4a with sycl::vec<int8_t,4> dot product or direct dp4a intrinsic, replace dpct::vectorized_binary with standard SYCL vector operations, remove DPCT_COMPATIBILITY_TEMP guards, replace __dpct_inline__ with standard inline hints.",
+          "expected_improvement": "Minimal direct performance impact. Primarily a code quality and maintainability improvement. May enable better compiler optimization by using standard SYCL constructs.",
+          "implementation_notes": "1) dpct::dp4a -> use sycl::dot() on char4 types or keep the dp4a helper but move it out of dpct namespace. 2) dpct::vectorized_binary -> use sycl::vec operations. 3) Remove DPCT_COMPATIBILITY_TEMP checks (always true for Intel). 4) __dpct_inline__ -> inline or SYCL_EXTERNAL. 5) dpct::queue_ptr -> sycl::queue*.",
+          "risk": "low",
+          "risk_notes": "Straightforward refactoring. Each replacement can be tested independently. No algorithmic changes."
+        }
+      ],
+      "overall_optimization_potential": "high",
+      "estimated_current_efficiency": "20-30%",
+      "efficiency_notes": "MMVQ is inherently memory-bandwidth bound (arithmetic intensity ~0.5 ops/byte for Q4 formats vs the 27 ops/byte compute intensity threshold). The key to performance is maximizing memory bandwidth utilization. The legacy kernel path (17 of 20 formats) uses only 16 work-items per work-group — a severe occupancy limitation on Intel GPUs. The reordered kernels (3 formats) are much better at 256 work-items and SoA layout, but still miss SLM caching of the shared Y vector. The kernel is critical for single-token inference (autoregressive decoding), where the matrix is weights and the vector is the hidden state — this path dominates inference latency."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 1,
-    "high_potential": 1,
+    "total_kernels_analyzed": 2,
+    "high_potential": 2,
     "medium_potential": 0,
     "low_potential": 0,
     "no_optimization_needed": 0,
@@ -207,6 +361,20 @@
         "kernel_name": "mul_mat_q (MMQ)",
         "optimization_id": "opt_001_003",
         "description": "Replace dp4a with joint_matrix (XMX) for 4-8x int8 matmul throughput",
+        "priority": "high"
+      },
+      {
+        "kernel_id": "sk_002",
+        "kernel_name": "mul_mat_vec_q (MMVQ)",
+        "optimization_id": "opt_002_001",
+        "description": "Increase legacy kernel work-group size from 16 to 256 (adopt reordered kernel pattern for all formats)",
+        "priority": "high"
+      },
+      {
+        "kernel_id": "sk_002",
+        "kernel_name": "mul_mat_vec_q (MMVQ)",
+        "optimization_id": "opt_002_002",
+        "description": "Cache Y vector in SLM to eliminate 16x redundant global memory loads across sub-groups",
         "priority": "high"
       }
     ]
