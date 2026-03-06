@@ -2662,12 +2662,129 @@
       "overall_optimization_potential": "low",
       "estimated_current_efficiency": "50-65%",
       "efficiency_notes": "The getrows kernel is a clean native SYCL port with minimal DPCT artifacts (only the nd_range<3> layout). The template-based dequant_traits dispatch is actually superior to CUDA's function pointer approach. The forward kernels are simple gather operations with WG=256, which is correct for Intel GPUs. The main optimization gaps are: (1) no vectorized loads/stores for the float copy path — this is the highest-impact opportunity since F32→F32 embedding lookup is a pure memory copy. (2) Missing reqd_sub_group_size attribute. (3) nd_range<3> cleanup. (4) The backward kernel uses brute-force serial scan, but this is training-only and both CUDA and SYCL share the same limitation. Overall low optimization potential because: get_rows is called infrequently during inference (only for initial token embedding lookup), the gather pattern means performance is dominated by cache behavior rather than kernel efficiency, and the kernel is already well-structured with correct work-group size."
+    },
+    {
+      "kernel_id": "sk_019",
+      "name": "cpy (tensor copy with type conversion)",
+      "file": "ggml/src/ggml-sycl/cpy.cpp",
+      "source_cuda_ids": ["ck_041", "ck_042", "ck_043", "ck_044", "ck_045"],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "nd_range_dims": 1,
+          "work_group_size": [256],
+          "work_group_size_total": 256,
+          "sub_group_size": null,
+          "sub_group_size_specified": false,
+          "sub_group_size_attribute": "none — missing on both kernel functions",
+          "global_size_expression": "nd_range<1>(num_blocks * 256, 256) where num_blocks = ceil(ne / 256), ne = total elements",
+          "notes": "Both k_cpy_scalar and k_cpy_scalar_contiguous use identical nd_range<1> with WG=256 (SYCL_CPY_BLOCK_SIZE). This is clean native SYCL with no DPCT artifacts. WG=256 is appropriate for Intel GPUs. Missing [[sycl::reqd_sub_group_size(WARP_SIZE)]] on both kernels. The same-type contiguous case bypasses the kernel entirely with stream.memcpy() — optimal fast path. Each work-item processes exactly 1 element."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": "depends",
+          "coalesced_notes": "k_cpy_scalar_contiguous: perfectly coalesced — adjacent work-items access adjacent elements in both src and dst. k_cpy_scalar (non-contiguous): depends on the actual strides. For row-contiguous tensors (nb00 == sizeof(src_t)), the innermost dimension access is coalesced. For transposed or arbitrary-stride tensors, access can be completely non-coalesced since the 4D offset computation allows arbitrary byte strides.",
+          "strided_accesses": [
+            "k_cpy_scalar: arbitrary strides via nb00/nb01/nb02/nb03 and nb10/nb11/nb12/nb13 — the src and dst offset computations allow fully non-contiguous access patterns. For a transposed tensor (swapped nb01/nb00), adjacent work-items may access elements separated by full row strides.",
+            "k_cpy_scalar_contiguous: no strided accesses — purely sequential element access"
+          ],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "All loads and stores are scalar — one element per work-item. For the contiguous same-type case (F32→F32), this is a pure memcpy done with 4-byte scalar operations. sycl::vec<float,4> loads/stores would process 16 bytes per work-item. For F16→F32 conversion, vec4 loads of half4 with conversion to float4 would improve throughput. CUDA also uses scalar operations for cpy_scalar but has an optimized cpy_scalar_transpose with shared-memory tiling that SYCL lacks entirely."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes": 0,
+          "potential_bank_conflicts": false,
+          "notes": "No SLM used. CUDA has a cpy_scalar_transpose kernel that uses __shared__ float tile[32][33] (32x33 = 4224 bytes) for coalesced transpose via tiled shared memory — this entire kernel is missing from the SYCL port. For non-transpose copy, SLM is not beneficial since there's no data reuse."
+        },
+        "reduction_pattern": {
+          "has_reduction": false,
+          "notes": "No reduction. Pure element-wise copy/conversion."
+        },
+        "data_types": {
+          "compute_type": "varies",
+          "input_types": ["float", "sycl::half", "sycl_bf16", "int32_t"],
+          "output_types": ["float", "sycl::half", "sycl_bf16", "int32_t"],
+          "accumulator_type": "none",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "Supports 12 type combinations via template instantiation: F32↔F16, F32↔I32, F32↔BF16, F16↔BF16, and same-type (F32, F16, I32, BF16). Type conversion is done via C-style cast (dst_t)(src_t) which goes through float intermediary for half/bf16 conversions. CUDA additionally supports float→quantized (cpy_f32_q) and quantized→float (cpy_q_f32) copy paths that the SYCL version lacks — these require F32→Q4_0/Q4_1/Q5_0/Q5_1/Q8_0/IQ4_NL quantization kernels."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [],
+          "notes": "No math functions. Pure memory copy with optional type casting."
+        },
+        "synchronization": {
+          "barriers": [],
+          "notes": "No synchronization. Each work-item operates independently."
+        },
+        "loop_analysis": {
+          "hot_loops": [],
+          "unrolled": false,
+          "notes": "No loops in either kernel — each work-item processes exactly 1 element via a flat global index. The work distribution is fully grid-based. The CUDA cpy_scalar_transpose kernel has loops with #pragma unroll for tiled processing — this entire kernel is missing from SYCL."
+        },
+        "estimated_bottleneck": "memory",
+        "bottleneck_notes": "Pure memory-bandwidth-bound operation. Arithmetic intensity: 0 FLOP/byte for same-type copy, negligible for type conversion (F32→F16 is just a truncation, ~1 FLOP/4 bytes). The non-contiguous kernel has significant integer arithmetic overhead: 12+ 64-bit integer divisions and multiplications per work-item for the 4D index decomposition. On Intel GPUs, 64-bit integer division is extremely expensive (~80-160 cycles vs ~4 cycles for a float multiply). For tensors with small inner dimensions, the index computation may actually dominate the kernel time, making it compute-bound on integer arithmetic rather than memory-bound.",
+        "anti_patterns": [
+          "Missing cpy_scalar_transpose: CUDA has an optimized 2D tiled transpose kernel using __shared__[32][33] that enables coalesced reads AND writes during transpose operations. The SYCL version handles transpose via the generic k_cpy_scalar which computes arbitrary 4D byte offsets per element, resulting in completely non-coalesced access patterns for transposed tensors. Transpose is a common operation in attention mechanisms (e.g., view permutations).",
+          "Missing cpy_f32_q and cpy_q_f32: CUDA supports direct float→quantized and quantized→float copy (e.g., F32→Q8_0 for KV-cache quantization). The SYCL version only supports float/half/bf16/i32 type combinations, requiring separate dequantize+copy for quantized types.",
+          "Heavy 64-bit integer arithmetic in k_cpy_scalar: 12+ 64-bit integer divisions and multiplications per work-item for 4D index decomposition (i03 = i/(ne00*ne01*ne02), etc.). On Intel GPUs, 64-bit division is emulated in ~80-160 cycles. For small tensors where the copy time is short, this integer overhead can dominate. CUDA has the same pattern but NVIDIA GPUs have faster 64-bit integer division hardware.",
+          "No vectorized loads/stores in k_cpy_scalar_contiguous: The contiguous kernel copies 1 element per work-item with scalar loads/stores. For F32→F32 (4 bytes), vec4 would process 16 bytes per work-item. For F16→F16 (2 bytes), vec8 would process 16 bytes per work-item. The same-type contiguous case is already handled by memcpy, but different-type contiguous (e.g., F32→F16) still uses scalar operations.",
+          "Missing [[sycl::reqd_sub_group_size(WARP_SIZE)]] on both kernels."
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_019_001",
+          "category": "missing_kernel",
+          "priority": "medium",
+          "description": "Implement cpy_scalar_transpose using SLM-tiled 2D transpose to match CUDA parity. CUDA's cpy_scalar_transpose uses __shared__ float tile[32][33] with 2D thread blocks (32x8) to read a 32x32 tile with coalesced reads, store to shared memory, then write the transposed tile with coalesced writes. The +1 padding avoids bank conflicts. The SYCL version handles transpose via the generic k_cpy_scalar with per-element 4D offset computation, resulting in non-coalesced accesses for transposed tensors.",
+          "expected_improvement": "2-5x throughput for transpose operations. The current generic path has non-coalesced reads OR writes (depending on which dimension is transposed), wasting memory bandwidth. The tiled approach ensures both reads and writes are coalesced, achieving near-peak memory bandwidth. Transpose is used in attention view permutations.",
+          "implementation_notes": "Detect transpose pattern at dispatch time: src0 is contiguous with swapped ne[0]/ne[1] relative to dst. Use nd_range<2>((ceil(ne01/32)*32, ceil(ne00/32)*8), (32, 8)) with SLM tile[32][33]. Each 32x8 thread block: (1) coalesced read 32x32 tile from src, (2) barrier, (3) coalesced write transposed 32x32 tile to dst. Handle boundary tiles with bounds checks. The +1 SLM padding (33 instead of 32) avoids bank conflicts. Support F32, F16, BF16 via template. Reference: CUDA cpy.cu cpy_scalar_transpose (lines 42-92).",
+          "risk": "medium",
+          "risk_notes": "SLM-tiled transpose is a well-understood pattern. The main risk is detecting the transpose case correctly at the dispatch level (must identify when src0 strides represent a simple 2D transpose). The kernel itself is straightforward."
+        },
+        {
+          "id": "opt_019_002",
+          "category": "vectorization",
+          "priority": "medium",
+          "description": "Use vectorized vec4/vec8 loads and stores in k_cpy_scalar_contiguous for different-type contiguous copies. Currently each work-item copies 1 element with scalar operations. For F32→F16 (the most common different-type contiguous copy), each work-item would load 4 F32 values, convert to 4 F16 values, and write 4 F16 values, reducing instruction count 4x.",
+          "expected_improvement": "1.5-2.5x throughput for contiguous different-type copies (F32→F16, F16→F32, F32→BF16, BF16→F32). The same-type contiguous case already uses memcpy (no improvement possible). The improvement comes from reduced instruction count and better memory subsystem utilization.",
+          "implementation_notes": "Add a k_cpy_vec4_contiguous template: each work-item processes 4 elements. sycl::vec<src_t,4> src = *reinterpret_cast<const sycl::vec<src_t,4>*>(&x[i*4]); sycl::vec<dst_t,4> dst_v; for each component: dst_v[k] = (dst_t)(src[k]); Write dst_v. Requires ne to be a multiple of 4 (add scalar tail). Use for contiguous different-type paths only.",
+          "risk": "low",
+          "risk_notes": "Standard vectorization pattern. Requires ne >= 4 (always true in practice). Half→float conversion in vec4 is well-supported by SYCL."
+        },
+        {
+          "id": "opt_019_003",
+          "category": "integer_optimization",
+          "priority": "low",
+          "description": "Reduce 64-bit integer arithmetic overhead in k_cpy_scalar by precomputing reciprocals or using 32-bit arithmetic where possible. The current kernel performs 12+ 64-bit integer divisions per work-item for the 4D index decomposition. For tensors where all dimensions fit in 32 bits (ne00*ne01*ne02 < 2^31, which is true for all practical transformer shapes), 32-bit arithmetic would be ~4x faster for the division operations.",
+          "expected_improvement": "5-15% for non-contiguous copy of small tensors where integer arithmetic overhead is significant relative to memory access time. For large tensors, memory bandwidth dominates and the integer arithmetic is hidden by memory latency. The improvement is primarily for the non-contiguous path (contiguous uses memcpy or k_cpy_scalar_contiguous which has no index decomposition).",
+          "implementation_notes": "Option A: Add a 32-bit fast path when ne00*ne01*ne02*ne03 < INT32_MAX (cast all dimensions to int32_t before the division chain). Option B: Precompute magic-number reciprocals on the host for ne00, ne00*ne01, ne00*ne01*ne02 and pass them to the kernel. Option C: Use nd_range<3> or nd_range<2> to let the runtime handle some of the index decomposition. Option A is simplest and covers 99% of cases.",
+          "risk": "low",
+          "risk_notes": "32-bit arithmetic is always safe when dimensions are checked to fit. The host-side check is trivial. CUDA has the same 64-bit arithmetic pattern."
+        },
+        {
+          "id": "opt_019_004",
+          "category": "sub_group_size",
+          "priority": "low",
+          "description": "Add [[sycl::reqd_sub_group_size(WARP_SIZE)]] attribute to both kernel launch lambdas for consistent sub-group behavior and compiler optimization.",
+          "expected_improvement": "0-3% from compiler optimization hints. Primarily a correctness safeguard.",
+          "implementation_notes": "Add the attribute to the parallel_for lambdas in launch_cpy_scalar and launch_cpy_scalar_contiguous.",
+          "risk": "low",
+          "risk_notes": "No functional change for kernels that don't use sub-group operations."
+        }
+      ],
+      "overall_optimization_potential": "medium",
+      "estimated_current_efficiency": "40-60%",
+      "efficiency_notes": "The cpy kernel is a clean native SYCL implementation with zero DPCT artifacts, proper nd_range<1>, and an intelligent memcpy fast path for same-type contiguous tensors. The code supports 12 type combinations with clean template dispatch. However, the SYCL version is missing 3 of 5 CUDA kernel variants: (1) cpy_scalar_transpose (SLM-tiled coalesced transpose) — this is the most impactful missing feature since transpose operations in attention use the slow generic path. (2) cpy_f32_q (float→quantized for KV-cache quantization). (3) cpy_q_f32 (quantized→float). The generic non-contiguous kernel has heavy 64-bit integer arithmetic (12+ divisions per work-item) that dominates for small tensors. The contiguous different-type path uses scalar 1-element-per-work-item processing. The cpy kernel is called frequently — every tensor reshape, view, transpose, and type conversion goes through it. The missing transpose optimization particularly impacts attention mechanisms which perform frequent view permutations. Medium potential overall because the missing transpose kernel and the frequency of copy operations make the aggregate impact significant."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 18,
+    "total_kernels_analyzed": 19,
     "high_potential": 4,
-    "medium_potential": 8,
+    "medium_potential": 9,
     "low_potential": 6,
     "no_optimization_needed": 0,
     "top_opportunities": [
