@@ -509,12 +509,200 @@
       "overall_optimization_potential": "high",
       "estimated_current_efficiency": "15-25%",
       "efficiency_notes": "DMMV is a fallback path for matrix-vector multiplication when the fused MMVQ path is not available or not optimal. It dequantizes to float first then multiplies, which is inherently less efficient than MMVQ's fused quantized dot product. The kernel has severe issues: K-quant sub-group size mismatch (QK_WARP_SIZE=32 on Intel native SIMD16), tiny work-group sizes (16 or 64), no SLM caching, no vectorized loads, strided memory access, and extensive DPCT artifacts. On the B60, memory bandwidth is the bottleneck (~0.5-1 ops/byte arithmetic intensity vs 27 ops/byte threshold), so maximizing bandwidth utilization through coalesced access, vectorized loads, and Y vector caching is critical. The kernel is used for single-token inference with quantized models."
+    },
+    {
+      "kernel_id": "sk_004",
+      "name": "dequantize_block_sycl (convert)",
+      "file": "ggml/src/ggml-sycl/convert.cpp",
+      "source_cuda_ids": ["ck_020", "ck_021", "ck_022", "ck_023", "ck_024", "ck_025", "ck_026", "ck_027", "ck_028", "ck_029", "ck_030", "ck_031", "ck_032", "ck_033", "ck_034", "ck_035", "ck_036", "ck_037", "ck_038", "ck_039"],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_sizes": {
+            "generic_dequantize_block": 256,
+            "q4_0_specialized": 32,
+            "q4_0_reorder": 16,
+            "q4_1_specialized": 32,
+            "q2_K": 64,
+            "q3_K": 64,
+            "q4_K": 32,
+            "q4_K_reorder": 32,
+            "q5_K": 64,
+            "q6_K": 64,
+            "q6_K_reorder": 64,
+            "iq_formats": 32,
+            "mxfp4": 32,
+            "convert_unary_nc": 256
+          },
+          "sub_group_size": null,
+          "sub_group_size_specified_only_q4_0_reorder": true,
+          "global_size_expression": "Varies by format: nb * work_group_size for most, where nb = number of quantization blocks",
+          "notes": "22+ distinct kernel launch configurations. Almost all use nd_range<3> with (1,1,N) — a DPCT artifact (only q4_K_reorder uses correct nd_range<1>). Only q4_0_reorder specifies [[sycl::reqd_sub_group_size(WARP_SIZE)]]. Work-group sizes range from 16 (q4_0_reorder) to 256 (generic path). The generic path (WG=256) handles Q5_0, Q5_1, Q8_0 via dispatch table; specialized paths use 32 or 64."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": false,
+          "strided_accesses": [
+            "Generic dequantize_block: writes 2 elements per thread at y[iybs+iqs] and y[iybs+iqs+y_offset] — the second write is strided by qk/2",
+            "Q2_K, Q6_K: output writes at strides of 32 (y[l+0], y[l+32], y[l+64], y[l+96])",
+            "Q3_K: writes at stride 1 within a 4-element span but overall block-strided",
+            "Q5_K: writes at offsets y[0], y[1], y[32], y[33] — partial stride",
+            "AoS block layout for non-reorder kernels: interleaved qs/d/scales fields cause strided reads"
+          ],
+          "vectorized_loads": true,
+          "vector_width": 4,
+          "vectorization_notes": "Only Q4_K and Q4_K_reorder use vectorized loads via vec_aligned_load<uint8_t, 4> (4-byte vector load). Generic path uses dfloat2 (sycl::float2 or sycl::half2) for 2-element output. All other kernels use scalar loads (1-4 bytes via type casting)."
+        },
+        "slm_usage": {
+          "uses_slm": true,
+          "slm_bytes": 12,
+          "which_kernels": ["Q4_K", "Q4_K_reorder"],
+          "potential_bank_conflicts": false,
+          "notes": "Only Q4_K and Q4_K_reorder use SLM: 12 bytes for scale data loaded cooperatively by first 12 threads. All other kernels (20+) use no SLM at all. The 12-byte SLM usage is trivial relative to the 64KB available — massive underutilization."
+        },
+        "reduction_pattern": {
+          "has_reduction": false,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "No reductions anywhere. All kernels are pure map operations — each thread independently dequantizes a subset of elements with no inter-thread data exchange (except Q4_K's cooperative scale loading)."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "output_type": "dst_t (float or sycl::half, template parameter)",
+          "scale_type": "sycl::half for block scales, converted to float for computation",
+          "could_use_half": true,
+          "could_use_joint_matrix": false,
+          "notes": "The generic path supports half-precision computation via dfloat typedef (sycl::half when GGML_SYCL_F16 is defined). Specialized K-quant kernels always use float32 for intermediate computation. Output type is templated (float or half). No opportunity for joint_matrix since these are pure dequantization (no matrix multiply)."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": ["sycl::fma (Q4_1, Q5_1 dequantization)", "ggml_sycl_e8m0_to_fp32 (MXFP4 scale conversion)"],
+          "notes": "No transcendental math functions. All operations are bit manipulation (shift, mask, AND, OR) followed by scale multiplication and bias addition. sycl::fma used in Q4_1 and Q5_1 for fused multiply-add of scale+minimum."
+        },
+        "loop_analysis": {
+          "hot_loops": [
+            "Q4_0 specialized: for (l=0; l<4; l++) — NOT unrolled",
+            "Q4_0 reorder: for (l=0; l<QK4_0/2; l++) = 16 iterations — UNROLLED via #pragma unroll",
+            "Q3_K: for (l=l0; l<l0+4; l++) — NOT unrolled",
+            "Q4_K: for (l=0; l<n; l++) where n=4 — NOT unrolled",
+            "IQ1_S/IQ1_M: for (j=0; j<8; j++) — UNROLLED",
+            "IQ2_S/IQ3_S: for (j=0; j<8; j++) — UNROLLED",
+            "IQ2_XXS/IQ2_XS/IQ3_XXS: for (j=0; j<8; j++) — NOT unrolled",
+            "IQ4_NL/IQ4_XS: for (j=0; j<4; j++) — UNROLLED",
+            "MXFP4: for (j=0; j<4; j++) — NOT unrolled",
+            "convert_unary_nc: grid-stride loop — UNROLLED"
+          ],
+          "unrolled": false,
+          "notes": "Inconsistent unrolling: some format-specific kernels have #pragma unroll, others with identical loop structures do not. All loops have small constant trip counts (4-16) and would benefit from unrolling."
+        },
+        "estimated_bottleneck": "memory",
+        "bottleneck_notes": "Dequantization is purely memory-bandwidth bound: each input byte produces 2-8 output float/half values via bit manipulation (trivial compute). The arithmetic intensity is well below the B60's 27 ops/byte threshold. Performance depends entirely on memory bandwidth utilization — coalesced reads of quantized data and coalesced writes of output. The strided output patterns and small work-group sizes limit achieved bandwidth.",
+        "anti_patterns": [
+          "Pervasive nd_range<3> with (1,1,N) — DPCT artifact. Only q4_K_reorder correctly uses nd_range<1>",
+          "Missing [[intel::reqd_sub_group_size()]] on 20+ of 22 kernel variants — only q4_0_reorder has it",
+          "dpct::has_capability_or_fail called on every kernel launch — DPCT runtime check artifact",
+          "__dpct_inline__ annotations in dequantize.hpp — DPCT artifact, should be standard inline",
+          "Inconsistent work-group sizes: 16 (q4_0_reorder), 32 (most specialized), 64 (K-quants), 256 (generic) — no clear rationale for Intel GPUs",
+          "Inconsistent loop unrolling: some kernels have #pragma unroll, identical structures don't",
+          "Inconsistent reorder kernel conventions: q4_0_reorder uses nd_range<3>+reqd_sub_group_size, q4_K_reorder uses nd_range<1>, q6_K_reorder uses nd_range<3> — three different patterns",
+          "Dispatch table inconsistency: Q4_0 FP16 path uses generic WG=256 kernel, FP32 path uses specialized WG=32 kernel",
+          "No vectorized loads except Q4_K (vec_aligned_load<uint8_t,4>) — all other formats use scalar byte loads",
+          "Strided output writes (stride 32) in Q2_K, Q5_K, Q6_K reduce coalescing efficiency",
+          "IQ format kernels use global memory lookup tables (iq2xxs_grid, iq3xxs_grid, etc.) — scattered random reads, no SLM caching of tables"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_004_001",
+          "category": "work_group_size",
+          "priority": "high",
+          "description": "Standardize work-group sizes to 256 across all dequantization kernels. Currently sizes vary from 16 to 256 with no clear rationale for Intel GPUs. With WG=256, each Xe-core gets 256/16=16 sub-groups per work-group for better occupancy. The generic dequantize_block template already uses 256 successfully — apply the same to all specialized kernels by having each thread process more elements (e.g., for Q4_0: change from 32 threads * 8 elements to 256 threads * 1 element, or better yet 256 threads * 4 elements for higher throughput).",
+          "expected_improvement": "15-30% throughput improvement for kernels currently using WG=32 or WG=64, from better occupancy and latency hiding on the B60's 20 Xe-cores. The improvement is larger for small tensors where fewer work-groups are launched.",
+          "implementation_notes": "For each format-specific launcher: change the block size from 32 or 64 to 256. Adjust the per-thread element count and grid dimensions accordingly. Example for Q4_0: nb_blocks = (k / QK4_0); launch with nd_range<1>(nb_blocks * 256 / new_blocks_per_wg, 256). Each thread processes k/256 elements instead of k/32. The Q4_K_reorder kernel (already nd_range<1>, WG=32) is the easiest to increase. Ensure total work is unchanged.",
+          "risk": "low",
+          "risk_notes": "Pure map kernels with no inter-thread dependencies — increasing work-group size just changes scheduling granularity. Only risk is if register pressure increases from processing more elements per thread, but dequantization uses very few registers."
+        },
+        {
+          "id": "opt_004_002",
+          "category": "vectorization",
+          "priority": "high",
+          "description": "Use vectorized memory loads (sycl::vec<uint8_t, 8> or sycl::vec<uint32_t, 2>) for reading quantized data, and vectorized stores (sycl::vec<float, 4> or sycl::vec<sycl::half, 8>) for writing dequantized output. Currently only Q4_K uses vec_aligned_load<uint8_t, 4> — all other formats use scalar 1-4 byte loads. For a purely memory-bound kernel, maximizing bytes per transaction is critical. Vectorized loads/stores reduce memory transactions by 2-4x.",
+          "expected_improvement": "20-40% throughput improvement. Dequantization is purely bandwidth-limited — each byte of input produces 2-8 bytes of output. Wider loads/stores directly translate to higher effective bandwidth. For float output, vec4 stores (16 bytes) instead of scalar stores (4 bytes) reduce store transactions by 4x.",
+          "implementation_notes": "For output writes: accumulate 4 float results into a sycl::vec<float, 4> and write via a single aligned store. For input reads: load quantized bytes as sycl::vec<uint8_t, N> where N matches the quant block's qs field alignment. The reorder (SoA) data layout is more amenable to wide loads since qs bytes are contiguous. Priority: Q4_0 (most common), Q8_0, Q6_K, Q4_K (already partially done). Must ensure 16-byte alignment for vec4 float stores.",
+          "risk": "medium",
+          "risk_notes": "Alignment requirements may not always be met. Output buffer alignment depends on the caller. Input quantization blocks may have sub-4-byte alignment for some fields. Need to handle tail cases where element count is not a multiple of the vector width."
+        },
+        {
+          "id": "opt_004_003",
+          "category": "memory_coalescing",
+          "priority": "medium",
+          "description": "Eliminate strided output writes in Q2_K, Q5_K, Q6_K dequantization. These kernels write 4 elements at stride 32 (y[l+0], y[l+32], y[l+64], y[l+96]), meaning 32 threads each write to non-adjacent locations. Restructure thread indexing so adjacent threads write to adjacent output locations. This requires changing how threads map to elements within a quant block — instead of each thread handling elements at stride-32, use a transposed mapping where a group of 4 adjacent threads handles 4 contiguous elements.",
+          "expected_improvement": "15-25% improvement for affected formats (Q2_K, Q5_K, Q6_K). Coalesced writes generate fewer memory transactions (16 adjacent float writes = 1 cache line store vs 16 scattered writes = up to 16 separate transactions). Q6_K is particularly common in K-quant models.",
+          "implementation_notes": "For Q6_K (64 threads, 256 elements per block, 4 elements per thread): currently thread tid writes y[off+0], y[off+32], y[off+64], y[off+96]. Remap so threads 0-3 write y[0..3], threads 4-7 write y[4..7], etc. This means changing from tid->(4 elements at stride 32) to tid->(4 contiguous elements at offset tid*4). The dequantization logic must be adjusted to fetch the correct input bits for the new thread-to-element mapping. This is a non-trivial restructuring of the bit manipulation code.",
+          "risk": "medium",
+          "risk_notes": "The complex bit manipulation in K-quant dequantization makes thread remapping non-trivial. Each format has unique bit packing. Must carefully verify correctness for all edge cases. The restructured code may be harder to maintain."
+        },
+        {
+          "id": "opt_004_004",
+          "category": "loop_unroll",
+          "priority": "medium",
+          "description": "Add #pragma unroll to all inner loops that are missing it. Currently only ~10 of ~20 format-specific kernels have #pragma unroll on their inner loops, despite all having small constant trip counts (4-16 iterations). The missing kernels include Q4_0, Q4_1, Q3_K, Q4_K, IQ2_XXS, IQ2_XS, IQ3_XXS, and MXFP4.",
+          "expected_improvement": "5-15% improvement per affected kernel. Loop overhead (branch, increment) is significant when the loop body is only 2-4 instructions. For a 4-iteration loop, eliminating overhead saves ~20% of loop cycles. For memory-bound kernels, the freed instruction slots allow better overlap of memory operations.",
+          "implementation_notes": "Add #pragma unroll before each undecorated for loop in dequantize.hpp: Q4_0 specialized (~line 189), Q4_1 (~line 248), Q3_K (~line 323), Q4_K_common (~line 376), IQ2_XXS (~line 594), IQ2_XS (~line 620), IQ3_XXS (~line 675), MXFP4 (~line 835). Verify that trip counts are compile-time constants (they are — all use literal constants like 4, 8, 16).",
+          "risk": "low",
+          "risk_notes": "Adding #pragma unroll to small constant-trip-count loops is a safe, well-understood optimization. Worst case: compiler already unrolls and the pragma is redundant. No correctness risk."
+        },
+        {
+          "id": "opt_004_005",
+          "category": "slm_tuning",
+          "priority": "medium",
+          "description": "Cache IQ format lookup tables (iq2xxs_grid, iq3xxs_grid, iq3s_grid, iq2xs_grid, ksigns_iq2xs, kvalues_iq4nl) in SLM for IQ dequantization kernels. These tables are accessed via random/scattered reads from global memory, incurring cache misses and high latency. Loading frequently-used table entries into SLM would provide predictable low-latency access. Tables are small: iq2xxs_grid = 256*uint32_t = 1KB, kvalues_iq4nl = 16*float = 64 bytes.",
+          "expected_improvement": "10-25% improvement for IQ format dequantization. The lookup tables cause random global memory access patterns that defeat the L1 cache's line-based prefetching. SLM provides deterministic single-cycle access. The improvement depends on what fraction of kernel time is spent in table lookups vs output writes.",
+          "implementation_notes": "For each IQ kernel: allocate sycl::local_accessor for the table (e.g., 256 uint32_t entries for iq2xxs_grid = 1KB). Have work-group cooperatively load the table into SLM (each thread loads table_size/WG entries). Insert group_barrier(). Then replace global table reads with SLM reads. Requires increasing work-group size to at least 256 to enable efficient cooperative loading (pairs with opt_004_001). Total SLM per work-group: ~1-2KB for the largest table, well within 64KB limit.",
+          "risk": "low",
+          "risk_notes": "Lookup tables are read-only and small. SLM caching is a standard optimization pattern. The barrier cost is incurred once per kernel invocation, amortized across all table lookups. Only risk is if the table is too large for SLM (none are — largest is ~1KB)."
+        },
+        {
+          "id": "opt_004_006",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Convert all nd_range<3>(sycl::range<3>(1,1,N), sycl::range<3>(1,1,WG)) launches to nd_range<1>(N, WG). The 3D launches with trivial first two dimensions are DPCT migration artifacts from CUDA's 3D grid/block model. Using nd_range<1> is cleaner, may avoid trivial scheduling overhead for unused dimensions, and aligns with the kernel's actual 1D nature. The q4_K_reorder kernel already demonstrates the correct nd_range<1> pattern.",
+          "expected_improvement": "0-3% improvement. Primarily a code quality fix. May provide marginal improvement from simpler index computation (get_global_id(0) vs get_global_id(2)).",
+          "implementation_notes": "In each launcher function: replace sycl::nd_range<3>(sycl::range<3>(1,1,global), sycl::range<3>(1,1,local)) with sycl::nd_range<1>(global, local). In each kernel: replace item.get_global_id(2) with item.get_global_id(0), item.get_local_id(2) with item.get_local_id(0), item.get_group(2) with item.get_group(0). The q4_K_reorder kernel (convert.cpp:194-209) serves as the template. Approximately 20 launch sites to update.",
+          "risk": "low",
+          "risk_notes": "Pure mechanical refactoring. No algorithmic change. The nd_range<1> pattern is proven by q4_K_reorder."
+        },
+        {
+          "id": "opt_004_007",
+          "category": "memory_coalescing",
+          "priority": "low",
+          "description": "Extend reorder (SoA) data layout support from Q4_0, Q4_K, Q6_K to all commonly-used quantization formats for the dequantization path. The SoA layout separates quantization block fields (qs, scales, d) into contiguous regions, enabling coalesced reads where adjacent threads access adjacent memory addresses. Currently only 3 formats have reorder kernels in convert.cpp.",
+          "expected_improvement": "10-20% improvement per newly-supported format. The reorder layout enables coalesced reads of qs bytes (the dominant memory access), reducing cache line waste from the interleaved AoS layout. Combined with vectorized loads (opt_004_002), this could achieve near-peak bandwidth.",
+          "implementation_notes": "For each new format: implement a dequantize_block_*_reorder function in dequantize.hpp that reads from separated qs/scales/d regions using offsets computed from the block index. Add a corresponding dequantize_row_*_sycl_reorder launcher in convert.cpp. Wire into the dispatch tables with is_reorder checks. Priority: Q8_0 (simple, common), Q4_1 (simple), Q5_K (common in K-quant models). The existing Q4_0_reorder, Q4_K_reorder, Q6_K_reorder implementations serve as templates.",
+          "risk": "medium",
+          "risk_notes": "Each format has unique block structure. The reorder/dereorder packing must be format-specific and consistent with the quants.hpp reorder infrastructure. Must ensure compatibility with all other kernel paths that may access the same tensor data."
+        },
+        {
+          "id": "opt_004_008",
+          "category": "reduction",
+          "priority": "low",
+          "description": "Remove dpct::has_capability_or_fail runtime checks from every kernel launch. These DPCT artifact calls check sycl::aspect::fp16 capability at every submission, adding unnecessary overhead. The check should be performed once during device initialization and cached, or removed entirely since the B60 always supports FP16.",
+          "expected_improvement": "1-2% improvement in kernel launch overhead. More impactful when many small dequantization kernels are launched in succession (e.g., during model loading or layer-by-layer inference).",
+          "implementation_notes": "Remove all dpct::has_capability_or_fail(dpct::get_current_device(), {sycl::aspect::fp16}) calls from convert.cpp (approximately 20 sites). If a runtime check is desired, perform it once in the SYCL backend initialization and store the result. Also remove the associated DPCT_COMPATIBILITY_TEMP macro guards.",
+          "risk": "low",
+          "risk_notes": "The B60 always supports FP16. Removing the check is safe for the target hardware. For portability, a one-time initialization check could replace the per-launch check."
+        }
+      ],
+      "overall_optimization_potential": "medium",
+      "estimated_current_efficiency": "30-45%",
+      "efficiency_notes": "Dequantization is a pure map operation (no reductions, no inter-thread communication) that is entirely memory-bandwidth bound. The arithmetic intensity is trivially low (~0.1-0.5 ops/byte for bit manipulation + scale multiply). The kernel's efficiency depends solely on memory bandwidth utilization. Current issues: inconsistent work-group sizes (16-256), strided output writes in K-quant formats, mostly scalar loads (no vectorization except Q4_K), pervasive DPCT artifacts. The kernel is called frequently during inference (every matmul path that dequantizes before compute) but is not on the critical path for single-token latency — it's used more during prompt processing and as a utility for other ops. Optimization potential is medium because: (a) the kernel is already functional and not as severely impacted as MMVQ/DMMV by tiny work-groups (the generic path uses WG=256), (b) the primary bottleneck is memory bandwidth which is harder to improve without algorithmic changes, and (c) some formats already have reorder+vectorized paths."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 3,
+    "total_kernels_analyzed": 4,
     "high_potential": 3,
-    "medium_potential": 0,
+    "medium_potential": 1,
     "low_potential": 0,
     "no_optimization_needed": 0,
     "top_opportunities": [
@@ -572,6 +760,20 @@
         "kernel_name": "dequantize_mul_mat_vec (DMMV)",
         "optimization_id": "opt_003_003",
         "description": "Cache Y vector in SLM to eliminate 16x redundant global memory loads",
+        "priority": "high"
+      },
+      {
+        "kernel_id": "sk_004",
+        "kernel_name": "dequantize_block_sycl (convert)",
+        "optimization_id": "opt_004_001",
+        "description": "Standardize work-group sizes to 256 for better occupancy across all dequant formats",
+        "priority": "high"
+      },
+      {
+        "kernel_id": "sk_004",
+        "kernel_name": "dequantize_block_sycl (convert)",
+        "optimization_id": "opt_004_002",
+        "description": "Use vectorized loads/stores (vec4/vec8) for 2-4x bandwidth improvement in memory-bound dequantization",
         "priority": "high"
       }
     ]
