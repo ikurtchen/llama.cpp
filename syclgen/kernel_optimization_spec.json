@@ -4173,13 +4173,113 @@
       "overall_optimization_potential": "low",
       "estimated_current_efficiency": "65-80%",
       "efficiency_notes": "The timestep embedding kernel is a near-perfect 1:1 CUDA port. Embarrassingly parallel with no reduction, no SLM, no synchronization, and trivial memory footprint. The only meaningful inefficiency is full-precision transcendentals vs CUDA's fast-math intrinsics. The kernel processes tiny tensors (dim=320-1280 for typical diffusion models) and is called only once per diffusion inference step. Even with 2-3x speedup from native math, the absolute time saved is sub-microsecond. Low potential because: (1) kernel is already well-structured, (2) called extremely rarely, (3) processes small data, (4) only used by diffusion models (not LLMs). The main value of optimization here is code consistency (using native math everywhere)."
+    },
+    {
+      "kernel_id": "sk_031",
+      "name": "roll",
+      "file": "ggml/src/ggml-sycl/roll.cpp",
+      "source_cuda_ids": [
+        "ck_089"
+      ],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": [256],
+          "work_group_size_total": 256,
+          "sub_group_size": null,
+          "sub_group_size_specified": false,
+          "global_size_expression": "nd_range<1>(num_blocks * SYCL_ROLL_BLOCK_SIZE, SYCL_ROLL_BLOCK_SIZE) where num_blocks = ceil(n_elements / 256)",
+          "notes": "Correct nd_range<1> with WG=256 (SYCL_ROLL_BLOCK_SIZE). Matches CUDA's CUDA_ROLL_BLOCK_SIZE=256. 1D dispatch over all elements in a flat 4D tensor. No reqd_sub_group_size — acceptable since kernel has no sub-group-level operations. Clean and idiomatic."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "coalesced_notes": "Destination writes are perfectly coalesced: dst[idx] since the flat output index equals the global thread ID. Source reads are mostly coalesced: consecutive threads read consecutive d0 values (d0 = wrap_index(i0 - s0, ne00)) except at the wrap boundary where one thread in a sub-group may jump to a distant address. This is a minor effect (1 wrap per ne00 elements).",
+          "strided_accesses": [],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "Each work-item reads 1 float and writes 1 float. No vectorized loads (sycl::vec, float4). Scalar 4-byte load/store. Same as CUDA original."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes": 0,
+          "potential_bank_conflicts": false,
+          "notes": "No SLM used. Appropriate — this is a simple 1:1 element copy with index remapping, no data reuse."
+        },
+        "reduction_pattern": {
+          "has_reduction": false,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "No reduction. Embarrassingly parallel — each work-item independently reads one element and writes one element."
+        },
+        "data_types": {
+          "compute_type": "float32",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "FP32 only. Host wrapper asserts src0->type == GGML_TYPE_F32. No F16/BF16 support (same as CUDA). The roll operation is a pure copy — data type does not affect compute, only bandwidth."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [],
+          "notes": "No transcendental math. All computation is integer arithmetic for 4D index decomposition and wrap_index (comparison + add/subtract). The kernel performs zero floating-point computation — it's a pure data movement kernel."
+        },
+        "loop_analysis": {
+          "hot_loops": [],
+          "unrolled": false,
+          "notes": "No loops in the kernel body. Each work-item executes straight-line code: decompose flat index to 4D, apply wrap_index per dimension, compute source flat index, copy one float. No unrolling needed."
+        },
+        "estimated_bottleneck": "memory",
+        "bottleneck_notes": "Pure memory-bound kernel with zero floating-point computation: 4 bytes read + 4 bytes written = 8 bytes per work-item, 0 FLOPs (only integer index math). Arithmetic intensity is exactly 0 ops/byte for floating-point, far below the 27 ops/byte compute threshold. Performance is limited entirely by memory bandwidth. The 4 int64 division/modulo operations for index decomposition add some integer compute overhead but this is secondary to memory latency.",
+        "anti_patterns": [
+          "Expensive 64-bit integer division/modulo for 4D index decomposition (4 divisions per work-item) — all dimension values likely fit in int32, and could use multiply-shift trick (fast_div) for further speedup",
+          "No vectorized loads/stores — could process 4 floats per work-item with sycl::vec<float,4> for simple roll along dim0 only",
+          "FP32-only — no F16/BF16 support for half-precision tensors (same limitation as CUDA)",
+          "Redundant destination index computation: dst[i3*(...)+i2*(...)+i1*ne00+i0] is identical to dst[idx] since idx = i0 + i1*ne00 + i2*(ne00*ne01) + i3*(ne00*ne01*ne02)"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_031_001",
+          "category": "memory_coalescing",
+          "priority": "low",
+          "description": "Replace expensive 64-bit integer division/modulo for 4D index decomposition with 32-bit arithmetic or multiply-shift fast division. Each work-item performs 4 int64 divisions (%, /) to decompose a flat index into (i0, i1, i2, i3). Since tensor dimensions (ne00, ne01, ne02, ne03) are typically < 2^31, int32 arithmetic suffices. Furthermore, the common.hpp fast_div_modulo or precomputed reciprocals could eliminate division entirely.",
+          "expected_improvement": "5-15% throughput improvement from cheaper integer index decomposition. Int64 division on GPU is multi-cycle; int32 division is faster, and multiply-shift avoids division entirely.",
+          "implementation_notes": "Option A (simple): Cast ne00/ne01/ne02/ne03 to int32 and use int32 %, /. Option B (advanced): Use fast_div_modulo from common.hpp (init_fastdiv_values + __fast_div). Option C: Use 3D or 4D nd_range to decompose indices via the hardware grid, eliminating division entirely. Option C would require restructuring the launch to nd_range<3> with local_range(1,1,256) and computing i0/i1/i2/i3 from group and local IDs.",
+          "risk": "low",
+          "risk_notes": "Integer optimization with no floating-point changes. Same mathematical result. Int32 truncation risk only for tensors with > 2^31 elements in a single dimension, which is extremely unlikely."
+        },
+        {
+          "id": "opt_031_002",
+          "category": "vectorization",
+          "priority": "low",
+          "description": "Use vectorized 16-byte loads/stores (sycl::vec<float,4>) when the roll shift is only along dimensions >= 1 (i.e., s0 == 0 and ne00 is a multiple of 4). When rolling only along outer dimensions, consecutive elements in dim0 map to consecutive source elements with the same shift, enabling 4-wide vector copies. This would reduce memory transactions by 4x for the common case.",
+          "expected_improvement": "1.5-2x throughput improvement for the s0==0 case (vec4 loads/stores). No improvement when s0 != 0 since consecutive elements in dim0 may wrap to non-contiguous source addresses. Most practical roll operations shift along a single dimension, so the fast path would be hit frequently.",
+          "implementation_notes": "Add a fast path: if (s0 == 0 && ne00 % 4 == 0) { process 4 elements per work-item using sycl::vec<float,4> }. Adjust global range to n_elements/4 for the fast path. Fall back to scalar for s0 != 0 or ne00 % 4 != 0.",
+          "risk": "low",
+          "risk_notes": "Conditional fast path — scalar fallback ensures correctness for all cases. 16-byte alignment of float arrays is guaranteed by the allocator."
+        },
+        {
+          "id": "opt_031_003",
+          "category": "data_type",
+          "priority": "low",
+          "description": "Add F16/BF16 support via template to match potential future CUDA expansion. Currently both CUDA and SYCL only support F32. For models using half-precision tensors, the roll operation would need to convert F16→F32→roll→F32→F16, which wastes bandwidth. A templated kernel processing sycl::half directly would halve the bandwidth requirement.",
+          "expected_improvement": "2x bandwidth improvement when processing F16 tensors (2 bytes vs 4 bytes per element). However, this is only useful if the upstream model uses F16 tensors, which is not the current default.",
+          "implementation_notes": "Template the kernel on data type: template<typename T> roll_sycl(const T* src, T* dst, ...). Instantiate for float, sycl::half, sycl::ext::oneapi::bfloat16. Update the host wrapper to dispatch based on src0->type.",
+          "risk": "low",
+          "risk_notes": "Pure code expansion — no algorithmic changes. The roll operation is a copy, so there are no precision concerns with F16/BF16."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "70-85%",
+      "efficiency_notes": "The roll kernel is a near-perfect 1:1 CUDA port. Clean hand-written SYCL (no DPCT artifacts), correct nd_range<1> with WG=256, proper bounds checking. Embarrassingly parallel with zero floating-point computation — a pure memory-bound data movement kernel. Writes are perfectly coalesced; reads are mostly coalesced except at wrap boundaries. The only inefficiencies are: (1) expensive int64 division for index decomposition, (2) scalar 1-element-per-thread processing where vec4 could be used for the common s0==0 case. Low potential because: (1) roll is called infrequently in LLM inference, (2) the kernel is already well-structured, (3) absolute time per call is small for typical tensor sizes. The primary optimization value is in integer arithmetic (fast_div) which would benefit many similar kernels."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 30,
+    "total_kernels_analyzed": 31,
     "high_potential": 4,
     "medium_potential": 13,
-    "low_potential": 13,
+    "low_potential": 14,
     "no_optimization_needed": 0,
     "top_opportunities": [
       {
