@@ -1566,13 +1566,113 @@
       "overall_optimization_potential": "medium",
       "estimated_current_efficiency": "40-55%",
       "efficiency_notes": "This is a clean manual port with no DPCT artifacts, correct nd_range<1> usage, and appropriate work-group size (256). The primary efficiency loss is from scalar (1-element-per-thread) processing of purely memory-bound operations — vectorized loads/stores could nearly double throughput for trivial ops. The transcendental ops (GELU, SILU) are slightly compute-heavy but still memory-bound at the B60's ridge point. Using native math functions would help at the margins. Overall, the kernel is reasonably well-implemented but leaves bandwidth on the table due to lack of vectorization."
+    },
+    {
+      "kernel_id": "sk_011",
+      "kernel_name": "element_wise (GLU ops)",
+      "source_files": ["ggml/src/ggml-sycl/element_wise.cpp"],
+      "header_files": ["ggml/src/ggml-sycl/element_wise.hpp"],
+      "source_line_range": "129-553",
+      "current_analysis": {
+        "description": "Gated Linear Unit (GLU) activation functions used in modern LLM architectures (SwiGLU, ReGLU, GeGLU, etc.). Covers 6 GLU ops (SWIGLU, REGLU, GEGLU, GEGLU_ERF, GEGLU_QUICK, SWIGLU_OAI) plus XIELU. GLU ops compute dst[i] = gate(x[i]) * g[i] where gate() varies by variant. Math copied from ggml-cuda/unary.cu to ensure numerical equivalence. Clean manual SYCL port — no DPCT artifacts.",
+        "launch_config": {
+          "work_group_size": 256,
+          "nd_range_dimensions": 1,
+          "sub_group_size_specified": false,
+          "notes": "All GLU ops use nd_range<1> with SYCL_GLU_BLOCK_SIZE=256 (defined in element_wise.hpp line 8). No [[intel::reqd_sub_group_size]] specified. swiglu_oai uses SYCL_NEG_BLOCK_SIZE=256 from presets.hpp. XIELU also uses 256."
+        },
+        "memory_access": {
+          "pattern": "Linear coalesced reads and writes for contiguous tensors. GLU ops read 2 input arrays (x and g) and write 1 output array. XIELU reads 1 input and writes 1 output.",
+          "coalesced": true,
+          "vectorized": false,
+          "slm_usage": false,
+          "slm_bytes": 0,
+          "notes": "Each work-item processes exactly 1 element — no vectorization. Output writes are perfectly coalesced. Input reads are coalesced within rows but may stride at row boundaries when the output offset o0 != n (used for non-contiguous tensors). swiglu_oai has a different indexing pattern: reads from src0 with stride (3*n) to extract x, g, b components."
+        },
+        "compute": {
+          "arithmetic_intensity_flops_per_byte": "0.17-1.25",
+          "dominant_operations": "Transcendental math (expf, tanhf, erff, expm1f) for gate functions plus multiply with gate value. REGLU is simplest (relu + multiply = 0.17 FLOP/byte). GEGLU is most complex (tanh-based GELU approximation + multiply = 1.25 FLOP/byte).",
+          "uses_special_functions": true,
+          "special_functions_list": ["expf", "tanhf", "erff", "expm1f"],
+          "notes": "All variants are deeply memory-bandwidth bound. The B60's ridge point is ~27 FLOP/byte — even GEGLU at 1.25 FLOP/byte is ~20x below threshold. Standard math functions used throughout (not native/fast-math variants)."
+        },
+        "data_types": {
+          "supported": ["F32", "F16"],
+          "primary": "F32",
+          "notes": "Generic GLU ops (glu_sycl template) support both F32 and F16 via src0->type dispatch. swiglu_oai is F32-only — explicitly operates on float pointers with no F16 path. XIELU supports F32 and F16."
+        },
+        "sub_group_usage": {
+          "uses_sub_group_ops": false,
+          "operations": [],
+          "notes": "No sub-group operations. Pure element-wise map — each work-item is completely independent."
+        },
+        "loop_structure": {
+          "hot_loops": [],
+          "unrolled": false,
+          "notes": "No loops in any GLU kernel. Every kernel is a pure single-element map: read x[i] and g[i], compute gate(x[i]) * g[i], write dst[i]. swiglu_oai reads 3 components (x, g, b) from a strided layout."
+        },
+        "estimated_bottleneck": "memory",
+        "bottleneck_notes": "ALL GLU operations are deeply memory-bound. With 2 reads + 1 write per element (12 bytes for F32), arithmetic intensity ranges from 0.17 FLOP/byte (REGLU) to 1.25 FLOP/byte (GEGLU). Far below the B60's 27 FLOP/byte ridge point. Memory bandwidth is the sole bottleneck.",
+        "anti_patterns": [
+          "No vectorized loads/stores — 1 element per work-item for purely memory-bound operations",
+          "64-bit integer division/modulo (i / n, i % n) in the hot path of every GLU kernel — expensive on GPU (tens of cycles per work-item)",
+          "Standard math functions where native math (sycl::native::exp, etc.) could improve throughput for inference",
+          "swiglu_oai is F32-only while all other GLU ops support F16 — inconsistent type coverage",
+          "Missing [[intel::reqd_sub_group_size(16)]] — same issue as sk_010"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_011_001",
+          "category": "vectorization",
+          "priority": "medium",
+          "description": "Process 4 elements per work-item using sycl::vec<float,4> for both x and g inputs. Currently each work-item handles 1 element (8B read for x + 4B read for g + 4B write = 16 bytes per work-item for F32 GLU ops, or 12B for XIELU). Vectorized 16-byte loads/stores would reduce work-item count by 4x and enable wider memory transactions.",
+          "expected_improvement": "1.3-1.8x throughput for GLU ops. Less impactful than sk_010 vectorization because GLU ops have slightly higher compute intensity (more transcendental math per byte transferred). Still the dominant optimization lever since all ops are memory-bound.",
+          "implementation_notes": "Modify glu_sycl kernel template to process 4 elements per thread. Load sycl::vec<float,4> for both src_x and src_g, apply gate function component-wise, store result. Adjust global_size to k/4 with scalar cleanup. For swiglu_oai, vectorization is more complex due to stride-3n indexing — may need to keep scalar path or use gather loads.",
+          "risk": "low",
+          "risk_notes": "GLU operations are embarrassingly parallel — vectorization changes only memory access pattern. Tail handling needed for k not divisible by 4. swiglu_oai's strided access pattern makes vectorization less straightforward than the generic GLU ops."
+        },
+        {
+          "id": "opt_011_002",
+          "category": "integer_arithmetic",
+          "priority": "low",
+          "description": "Replace 64-bit integer division/modulo (i / n, i % n) with cheaper alternatives. Every GLU kernel computes j0 = (i / n) * o0 + (i % n) to map global work-item index to source offsets. 64-bit integer division costs tens of cycles on GPU vs 1 cycle for bitwise ops. For power-of-2 n (common in LLMs: 4096, 8192, 14336), use bitwise AND and shift. For non-power-of-2, use Barrett reduction or compiler intrinsics.",
+          "expected_improvement": "1-3% for GLU kernels. The division is executed once per work-item, but with millions of elements the aggregate overhead is non-trivial. However, still dwarfed by memory bandwidth bottleneck.",
+          "implementation_notes": "Add power-of-2 fast path: if ((n & (n-1)) == 0) { int shift = __builtin_ctz(n); j0 = (i >> shift) * o0 + (i & (n-1)); }. Alternatively, precompute the magic number for Barrett reduction on host and pass as kernel arg. Could also restructure the kernel to iterate over rows explicitly (outer loop over rows, inner range over columns) to eliminate division entirely.",
+          "risk": "low",
+          "risk_notes": "Bitwise operations produce identical results for power-of-2 n. Barrett reduction needs careful implementation to avoid off-by-one. Restructuring to explicit row iteration is the safest approach but changes the kernel structure."
+        },
+        {
+          "id": "opt_011_003",
+          "category": "math_functions",
+          "priority": "low",
+          "description": "Use sycl::native:: math functions for GLU gate computations. Key targets: sycl::native::exp (SWIGLU, GEGLU_QUICK), sycl::native::tanh via exp (GEGLU), erff (GEGLU_ERF). For inference workloads, 1-2 ULP accuracy loss is acceptable.",
+          "expected_improvement": "3-8% for transcendental-heavy GLU variants (GEGLU, SWIGLU). Minimal for REGLU (which uses only relu — no transcendentals). Impact limited by memory-bound nature.",
+          "implementation_notes": "Same approach as opt_010_003 — use native math wrappers gated behind GGML_SYCL_NATIVE_MATH compile flag. Apply to: expf in op_swiglu/swiglu_oai, tanhf in op_geglu, erff in op_geglu_erf, expm1f in op_xielu. Note: erff has no sycl::native equivalent — keep standard version.",
+          "risk": "low",
+          "risk_notes": "Same risk profile as opt_010_003. Native math has lower accuracy but is fine for inference. Should be gated behind a compile flag. GEGLU's tanh approximation is the most accuracy-sensitive."
+        },
+        {
+          "id": "opt_011_004",
+          "category": "kernel_fusion",
+          "priority": "low",
+          "description": "Specialize the contiguous case (o0 == n) to eliminate index computation entirely. When the output tensor is contiguous, j0 simplifies to just i — no division or modulo needed. In typical LLM inference, tensors are contiguous most of the time. Add a host-side branch to dispatch a simpler kernel for the contiguous case.",
+          "expected_improvement": "1-5% when tensors are contiguous (the common case). Eliminates both the 64-bit division and the multiply-add index computation. Combined with vectorization (opt_011_001), the contiguous path becomes a trivial load-compute-store loop.",
+          "implementation_notes": "In glu_sycl wrapper, add: if (o0 == n) { dispatch simplified kernel where j0 = i directly; } else { dispatch current kernel with division; }. The simplified kernel can also more easily be vectorized since memory access is guaranteed sequential.",
+          "risk": "low",
+          "risk_notes": "Host-side branch adds no GPU overhead. The contiguous kernel is strictly simpler than the general case. Only risk is code duplication — can be mitigated with a template parameter for contiguity."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "40-55%",
+      "efficiency_notes": "Very similar to sk_010 (unary ops) — same code structure, same clean manual port, same WG=256 with nd_range<1>. The primary efficiency loss is from scalar processing of memory-bound operations. GLU ops have slightly higher arithmetic intensity than simple unary ops (0.17-1.25 vs 0.12-2.5 FLOP/byte) but are still deeply memory-bound. The 64-bit integer division is an additional overhead not present in sk_010's unary ops. Overall optimization potential is LOW because: (1) these are not on the critical inference path (GLU activation is a small fraction of total compute vs matmul), (2) the kernel is already correctly implemented with proper launch config, and (3) the main optimization (vectorization) provides only modest 1.3-1.8x improvement on an already-fast kernel."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 10,
+    "total_kernels_analyzed": 11,
     "high_potential": 4,
     "medium_potential": 4,
-    "low_potential": 2,
+    "low_potential": 3,
     "no_optimization_needed": 0,
     "top_opportunities": [
       {
