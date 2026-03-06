@@ -5,7 +5,7 @@
 
 ## Summary
 - Total SYCL kernels to analyze: 54
-- Kernels analyzed so far: 31
+- Kernels analyzed so far: 32
 - Analysis complete: No
 - Kernels with optimization potential: 27
 - Optimization tasks created: 0 (pending finalization)
@@ -42,7 +42,7 @@
 - [x] sk_029: gla — medium potential
 - [x] sk_030: tsembd — low potential
 - [x] sk_031: roll — low potential
-- [ ] sk_032: ssm_conv — pending
+- [x] sk_032: ssm_conv — medium potential
 - [ ] sk_033: ssm_scan — pending
 - [ ] sk_034: cross-entropy-loss — pending
 - [ ] sk_035: cumsum — pending
@@ -67,6 +67,7 @@
 - [ ] sk_054: upscale (inline) — pending
 
 ## Recent Activity
+[2026-03-06] Analyzed ssm_conv (sk_032). Found 4 optimization opportunities (medium potential). Key findings: 2 kernel variants (ssm_conv_f32, ssm_conv_back_f32) for Mamba-style selective state space models. nd_range<2> with WG=128, d_conv loop (typically 3-4 iterations) processes convolution window per work-item. CRITICAL: Missing compile-time template specialization for d_conv={3,4,9} — CUDA uses templates with #pragma unroll for full loop unrolling; SYCL uses runtime loop bounds preventing unrolling (~15-30% improvement). WG=128 is below recommended 256 for Xe2 occupancy. Missing reqd_sub_group_size(16). Weight caching in SLM could reduce redundant global reads when multiple sequence positions share same channel weights. ~50-65% estimated efficiency.
 [2026-03-06] Analyzed roll (sk_031). Found 3 optimization opportunities (low potential). Key findings: Clean hand-written SYCL port of cyclic tensor shift kernel — near-identical to CUDA roll.cu. nd_range<1> with WG=256, purely memory-bound (0 FLOPs, just copy with address computation), no SLM, no reductions, no DPCT artifacts, FP32-only. Each work-item decomposes a flat index into 4D coordinates via int64 divisions, applies shift on dims 1-3, then copies one float. Issues: (1) 7 expensive int64 divisions per work-item where all dimension values fit int32 or could use fast_div multiply-shift trick (~10-20% improvement). (2) No vectorized loads/stores — scalar 4-byte per work-item where vec4 could process 16 bytes when s0==0 (no shift on innermost dim). (3) FP32-only — no F16/BF16 support. Missing reqd_sub_group_size(16). Roll is called very infrequently in LLM inference (<0.01% of total time). ~70-85% estimated efficiency.
 [2026-03-06] Analyzed tsembd (sk_030). Found 2 optimization opportunities (low potential). Key findings: Near-perfect 1:1 CUDA port of sinusoidal timestep embedding for diffusion models. nd_range<2> with WG=256, embarrassingly parallel (no reduction, no SLM, no sync). Each work-item computes one (cos,sin) pair with 4 transcendentals (exp, log, cos, sin). Only meaningful inefficiency: full-precision sycl::exp/log/cos/sin where CUDA uses fast single-precision intrinsics — sycl::native:: variants would be 2-3x faster. Missing reqd_sub_group_size(16). Tiny tensors (dim=320-1280), called once per diffusion step — absolute impact negligible. FP32-only (same as CUDA). ~65-80% estimated efficiency.
 [2026-03-06] Analyzed gla (sk_029). Found 4 optimization opportunities (medium potential). Key findings: GLA (Gated Linear Attention) kernel structurally near-identical to WKV6 (sk_028) — same nd_range<1>, WG=head_size (64 or 128), same SLM caching pattern, same private state array. Simpler than WKV6: 3 SLM arrays (k,v,alpha) vs 4 (k,r,tf,td). Same anti-patterns: missing #pragma unroll on all loops, scalar SLM reads where CUDA uses float4& reinterpret-cast for 128-bit vectorized access (4x more SLM transactions), missing reqd_sub_group_size(16). FP32-only. GLA is the core attention for GLA-architecture models, called once per layer. ~50-65% estimated efficiency.
