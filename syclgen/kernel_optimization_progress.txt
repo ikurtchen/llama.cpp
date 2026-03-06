@@ -5,9 +5,9 @@
 
 ## Summary
 - Total SYCL kernels to analyze: 54
-- Kernels analyzed so far: 23
+- Kernels analyzed so far: 24
 - Analysis complete: No
-- Kernels with optimization potential: 21
+- Kernels with optimization potential: 22
 - Optimization tasks created: 0 (pending finalization)
 
 ## Kernels Analyzed
@@ -34,7 +34,7 @@
 - [x] sk_021: im2col — low potential
 - [x] sk_022: pad — low potential
 - [x] sk_023: pad_reflect_1d — low potential
-- [ ] sk_024: conv — pending
+- [x] sk_024: conv — medium potential
 - [ ] sk_025: set — pending
 - [ ] sk_026: set_rows — pending
 - [ ] sk_027: count-equal — pending
@@ -67,6 +67,7 @@
 - [ ] sk_054: upscale (inline) — pending
 
 ## Recent Activity
+[2026-03-06] Analyzed conv (sk_024). Found 5 optimization opportunities (medium potential). Key findings: 5 convolution kernels (conv_transpose_1d, conv2d, conv2d_dw_whcn, conv2d_dw_cwhn, conv2d_transpose) all using nd_range<1> with WG=256. Zero SLM usage — biggest missed optimization; kernel weights shared across work-items in same c_out group could be tiled in SLM (e.g., 64ch*3*3*4B = 2.3KB, well within 64KB). No loop unrolling on hot inner loops (IC*KH*KW iterations). All scalar loads/stores, no vectorization. Manual global_id computation (CUDA blockIdx*blockDim+threadIdx pattern) in 4 of 5 kernels. Custom sycl_max64/min64 helpers instead of sycl::max/min. Input reads strided by stride parameter in conv2d/dw. Heavy branching in transpose variants causes sub-group divergence. conv2d templated on kernel weight type (F16/F32); conv2d_transpose hardcodes sycl::half weights. No sub-group size specified. Potential im2col+XMX path for large conv2d (high risk, high reward). ~35-55% estimated efficiency.
 [2026-03-06] Analyzed pad_reflect_1d (sk_023). Found 4 optimization opportunities (low potential). Key findings: Clean native SYCL port of 1D reflection padding with WG=256, FP32-only, purely memory-bound (0 FLOP/byte), no DPCT artifacts. Close match to CUDA original with identical reflection logic. Issues: (1) No vectorized loads/stores — scalar 4-byte per work-item where vec4 could process 16 bytes for the non-reflected middle region (~1.5-2x improvement). (2) Missing CUDA's fast_div_modulo optimization — SYCL uses expensive int64 division for group_x/tiles0 decomposition where CUDA uses precomputed multiply-shift trick (~5-15% overhead). (3) FP32-only — no F16/BF16 support (same as CUDA). (4) 3D nd_range with packed group index could be restructured to avoid division entirely. ~60-75% estimated efficiency. Low potential because pad_reflect_1d is used primarily for audio model preprocessing (Whisper), called once per audio chunk, contributing <0.1% of end-to-end latency.
 [2026-03-06] Analyzed pad (sk_022). Found 4 optimization opportunities (low potential). Key findings: Clean native SYCL port of zero/circular padding with WG=256, FP32-only, purely memory-bound (0 FLOP/byte), no DPCT artifacts. Issues: (1) No vectorized loads/stores — scalar 4-byte per work-item where vec4 could process 16 bytes (~1.5-2x bandwidth improvement). (2) FP32-only — no F16/BF16 support unlike some other element-wise kernels. (3) 3D nd_range with degenerate dimensions — nd_range<3> with local(1,1,256) where only dim2 is active (CUDA grid mapping artifact). (4) Circular case uses expensive int64 modulus — could use conditional subtract for small padding sizes. ~60-75% estimated efficiency. Low potential because pad is called infrequently during inference (<1% of total time).
 [2026-03-06] Analyzed im2col (sk_021). Found 4 optimization opportunities (low potential). Key findings: Clean manual CUDA port with zero DPCT artifacts, both 2D and 3D variants present with near-perfect CUDA feature parity. Uses nd_range<3> with local_range(1,1,local_size) — only dim2 active (CUDA grid mapping artifact). WG=up to 256 (SYCL_IM2COL_BLOCK_SIZE), appropriate for Xe2. Supports F16 and F32 output via template. Purely memory-bound (0 FLOPs, just address computation + load + cast + store). Issues: (1) Heavy 64-bit integer division in hot path — 4-6 int64 divisions per work-item where all dimension values fit in int32 or could use multiply-shift trick (~10-20% throughput improvement). (2) Scalar 4-byte loads/stores — no vectorized output writes where adjacent threads write adjacent elements (~10-25% improvement for output writes). (3) Missing reqd_sub_group_size(16). (4) Scattered input reads fundamental to im2col algorithm — cannot be meaningfully improved without implicit GEMM approach. ~60-75% estimated efficiency. Low potential because im2col is primarily used by CNN-based vision models (Whisper, image encoders) and contributes <1% of typical LLM inference time.
