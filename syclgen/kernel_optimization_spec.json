@@ -2984,32 +2984,40 @@
           "uses_nd_range": true,
           "nd_range_dims": 3,
           "im2col_2d": {
-            "work_group_size": [1, 1, "min(IC_KH_KW, 256)"],
+            "work_group_size": [
+              1,
+              1,
+              "min(IC_KH_KW, 256)"
+            ],
             "work_group_size_total": "up to 256 (SYCL_IM2COL_BLOCK_SIZE)",
             "global_size_expression": "nd_range<3>((min(N*OH, 65535), OW, num_blocks * local_size), (1, 1, local_size))",
-            "notes": "local_range(1, 1, local_size) — only dimension 2 has actual work-group parallelism; dimensions 0 and 1 are trivially 1 in the local range, using grid dims for output spatial dims. Grid z = min(N_OH, 65535) maps to batch*output_height with MAX_GRIDDIM_Z clamping and a loop inside the kernel for overflow. Grid y = OW maps 1 work-group per output width column. Grid x = ceil(IC_KH_KW / 256) * local_size maps to the flattened input_channels * kernel_height * kernel_width dimension. Work-group size is well-chosen at up to 256 (matches SYCL_IM2COL_BLOCK_SIZE and CUDA's CUDA_IM2COL_BLOCK_SIZE=256)."
+            "notes": "local_range(1, 1, local_size) \u2014 only dimension 2 has actual work-group parallelism; dimensions 0 and 1 are trivially 1 in the local range, using grid dims for output spatial dims. Grid z = min(N_OH, 65535) maps to batch*output_height with MAX_GRIDDIM_Z clamping and a loop inside the kernel for overflow. Grid y = OW maps 1 work-group per output width column. Grid x = ceil(IC_KH_KW / 256) * local_size maps to the flattened input_channels * kernel_height * kernel_width dimension. Work-group size is well-chosen at up to 256 (matches SYCL_IM2COL_BLOCK_SIZE and CUDA's CUDA_IM2COL_BLOCK_SIZE=256)."
           },
           "im2col_3d": {
-            "work_group_size": [1, 1, "min(IC_KD_KH_KW, 256)"],
+            "work_group_size": [
+              1,
+              1,
+              "min(IC_KD_KH_KW, 256)"
+            ],
             "work_group_size_total": "up to 256",
             "global_size_expression": "nd_range<3>((min(N*OD*OH, 65535), OW, num_blocks * local_size), (1, 1, local_size))",
             "notes": "Same structure as 2D but with an additional depth dimension. Grid z = min(N_OD_OH, 65535) maps to batch*output_depth*output_height. The kernel iterates via iz loop when N_OD_OH > MAX_GRIDDIM_Z."
           },
           "sub_group_size": null,
           "sub_group_size_specified": false,
-          "sub_group_size_attribute": "none — not specified on any kernel lambda",
+          "sub_group_size_attribute": "none \u2014 not specified on any kernel lambda",
           "notes": "Both 2D and 3D kernels use the same launch pattern. WG=256 is appropriate for Intel Xe2. The local_range(1,1,N) pattern with only dim-2 active is a CUDA grid/block mapping artifact. Missing [[intel::reqd_sub_group_size(16)]] on both kernel lambdas."
         },
         "memory_patterns": {
           "coalesced_accesses": "partial",
-          "coalesced_notes": "Output writes (dst[offset_dst]): Adjacent work-items in the innermost local dimension have sequential global_id(2) values, mapping to sequential i values (i = iic*KH_KW + ikh*KW + ikw). The output offset formula ((in*OH+ioh)*OW+iow)*IC_KH_KW + i means adjacent threads write to adjacent output elements within the same (in, ioh, iow) slice — COALESCED for the output. Input reads (x[offset_src + iih*IW + iiw]): The input read depends on iih and iiw which are computed from kernel position (ikh, ikw), stride (s0, s1), dilation (d0, d1), and padding (p0, p1). Adjacent threads map to different (iic, ikh, ikw) triples, and the resulting (iih, iiw) values are NOT sequential — input reads are SCATTERED, especially with non-unit dilation or when IC > 1.",
+          "coalesced_notes": "Output writes (dst[offset_dst]): Adjacent work-items in the innermost local dimension have sequential global_id(2) values, mapping to sequential i values (i = iic*KH_KW + ikh*KW + ikw). The output offset formula ((in*OH+ioh)*OW+iow)*IC_KH_KW + i means adjacent threads write to adjacent output elements within the same (in, ioh, iow) slice \u2014 COALESCED for the output. Input reads (x[offset_src + iih*IW + iiw]): The input read depends on iih and iiw which are computed from kernel position (ikh, ikw), stride (s0, s1), dilation (d0, d1), and padding (p0, p1). Adjacent threads map to different (iic, ikh, ikw) triples, and the resulting (iih, iiw) values are NOT sequential \u2014 input reads are SCATTERED, especially with non-unit dilation or when IC > 1.",
           "strided_accesses": [
             "Input reads: adjacent work-items compute different (iic, ikh, ikw) triples, leading to strided/scattered source addresses. With dilation > 1, strides increase further.",
             "When IC > 1: adjacent threads with different iic values access completely different input channel planes (offset by IC_IH_IW), causing large strides in source memory."
           ],
           "vectorized_loads": false,
           "vector_width": null,
-          "notes": "All loads and stores are scalar 4-byte (float) operations. Each work-item reads 1 float from source and writes 1 float (or half) to destination per iz iteration. No sycl::vec usage. Output writes are coalesced (adjacent threads write adjacent dst elements). Input reads are inherently scattered due to the im2col transformation mapping — this is fundamental to the algorithm, not a code deficiency. The CUDA version has identical access patterns."
+          "notes": "All loads and stores are scalar 4-byte (float) operations. Each work-item reads 1 float from source and writes 1 float (or half) to destination per iz iteration. No sycl::vec usage. Output writes are coalesced (adjacent threads write adjacent dst elements). Input reads are inherently scattered due to the im2col transformation mapping \u2014 this is fundamental to the algorithm, not a code deficiency. The CUDA version has identical access patterns."
         },
         "slm_usage": {
           "uses_slm": false,
@@ -3019,7 +3027,7 @@
         },
         "reduction_pattern": {
           "has_reduction": false,
-          "notes": "No reduction. Pure element-wise transformation — each work-item independently computes one output element's source address and copies (with potential zero-padding)."
+          "notes": "No reduction. Pure element-wise transformation \u2014 each work-item independently computes one output element's source address and copies (with potential zero-padding)."
         },
         "data_types": {
           "compute_type": "int64 (address arithmetic only)",
@@ -3028,7 +3036,7 @@
           "accumulator_type": "none",
           "could_use_half": false,
           "could_use_joint_matrix": false,
-          "notes": "Input is always F32. Output is F16 or F32 depending on dst type. The type conversion from float to sycl::half is via static_cast<T>(). No compute on the float values — just load, optionally cast, and store. The address computation uses int64_t throughout (many divisions and multiplications). No opportunity for reduced-precision compute since there is no actual floating-point arithmetic."
+          "notes": "Input is always F32. Output is F16 or F32 depending on dst type. The type conversion from float to sycl::half is via static_cast<T>(). No compute on the float values \u2014 just load, optionally cast, and store. The address computation uses int64_t throughout (many divisions and multiplications). No opportunity for reduced-precision compute since there is no actual floating-point arithmetic."
         },
         "math_functions": {
           "uses_native_math": false,
@@ -3037,20 +3045,20 @@
         },
         "loop_analysis": {
           "hot_loops": [
-            "2D iz loop (line 35): for (iz = item.get_group(0); iz < N_OH; iz += MAX_GRIDDIM_Z) — iterates ceil(N_OH / grid_z) times. For typical CNN inference with small batch (N=1) and moderate OH (e.g., 28), this is 1 iteration. For large N*OH > 65535, iterates multiple times. NOT unrolled.",
-            "3D iz loop (line 136): for (iz = item.get_group(0); iz < N_OD_OH; iz += MAX_GRIDDIM_Z) — same pattern as 2D but over N*OD*OH. NOT unrolled."
+            "2D iz loop (line 35): for (iz = item.get_group(0); iz < N_OH; iz += MAX_GRIDDIM_Z) \u2014 iterates ceil(N_OH / grid_z) times. For typical CNN inference with small batch (N=1) and moderate OH (e.g., 28), this is 1 iteration. For large N*OH > 65535, iterates multiple times. NOT unrolled.",
+            "3D iz loop (line 136): for (iz = item.get_group(0); iz < N_OD_OH; iz += MAX_GRIDDIM_Z) \u2014 same pattern as 2D but over N*OD*OH. NOT unrolled."
           ],
           "unrolled": false,
           "notes": "The iz loops have dynamic trip count depending on N*OH (2D) or N*OD*OH (3D) vs the grid z dimension (clamped to 65535). For typical inference (N=1, OH<=256), the loop executes exactly once. The index decomposition inside the loop (iz / OH, iz % OH for 2D; iz / OD_OH, (iz-n*OD_OH)/OH, iz%OH for 3D) uses expensive 64-bit integer divisions that could be replaced with multiplications/shifts for power-of-2 dimensions or strength-reduced."
         },
         "estimated_bottleneck": "memory",
-        "bottleneck_notes": "Purely memory-bandwidth bound operation. Arithmetic intensity: 0 FLOPs/byte — zero floating-point computation. Each output element requires: reading 1 float (4 bytes) from scattered source location + writing 1 float or half (4 or 2 bytes) to coalesced destination = 6-8 bytes of memory traffic. The kernel is dominated by address computation (integer arithmetic) and memory access latency. For padding regions (iih < 0 || iih >= IH || iiw < 0 || iiw >= IW), no read is needed — just a zero write. The scattered input reads are the primary bottleneck because they defeat cache line prefetching and waste bandwidth when adjacent threads access different cache lines. At 456 GB/s peak B60 bandwidth, a typical im2col for a 224x224 image with 3x3 kernel and 64 channels processes ~2.3M output elements (~9.2 MB output) in ~0.02 ms. The kernel is not on the critical path for LLM inference but is important for CNN-based vision models.",
+        "bottleneck_notes": "Purely memory-bandwidth bound operation. Arithmetic intensity: 0 FLOPs/byte \u2014 zero floating-point computation. Each output element requires: reading 1 float (4 bytes) from scattered source location + writing 1 float or half (4 or 2 bytes) to coalesced destination = 6-8 bytes of memory traffic. The kernel is dominated by address computation (integer arithmetic) and memory access latency. For padding regions (iih < 0 || iih >= IH || iiw < 0 || iiw >= IW), no read is needed \u2014 just a zero write. The scattered input reads are the primary bottleneck because they defeat cache line prefetching and waste bandwidth when adjacent threads access different cache lines. At 456 GB/s peak B60 bandwidth, a typical im2col for a 224x224 image with 3x3 kernel and 64 channels processes ~2.3M output elements (~9.2 MB output) in ~0.02 ms. The kernel is not on the critical path for LLM inference but is important for CNN-based vision models.",
         "anti_patterns": [
-          "nd_range<3> with local_range(1, 1, local_size) — only dimension 2 has real parallelism in the work-group; dimensions 0 and 1 are trivially 1. This is a CUDA grid/block mapping artifact. Could use nd_range<1> with the batch/spatial dimensions encoded in the global range and decoded inside the kernel.",
-          "Missing [[intel::reqd_sub_group_size(16)]] on both kernel lambdas — compiler may select a suboptimal sub-group size. While correctness is not at risk (no sub-group operations used), specifying the native SIMD16 width helps the compiler generate optimal code.",
-          "Scalar 4-byte loads/stores — no vectorization of output writes. Since adjacent threads write to adjacent output elements, vectorized stores (sycl::vec<float,4> or sycl::vec<sycl::half,8>) could reduce store transactions.",
-          "Heavy 64-bit integer division in hot path: i / KH_KW, rem / KW (2D) and i / KD_KH_KW, (i - iic*KD_KH_KW) / KH_KW, ... / KW (3D) — four 64-bit divisions per work-item in the 3D kernel. Also iz / OH (2D) or iz / OD_OH, (iz-n*OD_OH)/OH (3D) per loop iteration. 64-bit integer division is ~30-50 cycles on Xe2 vs ~4 cycles for multiply. These could be strength-reduced to 32-bit divisions (dimensions fit in int32) or multiply-shift for known values.",
-          "No #pragma unroll on the iz loop — for the common case of 1 iteration, the compiler can typically optimize this, but for multi-iteration cases, unrolling by 2 could help overlap memory operations.",
+          "nd_range<3> with local_range(1, 1, local_size) \u2014 only dimension 2 has real parallelism in the work-group; dimensions 0 and 1 are trivially 1. This is a CUDA grid/block mapping artifact. Could use nd_range<1> with the batch/spatial dimensions encoded in the global range and decoded inside the kernel.",
+          "Missing [[intel::reqd_sub_group_size(16)]] on both kernel lambdas \u2014 compiler may select a suboptimal sub-group size. While correctness is not at risk (no sub-group operations used), specifying the native SIMD16 width helps the compiler generate optimal code.",
+          "Scalar 4-byte loads/stores \u2014 no vectorization of output writes. Since adjacent threads write to adjacent output elements, vectorized stores (sycl::vec<float,4> or sycl::vec<sycl::half,8>) could reduce store transactions.",
+          "Heavy 64-bit integer division in hot path: i / KH_KW, rem / KW (2D) and i / KD_KH_KW, (i - iic*KD_KH_KW) / KH_KW, ... / KW (3D) \u2014 four 64-bit divisions per work-item in the 3D kernel. Also iz / OH (2D) or iz / OD_OH, (iz-n*OD_OH)/OH (3D) per loop iteration. 64-bit integer division is ~30-50 cycles on Xe2 vs ~4 cycles for multiply. These could be strength-reduced to 32-bit divisions (dimensions fit in int32) or multiply-shift for known values.",
+          "No #pragma unroll on the iz loop \u2014 for the common case of 1 iteration, the compiler can typically optimize this, but for multi-iteration cases, unrolling by 2 could help overlap memory operations.",
           "The 3D kernel recomputes compound products (OD_OH_OW_IC_KD_KH_KW, OH_OW_IC_KD_KH_KW, OW_IC_KD_KH_KW) inside the kernel from captured values, while the CUDA version passes all pre-computed products as kernel parameters. The SYCL approach avoids parameter bloat but the on-device computation is redundant (computed identically by all work-items). However, with lambda capture, the compiler should hoist these to registers automatically."
         ]
       },
@@ -3061,7 +3069,7 @@
           "priority": "medium",
           "description": "Replace 64-bit integer divisions with 32-bit or multiply-shift alternatives. The 2D kernel performs 2 int64 divisions per work-item (i/KH_KW, rem/KW) plus 1-2 per iz iteration (iz/OH, iz-in*OH). The 3D kernel performs 4 int64 divisions per work-item and 2-3 per iz iteration. All dimension values (IC, KH, KW, OH, OW, OD, etc.) fit comfortably in int32, so 64-bit division is unnecessary. Additionally, for power-of-2 dimensions (common in CNNs), divisions can be replaced with right-shifts. For non-power-of-2, use the multiply-and-shift magic number trick (precompute on host, pass as kernel parameter).",
           "expected_improvement": "10-20% throughput improvement. On Xe2, 64-bit integer division takes ~30-50 cycles vs ~4 cycles for 32-bit multiply. With 4-6 divisions per work-item in the 3D kernel, this is significant instruction overhead for a kernel with zero floating-point compute. The improvement is most pronounced when the iz loop iterates multiple times.",
-          "implementation_notes": "Option A (simple): Cast all dimension variables to int32_t at the top of the kernel lambda — iic = (int32_t)i / (int32_t)KH_KW, etc. This works because typical CNN dimensions (IC*KH*KW, N*OH*OW) are well within int32 range. Only the output offset computation needs 64-bit for large tensors. Option B (optimal): Precompute magic numbers on host for each divisor (KH_KW, KW, OH, OD_OH) using the standard fast-division algorithm, pass as kernel parameters, and use multiply-shift in the kernel. The CUDA version also uses 64-bit divisions but NVIDIA hardware has faster int64 division than Intel Xe2. Priority: the 3D kernel benefits more due to more divisions.",
+          "implementation_notes": "Option A (simple): Cast all dimension variables to int32_t at the top of the kernel lambda \u2014 iic = (int32_t)i / (int32_t)KH_KW, etc. This works because typical CNN dimensions (IC*KH*KW, N*OH*OW) are well within int32 range. Only the output offset computation needs 64-bit for large tensors. Option B (optimal): Precompute magic numbers on host for each divisor (KH_KW, KW, OH, OD_OH) using the standard fast-division algorithm, pass as kernel parameters, and use multiply-shift in the kernel. The CUDA version also uses 64-bit divisions but NVIDIA hardware has faster int64 division than Intel Xe2. Priority: the 3D kernel benefits more due to more divisions.",
           "risk": "low",
           "risk_notes": "Narrowing to int32 is safe as long as individual dimensions fit in int32 (they always do for practical CNN parameters). The multiply-shift approach is mathematically exact for all inputs within the divisor's range. Must ensure the output offset computation remains 64-bit for large total element counts."
         },
@@ -3091,21 +3099,137 @@
           "priority": "low",
           "description": "Convert from nd_range<3> with local_range(1,1,N) to nd_range<1> with a flattened 1D dispatch. The current 3D dispatch uses dimensions 0 and 1 of the local range as trivially 1, wasting the 3D dispatch overhead. A 1D dispatch would flatten the (iz, iow, i) triple into a single global index, decoded inside the kernel. However, this would replace the implicit grid mapping (get_group(0)=iz, get_group(1)=iow) with explicit integer arithmetic, adding division overhead. Alternative: keep nd_range<3> but note it as a cosmetic issue.",
           "expected_improvement": "0-2% improvement. Primarily a code quality fix. The 3D dispatch overhead is trivial on Intel GPUs. The compiler likely optimizes away the unused dimensions.",
-          "implementation_notes": "Option A: Convert to nd_range<1> with total_work_items = grid_z * OW * num_blocks * local_size. Inside kernel: decode item.get_global_id(0) back to (iz, iow, i). This adds 2 divisions per work-item which partly negates any benefit. Option B: Keep nd_range<3> but document it as a CUDA mapping artifact. Option B is recommended — the 3D dispatch is not a real performance issue and the explicit grid mapping is clearer. Not recommended for implementation.",
+          "implementation_notes": "Option A: Convert to nd_range<1> with total_work_items = grid_z * OW * num_blocks * local_size. Inside kernel: decode item.get_global_id(0) back to (iz, iow, i). This adds 2 divisions per work-item which partly negates any benefit. Option B: Keep nd_range<3> but document it as a CUDA mapping artifact. Option B is recommended \u2014 the 3D dispatch is not a real performance issue and the explicit grid mapping is clearer. Not recommended for implementation.",
           "risk": "low",
           "risk_notes": "No correctness risk. The 3D dispatch pattern works correctly. Converting to 1D would add integer divisions that could slightly hurt performance."
         }
       ],
       "overall_optimization_potential": "low",
       "estimated_current_efficiency": "60-75%",
-      "efficiency_notes": "The im2col kernel is a clean, direct port from CUDA with near-perfect feature parity — both 2D and 3D variants are present with identical algorithmic structure. The code is well-organized with templated type support (F16/F32 output), proper MAX_GRIDDIM_Z overflow handling, and appropriate work-group size (up to 256 via SYCL_IM2COL_BLOCK_SIZE). Zero DPCT artifacts — this appears to be a manual port, not DPCT-migrated. The kernel's efficiency is primarily limited by the inherent nature of im2col: scattered input reads (each work-item reads from a different location in the input tensor based on kernel position, stride, and dilation), heavy 64-bit integer address arithmetic (4-6 divisions per work-item), and scalar memory operations. These are fundamental algorithmic characteristics shared with the CUDA version. The main Intel-specific optimization is reducing 64-bit integer divisions to 32-bit or multiply-shift equivalents (medium impact, ~10-20%). Vectorized output stores offer moderate improvement (~10-25%). Adding reqd_sub_group_size is a best-practice fix with minimal impact. Overall low optimization potential because: (a) im2col is called infrequently in LLM inference — it's primarily used by CNN-based vision models (Whisper audio, image encoders) and contributes <1% of typical LLM inference time, (b) the implementation quality is already good with no DPCT artifacts and correct CUDA parity, (c) the scattered input access pattern is fundamental to the im2col algorithm and cannot be meaningfully improved without changing the algorithmic approach (e.g., implicit GEMM which eliminates im2col entirely)."
+      "efficiency_notes": "The im2col kernel is a clean, direct port from CUDA with near-perfect feature parity \u2014 both 2D and 3D variants are present with identical algorithmic structure. The code is well-organized with templated type support (F16/F32 output), proper MAX_GRIDDIM_Z overflow handling, and appropriate work-group size (up to 256 via SYCL_IM2COL_BLOCK_SIZE). Zero DPCT artifacts \u2014 this appears to be a manual port, not DPCT-migrated. The kernel's efficiency is primarily limited by the inherent nature of im2col: scattered input reads (each work-item reads from a different location in the input tensor based on kernel position, stride, and dilation), heavy 64-bit integer address arithmetic (4-6 divisions per work-item), and scalar memory operations. These are fundamental algorithmic characteristics shared with the CUDA version. The main Intel-specific optimization is reducing 64-bit integer divisions to 32-bit or multiply-shift equivalents (medium impact, ~10-20%). Vectorized output stores offer moderate improvement (~10-25%). Adding reqd_sub_group_size is a best-practice fix with minimal impact. Overall low optimization potential because: (a) im2col is called infrequently in LLM inference \u2014 it's primarily used by CNN-based vision models (Whisper audio, image encoders) and contributes <1% of typical LLM inference time, (b) the implementation quality is already good with no DPCT artifacts and correct CUDA parity, (c) the scattered input access pattern is fundamental to the im2col algorithm and cannot be meaningfully improved without changing the algorithmic approach (e.g., implicit GEMM which eliminates im2col entirely)."
+    },
+    {
+      "kernel_id": "sk_022",
+      "name": "pad",
+      "file": "ggml/src/ggml-sycl/pad.cpp",
+      "source_cuda_ids": [
+        "ck_082"
+      ],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": [
+            1,
+            1,
+            256
+          ],
+          "work_group_size_total": 256,
+          "sub_group_size": null,
+          "sub_group_size_specified": false,
+          "global_size_expression": "3D: (ne2*ne3, ne1, num_blocks_x*256) where num_blocks_x = ceil(ne0/256)",
+          "notes": "WG=256 in dim2 only; dims 0 and 1 are degenerate (size 1). This is the standard CUDA grid translation pattern. 256 work-items matches Intel's preferred range. No sub-group size specified \u2014 acceptable since no sub-group ops used."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "strided_accesses": [
+            "Source reads when s00 != 1 (non-contiguous dim-0 stride) \u2014 inherent to data layout, matches CUDA behavior"
+          ],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "Destination writes are perfectly coalesced (adjacent work-items write adjacent float elements). Source reads are coalesced when s00==1 (standard contiguous tensor). Each work-item processes exactly 1 float \u2014 no vectorization."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes": 0,
+          "potential_bank_conflicts": false,
+          "notes": "No SLM used. Correct for a pure element-wise copy/fill operation with no data reuse between work-items."
+        },
+        "reduction_pattern": {
+          "has_reduction": false,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "No reduction \u2014 each work-item independently computes one output element."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "could_use_half": true,
+          "could_use_joint_matrix": false,
+          "notes": "FP32 only \u2014 hardcoded with GGML_ASSERT(type == GGML_TYPE_F32). Pad is a pure data-movement op (copy or zero-fill) with no arithmetic. Templating on element type to support FP16/BF16 would avoid unnecessary type conversion round-trips in half-precision pipelines."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [],
+          "notes": "No math functions. Only integer arithmetic for index computation (add, subtract, multiply, divide, modulus). The circular case uses int64 modulus for wrap-around."
+        },
+        "loop_analysis": {
+          "hot_loops": [],
+          "unrolled": true,
+          "notes": "No loops inside the kernel. Each work-item executes a single branch (circular vs non-circular) and processes exactly one element. Performance is purely determined by launch overhead and memory bandwidth."
+        },
+        "estimated_bottleneck": "memory",
+        "bottleneck_notes": "Pad is a pure memory-movement operation: one float read (or zero-fill) + one float write per work-item. Zero compute intensity (0 FLOP/byte). Performance is entirely memory-bandwidth limited. For the zero-padding path, no read is needed \u2014 just a store of 0.0f.",
+        "anti_patterns": [
+          "3D nd_range with degenerate dimensions (dims 0 and 1 have WG=1) \u2014 CUDA grid translation artifact, functionally correct",
+          "No vectorized loads/stores \u2014 each work-item processes only 1 float (4 bytes) where 16-byte vec4 loads/stores would improve bandwidth utilization",
+          "FP32-only \u2014 no FP16/BF16 support, forces type conversion in mixed-precision pipelines",
+          "Circular case uses 4x int64 modulus operations \u2014 could use conditional subtraction for faster wrap-around when padding is small relative to tensor size",
+          "Dead declaration: ggml_sycl_pad() declared in pad.hpp but never defined"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_022_001",
+          "category": "vectorization",
+          "priority": "medium",
+          "description": "Use vectorized vec4 loads/stores (sycl::vec<float,4>) for the non-circular contiguous case (s00==1). Process 4 elements per work-item, reducing memory transactions by 4x. For the non-padded interior region, this is a straightforward 128-bit load + 128-bit store. For the zero-fill boundary, use a vec4 of zeros. Handle the tail (ne0 not divisible by 4) with scalar fallback.",
+          "expected_improvement": "1.5-2x throughput improvement for the memory-bound pad kernel by utilizing wider memory transactions. Impact scales with tensor size \u2014 more significant for large tensors.",
+          "implementation_notes": "Specialize the kernel launch: when s00==1 and !circular, use a vec4 kernel where each work-item processes 4 consecutive elements. Adjust num_blocks_x = ceil(ne0/4/256). Each work-item computes i0_base = (local_id + group_id * 256) * 4, then loads/stores sycl::vec<float,4>. For boundary work-items, fall back to scalar processing. This pattern is already used in other SYCL kernels in this codebase (e.g., element_wise).",
+          "risk": "low",
+          "risk_notes": "The vec4 optimization only applies to the contiguous non-circular fast path. The scalar fallback handles all edge cases. No correctness risk since the underlying memory layout is unchanged."
+        },
+        {
+          "id": "opt_022_002",
+          "category": "data_type",
+          "priority": "low",
+          "description": "Template the pad kernel on element type to support FP16 and BF16 natively, avoiding unnecessary FP32 type conversion round-trips in mixed-precision pipelines. Pad is a pure data-movement op \u2014 it doesn't care about the element type, it just copies bytes or writes zeros.",
+          "expected_improvement": "2x throughput for FP16 tensors (half the bytes to move). Eliminates two type conversion passes (FP16\u2192FP32 before pad, FP32\u2192FP16 after pad) if the pipeline uses half precision.",
+          "implementation_notes": "Template the lambda on typename T. Remove the GGML_ASSERT(type == GGML_TYPE_F32) guards. Dispatch based on dst->type: GGML_TYPE_F32 \u2192 float, GGML_TYPE_F16 \u2192 sycl::half, GGML_TYPE_BF16 \u2192 sycl::ext::oneapi::bfloat16. Use static_cast<T>(0) instead of 0.0f for zero-fill. The kernel logic is type-agnostic \u2014 only the pointer types and zero literal need parameterization.",
+          "risk": "low",
+          "risk_notes": "Pad performs no arithmetic, so data type doesn't affect numerical accuracy. The only risk is ensuring the type dispatch is correct and that the caller provides matching src/dst types."
+        },
+        {
+          "id": "opt_022_003",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Replace 3D nd_range with 1D nd_range and manual index decomposition. The current 3D layout has degenerate dimensions 0 and 1 (WG=1), making it effectively 1D. A 1D nd_range simplifies the code and may reduce kernel argument overhead slightly. This is primarily a code quality improvement.",
+          "expected_improvement": "Negligible performance impact (<1%). Primarily improves code clarity and reduces kernel argument size. The 3D nd_range overhead is minimal on Intel GPUs.",
+          "implementation_notes": "Replace nd_range<3>(...) with nd_range<1>(total_elements_rounded, 256). Compute i0/i1/i2/i3 from the global linear index using division and modulus: i0 = gid % ne0, i1 = (gid / ne0) % ne1, etc. This matches the pattern used in element_wise.cpp and other newer SYCL kernels in this codebase.",
+          "risk": "low",
+          "risk_notes": "Pure refactoring \u2014 same algorithm, different indexing. The 1D decomposition introduces integer divisions, but these are the same divisions the hardware does internally for 3D dispatch."
+        },
+        {
+          "id": "opt_022_004",
+          "category": "memory_coalescing",
+          "priority": "low",
+          "description": "Optimize the circular padding wrap-around: replace 4 int64 modulus operations with conditional subtraction. For the common case where padding is small relative to tensor size, most elements map to non-wrapped indices. A branch-free conditional subtraction (coord = coord >= size ? coord - size : coord) avoids expensive integer division. If coord can be negative (from the lp subtraction), use a two-step: if (coord < 0) coord += size; if (coord >= size) coord -= size;",
+          "expected_improvement": "5-10% throughput improvement for the circular padding case only. Integer division is ~30 cycles on Intel GPUs. Most pads use zero-padding (non-circular), so this only benefits circular pad use cases.",
+          "implementation_notes": "Replace `((i0 - lp0) + ne00) % ne00` with: `int64_t c = i0 - lp0; if (c < 0) c += ne00; else if (c >= ne00) c -= ne00;`. This works when padding is < tensor_size (which is always true for valid circular padding). Same for i1/i2/i3 coordinates.",
+          "risk": "low",
+          "risk_notes": "The conditional subtraction is valid when padding amount < tensor dimension, which is guaranteed by the semantics of circular padding. For paranoid safety, can add GGML_ASSERT(lp0 < ne00) in the host wrapper."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "60-75%",
+      "efficiency_notes": "Clean native SYCL port with zero DPCT artifacts, proper WG=256, and correct coalesced access patterns. The kernel is a faithful 1:1 translation of the CUDA original. It is purely memory-bandwidth bound with zero compute. The main inefficiency is scalar 4-byte loads/stores where vec4 could improve bandwidth utilization. Pad is called infrequently during typical LLM inference (mainly for vision encoders and diffusion models), contributing <1% of end-to-end latency. The circular padding path has expensive int64 modulus operations but is rarely used. Overall, the implementation quality is good and the optimization ROI is low."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 21,
+    "total_kernels_analyzed": 22,
     "high_potential": 4,
     "medium_potential": 9,
-    "low_potential": 8,
+    "low_potential": 9,
     "no_optimization_needed": 0,
     "top_opportunities": [
       {
