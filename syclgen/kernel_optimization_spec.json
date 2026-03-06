@@ -697,13 +697,109 @@
       "overall_optimization_potential": "medium",
       "estimated_current_efficiency": "30-45%",
       "efficiency_notes": "Dequantization is a pure map operation (no reductions, no inter-thread communication) that is entirely memory-bandwidth bound. The arithmetic intensity is trivially low (~0.1-0.5 ops/byte for bit manipulation + scale multiply). The kernel's efficiency depends solely on memory bandwidth utilization. Current issues: inconsistent work-group sizes (16-256), strided output writes in K-quant formats, mostly scalar loads (no vectorization except Q4_K), pervasive DPCT artifacts. The kernel is called frequently during inference (every matmul path that dequantizes before compute) but is not on the critical path for single-token latency — it's used more during prompt processing and as a utility for other ops. Optimization potential is medium because: (a) the kernel is already functional and not as severely impacted as MMVQ/DMMV by tiny work-groups (the generic path uses WG=256), (b) the primary bottleneck is memory bandwidth which is harder to improve without algorithmic changes, and (c) some formats already have reorder+vectorized paths."
+    },
+    {
+      "kernel_id": "sk_005",
+      "name": "outprod (oneMKL GEMM)",
+      "file": "ggml/src/ggml-sycl/outprod.cpp",
+      "source_cuda_ids": [],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": false,
+          "work_group_size": null,
+          "sub_group_size": null,
+          "global_size_expression": "N/A — delegates to oneapi::mkl::blas::column_major::gemm()",
+          "notes": "This is NOT a custom SYCL kernel. It is a thin wrapper around oneMKL GEMM. All launch configuration (work-group size, sub-group size, grid dimensions) is managed internally by the oneMKL library. The function simply sets up GEMM parameters (M=ne0, N=ne1, K=ne01, alpha=1.0, beta=0.0) and calls gemm(). No parallel_for or nd_range in this code."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "strided_accesses": [],
+          "vectorized_loads": true,
+          "vector_width": null,
+          "notes": "Memory access is managed by oneMKL GEMM implementation which is highly optimized for the target hardware. src0 is asserted contiguous (lda=ne00). dst is asserted contiguous (ldc=ne0). src1 can be either contiguous or transposed — the GEMM op flag is set accordingly. Leading dimensions are derived from tensor shapes. oneMKL internally handles memory coalescing, vectorization, and tiling."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes": 0,
+          "potential_bank_conflicts": false,
+          "notes": "No SLM managed by this code. oneMKL GEMM internally uses SLM for tiled matrix multiplication, but this is opaque to the caller. The oneMKL implementation for Xe2 GPUs is expected to use efficient tiling strategies with SLM."
+        },
+        "reduction_pattern": {
+          "has_reduction": false,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "Reduction is internal to the GEMM implementation. The outer product operation (C = alpha*A*B^T + beta*C with beta=0) involves accumulation along the K dimension, handled entirely by oneMKL."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "could_use_half": true,
+          "could_use_joint_matrix": false,
+          "notes": "F32 only — all three tensors (src0, src1, dst) are asserted to be GGML_TYPE_F32. The supports_op check in ggml-sycl.cpp also enforces F32 for all operands. oneMKL GEMM supports half-precision (sycl::half) which could be used for F16 inputs, but the current implementation does not support this. joint_matrix is N/A since oneMKL handles the matrix multiply internally."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [],
+          "notes": "No math functions in the wrapper. All computation is delegated to oneMKL GEMM."
+        },
+        "loop_analysis": {
+          "hot_loops": [],
+          "unrolled": false,
+          "notes": "No loops in the wrapper code. The CUDA equivalent has a loop over batch dimensions (ne2, ne3) but the SYCL version restricts to ne2==1, ne3==1. No tiling or iteration logic — single GEMM call."
+        },
+        "estimated_bottleneck": "compute",
+        "bottleneck_notes": "For outer products with substantial K dimension, the operation is compute-bound (standard GEMM behavior). For small matrices (small M, N, or K), launch overhead may dominate. The oneMKL GEMM is expected to achieve near-peak throughput for large matrices on the B60's 12.28 TFLOPS FP32. The actual bottleneck is the missing batched operation support — for models with ne2 > 1 or ne3 > 1, the op is simply unsupported, forcing fallback to CPU.",
+        "anti_patterns": [
+          "CRITICAL: Missing batch dimension support (ne2 > 1 or ne3 > 1) — CUDA supports arbitrary batching via loop, SYCL restricts to 2D only. This means many test cases and real model configurations are rejected by supports_op.",
+          "CRITICAL: Missing GQA (Grouped Query Attention) broadcasting support — CUDA handles ne2/ne02 and ne3/ne03 broadcasting for cases where src1 has more batch dimensions than src0. SYCL does not implement this.",
+          "Hardcoded leading dimensions (lda=ne00, ldc=ne0) instead of deriving from byte strides (nb01/sizeof(float), nb1/sizeof(float)) — fragile, assumes contiguity that is already asserted but less general than CUDA equivalent",
+          "Missing stride assertion on src1: CUDA checks (src1_T ? nb11 : nb10) == sizeof(float) but SYCL does not — potential silent incorrect results for non-contiguous src1 edge cases",
+          "F16 not supported — oneMKL GEMM supports half-precision but the wrapper only handles F32, limiting the op's applicability"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_005_001",
+          "category": "kernel_fusion",
+          "priority": "high",
+          "description": "Add batch dimension support (ne2 > 1 and/or ne3 > 1) to match CUDA parity. Currently the SYCL backend rejects any outprod with ne2 != 1 or ne3 != 1, forcing CPU fallback for batched operations. Implement either: (a) a loop over ne2*ne3 calling GEMM per batch (matching CUDA approach), or preferably (b) use oneapi::mkl::blas::column_major::gemm_batch for batched GEMM which can launch all batches in a single API call for better GPU utilization.",
+          "expected_improvement": "Functional improvement — enables models requiring batched outer products (e.g., during training backward passes) to run on GPU instead of CPU fallback. For batched workloads, gemm_batch can provide 2-5x speedup over sequential GEMM calls by amortizing launch overhead and enabling cross-batch parallelism.",
+          "implementation_notes": "Option A (loop, matching CUDA): Add nested loop over i3=0..ne3-1, i2=0..ne2-1, computing pointer offsets as src0_ptr += i2*nb02 + i3*nb03, etc. Handle GQA broadcasting: dps2 = ne2/ne02, dps3 = ne3/ne03, with src0 offset using i2/dps2 and i3/dps3. Option B (batched GEMM): Use oneapi::mkl::blas::column_major::gemm_batch with group_count=1, group_size=ne2*ne3, and arrays of A/B/C pointers computed per batch. For GQA, the pointer arrays handle the broadcasting. Remove the ne2==1 && ne3==1 restriction from supports_op in ggml-sycl.cpp (line 5038).",
+          "risk": "low",
+          "risk_notes": "The loop approach is a straightforward port from CUDA and has minimal risk. The batched GEMM approach is slightly more complex (needs pointer array allocation) but is a standard oneMKL API. Both approaches can be validated against the existing test suite (test_out_prod generates batched test cases that are currently skipped by SYCL)."
+        },
+        {
+          "id": "opt_005_002",
+          "category": "data_type",
+          "priority": "medium",
+          "description": "Add F16 input support for outprod. oneMKL GEMM supports half-precision (sycl::half) types. Many models use F16 tensors, and the current F32-only restriction limits the op's applicability. F16 GEMM achieves 2x peak throughput on Xe2 hardware (XMX engines natively support F16->F32 accumulation).",
+          "expected_improvement": "2x throughput for F16 inputs due to halved memory bandwidth requirement and 2x FP16 compute throughput on Xe2. Also enables more model configurations to use GPU acceleration instead of CPU fallback.",
+          "implementation_notes": "Add a type dispatch in ggml_sycl_op_out_prod: if src0/src1 are F16, call gemm() with sycl::half pointers and sycl::half alpha/beta (or float alpha/beta with half data depending on oneMKL API). Update supports_op to accept F16 types. May need mixed-precision support (F16 inputs, F32 accumulation) via the gemm extended API if available.",
+          "risk": "medium",
+          "risk_notes": "F16 has lower precision than F32. For outer products used in training (gradient computation), precision matters. Need accuracy validation. Also need to verify oneMKL half-precision GEMM support on the target Intel GPU — some oneMKL configurations may not support all data type combinations."
+        },
+        {
+          "id": "opt_005_003",
+          "category": "memory_coalescing",
+          "priority": "low",
+          "description": "Use stride-based leading dimensions (nb01/sizeof(float) for lda, nb1/sizeof(float) for ldc) instead of hardcoded ne00/ne0. This makes the implementation more general and handles edge cases where the tensors have non-minimal strides (e.g., sub-views of larger tensors). The CUDA implementation already uses stride-based dimensions.",
+          "expected_improvement": "No performance improvement for typical cases where tensors are contiguous. Enables correct behavior for edge cases with padded or sub-viewed tensors, improving robustness.",
+          "implementation_notes": "Replace lda=ne00 with lda=nb01/sizeof(float). Replace ldc=ne0 with ldc=nb1/sizeof(float) where nb1 is dst->nb[1]. Add the missing src1 contiguity assertion from CUDA: assert((src1_T ? nb11 : nb10) == sizeof(float)). This is a 3-line change.",
+          "risk": "low",
+          "risk_notes": "Low risk — this aligns with the CUDA implementation. The existing contiguity assertions ensure that the change is equivalent for all currently-supported cases."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "85-95%",
+      "efficiency_notes": "For the supported case (2D F32 outer product), this kernel delegates entirely to oneMKL GEMM which is a highly-optimized vendor library. The oneMKL GEMM implementation for Intel GPUs uses XMX engines, tiled algorithms, and SLM caching internally — there is little room for user-level optimization of the GEMM itself. The kernel's efficiency is near-optimal for what it does. However, the kernel's SCOPE is severely limited: it only handles 2D F32 outer products while CUDA handles batched, broadcasted, and (potentially) F16 outer products. The primary optimization is not performance but functionality — adding batch support and F16 types to match CUDA parity and avoid CPU fallbacks. The 'low' optimization potential rating reflects that the actual GEMM compute is already near-optimal; the improvements are about expanding supported configurations."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 4,
+    "total_kernels_analyzed": 5,
     "high_potential": 3,
     "medium_potential": 1,
-    "low_potential": 0,
+    "low_potential": 1,
     "no_optimization_needed": 0,
     "top_opportunities": [
       {
@@ -774,6 +870,13 @@
         "kernel_name": "dequantize_block_sycl (convert)",
         "optimization_id": "opt_004_002",
         "description": "Use vectorized loads/stores (vec4/vec8) for 2-4x bandwidth improvement in memory-bound dequantization",
+        "priority": "high"
+      },
+      {
+        "kernel_id": "sk_005",
+        "kernel_name": "outprod (oneMKL GEMM)",
+        "optimization_id": "opt_005_001",
+        "description": "Add batch dimension support (ne2 > 1, ne3 > 1) and GQA broadcasting to match CUDA parity — currently rejects batched outprod forcing CPU fallback",
         "priority": "high"
       }
     ]
