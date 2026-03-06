@@ -1783,12 +1783,141 @@
       "overall_optimization_potential": "low",
       "estimated_current_efficiency": "40-55%",
       "efficiency_notes": "All 5 kernels are cleanly written native SYCL with zero DPCT artifacts. They use proper nd_range<1> with WG=256, correct bounds checking, and support FP16 (4 of 5). The primary efficiency loss is from scalar 1-element-per-work-item processing on purely memory-bound operations (0.4-2.0 FLOP/byte, all far below the 27 FLOP/byte ridge point). Vectorized vec4 loads/stores could improve bandwidth utilization by 1.5-2x. The integer division overhead in swiglu_oai adds ~5% cost. Overall optimization potential is LOW because: (1) special unary activations are not on the critical inference path (tiny fraction of total compute time vs matmul kernels), (2) the kernels are already correctly implemented with recommended launch configuration, (3) the main optimization (vectorization) provides modest improvement on already-fast kernels, and (4) native math provides marginal gains on memory-bound operations. These kernels fix 2 latent bugs from the CUDA source (xielu block count off-by-one, silu_back wrong divisor constant)."
+    },
+    {
+      "kernel_id": "sk_013",
+      "name": "binbcast (binary broadcast)",
+      "file": "ggml/src/ggml-sycl/binbcast.cpp",
+      "source_cuda_ids": [
+        "ck_008",
+        "ck_009"
+      ],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "nd_range_dims": "3D (primary) and 1D (fallback for large grids)",
+          "work_group_size": "3D: (bz, by, bx) where bx*by*bz <= 128. Typical: (1, 1, 128) for large ne0, (1, 4, 32) for medium ne0. 1D fallback: 128.",
+          "work_group_size_total": 128,
+          "sub_group_size": null,
+          "sub_group_size_specified": false,
+          "global_size_expression": "3D: (gz*bz, gy*by, gx*bx) where gx=ceil(hne0/bx), gy=ceil(ne1/by), gz=ceil(ne2*ne3/bz), hne0=max(ne0/2,1). 1D fallback: ceil(ne0*ne1*ne2*ne3/128)*128.",
+          "notes": "Work-group size of 128 is below the recommended 256-512 for Intel GPUs. The grid halving (hne0 = ne0/2) means each work-item processes ~2 elements via the grid-stride loop. The 3D launch uses (z,y,x) ordering matching SYCL convention. The 1D fallback (k_bin_bcast_unravel) is used when gz > 65535 or gy > 65535. No [[intel::reqd_sub_group_size()]] specified — correct per optimization guide since no sub-group operations are used."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "strided_accesses": [
+            "When s00 != 1 (non-contiguous src0), src0_row[i0*s00] has strided access pattern",
+            "When s10 != 1 (non-contiguous src1), src1[i_src1 + i10*s10] has strided access",
+            "Broadcasting dimension access (i0 % ne10) can cause non-contiguous src1 reads when ne10 < ne0"
+          ],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "All loads/stores are scalar. Adjacent work-items in dim-x read adjacent elements (i0, i0+1, ...), giving coalesced access when s00=1 and s10=1 (contiguous case). For the common case of contiguous ADD with no broadcasting, memory access is well-coalesced. The dimension collapsing optimization (lines 185-199) merges contiguous non-broadcast dimensions to maximize the inner dimension, which improves coalescing."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes": 0,
+          "notes": "No SLM used. The kernel is a simple element-wise operation with no data reuse. SLM would not help since each element is read once and written once."
+        },
+        "reduction_pattern": {
+          "has_reduction": false,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "Pure element-wise operation — no reductions needed."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "supported_types": "F32×F32→F32, F16×F16→F16, F16×F32→F16, F16×F32→F32",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "All computation done in FP32 via casts: (float)src0_row[i0] and (float)src1[...], result cast back to dst_t. This matches CUDA behavior. The FP32 intermediate is needed for numerical correctness (especially for DIV). For F16×F16→F16 path, the FP32 intermediate adds 2 casts per element but ensures accuracy. No opportunity for joint_matrix — these are element-wise ops."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [],
+          "notes": "Only basic arithmetic (+, -, *, /) used. No transcendental functions. Division is the most expensive operation but is FP32 division which is hardware-supported."
+        },
+        "loop_analysis": {
+          "hot_loops": [
+            "Grid-stride loop in k_bin_bcast (line 75): for (i0 = i0s; i0 < ne0; i0 += grid_x) — processes ~2 elements per work-item due to hne0=ne0/2 grid halving. Not unrolled."
+          ],
+          "unrolled": false,
+          "notes": "The grid-stride loop typically iterates 2 times (due to hne0=ne0/2). This is a reasonable approach but the loop body has integer modulo (i0 % ne10) which is expensive on GPU. The k_bin_bcast_unravel kernel has no inner loop — each work-item processes exactly 1 element."
+        },
+        "estimated_bottleneck": "memory",
+        "bottleneck_notes": "All 5 binary operations (ADD, SUB, MUL, DIV, REPEAT) are deeply memory-bound. Arithmetic intensity: ADD/SUB/MUL = 1 FLOP / 12 bytes (2 reads + 1 write × 4B each for F32) = 0.08 FLOP/byte. DIV = 1 FLOP / 12 bytes = 0.08 FLOP/byte. REPEAT = 0 FLOP / 8 bytes. All are far below the B60's compute intensity threshold of ~27 FLOP/byte. Performance is entirely determined by memory bandwidth utilization. The hne0=ne0/2 grid halving means each work-item processes 2 elements, giving 2x work per item, but this is partially offset by the grid-stride loop overhead.",
+        "anti_patterns": [
+          "Work-group size 128 — below recommended 256-512 for Intel GPUs. Reduces occupancy and memory-level parallelism for memory-bound kernels.",
+          "No vectorized loads/stores — each work-item processes elements one-at-a-time via scalar loads. For contiguous tensors, vec4 loads could reduce memory transactions by 4x.",
+          "Expensive integer modulo operations: i2=i23/ne3, i3=i23%ne3, i0%ne10, i1%ne11, i2%ne12, i3%ne13 — all use plain % operator. CUDA uses fastdiv/fastmodulo (multiplication-based). On Intel GPUs, 32-bit integer division is ~20-30 cycles vs ~4 cycles for the multiply-shift trick.",
+          "Missing fused-add support — CUDA has ggml_cuda_op_fused_add supporting up to 8 additions in a single kernel launch (reduces kernel launch overhead and increases data reuse). SYCL version only supports 1 src1 operand.",
+          "3D nd_range with small per-dimension sizes — when ne1 is small (e.g., 1 for vector operations), the by dimension collapses to 1, wasting 2 of 3 nd_range dimensions. A 1D kernel with vectorized loads would be simpler and potentially faster.",
+          "Grid halving hne0=ne0/2 with grid-stride loop — an indirect way to get 2 elements per work-item. Direct vec2/vec4 processing with adjusted grid would be cleaner and more efficient."
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_013_001",
+          "category": "work_group_size",
+          "priority": "medium",
+          "description": "Increase work-group size from 128 to 256 for better occupancy and memory-level parallelism. For purely memory-bound kernels, larger work-groups generate more concurrent memory requests per Xe-core, improving bandwidth utilization. The current 128 gives 8 sub-groups per work-group (at SIMD16); 256 would give 16 sub-groups, doubling the memory-level parallelism per work-group.",
+          "expected_improvement": "5-15% throughput improvement from better memory bandwidth utilization. The B60 has 20 Xe-cores each running multiple work-groups concurrently. With WG=128, fewer memory requests are in-flight per Xe-core. The improvement is larger for small tensors where fewer work-groups are launched.",
+          "implementation_notes": "Change const int block_size = 128 to const int block_size = 256 on line 252. This affects both the 3D and 1D kernel paths. The bx/by/bz factorization (lines 257-259) will automatically adapt: for large ne0, bx=256 with by=bz=1. For moderate ne0, bx might be smaller with by>1. Verify that gz and gy don't exceed 65535 more often with the larger work-group (should be fine since gz/gy decrease with larger bz/by).",
+          "risk": "low",
+          "risk_notes": "256 is within hardware limits (max 1024) and is the standard recommended size. The bx/by/bz factorization logic handles arbitrary block_size correctly. Main risk is edge cases where larger WG creates fewer total work-groups, reducing GPU utilization for small tensors."
+        },
+        {
+          "id": "opt_013_002",
+          "category": "vectorization",
+          "priority": "medium",
+          "description": "Use vectorized 4-wide loads/stores (sycl::vec<float,4>) for contiguous tensors where s00=1 and s10=1 (no striding). Each work-item would process 4 elements instead of the current ~2 (from hne0 grid halving). For F16, use sycl::vec<sycl::half,4> for 8-byte loads. This directly reduces memory transactions by 2-4x for the common contiguous case.",
+          "expected_improvement": "1.5-3x throughput improvement for contiguous tensors (the dominant case in LLM inference: residual ADD, bias ADD, attention scaling MUL). The B60's 456 GB/s bandwidth is better utilized with 16-byte transactions (vec4 float) vs 4-byte scalar loads. For broadcasting cases (ne10 < ne0), vectorization is only safe when ne0 is a multiple of vec_width AND ne10 is a multiple of vec_width.",
+          "implementation_notes": "Add a fast-path check in launch_bin_bcast: if s00==1 && s10==1 && s01==ne0 && s11==ne10 (both src0 and src1 are row-contiguous), launch a vectorized kernel variant. The vectorized kernel processes 4 elements per iteration: load vec4 from src0 and src1 (handling broadcasting by loading vec4 from src1 with appropriate index mapping), apply op, store vec4 to dst. The grid-stride loop iterates ceil(ne0/4/WG_SIZE) times. Keep the scalar kernel as fallback for strided/non-contiguous cases. Remove the hne0=ne0/2 halving for the vectorized path — process exactly ceil(ne0/4) work-items instead.",
+          "risk": "low",
+          "risk_notes": "Alignment: ggml tensors are typically 32-byte aligned, so vec4 float (16 bytes) is safe. Tail handling needed when ne0 is not a multiple of 4. Broadcasting complicates vectorization — when ne10 < ne0, the src1 access pattern (i0 % ne10) means src1 elements repeat, preventing simple vec4 loads. The safe approach is to only vectorize when ne10 == ne0 (no broadcasting on dim 0) or ne10 == 1 (scalar broadcast, can use sycl::vec splat)."
+        },
+        {
+          "id": "opt_013_003",
+          "category": "integer_math",
+          "priority": "medium",
+          "description": "Replace expensive integer division/modulo (%) operations with multiplication-based fast division. The kernel has 6 modulo operations per work-item (i23/ne3, i23%ne3, i0%ne10, i1%ne11, i2%ne12, i3%ne13). On Intel GPUs, 32-bit integer division takes ~20-30 cycles vs ~4 cycles for the multiply-shift trick. The CUDA version uses fastdiv/fastmodulo for all of these. Implement the standard Barrett reduction or magic number division technique.",
+          "expected_improvement": "5-10% throughput improvement. With 6 division/modulo operations per work-item and ~2 elements per work-item, the integer math overhead is ~120-180 cycles vs ~24 cycles with fast division. For small tensors where the kernel is less memory-bound (compute becomes a larger fraction), the improvement is more significant. For large tensors that are deeply memory-bound, the improvement is smaller since the memory latency dominates.",
+          "implementation_notes": "Pre-compute magic numbers on host: for each divisor d, compute magic multiplier m and shift s such that (x * m) >> s == x / d. Pass m and s as kernel arguments alongside the original ne values. In the kernel, replace i23 / ne3 with fast_div(i23, ne3_magic, ne3_shift) and i23 % ne3 with i23 - fast_div(i23, ne3_magic, ne3_shift) * ne3. The CUDA reference uses uint3 to pack {divisor, magic, shift} into a single struct — a similar approach works for SYCL. Apply to both k_bin_bcast and k_bin_bcast_unravel kernels.",
+          "risk": "low",
+          "risk_notes": "The multiply-shift fast division technique is well-established and exact for all 32-bit dividends when the magic numbers are computed correctly. No precision risk. The main complexity is computing the magic numbers on the host side and passing them as additional kernel arguments (6 extra uint32_t pairs). For power-of-2 divisors, can use simple bit shift instead."
+        },
+        {
+          "id": "opt_013_004",
+          "category": "kernel_fusion",
+          "priority": "medium",
+          "description": "Implement fused multi-source ADD kernel to match CUDA's ggml_cuda_op_fused_add supporting up to 8 additions in a single kernel launch. In transformer inference, multiple residual additions are often chained (e.g., x + attn_out + ffn_out). Fusing these into a single kernel reduces kernel launch overhead (significant for small tensors) and improves data locality (the base tensor is loaded once instead of N times).",
+          "expected_improvement": "Up to Nx bandwidth reduction for N-way fused add (since the destination tensor is only read/written once instead of N times). For 2-way fused add: ~33% fewer memory transactions (1 read base + 2 read addends + 1 write vs 2×(1 read + 1 read + 1 write)). Kernel launch overhead reduction: ~2-5 µs per fused kernel on Intel GPUs. Most impactful for small-to-medium tensors in batch-1 inference where launch overhead is a larger fraction of total time.",
+          "implementation_notes": "Add variadic template parameter pack for additional src1 pointers, matching CUDA's approach: template <bin_op_type op, typename src0_t, typename src1_t, typename dst_t, typename... src1_ptrs>. The kernel accumulates: result = apply_bin_op<op>(result, src1[...]); result = apply_bin_op<op>(result, src1s[0][...]); ...; for each additional source. Host-side dispatch: ggml_sycl_op_fused_add(ctx, dst, n_fuse) with switch on n_fuse (2-8) to instantiate the correct template. Requires graph-level support to identify fusible sequences.",
+          "risk": "medium",
+          "risk_notes": "Requires upstream graph-level changes to identify and schedule fused operations. The kernel itself is straightforward (variadic template expansion), but the dispatch logic and tensor validation add complexity. Each n_fuse instantiation (2-8) generates a separate kernel binary, increasing compile time. Risk of template bloat with 7 fuse levels × 4 type combos × 5 ops = 140 kernel variants (though only ADD fusion is practically needed)."
+        },
+        {
+          "id": "opt_013_005",
+          "category": "launch_config",
+          "priority": "low",
+          "description": "Add a 1D fast-path for the common case of contiguous element-wise operations (no broadcasting, all strides=1). When src0, src1, and dst are all contiguous with no broadcasting (nr0=nr1=nr2=nr3=1 after collapsing), the entire operation is a simple 1D element-wise: dst[i] = op(src0[i], src1[i]). A 1D nd_range kernel avoids the overhead of 3D indexing, dimension collapsing logic, and the multiple modulo operations for broadcast index mapping.",
+          "expected_improvement": "2-5% throughput improvement from eliminating 3D indexing overhead and modulo operations. The dimension collapsing already partially achieves this, but a dedicated 1D kernel avoids all the stride/broadcast machinery. More impactful combined with vectorization (opt_013_002).",
+          "implementation_notes": "In launch_bin_bcast, after dimension collapsing, check if ne1==1 && ne2==1 && ne3==1 && s00==1 && s10==1 (fully collapsed 1D contiguous). If so, launch a simple 1D kernel: q.parallel_for(nd_range<1>({N_rounded}, {256}), [=](nd_item<1> item) { int i = item.get_global_id(0); if (i < ne0) dst[i] = (dst_t)apply_bin_op<op>((float)src0[i], (float)src1[i]); }). This combines well with vectorization for maximum throughput on the common case.",
+          "risk": "low",
+          "risk_notes": "The fast-path condition check adds trivial host-side overhead. The 1D kernel is simpler than the 3D kernel, so less risk of bugs. Must ensure the dimension collapsing has correctly reduced the problem to 1D before using this path."
+        }
+      ],
+      "overall_optimization_potential": "medium",
+      "estimated_current_efficiency": "35-50%",
+      "efficiency_notes": "The binbcast kernel is a clean native SYCL implementation with zero DPCT artifacts. It correctly handles 4D broadcasting, dimension collapsing for contiguous tensors, type dispatch for F32/F16 mixed types, and has a 1D fallback for large grids. However, it has several performance gaps: (1) WG=128 is below the recommended 256 for memory-bound kernels, reducing occupancy, (2) no vectorized loads despite being purely memory-bound (0.08 FLOP/byte for ADD — deeply below the 27 FLOP/byte ridge point), (3) 6 expensive integer modulo operations per work-item where CUDA uses fast division, (4) missing fused-add support that CUDA provides for up to 8-way addition fusion. The overall potential is MEDIUM because: (a) ADD is the most frequently called operation in transformer inference (residual connections, every layer), so even modest per-call improvement accumulates across the model, (b) the vectorization + fast-div + WG size improvements are complementary and can compound to 1.5-3x improvement for contiguous ADD, (c) the fused-add feature provides an additional bandwidth reduction path for chained additions."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 12,
+    "total_kernels_analyzed": 13,
     "high_potential": 4,
-    "medium_potential": 4,
+    "medium_potential": 5,
     "low_potential": 4,
     "no_optimization_needed": 0,
     "top_opportunities": [
@@ -1880,8 +2009,29 @@
         "kernel_id": "sk_006",
         "kernel_name": "MUL_MAT_ID kernels",
         "optimization_id": "opt_006_002",
-        "description": "Replace ne12==1 serial path with batched compaction \u2014 5-20x speedup for common MoE inference case",
+        "description": "Replace ne12==1 serial path with batched compaction — 5-20x speedup for common MoE inference case",
         "priority": "high"
+      },
+      {
+        "kernel_id": "sk_013",
+        "kernel_name": "binbcast (binary broadcast)",
+        "optimization_id": "opt_013_002",
+        "description": "Use vectorized vec4 loads/stores for contiguous tensors — 1.5-3x throughput for memory-bound ADD/MUL (most frequent ops in transformer inference)",
+        "priority": "medium"
+      },
+      {
+        "kernel_id": "sk_013",
+        "kernel_name": "binbcast (binary broadcast)",
+        "optimization_id": "opt_013_003",
+        "description": "Replace 6 expensive integer modulo operations with fast-division multiply-shift trick — 5-10% throughput improvement",
+        "priority": "medium"
+      },
+      {
+        "kernel_id": "sk_013",
+        "kernel_name": "binbcast (binary broadcast)",
+        "optimization_id": "opt_013_004",
+        "description": "Implement fused multi-source ADD kernel (up to 8-way) to match CUDA parity — reduces kernel launches and memory traffic for chained residual additions",
+        "priority": "medium"
       }
     ]
   }
