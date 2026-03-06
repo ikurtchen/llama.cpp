@@ -3579,12 +3579,144 @@
       "overall_optimization_potential": "low",
       "estimated_current_efficiency": "60-75%",
       "efficiency_notes": "The set operation is a thin orchestration layer (42 lines, no dedicated kernel) that delegates to ggml_sycl_cpy(). The actual GPU work is: (1) a DMA memcpy for the base tensor copy (optimal \u2014 hardware DMA), and (2) a k_cpy_scalar kernel for the src1\u2192view copy (suboptimal due to 8 int64 divisions per work-item and scalar loads, but work-group size of 256 is appropriate). The operation is near-identical to the CUDA implementation \u2014 no DPCT artifacts, no migration issues. Optimization potential is low because: (a) the set op is called infrequently during inference (primarily for KV cache updates, which are being replaced by set_rows in newer models), (b) the heavy lifting is in the cpy infrastructure (analyzed in sk_019), and (c) the inplace fast path avoids the memcpy entirely. Optimizations to cpy.cpp (int32 fast division, vectorization) benefit set transitively."
+    },
+    {
+      "kernel_id": "sk_026",
+      "name": "set_rows",
+      "file": "ggml/src/ggml-sycl/set_rows.cpp",
+      "source_cuda_ids": [
+        "ck_095",
+        "ck_096"
+      ],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": [
+            256,
+            1,
+            1
+          ],
+          "work_group_size_total": 256,
+          "sub_group_size": null,
+          "sub_group_size_specified": false,
+          "global_size_expression": "ceil(ne_total / SYCL_SET_BLOCK_SIZE) * SYCL_SET_BLOCK_SIZE, where ne_total = ne00 * ne01 * ne02 * ne03",
+          "notes": "Uses nd_range<1> with SYCL_SET_BLOCK_SIZE=256 (from presets.hpp). Appropriate work-group size for Xe2. Single kernel function k_set_rows templated on <src_t, idx_t, dst_t>. Each work-item processes exactly one element. Dispatch: src0 always F32, src1 is I32 or I64 (index type), dst is F32/F16/BF16. Missing [[intel::reqd_sub_group_size(16)]]."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": false,
+          "coalesced_notes": "Source reads (src0_row[i00]) are coalesced when src0 rows are contiguous (nb01 == ne00*sizeof(float)), which is the common case. However, destination writes (dst_row_ptr[i00]) are scattered because each row maps to a different dst_row via the index tensor src1. Adjacent work-items within the same source row (same i01, i02, i03) write to the same destination row (coalesced), but work-items spanning different source rows write to arbitrary destination rows (scatter pattern). The degree of scatter depends on the index tensor contents.",
+          "strided_accesses": [
+            "5 int64 division/modulo operations per work-item for 4D index decomposition: i%ne00, (i/ne00)%ne01, (i/ne00*ne01)%ne02, i/(ne00*ne01*ne02)",
+            "2 additional int64 modulo ops for src1 index wrapping: i03%ne12, i02%ne11",
+            "Source row pointer computation: src0 + i01*s01 + i02*s02 + i03*s03 \u2014 strided if src0 is not row-contiguous",
+            "Index tensor read: src1 + i10*s10 + i11*s11 + i12*s12 \u2014 scattered read based on index structure"
+          ],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "All loads/stores are scalar. Source reads are 4-byte float. Index reads are 4-byte (I32) or 8-byte (I64). Destination writes are 4-byte (F32), 2-byte (F16/BF16). No sycl::vec types used. The innermost dimension (i00) iterates across adjacent elements in both source and destination rows, making vectorization viable for the i00 dimension."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes": 0,
+          "potential_bank_conflicts": false,
+          "notes": "No SLM used. Each work-item independently computes its own multi-dimensional index, reads one element from src0, reads one index from src1, and writes one element to dst. No data sharing between work-items."
+        },
+        "reduction_pattern": {
+          "has_reduction": false,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "No reduction. set_rows is a pure scatter-write operation \u2014 each source element maps to exactly one destination location via the index tensor."
+        },
+        "data_types": {
+          "compute_type": "float (src0) \u2192 F32/F16/BF16 (dst)",
+          "could_use_half": true,
+          "could_use_joint_matrix": false,
+          "notes": "SYCL supports F32, F16, BF16 destination types (src0 always F32). CUDA additionally supports 6 quantized dst types: Q4_0, Q4_1, Q5_0, Q5_1, Q8_0, IQ4_NL via a separate k_set_rows_quant kernel that quantizes F32\u2192Qx inline. The type cast dst_row_ptr[i00] = (dst_t) src0_row[i00] is a simple truncation for F16/BF16. Index type supports both I32 and I64 via template."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [],
+          "notes": "No math functions. set_rows performs integer index computation and a type cast (F32\u2192F16/BF16 truncation). Zero FLOPs per element."
+        },
+        "loop_analysis": {
+          "hot_loops": [],
+          "unrolled": false,
+          "notes": "No loops. Each work-item processes exactly one element with straight-line code: 7 int64 divisions/modulos for index decomposition, 3 multiply-add for src0 row address, 3 multiply-add for dst row address, 1 scattered index read, 1 source read, 1 type-cast store."
+        },
+        "estimated_bottleneck": "integer_arithmetic",
+        "bottleneck_notes": "For typical set_rows usage (token embedding scatter during inference), the kernel processes ne00*ne01*ne02*ne03 elements where ne00 is the embedding dimension (e.g., 4096) and ne01 is typically small (batch of tokens). With 7 expensive int64 divisions per work-item and zero useful FLOPs, the integer arithmetic for index decomposition dominates. CUDA avoids this entirely via fast_div_modulo with precomputed multiply-shift values \u2014 the SYCL common.hpp already has init_fastdiv_values() and fast_div_modulo() but set_rows.cpp does not use them. For large ne_total, the kernel becomes memory-bound (one scattered write per work-item, 0 FLOP/byte).",
+        "anti_patterns": [
+          "7 expensive int64 division/modulo operations per work-item for 4D index decomposition \u2014 CUDA uses precomputed fast_div_modulo (multiply-shift trick) for all 5 dimension decompositions; SYCL has this utility in common.hpp but set_rows.cpp does not use it",
+          "Missing quantized destination type support \u2014 CUDA has k_set_rows_quant with inline F32\u2192Q4_0/Q4_1/Q5_0/Q5_1/Q8_0/IQ4_NL quantization; SYCL only supports F32/F16/BF16 destinations, forcing CPU fallback for quantized KV caches",
+          "No vectorized loads/stores \u2014 scalar 4-byte per work-item where vec4 could process 16 bytes for the contiguous innermost dimension (i00)",
+          "Missing [[intel::reqd_sub_group_size(16)]] attribute \u2014 compiler may select suboptimal sub-group size",
+          "Missing ROPE+VIEW+SET_ROWS kernel fusion that CUDA implements \u2014 SYCL requires 3 separate kernel launches (rope \u2192 view \u2192 set_rows) where CUDA fuses them into one kernel",
+          "supports_op restricts to F32/F16/BF16 only \u2014 CUDA's supports_op includes Q4_0/Q4_1/Q5_0/Q5_1/Q8_0/IQ4_NL, creating a functional parity gap"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_026_001",
+          "category": "integer_arithmetic",
+          "priority": "medium",
+          "description": "Replace 7 expensive int64 division/modulo operations with fast_div_modulo using precomputed multiply-shift values. The SYCL codebase already has init_fastdiv_values() and fast_div_modulo() in common.hpp (used by solve_tri.cpp). CUDA's set-rows.cu passes 5 precomputed uint3 fast-division descriptors (ne00_fd, ne01_fd, ne02_fd, ne11_fd, ne12_fd) as kernel arguments. The SYCL kernel should do the same: compute init_fastdiv_values on the host for each dimension, pass as kernel arguments, and replace all % and / operations with fast_div_modulo calls.",
+          "expected_improvement": "15-30% throughput improvement. The 7 int64 divisions are the dominant cost for this zero-FLOP kernel. fast_div_modulo replaces each division with one mul_hi + add + shift (3 int32 ops) \u2014 roughly 10-20x cheaper per division on Intel GPUs. The improvement is highest for small tensors where the arithmetic overhead is a larger fraction of total time.",
+          "implementation_notes": "In set_rows_sycl launch helper: (1) compute ne00_fd = init_fastdiv_values(ne00), ne01_fd, ne02_fd, ne11_fd, ne12_fd on host. (2) Pass as kernel arguments (sycl::uint3 type). (3) In k_set_rows: replace 'i % ne00' with fast_div_modulo(i, ne00_fd).y(), replace '(i/ne00) % ne01' with sequential fast_div_modulo on the quotient, etc. (4) For i03%ne12 and i02%ne11 modular wrapping, use fastmodulo variant. The existing common.hpp utilities match CUDA's interface exactly.",
+          "risk": "low",
+          "risk_notes": "Zero correctness risk \u2014 fast_div_modulo produces identical results to integer division for all uint32 inputs. The only constraint is ne00*ne01*ne02*ne03 < 2^32, which is true for all practical tensor shapes. The SYCL implementation in common.hpp is already proven in solve_tri.cpp."
+        },
+        {
+          "id": "opt_026_002",
+          "category": "functional_parity",
+          "priority": "medium",
+          "description": "Add quantized destination type support (Q4_0, Q4_1, Q5_0, Q5_1, Q8_0, IQ4_NL) to match CUDA's k_set_rows_quant. This requires implementing inline F32\u2192Qx quantization functions that quantize a block of qk elements at once. CUDA uses per-block quantize_f32_q4_0_block etc. functions. Without this, quantized KV cache models must fall back to CPU for set_rows, which is a significant performance cliff.",
+          "expected_improvement": "Enables GPU execution path for quantized KV cache models \u2014 eliminates CPU fallback. No direct throughput improvement for existing supported types, but eliminates the host-device transfer bottleneck for quantized models. This is a critical functional gap.",
+          "implementation_notes": "Create k_set_rows_quant<idx_t, block_type, qk, quantize_func> kernel mirroring CUDA's approach: (1) Each work-item processes qk elements (one quantized block). (2) ne_total = (ne00*ne01*ne02*ne03)/qk. (3) i_base = i*qk for index decomposition. (4) Read qk consecutive F32 values from src0, quantize to one block_type, write to dst. (5) Need SYCL implementations of quantize_f32_q4_0_block etc. \u2014 check if these exist in the quantize infrastructure or port from CUDA cpy-utils.cuh. (6) Update supports_op to include the quantized types.",
+          "risk": "medium",
+          "risk_notes": "Requires implementing or porting per-block quantization device functions if they don't already exist in SYCL. Must ensure the quantized block boundary alignment (ne00 % qk == 0). Testing requires quantized KV cache model configurations."
+        },
+        {
+          "id": "opt_026_003",
+          "category": "vectorization",
+          "priority": "low",
+          "description": "Add vectorized load/store path for the common case where the innermost dimension (ne00) is large and both source and destination are contiguous in the i00 dimension. Adjacent work-items with the same (i01, i02, i03) already access adjacent src0 and dst elements, so vec4 loads/stores (16 bytes per work-item for F32, 8 bytes for F16/BF16) would reduce memory transactions by 4x.",
+          "expected_improvement": "1.5-2.5x throughput improvement when applicable. For typical LLM embedding dimensions (ne00=4096), this applies to >99% of work-items (only the tail 0-3 elements need scalar fallback). The improvement is bounded by memory bandwidth \u2014 the kernel is already memory-bound for large ne_total.",
+          "implementation_notes": "Add a kernel variant k_set_rows_vec4 where each work-item processes 4 elements: global_id maps to element i*4 in the i00 dimension. Compute multi-dimensional index for element i*4, then load vec4 from src0, store vec4 to dst (with type conversion for F16/BF16). Launch condition: ne00 >= 4 && ne00 % 4 == 0 for the vectorized path, fallback to scalar for the remainder. For F16/BF16, use vec4 of sycl::half / sycl_bf16 (8 bytes per vec4 store).",
+          "risk": "low",
+          "risk_notes": "Must handle ne00 not divisible by 4 with tail processing. Alignment of src0 and dst pointers must be verified (F32 is naturally 4-byte aligned, vec4 needs 16-byte alignment \u2014 use scalar fallback if misaligned)."
+        },
+        {
+          "id": "opt_026_004",
+          "category": "kernel_fusion",
+          "priority": "high",
+          "description": "Implement ROPE+VIEW+SET_ROWS kernel fusion to match CUDA. CUDA fuses these 3 operations into a single kernel launch that applies rotary position embedding directly into the scattered destination rows, eliminating the intermediate buffer (rope output / view), the view operation, and the set_rows kernel \u2014 saving 2 kernel launches and 2 full read+write passes over the data. This fusion is triggered when rope\u2192view\u2192set_rows appears in the compute graph with compatible shapes.",
+          "expected_improvement": "20-40% latency reduction for the combined rope+set_rows operation. For single-token inference (the dominant case), this eliminates 2 kernel launch overheads (~10\u03bcs each on Intel GPUs) and 2 memory passes (read+write of ne0*ne1*sizeof elements). For ne0=128, ne1=32, F16: saves 2 \u00d7 128*32*2 = 16KB of unnecessary memory traffic per attention head.",
+          "implementation_notes": "This is a graph-level fusion that requires: (1) Pattern detection in ggml-sycl.cpp compute graph traversal (similar to CUDA's ggml_cuda_can_fuse). (2) A fused kernel that combines rope rotation (sin/cos application to element pairs) with scattered row writes. (3) The fused kernel reads rope input, applies rotation, converts to dst type (F32\u2192F16), and writes directly to the scattered destination via index tensor. (4) Must handle both ROPE_TYPE_NORMAL and ROPE_TYPE_NEOX modes. (5) The SYCL backend currently lacks graph-level fusion infrastructure \u2014 this is a larger architectural change. This optimization was also identified for rope (sk_016, opt_016_001).",
+          "risk": "high",
+          "risk_notes": "Graph-level fusion is a major architectural change. Requires: (a) compute graph pattern matching in SYCL backend (currently absent), (b) fused kernel correctness for all rope modes, (c) shape constraint validation matching CUDA's ggml_cuda_should_fuse_rope_set_rows checks. High implementation complexity but high reward for inference latency."
+        },
+        {
+          "id": "opt_026_005",
+          "category": "launch_config",
+          "priority": "low",
+          "description": "Add [[intel::reqd_sub_group_size(16)]] attribute to the k_set_rows kernel to ensure optimal sub-group size on Intel GPUs. Without this attribute, the compiler may select SIMD8 or SIMD32, neither of which is optimal for Xe2 architecture.",
+          "expected_improvement": "0-5% throughput improvement. Minor effect for this simple kernel but establishes correct baseline for Xe2.",
+          "implementation_notes": "Add the attribute to the lambda in set_rows_sycl: stream.parallel_for(nd_range, [=](sycl::nd_item<1> item) [[intel::reqd_sub_group_size(16)]] { ... });",
+          "risk": "low",
+          "risk_notes": "No correctness risk. Standard Intel SYCL attribute."
+        }
+      ],
+      "overall_optimization_potential": "medium",
+      "estimated_current_efficiency": "40-55%",
+      "efficiency_notes": "The SYCL set_rows kernel is a clean manual port from CUDA with correct structure and appropriate WG size (256). However, it has two major gaps vs CUDA: (1) All 7 int64 division/modulo operations use expensive native division where CUDA uses precomputed fast_div_modulo \u2014 the SYCL infrastructure (init_fastdiv_values, fast_div_modulo in common.hpp) already exists but is not used. This is the biggest per-element inefficiency. (2) Missing quantized destination types (Q4_0, Q4_1, Q5_0, Q5_1, Q8_0, IQ4_NL) forces CPU fallback for quantized KV caches \u2014 a critical functional parity gap. (3) Missing ROPE+VIEW+SET_ROWS fusion (a graph-level optimization) costs 2 kernel launches and 2 memory passes per attention head per token. The kernel is used for KV cache scatter operations during inference (every attention layer), so medium optimization potential overall. Scalar loads/stores and missing reqd_sub_group_size are minor issues compared to the integer division and functional parity gaps."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 25,
+    "total_kernels_analyzed": 26,
     "high_potential": 4,
-    "medium_potential": 10,
+    "medium_potential": 11,
     "low_potential": 11,
     "no_optimization_needed": 0,
     "top_opportunities": [
