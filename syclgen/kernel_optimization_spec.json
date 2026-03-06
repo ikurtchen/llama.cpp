@@ -3470,13 +3470,122 @@
       ],
       "overall_optimization_potential": "medium",
       "estimated_current_efficiency": "35-55%"
+    },
+    {
+      "kernel_id": "sk_025",
+      "name": "set",
+      "file": "ggml/src/ggml-sycl/set.cpp",
+      "source_cuda_ids": [
+        "ck_041"
+      ],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": [
+            256,
+            1,
+            1
+          ],
+          "work_group_size_total": 256,
+          "sub_group_size": null,
+          "sub_group_size_specified": false,
+          "global_size_expression": "ceil(ne / SYCL_CPY_BLOCK_SIZE) * SYCL_CPY_BLOCK_SIZE, where ne = total elements in src1",
+          "notes": "The set operation has NO dedicated kernel. It is a pure orchestration function (42 lines) that delegates ALL GPU work to ggml_sycl_cpy() from cpy.cpp. Step 1 (if !inplace): copies src0 \u2192 dst via stream.memcpy() (contiguous same-type fast path). Step 2 (always): copies src1 \u2192 dst_view via k_cpy_scalar kernel with strided 4D addressing. The k_cpy_scalar kernel uses nd_range<1> with SYCL_CPY_BLOCK_SIZE=256 work-group size. This is an appropriate work-group size for Intel GPUs."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": false,
+          "coalesced_notes": "Two distinct memory patterns: (1) The inplace=false copy (src0\u2192dst) uses stream.memcpy() \u2014 optimal, hardware DMA. (2) The src1\u2192dst_view copy via k_cpy_scalar uses 4D index decomposition with arbitrary strides (nb1, nb2, nb3 from op_params). When dst_view strides match src1 strides (contiguous-to-contiguous), access is coalesced. When strides differ (the common case for set \u2014 writing a small tensor into a larger one at an offset), the destination writes can be strided.",
+          "strided_accesses": [
+            "k_cpy_scalar: 8 int64 divisions per work-item for 4D index decomposition (4 for src, 4 for dst) \u2014 extremely expensive on GPU",
+            "Destination writes via computed byte offsets (i10*nb10 + i11*nb11 + i12*nb12 + i13*nb13) \u2014 stride pattern depends on op_params"
+          ],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "All loads/stores in k_cpy_scalar are scalar 4-byte (float or int32_t). No sycl::vec types. The 4D index decomposition performs 8 int64 divisions per work-item \u2014 extremely expensive relative to the actual data movement (1 load + 1 store per work-item)."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes": 0,
+          "potential_bank_conflicts": false,
+          "notes": "No SLM used. Each work-item independently computes its own source and destination addresses and copies one element."
+        },
+        "reduction_pattern": {
+          "has_reduction": false,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "No reduction needed \u2014 set is a pure data movement operation."
+        },
+        "data_types": {
+          "compute_type": "float/int32",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "Set only supports F32 and I32 types (same as CUDA). The type combination is homogeneous: src0, src1, and dst must all be the same type. No type conversion occurs."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [],
+          "notes": "No math functions. Set is pure data movement."
+        },
+        "loop_analysis": {
+          "hot_loops": [],
+          "unrolled": false,
+          "notes": "No loops in the kernel itself. Each work-item processes exactly one element. The 4D index decomposition is straight-line code with 8 int64 divisions."
+        },
+        "estimated_bottleneck": "launch_overhead",
+        "bottleneck_notes": "The set operation launches UP TO 2 kernel/DMA operations: (1) stream.memcpy for inplace=false case, (2) k_cpy_scalar for the src1\u2192dst_view copy. For small tensors (common in LLM inference \u2014 e.g., updating a single KV cache row), the kernel launch overhead and 8 int64 divisions per work-item dominate over actual data movement. For larger tensors, the operation is purely memory-bound with arithmetic intensity of 0 FLOP/byte. The lack of vectorized loads means the memory bus is underutilized.",
+        "anti_patterns": [
+          "Delegates to k_cpy_scalar which performs 8 int64 divisions per work-item for 4D index decomposition \u2014 extremely expensive for a zero-compute data movement kernel",
+          "No vectorized loads/stores \u2014 scalar 4-byte per work-item",
+          "No specialized contiguous-to-strided path \u2014 even when src1 is contiguous and only the dst_view has custom strides, the kernel computes both source and destination 4D indices",
+          "Two separate GPU operations (memcpy + kernel) for non-inplace set \u2014 could potentially be fused into a single kernel",
+          "Missing [[intel::reqd_sub_group_size(16)]] on k_cpy_scalar kernel",
+          "SYCL implementation is near-identical to CUDA (1:1 port) \u2014 all optimizations in the cpy infrastructure apply here"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_025_001",
+          "category": "memory_coalescing",
+          "priority": "low",
+          "description": "Optimize k_cpy_scalar's 4D index decomposition to use int32 arithmetic instead of int64 where possible. The current implementation performs 8 int64 divisions per work-item. For tensors where all dimension products fit in int32 (ne00*ne01*ne02 < 2^31, which is true for virtually all practical LLM tensor shapes), downcast to int32 divisions which are 2-4x faster on Intel GPUs. Alternatively, precompute divisors on the host and pass as kernel arguments to use multiply-shift fast division.",
+          "expected_improvement": "5-15% throughput improvement for the k_cpy_scalar kernel path. The improvement is higher for small tensors where the division overhead is a larger fraction of total work.",
+          "implementation_notes": "This optimization applies to the shared cpy.cpp kernel infrastructure, not set.cpp itself. In k_cpy_scalar, add a template parameter or runtime check: if ne00*ne01*ne02 < INT32_MAX, use int32 arithmetic for all index decomposition. Alternatively, precompute fast-division magic numbers on the host (multiply-shift trick) and pass them as kernel arguments. The latter approach benefits all cpy users (set, cpy, dup, cont).",
+          "risk": "low",
+          "risk_notes": "Int32 overflow is the only risk \u2014 must verify all dimension products fit. For LLM tensors with typical shapes (ne[0] < 32768, ne[1] < 65536, etc.), int32 is sufficient. The fast-division approach has zero correctness risk since it produces identical results."
+        },
+        {
+          "id": "opt_025_002",
+          "category": "vectorization",
+          "priority": "low",
+          "description": "Add vectorized load/store path for the common case where src1 is contiguous and the dst_view has nb0 = sizeof(float) (i.e., innermost dimension is contiguous in both). In this case, adjacent work-items access adjacent elements in both source and destination, and vec4 loads/stores (16 bytes per work-item) would reduce memory transactions by 4x. This is the dominant case for GGML_OP_SET when setting a contiguous slice into a larger tensor.",
+          "expected_improvement": "1.5-3x throughput improvement for the src1\u2192dst_view copy when the contiguous condition is met. Impact is higher for larger src1 tensors.",
+          "implementation_notes": "In cpy.cpp, add a specialized launch path: if nb00==sizeof(src_t) && nb10==sizeof(dst_t) && src0->type==src1->type, launch a kernel that processes 4 elements per work-item using sycl::vec<float,4>. The kernel would compute 4D offsets for element i*4 and then load/store 4 consecutive elements. Only the outer 3 dimensions need 4D decomposition; the innermost dimension is handled by the vectorized access. Alternatively, add a 'k_cpy_scalar_contiguous_strided' kernel variant for when src is contiguous and dst has only non-unit stride in dimensions > 0.",
+          "risk": "low",
+          "risk_notes": "Must handle tail elements when ne is not a multiple of 4. Must verify alignment of source and destination pointers. The common F32 case (4-byte aligned) naturally supports vec4 loads."
+        },
+        {
+          "id": "opt_025_003",
+          "category": "kernel_fusion",
+          "priority": "low",
+          "description": "For the non-inplace case, fuse the stream.memcpy (src0\u2192dst) and k_cpy_scalar (src1\u2192dst_view) into a single kernel that copies src0 to dst while simultaneously writing src1 into the view region. This eliminates one kernel/DMA launch and one full read+write pass over the dst buffer (since the memcpy writes all of dst, and then k_cpy_scalar overwrites a subset).",
+          "expected_improvement": "30-50% latency reduction for non-inplace set of small tensors (where launch overhead dominates). For large tensors, the improvement is smaller (~10-20%) since the memcpy and kernel already overlap on the GPU due to independent memory accesses.",
+          "implementation_notes": "Create a k_set_fused kernel that takes both src0 and src1 pointers, the offset, and src1's shape/strides. Each work-item processes one element of dst: if the element falls within the src1 view region, it copies from src1; otherwise, it copies from src0. The conditional branch is the same for all work-items processing the same row (no sub-group divergence for typical 2D/3D set operations). This kernel would be launched from set.cpp directly, bypassing cpy.cpp for the non-inplace case.",
+          "risk": "medium",
+          "risk_notes": "The fused kernel must correctly handle the boundary between the src0 region and the src1 view region for arbitrary 4D offsets and strides. Edge cases: offset not aligned to element size (impossible per ggml constraints), src1 view exactly covers all of dst (set degenerates to cpy), src1 view is empty (ne == 0). Testing with all 12 existing test cases (3 dims x 2 inplace modes x 2 types) should cover correctness."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "60-75%",
+      "efficiency_notes": "The set operation is a thin orchestration layer (42 lines, no dedicated kernel) that delegates to ggml_sycl_cpy(). The actual GPU work is: (1) a DMA memcpy for the base tensor copy (optimal \u2014 hardware DMA), and (2) a k_cpy_scalar kernel for the src1\u2192view copy (suboptimal due to 8 int64 divisions per work-item and scalar loads, but work-group size of 256 is appropriate). The operation is near-identical to the CUDA implementation \u2014 no DPCT artifacts, no migration issues. Optimization potential is low because: (a) the set op is called infrequently during inference (primarily for KV cache updates, which are being replaced by set_rows in newer models), (b) the heavy lifting is in the cpy infrastructure (analyzed in sk_019), and (c) the inplace fast path avoids the memcpy entirely. Optimizations to cpy.cpp (int32 fast division, vectorization) benefit set transitively."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 24,
+    "total_kernels_analyzed": 25,
     "high_potential": 4,
     "medium_potential": 10,
-    "low_potential": 10,
+    "low_potential": 11,
     "no_optimization_needed": 0,
     "top_opportunities": [
       {
