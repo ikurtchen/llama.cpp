@@ -3955,12 +3955,132 @@
       "overall_optimization_potential": "medium",
       "estimated_current_efficiency": "50-65%",
       "efficiency_notes": "The WKV kernels are clean CUDA ports with correct structure, proper SLM usage for shared vectors, and appropriate work-group sizing (constrained by head_size). The main inefficiencies vs CUDA are: (1) Missing #pragma unroll on all loops \u2014 CUDA explicitly unrolls state init/writeback and the compiler likely unrolls the inner loop. (2) Scalar SLM reads vs CUDA's float4 vectorized reads \u2014 4x more SLM transactions in the compute hotspot. (3) Missing reqd_sub_group_size. (4) FP32-only. The kernel is moderately compute-intensive (each work-item does head_size*3 FLOPs per token per timestep) with high register pressure (head_size private floats). WKV is the core attention mechanism for RWKV models (v5/v6/v7), called once per layer \u2014 for RWKV models, this kernel is on the critical path. For non-RWKV models (the majority of LLM usage), this kernel is never called. Medium potential because the optimizations are straightforward (unroll + vectorized SLM) but the user base is limited to RWKV models."
+    },
+    {
+      "kernel_id": "sk_029",
+      "name": "gla",
+      "file": "ggml/src/ggml-sycl/gla.cpp",
+      "source_cuda_ids": [
+        "ck_064"
+      ],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": [
+            64,
+            1,
+            1
+          ],
+          "work_group_size_total": 64,
+          "sub_group_size": null,
+          "sub_group_size_specified": false,
+          "global_size_expression": "B * H * head_size, where head_size = C/H (64 or 128)",
+          "notes": "Structurally near-identical to WKV6 (sk_028). Uses nd_range<1> with local_range = head_size (64 or 128). Template parameter selects head_size at compile time. Each work-group processes one (batch, head) pair. WG=64 or 128 \u2014 below optimal 256 but constrained by head_size. Missing [[intel::reqd_sub_group_size(16)]]. Single kernel variant: gated_linear_attn_f32."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "coalesced_notes": "Same as WKV6: per-token SLM loads (k[t], r[t], td[t]) are coalesced. State init/writeback has stride-head_size pattern through global memory.",
+          "strided_accesses": [
+            "State initialization: s[... + i * head_size + tid] \u2014 stride-head_size global reads (same as WKV6)",
+            "State writeback: dst[T * C + ... + i * head_size + tid] \u2014 stride-head_size global writes"
+          ],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "All SLM and global loads are scalar 32-bit. CUDA uses float4& reinterpret casts for 128-bit vectorized SLM reads in the inner loop. Same issue as WKV6."
+        },
+        "slm_usage": {
+          "uses_slm": true,
+          "slm_bytes": "3 * head_size * 4 = 768B (head_size=64) or 1536B (head_size=128)",
+          "potential_bank_conflicts": true,
+          "notes": "3 SLM arrays: _k, _r, _td (each head_size floats). Even less SLM than WKV6 (which has 4 arrays). Scalar reads in inner loop may cause bank conflicts."
+        },
+        "reduction_pattern": {
+          "has_reduction": false,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "No inter-thread reduction. y accumulation is thread-local (same as WKV6)."
+        },
+        "data_types": {
+          "compute_type": "float32",
+          "could_use_half": true,
+          "could_use_joint_matrix": false,
+          "notes": "FP32 only, same as CUDA. GLA models could potentially use FP16 for inference."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [],
+          "notes": "No transcendental math. Pure multiply-add + scale factor."
+        },
+        "loop_analysis": {
+          "hot_loops": [
+            {
+              "location": "gla.cpp:36-64",
+              "trip_count": "n_seq_tokens iterations",
+              "description": "Outer time loop: barrier, load k/r/td to SLM, barrier, inner loop, write y*scale"
+            },
+            {
+              "location": "gla.cpp:47-62",
+              "trip_count": "head_size/4 = 16 or 32 iterations",
+              "description": "Inner unrolled-by-4 loop: kv = k*v, state = state*td + kv, y += r*state. Computational hot spot."
+            }
+          ],
+          "unrolled": false,
+          "notes": "CRITICAL: CUDA uses #pragma unroll on state init (line 19) and state writeback (line 58). SYCL has NO unroll hints. Same issue as WKV6."
+        },
+        "estimated_bottleneck": "register_pressure",
+        "bottleneck_notes": "Same as WKV6: float state[head_size] per work-item (256 or 512 bytes). Moderate compute intensity (head_size multiply-adds per token per thread). 2 barriers per time step. For RWKV/linear attention models, GLA is called once per layer.",
+        "anti_patterns": [
+          "Missing #pragma unroll on state init loop (CUDA has it) \u2014 head_size iterations of strided global reads",
+          "Missing #pragma unroll on state writeback loop (CUDA has it) \u2014 head_size iterations of strided global writes",
+          "Scalar SLM loads in inner loop \u2014 4 separate 32-bit reads vs CUDA's single 128-bit float4& read per iteration",
+          "Missing [[intel::reqd_sub_group_size(16)]]",
+          "FP32-only \u2014 no FP16 variant",
+          "Structurally identical to WKV6 \u2014 same optimization opportunities apply"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_029_001",
+          "category": "loop_optimization",
+          "priority": "medium",
+          "description": "Add #pragma unroll to state init/writeback loops and inner compute loop, matching CUDA. Identical optimization as opt_028_001 for WKV6 \u2014 GLA shares the exact same code structure.",
+          "expected_improvement": "5-15% throughput improvement. Same reasoning as WKV6.",
+          "implementation_notes": "Add '#pragma unroll' before loops at gla.cpp:32 (state init), gla.cpp:47 (inner compute), and gla.cpp:66 (state writeback). All have compile-time known trip counts via template parameter.",
+          "risk": "low",
+          "risk_notes": "No correctness risk."
+        },
+        {
+          "id": "opt_029_002",
+          "category": "slm_access",
+          "priority": "medium",
+          "description": "Use vectorized 128-bit SLM reads (sycl::vec<float,4> or reinterpret_cast) in the inner loop to match CUDA's float4& pattern. Identical optimization as opt_028_002.",
+          "expected_improvement": "5-20% throughput improvement. Same reasoning as WKV6.",
+          "implementation_notes": "Replace _k[j+0..3] scalar reads with *reinterpret_cast<const sycl::vec<float,4>*>(&_k[j]). Apply to _k, _r, _td arrays.",
+          "risk": "low",
+          "risk_notes": "Alignment guaranteed since j is always multiple of 4."
+        },
+        {
+          "id": "opt_029_003",
+          "category": "launch_config",
+          "priority": "low",
+          "description": "Add [[intel::reqd_sub_group_size(16)]] attribute to the kernel lambda.",
+          "expected_improvement": "0-5% throughput improvement.",
+          "implementation_notes": "Add attribute to the parallel_for lambda.",
+          "risk": "low",
+          "risk_notes": "Standard Intel attribute."
+        }
+      ],
+      "overall_optimization_potential": "medium",
+      "estimated_current_efficiency": "50-65%",
+      "efficiency_notes": "GLA is structurally near-identical to WKV6 (sk_028) \u2014 same code pattern (SLM-cached shared vectors, private state array, outer time loop, inner unrolled-by-4 compute loop). Same anti-patterns: missing #pragma unroll, scalar SLM reads vs CUDA's float4, missing reqd_sub_group_size, FP32-only. GLA is the core attention mechanism for gated linear attention models (e.g., RetNet, GLA architectures). For these models, it's on the critical path; for standard transformer models, it's never called. Medium potential because the optimizations are straightforward and identical to WKV6, but the user base is limited to GLA/linear attention models."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 28,
+    "total_kernels_analyzed": 29,
     "high_potential": 4,
-    "medium_potential": 12,
+    "medium_potential": 13,
     "low_potential": 12,
     "no_optimization_needed": 0,
     "top_opportunities": [
