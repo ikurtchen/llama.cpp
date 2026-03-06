@@ -5,9 +5,9 @@
 
 ## Summary
 - Total SYCL kernels to analyze: 54
-- Kernels analyzed so far: 9
+- Kernels analyzed so far: 10
 - Analysis complete: No
-- Kernels with optimization potential: 9
+- Kernels with optimization potential: 10
 - Optimization tasks created: 0 (pending finalization)
 
 ## Kernels Analyzed
@@ -20,7 +20,7 @@
 - [x] sk_007: quantize_sycl — low potential
 - [x] sk_008: vecdotq — medium potential
 - [x] sk_009: dequantize device functions — medium potential
-- [ ] sk_010: element_wise (unary ops) — pending
+- [x] sk_010: element_wise (unary ops) — medium potential
 - [ ] sk_011: element_wise (GLU ops) — pending
 - [ ] sk_012: element_wise (special unary) — pending
 - [ ] sk_013: binbcast — pending
@@ -67,6 +67,7 @@
 - [ ] sk_054: upscale (inline) — pending
 
 ## Recent Activity
+[2026-03-06] Analyzed element_wise unary ops (sk_010). Found 5 optimization opportunities (medium potential). Key findings: Clean manual port with no DPCT artifacts. All 6 kernel launch sites use proper nd_range<1> with WG=256. Primary issue: no vectorized loads/stores — each work-item processes only 1 element for purely memory-bound operations (arithmetic intensity 0.12-2.5 FLOP/byte, all far below the 27 FLOP/byte ridge point). Missing [[intel::reqd_sub_group_size(16)]] on all launch sites. Standard math functions used where native math would suffice for inference. 25 unary ops + 6 gated ops through clean template dispatch. ~40-55% estimated efficiency.
 [2026-03-06] Analyzed dequantize device functions (sk_009). Found 5 optimization opportunities (medium potential). Key findings: Mix of per-element helpers (6 functions) and block dequantization kernel bodies (17 functions). Purely memory-bandwidth bound. Strided output writes (stride 32) waste bandwidth. Only Q4_K reorder uses vectorized loads. Only 3/17+ formats have SoA reorder variants. Inconsistent #pragma unroll. nd_item<3> DPCT artifacts pervasive.
 [2026-03-06] Analyzed vecdotq device functions (sk_008). Found 5 optimization opportunities (medium potential). Key findings: 1361 lines of device helper functions (NOT kernels) called by MMVQ/DMMV. Heavy DPCT artifacts (dp4a, vectorized_binary, byte_level_permute). Inconsistent get_int_from_* helpers (non-aligned 4-byte-load vs aligned single-load). Only 3/20+ formats have reorder (SoA) variants. IQ format loops missing #pragma unroll. DPCT_COMPATIBILITY_TEMP CUDA artifact may incorrectly gate IQ format support.
 [2026-03-06] Analyzed kernel quantize_sycl Q8_1 (sk_007). Found 3 optimization opportunities (low potential). Key findings: Already well-implemented with correct sub-group size (16), vectorized vec2 loads/stores, and proper sycl::reduce_over_group reductions. Purely memory-bandwidth bound (0.16 ops/byte). WG size 16 is suboptimal but hardware compensates via concurrent WG scheduling. SoA reorder variant enables cache-friendly layout for downstream matmul. This is a utility kernel with low optimization ROI.

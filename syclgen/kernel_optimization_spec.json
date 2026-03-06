@@ -1443,12 +1443,135 @@
         "blocking_issues": [],
         "correctness_risks": []
       }
+    },
+    {
+      "kernel_id": "sk_010",
+      "name": "element_wise (unary ops)",
+      "file": "ggml/src/ggml-sycl/element_wise.cpp",
+      "source_cuda_ids": ["ck_110"],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": [256],
+          "work_group_size_total": 256,
+          "sub_group_size": null,
+          "sub_group_size_specified": false,
+          "global_size_expression": "1D: ceil(k / 256) * 256, where k = total elements",
+          "notes": "All 6 kernel launch sites use nd_range<1> with work-group size 256 (SYCL_NEG_BLOCK_SIZE or SYCL_GLU_BLOCK_SIZE). Work-group size is appropriate for Intel GPUs (256 / 16 = 16 sub-groups per work-group). However, NONE of the 6 launch sites specify [[intel::reqd_sub_group_size(16)]], unlike other SYCL kernels in this codebase which consistently use it. This is a clean manual port — no DPCT artifacts."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "strided_accesses": [
+            "Gated kernels (GLU, SwiGLU-OAI): index j0 = (i / n) * o0 + (i % n) can be strided when o0 != n (non-contiguous row layouts)"
+          ],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "All kernels process exactly 1 element per work-item. Unary kernels: thread i reads x[i], writes dst[i] — perfectly coalesced. Gated kernels read 2 inputs + write 1 output. silu_back reads 2 inputs + writes 1 output. No sycl::vec types, no multi-element processing. This is the single biggest optimization opportunity for these purely memory-bound kernels."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes": 0,
+          "potential_bank_conflicts": false,
+          "notes": "No SLM used. Appropriate for embarrassingly parallel element-wise operations."
+        },
+        "reduction_pattern": {
+          "has_reduction": false,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "No reductions. All operations are pure element-wise maps."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "input_types": ["float", "sycl::half"],
+          "output_types": ["float", "sycl::half"],
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "Supports both F32 and F16 via template parameter T. F16 path reads half, converts to float for computation, converts back. All internal compute in float32 for accuracy. swiglu_oai is F32-only. Using half-precision compute would risk accuracy for operations like GELU and SILU."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": ["tanhf", "expf", "erff", "sqrtf", "sinf", "cosf", "logf", "expm1f", "fabsf"],
+          "native_candidates": ["expf->sycl::native::exp (7+ call sites)", "logf->sycl::native::log (2 sites)", "sqrtf->sycl::native::sqrt (1 site)", "sinf->sycl::native::sin (1 site)", "cosf->sycl::native::cos (1 site)"],
+          "notes": "All math functions use standard C library functions (IEEE compliant). No sycl::native:: usage anywhere in this file (or in any SYCL file in the project). For inference workloads, native math (1-2 ULP accuracy) is typically acceptable and faster. expf is the most impactful target (used in GELU_quick, SILU, sigmoid, exp, softplus, swiglu_oai, silu_back)."
+        },
+        "loop_analysis": {
+          "hot_loops": [],
+          "unrolled": false,
+          "notes": "No loops in any kernel. Every kernel is a pure single-element map: read x[i], compute op(x[i]), write dst[i]. No #pragma unroll directives in the file."
+        },
+        "estimated_bottleneck": "memory",
+        "bottleneck_notes": "ALL operations are deeply memory-bound. Arithmetic intensity ranges from 0.12 FLOP/byte (trivial ops: abs, neg, relu) to 2.5 FLOP/byte (GELU with tanh). The B60's ridge point is ~27 FLOP/byte, so even the most compute-heavy op is ~10x below the threshold. Memory bandwidth optimization (vectorized loads/stores) is the primary lever.",
+        "anti_patterns": [
+          "Missing [[intel::reqd_sub_group_size(16)]] on all 6 parallel_for launch sites — inconsistent with rest of codebase",
+          "No vectorized loads/stores — 1 element per work-item for purely memory-bound operations",
+          "Standard math functions where native math could improve throughput for inference",
+          "Integer division/modulo in gated kernels (i / n, i % n) — expensive on GPU, could use bitwise ops for power-of-2 n",
+          "Redundant block size macros in presets.hpp (SYCL_GELU_BLOCK_SIZE, SYCL_SILU_BLOCK_SIZE, etc.) all defined as 256 but never used"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_010_001",
+          "category": "vectorization",
+          "priority": "high",
+          "description": "Process 4-8 elements per work-item using sycl::vec<float,4> or manual multi-element processing. Currently each work-item handles exactly 1 float element (4B read + 4B write = 8 bytes traffic). For trivial ops like abs, neg, relu, sqr, floor — which are purely memory-bound at 0.12-0.25 FLOP/byte — vectorized 16-byte loads/stores would reduce work-item count by 4x and enable wider memory transactions, better amortizing launch overhead and improving effective bandwidth utilization.",
+          "expected_improvement": "1.5-2.5x throughput for trivial ops (abs, neg, relu, sqr, floor, ceil, round, trunc). 1.2-1.5x for transcendental-heavy ops (GELU, SILU, sigmoid) where compute is a larger fraction. The improvement depends on how much of the kernel time is spent in memory access overhead vs compute.",
+          "implementation_notes": "Modify unary_op_kernel to process 4 elements per thread: each thread loads a sycl::vec<float,4>, applies op() to each component, and stores the result. Adjust global_size to k/4 (with a scalar cleanup loop for the tail). For the gated kernels, use sycl::vec<float,4> for both x and g inputs. The template structure makes this easy: add a vec4 variant of unary_op_kernel and dispatch based on alignment and size. For F16 path, use sycl::vec<sycl::half,8> (same 16-byte width).",
+          "risk": "low",
+          "risk_notes": "Element-wise operations are embarrassingly parallel — vectorization does not change the computation, only the memory access pattern. Tail handling (k not divisible by 4) needs a scalar cleanup path. Must ensure 16-byte alignment of input/output pointers for vec4 loads."
+        },
+        {
+          "id": "opt_010_002",
+          "category": "sub_group_ops",
+          "priority": "medium",
+          "description": "Add [[intel::reqd_sub_group_size(16)]] to all 6 kernel lambda functions (lines 93, 151, 389, 466, 510, 560). Every other kernel file in the SYCL backend consistently specifies this attribute, but element_wise.cpp omits it. Without it, the Intel compiler may select a non-optimal sub-group size (SIMD8 or SIMD32), potentially affecting register allocation, occupancy, and scheduling on Xe2.",
+          "expected_improvement": "2-5% improvement from predictable sub-group scheduling. Ensures compiler generates SIMD16 code matching the hardware's native width. More importantly, this is a consistency fix aligning with the rest of the codebase.",
+          "implementation_notes": "Add [[intel::reqd_sub_group_size(16)]] (or [[sycl::reqd_sub_group_size(WARP_SIZE)]]) to each lambda in parallel_for. Since these kernels don't use sub-group operations directly, the attribute primarily serves as a compiler hint for optimal code generation. Per the optimization guide section 1.2, only specify sub-group size when kernel logic requires it — these kernels don't strictly need it, but consistency with the codebase is valuable.",
+          "risk": "low",
+          "risk_notes": "Simple attribute addition. No algorithmic change. If the compiler was already selecting SIMD16, this is a no-op. If it was selecting SIMD8 or SIMD32, this forces the native width which is generally better for element-wise ops on Xe2."
+        },
+        {
+          "id": "opt_010_003",
+          "category": "math_functions",
+          "priority": "medium",
+          "description": "Use sycl::native:: math functions for inference-time activation functions. Key targets: sycl::native::exp (used in 7+ ops: GELU_quick, SILU, sigmoid, exp, softplus, swiglu_oai, silu_back), sycl::native::log (softplus, log), sycl::native::sqrt (sqrt), sycl::native::sin/cos (sin, cos). Native math trades IEEE compliance for speed (1-2 ULP accuracy). For ML inference, this is typically acceptable.",
+          "expected_improvement": "5-15% for transcendental-heavy ops (GELU, SILU, sigmoid, softplus). Minimal impact on trivial ops. The improvement is limited by the memory-bound nature — even with free compute, memory bandwidth is the bottleneck. Native math primarily helps by reducing instruction count and freeing execution units.",
+          "implementation_notes": "Create native math wrappers: native_expf() = sycl::native::exp(), etc. Gate behind a compile-time flag (GGML_SYCL_NATIVE_MATH) or runtime flag for accuracy-sensitive workloads. Apply to op_gelu_quick, op_silu, op_sigmoid, op_exp, op_softplus, swiglu_oai_single, silu_back_op_kernel, op_sin, op_cos, op_sqrt, op_log. Note: erff() and expm1f() have no native equivalents — keep standard versions.",
+          "risk": "medium",
+          "risk_notes": "Native math has lower accuracy (1-2 ULP vs 0.5 ULP). For most inference workloads this is fine, but for training or precision-sensitive applications it could cause issues. Should be gated behind a flag. GELU is the most sensitive — its tanh(x) based implementation amplifies any exp() error."
+        },
+        {
+          "id": "opt_010_004",
+          "category": "kernel_fusion",
+          "priority": "low",
+          "description": "For the gated kernels (GLU variants), replace integer division/modulo (i / n, i % n) with bitwise operations when n is a power of 2. In LLM architectures, the hidden dimension n is almost always a power of 2 (e.g., 4096, 11008, 14336). Integer division and modulo are expensive on GPUs (tens of cycles vs 1 cycle for bitwise ops).",
+          "expected_improvement": "1-3% for gated kernels only. The integer div/mod is only 2 instructions per work-item, but at the GPU's clock rate of 2.4 GHz with 160 XVEs, saving 10+ cycles per work-item across millions of elements adds up. However, this is dwarfed by the memory bandwidth bottleneck.",
+          "implementation_notes": "Add a power-of-2 fast path: if (n & (n-1) == 0) { j0 = (i >> log2_n) * o0 + (i & (n-1)); } else { j0 = (i / n) * o0 + (i % n); }. The log2_n can be computed once on the host and passed as a kernel argument. Alternatively, rely on the compiler to optimize when n is constexpr — but it's not constexpr in the current implementation.",
+          "risk": "low",
+          "risk_notes": "Straightforward optimization. The bitwise path produces identical results for power-of-2 n. The fallback path handles non-power-of-2 cases. No accuracy impact."
+        },
+        {
+          "id": "opt_010_005",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Add a small-tensor fast path that uses sycl::range<1>(k) (without nd_range) for tensors with fewer than 256 elements. Currently, even a 1-element tensor launches a full 256-wide work-group with 255 threads doing nothing. While this is a minor overhead for typical LLM workloads (hidden dims are thousands), it could matter for small auxiliary tensors in preprocessing or attention masking.",
+          "expected_improvement": "Negligible for typical inference (hidden dims > 1024). Could improve latency by 2-5 microseconds for small tensors (k < 256), which matters only if such kernels are on the critical path.",
+          "implementation_notes": "In each *_sycl launch wrapper, add: if (k <= 256) { stream.parallel_for(sycl::range<1>(k), [=](sycl::id<1> idx) { ... }); } else { /* existing nd_range path */ }. This avoids the bounds check overhead for small tensors. Low priority because small tensors are rare in the hot path.",
+          "risk": "low",
+          "risk_notes": "Adding a separate code path increases maintenance burden. The sycl::range path doesn't guarantee sub-group size. For small tensors the performance difference is negligible in practice."
+        }
+      ],
+      "overall_optimization_potential": "medium",
+      "estimated_current_efficiency": "40-55%",
+      "efficiency_notes": "This is a clean manual port with no DPCT artifacts, correct nd_range<1> usage, and appropriate work-group size (256). The primary efficiency loss is from scalar (1-element-per-thread) processing of purely memory-bound operations — vectorized loads/stores could nearly double throughput for trivial ops. The transcendental ops (GELU, SILU) are slightly compute-heavy but still memory-bound at the B60's ridge point. Using native math functions would help at the margins. Overall, the kernel is reasonably well-implemented but leaves bandwidth on the table due to lack of vectorization."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 9,
+    "total_kernels_analyzed": 10,
     "high_potential": 4,
-    "medium_potential": 3,
+    "medium_potential": 4,
     "low_potential": 2,
     "no_optimization_needed": 0,
     "top_opportunities": [
