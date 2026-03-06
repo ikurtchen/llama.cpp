@@ -4075,13 +4075,111 @@
       "overall_optimization_potential": "medium",
       "estimated_current_efficiency": "50-65%",
       "efficiency_notes": "GLA is structurally near-identical to WKV6 (sk_028) \u2014 same code pattern (SLM-cached shared vectors, private state array, outer time loop, inner unrolled-by-4 compute loop). Same anti-patterns: missing #pragma unroll, scalar SLM reads vs CUDA's float4, missing reqd_sub_group_size, FP32-only. GLA is the core attention mechanism for gated linear attention models (e.g., RetNet, GLA architectures). For these models, it's on the critical path; for standard transformer models, it's never called. Medium potential because the optimizations are straightforward and identical to WKV6, but the user base is limited to GLA/linear attention models."
+    },
+    {
+      "kernel_id": "sk_030",
+      "name": "tsembd",
+      "file": "ggml/src/ggml-sycl/tsembd.cpp",
+      "source_cuda_ids": [
+        "ck_065"
+      ],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": [
+            1,
+            256,
+            1
+          ],
+          "work_group_size_total": 256,
+          "sub_group_size": null,
+          "sub_group_size_specified": false,
+          "global_size_expression": "nd_range<2>(global_range(ne00, num_blocks_x * 256), local_range(1, 256))",
+          "notes": "nd_range<2> with local_range(1, 256): dim0 is degenerate (1 thread per batch element via group index), dim1 is the actual work dimension over half_ceil embedding positions. WG=256 appropriate for Xe2. ne00 is batch size (typically 1-4 for diffusion). Missing [[intel::reqd_sub_group_size(16)]]. Near-identical to CUDA grid(num_blocks, ne00, 1) with blockDim=256."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "coalesced_notes": "Adjacent threads write adjacent embedding positions: embed_data[j] and embed_data[j+half]. Both writes are coalesced within a WG. Read is a single scalar broadcast: src0_d[i] (same timestep value for all threads in a WG row).",
+          "strided_accesses": [],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "Each work-item reads 1 float (timestep), writes 2 floats (cos, sin) at offset j and j+half. The two writes are half apart so vectorization is not straightforward. Total bandwidth per work-item: 4B read + 8B write = 12B. Very light memory footprint."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes": 0,
+          "potential_bank_conflicts": false,
+          "notes": "No SLM used. Each work-item operates independently."
+        },
+        "reduction_pattern": {
+          "has_reduction": false,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "No reduction. Embarrassingly parallel \u2014 each work-item computes one (cos, sin) pair independently."
+        },
+        "data_types": {
+          "compute_type": "float32",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "FP32 only (same as CUDA). Embedding precision matters for downstream diffusion model accuracy, so FP16 is not advisable here."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [
+            "sycl::exp",
+            "sycl::log",
+            "sycl::cos",
+            "sycl::sin"
+          ],
+          "notes": "4 transcendental functions per work-item. CUDA uses expf/logf/cosf/sinf (fast single-precision). SYCL uses full-precision sycl::exp/log/cos/sin. Could use sycl::native::exp/log/cos/sin for ~2-3x faster transcendentals with slightly reduced precision (sufficient for embedding generation). The exp(-log(max_period)*j/half) could also be precomputed as pow(max_period, -j/half) or computed via a single exp with combined argument."
+        },
+        "loop_analysis": {
+          "hot_loops": [],
+          "unrolled": false,
+          "notes": "No loops in the kernel body. Each work-item is a straight-line computation: 1 read, 4 transcendentals, 2 writes. The 'loop' is over threads in the nd_range."
+        },
+        "estimated_bottleneck": "compute_bound",
+        "bottleneck_notes": "4 transcendental functions (exp, log, cos, sin) per work-item dominate execution time. Memory footprint is trivial (12 bytes per work-item). Arithmetic intensity is high (4 transcendentals / 12 bytes). However, the kernel is called extremely rarely (once per diffusion step) and processes small tensors (dim is typically 320-1280), so absolute runtime is negligible.",
+        "anti_patterns": [
+          "Missing [[intel::reqd_sub_group_size(16)]]",
+          "Full-precision sycl::exp/log/cos/sin instead of sycl::native:: variants (CUDA uses fast single-precision expf/logf/cosf/sinf)",
+          "nd_range<2> with degenerate dim0 local_range(1,...) \u2014 works but the batch dimension uses groups not threads"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_030_001",
+          "category": "math_functions",
+          "priority": "low",
+          "description": "Replace sycl::exp/log/cos/sin with sycl::native::exp/log/cos/sin for ~2-3x faster transcendentals. CUDA's expf/logf/cosf/sinf map to fast hardware intrinsics; SYCL's full-precision variants do not. For embedding generation, native precision (roughly 2^-11 relative error) is more than sufficient.",
+          "expected_improvement": "2-3x faster kernel execution from native transcendentals. However, absolute impact is negligible because the kernel processes tiny tensors (dim=320-1280) and is called once per diffusion step.",
+          "implementation_notes": "Replace sycl::exp with sycl::native::exp, sycl::log with sycl::native::log, sycl::cos with sycl::native::cos, sycl::sin with sycl::native::sin. Alternatively, combine: float arg = timestep * sycl::native::exp(sycl::native::log((float)max_period) * (-j_over_half));",
+          "risk": "low",
+          "risk_notes": "Native math has reduced precision (~2^-11 relative error) but this is acceptable for sinusoidal embeddings. CUDA already uses fast-math equivalents."
+        },
+        {
+          "id": "opt_030_002",
+          "category": "launch_config",
+          "priority": "low",
+          "description": "Add [[intel::reqd_sub_group_size(16)]] to ensure optimal SIMD16 execution on Xe2.",
+          "expected_improvement": "0-5% throughput improvement. Mostly a correctness/consistency attribute.",
+          "implementation_notes": "Add the attribute to the parallel_for lambda.",
+          "risk": "low",
+          "risk_notes": "No correctness risk. Standard Intel attribute."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "65-80%",
+      "efficiency_notes": "The timestep embedding kernel is a near-perfect 1:1 CUDA port. Embarrassingly parallel with no reduction, no SLM, no synchronization, and trivial memory footprint. The only meaningful inefficiency is full-precision transcendentals vs CUDA's fast-math intrinsics. The kernel processes tiny tensors (dim=320-1280 for typical diffusion models) and is called only once per diffusion inference step. Even with 2-3x speedup from native math, the absolute time saved is sub-microsecond. Low potential because: (1) kernel is already well-structured, (2) called extremely rarely, (3) processes small data, (4) only used by diffusion models (not LLMs). The main value of optimization here is code consistency (using native math everywhere)."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 29,
+    "total_kernels_analyzed": 30,
     "high_potential": 4,
     "medium_potential": 13,
-    "low_potential": 12,
+    "low_potential": 13,
     "no_optimization_needed": 0,
     "top_opportunities": [
       {

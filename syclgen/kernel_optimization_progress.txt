@@ -5,9 +5,9 @@
 
 ## Summary
 - Total SYCL kernels to analyze: 54
-- Kernels analyzed so far: 29
+- Kernels analyzed so far: 30
 - Analysis complete: No
-- Kernels with optimization potential: 26
+- Kernels with optimization potential: 27
 - Optimization tasks created: 0 (pending finalization)
 
 ## Kernels Analyzed
@@ -40,7 +40,7 @@
 - [x] sk_027: count-equal — low potential
 - [x] sk_028: wkv — medium potential
 - [x] sk_029: gla — medium potential
-- [ ] sk_030: tsembd — pending
+- [x] sk_030: tsembd — low potential
 - [ ] sk_031: roll — pending
 - [ ] sk_032: ssm_conv — pending
 - [ ] sk_033: ssm_scan — pending
@@ -67,6 +67,7 @@
 - [ ] sk_054: upscale (inline) — pending
 
 ## Recent Activity
+[2026-03-06] Analyzed tsembd (sk_030). Found 2 optimization opportunities (low potential). Key findings: Near-perfect 1:1 CUDA port of sinusoidal timestep embedding for diffusion models. nd_range<2> with WG=256, embarrassingly parallel (no reduction, no SLM, no sync). Each work-item computes one (cos,sin) pair with 4 transcendentals (exp, log, cos, sin). Only meaningful inefficiency: full-precision sycl::exp/log/cos/sin where CUDA uses fast single-precision intrinsics — sycl::native:: variants would be 2-3x faster. Missing reqd_sub_group_size(16). Tiny tensors (dim=320-1280), called once per diffusion step — absolute impact negligible. FP32-only (same as CUDA). ~65-80% estimated efficiency.
 [2026-03-06] Analyzed gla (sk_029). Found 4 optimization opportunities (medium potential). Key findings: GLA (Gated Linear Attention) kernel structurally near-identical to WKV6 (sk_028) — same nd_range<1>, WG=head_size (64 or 128), same SLM caching pattern, same private state array. Simpler than WKV6: 3 SLM arrays (k,v,alpha) vs 4 (k,r,tf,td). Same anti-patterns: missing #pragma unroll on all loops, scalar SLM reads where CUDA uses float4& reinterpret-cast for 128-bit vectorized access (4x more SLM transactions), missing reqd_sub_group_size(16). FP32-only. GLA is the core attention for GLA-architecture models, called once per layer. ~50-65% estimated efficiency.
 [2026-03-06] Analyzed wkv (sk_028). Found 4 optimization opportunities (medium potential). Key findings: 2 kernel variants (WKV6 for RWKV v5/v6, WKV7 for v7) with nd_range<1>, WG=head_size (64 or 128). Clean CUDA port with proper SLM caching of shared vectors (k,r,tf,td / r,w,k,a,b). Private state array of head_size floats per work-item — high register pressure (256-512 bytes per thread). CRITICAL: Missing #pragma unroll on all loops (CUDA has them). Scalar SLM reads where CUDA uses float4& reinterpret-cast for 128-bit vectorized SLM access — 4x more SLM transactions in the hot inner loop. Missing reqd_sub_group_size(16). FP32-only (no F16 variant). WKV is the core RWKV attention mechanism, called once per layer — critical path for RWKV models only. ~50-65% estimated efficiency.
 [2026-03-06] Analyzed count-equal (sk_027). Found 3 optimization opportunities (low potential). Key findings: Clean CUDA port with nd_range<1>, WG=WARP_SIZE (16 on Intel) — only 1 sub-group per WG, far below recommended 256. Uses correct reqd_sub_group_size(WARP_SIZE) and sycl::reduce_over_group for int warp_reduce_sum. Atomic_ref<int> for global accumulation — all nblocks WGs contend on single atomic (serial bottleneck). Hardcoded nsm=64 instead of querying device. No vectorized loads (scalar int32). Missing #pragma unroll on comparison loop. Low potential because count_equal is used only for accuracy evaluation, not in inference critical path.
