@@ -1,0 +1,70 @@
+# SyclGen Kernel Optimization Progress
+# Project: llama.cpp
+# Target Hardware: Intel Arc Pro B60 (Xe2, Battlemage)
+# Created: 2026-03-06
+
+## Summary
+- Total SYCL kernels to analyze: 54
+- Kernels analyzed so far: 1
+- Analysis complete: No
+- Kernels with optimization potential: 1
+- Optimization tasks created: 0 (pending finalization)
+
+## Kernels Analyzed
+- [x] sk_001: mul_mat_q (MMQ) — high potential
+- [ ] sk_002: mul_mat_vec_q (MMVQ) — pending
+- [ ] sk_003: dequantize_mul_mat_vec (DMMV) — pending
+- [ ] sk_004: dequantize_block_sycl (convert) — pending
+- [ ] sk_005: outprod (oneMKL GEMM) — pending
+- [ ] sk_006: MUL_MAT_ID kernels — pending
+- [ ] sk_007: quantize_sycl — pending
+- [ ] sk_008: vecdotq — pending
+- [ ] sk_009: dequantize device functions — pending
+- [ ] sk_010: element_wise (unary ops) — pending
+- [ ] sk_011: element_wise (GLU ops) — pending
+- [ ] sk_012: element_wise (special unary) — pending
+- [ ] sk_013: binbcast — pending
+- [ ] sk_014: repeat_back — pending
+- [ ] sk_015: softmax — pending
+- [ ] sk_016: rope — pending
+- [ ] sk_017: norm — pending
+- [ ] sk_018: getrows — pending
+- [ ] sk_019: cpy — pending
+- [ ] sk_020: concat — pending
+- [ ] sk_021: im2col — pending
+- [ ] sk_022: pad — pending
+- [ ] sk_023: pad_reflect_1d — pending
+- [ ] sk_024: conv — pending
+- [ ] sk_025: set — pending
+- [ ] sk_026: set_rows — pending
+- [ ] sk_027: count-equal — pending
+- [ ] sk_028: wkv — pending
+- [ ] sk_029: gla — pending
+- [ ] sk_030: tsembd — pending
+- [ ] sk_031: roll — pending
+- [ ] sk_032: ssm_conv — pending
+- [ ] sk_033: ssm_scan — pending
+- [ ] sk_034: cross-entropy-loss — pending
+- [ ] sk_035: cumsum — pending
+- [ ] sk_036: opt-step-adamw — pending
+- [ ] sk_037: opt-step-sgd — pending
+- [ ] sk_038: solve_tri — pending
+- [ ] sk_039: sumrows — pending
+- [ ] sk_040: sum — pending
+- [ ] sk_041: add-id — pending
+- [ ] sk_042: scale (inline) — pending
+- [ ] sk_043: diag_mask_inf (inline) — pending
+- [ ] sk_044: arange (inline) — pending
+- [ ] sk_045: clamp (inline) — pending
+- [ ] sk_046: acc (inline) — pending
+- [ ] sk_047: diag (inline) — pending
+- [ ] sk_048: tri (inline) — pending
+- [ ] sk_049: fill (inline) — pending
+- [ ] sk_050: argmax (inline) — pending
+- [ ] sk_051: argsort (inline) — pending
+- [ ] sk_052: top_k (inline) — pending
+- [ ] sk_053: pool2d (inline) — pending
+- [ ] sk_054: upscale (inline) — pending
+
+## Recent Activity
+[2026-03-06] Analyzed kernel mul_mat_q (MMQ) (sk_001). Found 8 optimization opportunities (high potential). Key findings: work-group size 64 (should be 256+), missing reqd_sub_group_size, no XMX/joint_matrix usage, no vectorized loads, CUDA SLM padding patterns.

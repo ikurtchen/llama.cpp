@@ -1,0 +1,214 @@
+{
+  "version": "1.0",
+  "created": "2026-03-06T00:00:00Z",
+  "target_hardware": {
+    "name": "Intel Arc Pro B60",
+    "architecture": "Xe2 (Battlemage)",
+    "xe_cores": 20,
+    "xve_per_core": 8,
+    "simd_width": 16,
+    "slm_per_xe_core_kb": 128,
+    "memory_bandwidth_gbs": 456,
+    "fp32_tflops": 12.28,
+    "max_work_group_size": 1024,
+    "preferred_work_group_sizes": [256, 512],
+    "native_sub_group_size": 16
+  },
+  "kernels": [
+    {
+      "kernel_id": "sk_001",
+      "name": "mul_mat_q (MMQ)",
+      "file": "ggml/src/ggml-sycl/mmq.cpp",
+      "source_cuda_ids": ["ck_071", "ck_072"],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": [1, 4, 16],
+          "work_group_size_total": 64,
+          "sub_group_size": null,
+          "sub_group_size_specified": false,
+          "global_size_expression": "3D: (1, block_num_y, block_num_x) * (1, nwarps, WARP_SIZE). block_num_x = (ncols_x + mmq_x - 1) / mmq_x, block_num_y = (nrows_x + mmq_y - 1) / mmq_y",
+          "notes": "Work-group size of 64 is well below the recommended 256-512 for Intel GPUs. The WARP_SIZE=16 matches native SIMD width, but nwarps=4 gives only 4 sub-groups per work-group. Missing [[intel::reqd_sub_group_size(16)]] is a correctness risk since the entire kernel assumes WARP_SIZE=16 as the sub-group width."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "strided_accesses": ["X-tile loads have row-stride separation (different rows of the tile separated by blocks_per_row in global memory)", "Y-tile loads have per-warp column strides as each warp loads a different column block"],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "All loads use scalar 4-byte get_int_from_uint8/get_int_from_int8_aligned helpers. No sycl::vec or 16-byte loads. Within a sub-group, consecutive lanes read consecutive data from the qs field of quantization blocks, which is reasonably coalesced."
+        },
+        "slm_usage": {
+          "uses_slm": true,
+          "slm_bytes_min": 3008,
+          "slm_bytes_max": 4852,
+          "slm_bytes_typical": 3500,
+          "potential_bank_conflicts": true,
+          "notes": "SLM usage is 3-5 KB depending on quantization format, vastly underutilizing the 64 KB available per Xe-core. Bank conflict avoidance uses CUDA-style +1 stride padding (WARP_SIZE+1=17 stride), which may actually cause conflicts on Intel's 16-bank SLM architecture. tile_x_ql, tile_x_dm/tile_x_d, tile_x_sc, tile_x_qh (format-dependent), tile_y_qs, tile_y_ds are allocated."
+        },
+        "reduction_pattern": {
+          "has_reduction": false,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "No reduction needed — each thread accumulates into its own private sum[2][1] and writes a unique output element. This is architecturally correct for the tiling approach."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "accumulator_type": "float",
+          "dot_product_type": "int32 (via dpct::dp4a)",
+          "scale_type": "sycl::half2 -> float",
+          "could_use_half": false,
+          "could_use_joint_matrix": true,
+          "notes": "Primary compute is integer dot products (dp4a on int8/uint8 quantized values) scaled by float/half factors. Accumulation in float32 is appropriate for numerical stability. joint_matrix could replace dp4a with XMX hardware int8 matmul for significant throughput gains."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [],
+          "notes": "No transcendental math functions used. All compute is integer bitwise ops, dp4a, and float multiply-add."
+        },
+        "loop_analysis": {
+          "hot_loops": [
+            "Outer K-tiling loop (line 1228): iterates blocks_per_row_x / blocks_per_warp times, NOT unrolled — trip count is data-dependent",
+            "qr loop (line 1236): iterates qr times (2 for most formats), UNROLLED via #pragma unroll",
+            "Inner k loop (line 1289-1301): iterates WARP_SIZE/(qr*vdr) times (1-2 iterations), NOT unrolled due to register pressure (comment on line 1289)",
+            "Inner j loop (line 1291): mmq_x/nwarps = 1 iteration, UNROLLED — trivially 1 iteration",
+            "Inner i loop (line 1293): mmq_y/WARP_SIZE = 2 iterations, UNROLLED via #pragma unroll",
+            "Load tile loops: 8 iterations each, all UNROLLED via #pragma unroll"
+          ],
+          "unrolled": false,
+          "notes": "The critical hot inner k-loop is explicitly NOT unrolled due to register pressure (comment says unrolling causes too much register pressure). With the current tiny tile sizes, the inner loop body is only 1-2 iterations. Increasing tile sizes would require revisiting unroll strategy."
+        },
+        "estimated_bottleneck": "compute",
+        "bottleneck_notes": "With mmq_x=4 and mmq_y=32, each work-group computes only a 32x4 output tile, resulting in very low arithmetic intensity per memory load. The tiny work-group size (64) also means poor occupancy on Xe2 hardware. The kernel is compute-limited by the lack of XMX utilization — dp4a provides far lower throughput than XMX joint_matrix operations.",
+        "anti_patterns": [
+          "CRITICAL: Missing [[intel::reqd_sub_group_size(16)]] — kernel assumes WARP_SIZE=16 as sub-group width but doesn't enforce it. Compiler may choose SIMD8 or SIMD32, breaking correctness",
+          "CUDA-style SLM bank conflict padding (+1 stride) mismatched for Intel 16-bank SLM",
+          "Very small work-group size (64) — well below recommended 256-512 for Intel GPUs",
+          "Tiny tile sizes (mmq_x=4, mmq_y=32) wasting SLM capacity and limiting compute density",
+          "3D nd_range with unused first dimension (always 1) — should be 2D",
+          "DPCT migration artifacts: __dpct_inline__, DPCT warning comments, dpct::dp4a calls",
+          "CUDA architecture naming (AMPERE, PASCAL, RDNA1/RDNA2) mapped to Intel Gen labels with TODO comments",
+          "Manual warp/lane indexing via get_local_id instead of SYCL sub-group APIs",
+          "No vectorized memory loads — all scalar 4-byte loads",
+          "Massive code duplication: 10 formats x 2 (need_check) = 20 near-identical kernel launches (~1200 lines)"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_001_001",
+          "category": "sub_group_ops",
+          "priority": "high",
+          "description": "Add [[intel::reqd_sub_group_size(16)]] to the kernel. The entire kernel assumes WARP_SIZE=16 as the sub-group size for indexing, SLM layout, and tile computation. Without this attribute, the compiler may select SIMD8 or SIMD32, potentially breaking correctness. This is a correctness fix first, performance second.",
+          "expected_improvement": "Correctness guarantee. May also improve performance by ensuring the compiler generates SIMD16 code matching the kernel's assumptions. Low single-digit percent speedup from removing compiler ambiguity.",
+          "implementation_notes": "Add [[intel::reqd_sub_group_size(16)]] to the lambda in the parallel_for calls (20 launch sites across all formats). Must be placed on the kernel lambda, not a device function.",
+          "risk": "low",
+          "risk_notes": "This is a correctness fix. Risk is if the kernel actually performs better at a different sub-group size, but the logic requires SIMD16."
+        },
+        {
+          "id": "opt_001_002",
+          "category": "work_group_size",
+          "priority": "high",
+          "description": "Increase work-group size from 64 to 256 by increasing nwarps from 4 to 16, or by increasing tile dimensions. Current 64-thread work-groups severely underutilize Intel GPU hardware which prefers 256-512. With 64 threads, each Xe-core can run 64/64=1 work-group max per hardware thread slot, leading to poor latency hiding.",
+          "expected_improvement": "20-40% throughput improvement from better occupancy and latency hiding. More sub-groups per work-group means better utilization of the Xe-core's 8 XVEs.",
+          "implementation_notes": "Increase mmq_y to 128 (from 32) and/or mmq_x to 16 (from 4), with nwarps=16. This increases the output tile to 128x16, improving arithmetic intensity. Must also increase SLM allocation proportionally (from ~4KB to ~16-32KB, still well within 64KB limit). Register pressure needs profiling — the inner k-loop unrolling comment may need revisiting.",
+          "risk": "medium",
+          "risk_notes": "Larger tiles increase register pressure. The existing comment about unrolling causing register pressure suggests this dimension is sensitive. Needs careful tuning and benchmarking per quantization format."
+        },
+        {
+          "id": "opt_001_003",
+          "category": "joint_matrix",
+          "priority": "high",
+          "description": "Replace scalar dpct::dp4a() calls with joint_matrix (XMX) operations for the integer dot product inner loop. The B60 has 160 XMX engines that provide ~197 Int8 TOPS vs the ~12 TFLOPS of scalar FP32. The inner loop computes int8 dot products that map directly to XMX's int8->int32 matmul capability.",
+          "expected_improvement": "4-8x throughput improvement for the compute-bound inner loop. XMX provides 16x the peak int8 throughput vs scalar paths, but memory access overhead and tile management limit real-world gains.",
+          "implementation_notes": "Use sycl::ext::oneapi::experimental::matrix::joint_matrix with int8 inputs and int32 accumulator. Requires restructuring the tile loading to match XMX tile sizes (M=8, N=16, K=32 for int8 on Xe2). The quantized data is already in int8 format in SLM, so the primary work is reshaping the data flow. Requires [[intel::reqd_sub_group_size(16)]] as a prerequisite.",
+          "risk": "high",
+          "risk_notes": "Major kernel rewrite. joint_matrix has strict layout requirements that may not align well with the varied quantization formats (q4_0 through q6_K each have different block structures). May need format-specific XMX tile loaders. Risk of numerical differences in accumulation order."
+        },
+        {
+          "id": "opt_001_004",
+          "category": "memory_coalescing",
+          "priority": "medium",
+          "description": "Use vectorized 16-byte loads (sycl::vec<int,4>) instead of scalar 4-byte loads in the tile loading functions. Adjacent work-items currently each load one 4-byte int; instead, each work-item could load a vec4 (16 bytes), reducing the number of memory transactions by 4x.",
+          "expected_improvement": "15-25% improvement in tile loading phase bandwidth utilization. Impact depends on what fraction of kernel time is spent in loads vs compute.",
+          "implementation_notes": "Replace get_int_from_uint8/get_int_from_int8_aligned with reinterpret_cast<sycl::vec<int,4>*> aligned loads where quantization block layout permits. Must ensure 16-byte alignment of source data. The load_tiles_* functions (10 format-specific) each need modification.",
+          "risk": "medium",
+          "risk_notes": "Alignment requirements may not always be met depending on quantization block sizes. Some formats (IQ types) have irregular layouts. Need to handle edge cases where the remaining data is less than 16 bytes."
+        },
+        {
+          "id": "opt_001_005",
+          "category": "slm_tuning",
+          "priority": "medium",
+          "description": "Fix SLM bank conflict avoidance for Intel GPU architecture. Current code uses CUDA-style +1 padding (stride WARP_SIZE+1=17) for SLM arrays. Intel SLM has 16 banks with 4-byte granularity. With stride 17, consecutive row accesses hit banks 0,17%16=1,34%16=2,... which is actually conflict-free for row access but may conflict for column access patterns. Analyze actual access patterns and adjust padding for Intel's 16-bank layout.",
+          "expected_improvement": "5-15% improvement in SLM-heavy phases if bank conflicts exist. Requires profiling to quantify actual conflict rate.",
+          "implementation_notes": "Replace (WARP_SIZE + 1) stride with a stride that avoids conflicts for the actual access patterns in vec_dot_* functions. For Intel's 16 banks, a stride of 17 (WARP_SIZE+1) actually works well for sequential row access but may need adjustment for the interleaved access pattern in the dot product phase. Profile with Intel VTune or Level Zero metrics to measure actual SLM bank conflicts before and after.",
+          "risk": "low",
+          "risk_notes": "SLM padding changes are localized. Can be benchmarked independently. Low risk of correctness issues."
+        },
+        {
+          "id": "opt_001_006",
+          "category": "work_group_size",
+          "priority": "medium",
+          "description": "Tune tile configuration per quantization format instead of using one-size-fits-all mmq_x=4, mmq_y=32 for all formats. Different quantization formats have different memory footprints and compute intensities. For example, q4_0 (4-bit, simple) could use larger tiles than q6_K (6-bit, complex scales) without exceeding register or SLM limits.",
+          "expected_improvement": "10-20% improvement for some formats by better matching tile sizes to format complexity.",
+          "implementation_notes": "The configuration macros already support per-format tile sizes (MMQ_X_Q4_0_AMPERE, etc.). Change the Intel target configuration from the current uniform mmq_x=4, mmq_y=32 to format-specific values. Simpler formats (q4_0, q4_1, q8_0) can use larger tiles; complex formats (q3_K, q5_K, q6_K) may need smaller tiles to avoid register spilling.",
+          "risk": "medium",
+          "risk_notes": "Requires per-format benchmarking. Wrong tile sizes can cause register spilling and severe performance regressions."
+        },
+        {
+          "id": "opt_001_007",
+          "category": "reduction",
+          "priority": "low",
+          "description": "Replace item_ct1.barrier() with item_ct1.barrier(sycl::access::fence_space::local_space) since the barriers only synchronize SLM accesses, not global memory. This tells the hardware that only local memory fence is needed, potentially reducing barrier overhead.",
+          "expected_improvement": "1-3% improvement. Barriers are executed twice per qr iteration, so the effect compounds but is still minor.",
+          "implementation_notes": "Change the two barrier() calls in the mul_mat_q template (lines ~1287 and ~1312) to barrier(sycl::access::fence_space::local_space). Verify that no global memory synchronization is actually needed between the barrier points.",
+          "risk": "low",
+          "risk_notes": "If any global memory accesses actually depend on the barrier (e.g., the output write at the end), this would be incorrect. Analysis shows the barriers are only for SLM coherence, so local_space fence should suffice."
+        },
+        {
+          "id": "opt_001_008",
+          "category": "loop_unroll",
+          "priority": "low",
+          "description": "Investigate whether the hot inner k-loop (line ~1289) can be partially unrolled now that the target is Intel GPU (different register file characteristics than NVIDIA). The comment says unrolling causes too much register pressure, but this was likely profiled on NVIDIA hardware. Intel Xe2 has 512 bytes GRF per thread in SIMD16 mode.",
+          "expected_improvement": "5-10% if register pressure permits. The k-loop has only 1-2 iterations for most formats, so full unroll would eliminate the loop overhead entirely.",
+          "implementation_notes": "Try adding #pragma unroll to the k-loop for simple formats (q4_0, q8_0) first. Monitor register usage via -cl-intel-greater-than-4GB-buffer-required or IGC internal flags. If registers spill, revert.",
+          "risk": "medium",
+          "risk_notes": "Register spilling on Intel GPUs causes performance cliffs (spill to SLM or global memory). Must benchmark each format individually."
+        }
+      ],
+      "overall_optimization_potential": "high",
+      "estimated_current_efficiency": "15-25%",
+      "efficiency_notes": "This is a DPCT-migrated kernel running with CUDA-optimized tile sizes (optimized for NVIDIA Ampere with warp size 32, then scaled down to warp size 16). The work-group size of 64 is far below Intel's preferred 256-512. No XMX utilization despite having 160 XMX engines. Scalar dp4a instead of hardware matrix multiply. Minimal SLM utilization (3-5 KB of 64 KB available). No vectorized loads. The kernel functions correctly but is leaving substantial performance on the table."
+    }
+  ],
+  "summary": {
+    "total_kernels_analyzed": 1,
+    "high_potential": 1,
+    "medium_potential": 0,
+    "low_potential": 0,
+    "no_optimization_needed": 0,
+    "top_opportunities": [
+      {
+        "kernel_id": "sk_001",
+        "kernel_name": "mul_mat_q (MMQ)",
+        "optimization_id": "opt_001_001",
+        "description": "Add [[intel::reqd_sub_group_size(16)]] — correctness fix and performance baseline",
+        "priority": "high"
+      },
+      {
+        "kernel_id": "sk_001",
+        "kernel_name": "mul_mat_q (MMQ)",
+        "optimization_id": "opt_001_002",
+        "description": "Increase work-group size from 64 to 256+ for better occupancy",
+        "priority": "high"
+      },
+      {
+        "kernel_id": "sk_001",
+        "kernel_name": "mul_mat_q (MMQ)",
+        "optimization_id": "opt_001_003",
+        "description": "Replace dp4a with joint_matrix (XMX) for 4-8x int8 matmul throughput",
+        "priority": "high"
+      }
+    ]
+  }
+}
