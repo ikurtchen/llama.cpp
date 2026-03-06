@@ -1666,13 +1666,130 @@
       "overall_optimization_potential": "low",
       "estimated_current_efficiency": "40-55%",
       "efficiency_notes": "Very similar to sk_010 (unary ops) — same code structure, same clean manual port, same WG=256 with nd_range<1>. The primary efficiency loss is from scalar processing of memory-bound operations. GLU ops have slightly higher arithmetic intensity than simple unary ops (0.17-1.25 vs 0.12-2.5 FLOP/byte) but are still deeply memory-bound. The 64-bit integer division is an additional overhead not present in sk_010's unary ops. Overall optimization potential is LOW because: (1) these are not on the critical inference path (GLU activation is a small fraction of total compute vs matmul), (2) the kernel is already correctly implemented with proper launch config, and (3) the main optimization (vectorization) provides only modest 1.3-1.8x improvement on an already-fast kernel."
+    },
+    {
+      "kernel_id": "sk_012",
+      "name": "element_wise (special unary)",
+      "file": "ggml/src/ggml-sycl/element_wise.cpp",
+      "source_cuda_ids": ["ck_112", "ck_113", "ck_114", "ck_115"],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": [256, 1, 1],
+          "work_group_size_total": 256,
+          "sub_group_size": null,
+          "sub_group_size_specified": false,
+          "global_size_expression": "1D: ceil(k / BLOCK_SIZE) * BLOCK_SIZE where k = ggml_nelements(src0) or ggml_nelements(dst)",
+          "notes": "All 5 kernels (leaky_relu, silu_back, xielu, expm1, swiglu_oai) use nd_range<1> with work-group size 256. leaky_relu/silu_back/xielu/expm1 use SYCL_NEG_BLOCK_SIZE=256; swiglu_oai uses SYCL_GLU_BLOCK_SIZE=256. No [[intel::reqd_sub_group_size()]] specified on any kernel. Clean manual port — no DPCT artifacts, no nd_item<3>."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "coalesced_notes": "leaky_relu, silu_back, xielu, expm1: fully coalesced — each work-item reads x[i] and writes dst[i] where i = get_global_id(0). swiglu_oai: potentially strided when o0 != n due to index computation j0 = (i/n)*o0 + (i%n) — within a row, accesses are contiguous, but at row boundaries there's a stride gap when row stride differs from column count.",
+          "strided_accesses": [
+            "swiglu_oai: index computation j0 = (i/n)*o0 + (i%n) introduces stride gaps at row boundaries when o0 != n"
+          ],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "No sycl::vec types used in any kernel. All loads/stores are scalar (4 bytes for FP32, 2 bytes for FP16). Each work-item processes exactly 1 element."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes": 0,
+          "potential_bank_conflicts": false,
+          "notes": "None of the 5 kernels use shared local memory. All are pure element-wise maps with no cross-work-item communication."
+        },
+        "reduction_pattern": {
+          "has_reduction": false,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "Pure element-wise operations — no reductions needed."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "supported_types": "FP32 and FP16 for leaky_relu, silu_back, xielu, expm1; FP32-only for swiglu_oai",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "All computation done in FP32 with casts from/to T (sycl::half or float). FP16 support via template <typename T> pattern on 4 of 5 kernels. swiglu_oai is explicitly FP32-only (matching CUDA). No opportunity for joint_matrix — these are element-wise ops."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [
+            "fmaxf (leaky_relu, swiglu_oai)",
+            "fminf (leaky_relu, xielu, swiglu_oai)",
+            "expf (silu_back, swiglu_oai)",
+            "expm1f (xielu, expm1)"
+          ],
+          "notes": "All math functions use standard C/SYCL math (not sycl::native::). For inference-level precision (~2-3 ULP error acceptable), sycl::native::exp() could replace expf for silu_back and swiglu_oai. expm1f has no native equivalent in SYCL."
+        },
+        "loop_analysis": {
+          "hot_loops": [],
+          "unrolled": false,
+          "notes": "No inner loops in any of the 5 kernels. Each work-item processes exactly 1 element. No #pragma unroll directives needed."
+        },
+        "estimated_bottleneck": "memory",
+        "bottleneck_notes": "All 5 kernels are deeply memory-bound. Arithmetic intensity ranges: leaky_relu ~0.4 FLOP/byte, expm1 <0.5 FLOP/byte, silu_back ~0.7 FLOP/byte, swiglu_oai ~0.8 FLOP/byte, xielu ~1.5-2.0 FLOP/byte. All are far below the B60's compute intensity threshold of ~27 FLOP/byte. Performance is entirely determined by memory bandwidth utilization.",
+        "anti_patterns": [
+          "No vectorized loads/stores — each work-item processes only 1 element for purely memory-bound operations",
+          "Missing [[intel::reqd_sub_group_size()]] on all kernel launches — compiler free to choose sub-group size",
+          "swiglu_oai: 64-bit integer division/modulo (i/n, i%n) in hot path — expensive on GPU, no hardware support for int64 division",
+          "swiglu_oai: FP32-only while other special unary ops support FP16",
+          "Standard math functions (expf, expm1f) used where native approximations would suffice for inference precision"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_012_001",
+          "category": "vectorization",
+          "priority": "medium",
+          "description": "Use vectorized 4-wide loads/stores (sycl::vec<float,4> or sycl::vec<sycl::half,4>) so each work-item processes 4 elements instead of 1. For purely memory-bound kernels, vectorized access reduces memory transactions by 4x. Apply to all 5 kernels. leaky_relu, expm1, xielu, and silu_back have simple linear indexing that trivially supports vec4. swiglu_oai needs care due to strided index computation.",
+          "expected_improvement": "1.5-2x throughput improvement from better memory bus utilization. The B60's 456 GB/s bandwidth is better utilized with 16-byte transactions (vec4 float) vs 4-byte scalar loads. Diminishing returns if the memory subsystem is already near saturation from concurrent work-groups.",
+          "implementation_notes": "Change kernel to process 4 elements per work-item: load sycl::vec<float,4> v = *reinterpret_cast<const sycl::vec<float,4>*>(&x[i*4]); apply operation to each component; store similarly. Adjust grid size: num_blocks = ceil(k/4 / BLOCK_SIZE). Handle tail elements (k not divisible by 4) with a scalar fallback or by processing the last partial vec separately. For sycl::half, use sycl::vec<sycl::half,4> (8-byte loads). For swiglu_oai, vectorization is only safe when o0 == n (contiguous case).",
+          "risk": "low",
+          "risk_notes": "Alignment must be ensured — ggml tensors are typically 32-byte aligned so vec4 float (16 bytes) is safe. Tail handling adds minor code complexity. No correctness risk for the math operations themselves."
+        },
+        {
+          "id": "opt_012_002",
+          "category": "math_functions",
+          "priority": "low",
+          "description": "Replace standard expf() with sycl::native::exp() in silu_back and swiglu_oai kernels. Native exp provides ~2-3 ULP error vs full precision, which is acceptable for activation function computation in neural network inference. This reduces the per-element compute latency, though the kernels are memory-bound so the impact is limited.",
+          "expected_improvement": "2-5% throughput improvement. The expf call is the most expensive single operation in silu_back and swiglu_oai (~20+ cycles vs ~1-4 cycles for native). However, since these kernels are memory-bound, reducing compute latency only helps if it allows the memory pipeline to stay busier. More impactful for xielu's expm1f, but there is no sycl::native::expm1 equivalent.",
+          "implementation_notes": "Replace `expf(-x)` with `sycl::native::exp(-x)` in silu_back_op_kernel (line 502) and swiglu_oai_single (line 357). Verify inference accuracy is maintained by running the full test suite. Do NOT replace expm1f in xielu/expm1 — there is no native equivalent, and manual implementation (native::exp(x) - 1.0f) loses precision for small x.",
+          "risk": "low",
+          "risk_notes": "Native math has lower precision (~2-3 ULP error). For activation functions this is generally acceptable, but edge cases near zero or very large/small inputs should be tested. The CUDA backend uses standard math for these same operations, so switching to native would make SYCL slightly less precise than CUDA."
+        },
+        {
+          "id": "opt_012_003",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Evaluate increasing work-group size from 256 to 512 for these memory-bound kernels. Larger work-groups mean more concurrent memory requests per Xe-core, potentially improving memory-level parallelism and bandwidth utilization. However, 256 is already within the recommended range (256-512) and may be sufficient.",
+          "expected_improvement": "0-5% throughput improvement. The benefit depends on whether the current 256-thread work-groups generate enough outstanding memory requests to saturate the memory bus. With 16 sub-groups per 256-thread work-group, occupancy may already be adequate.",
+          "implementation_notes": "Change SYCL_NEG_BLOCK_SIZE from 256 to 512 for these kernels. This affects all unary/GLU/special-unary kernels that share this constant, so must verify no regressions. Alternatively, use a separate constant for the special unary kernels.",
+          "risk": "low",
+          "risk_notes": "Doubling work-group size from 256 to 512 is within hardware limits (max 1024). May slightly increase register pressure per work-group but these simple kernels use very few registers. Main risk is shared constant affecting other kernels."
+        },
+        {
+          "id": "opt_012_004",
+          "category": "data_type",
+          "priority": "low",
+          "description": "Add FP16 support to swiglu_oai to match the other 4 special unary kernels. The current FP32-only restriction (matching CUDA) means FP16 models must dequantize to FP32 for SwiGLU-OAI, wasting bandwidth. The other GLU kernels in sk_011 already support FP16 via the generic gated template.",
+          "expected_improvement": "Up to 2x throughput for FP16 models using SwiGLU-OAI (halving memory traffic: 2 bytes per element vs 4 bytes). Only applicable when the model uses FP16 weights/activations with the SwiGLU-OAI activation pattern.",
+          "implementation_notes": "Template swiglu_oai_op_kernel and swiglu_oai_sycl on <typename T> (already done), but also need to add the FP16 dispatch in ggml_sycl_swiglu_oai. The math (fminf, fmaxf, expf) should remain in FP32 — only the load/store should use half. Update the assertion from src0->type == GGML_TYPE_F32 to allow GGML_TYPE_F16.",
+          "risk": "medium",
+          "risk_notes": "The CUDA backend does not support FP16 for swiglu_oai, so enabling it in SYCL would be a divergence. Must verify that the FP32 intermediate computation provides sufficient precision when inputs are FP16 (may lose information during the fminf/fmaxf clamping if half's limited range affects the limit parameter). Need to verify upstream dispatch actually sends FP16 tensors."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "40-55%",
+      "efficiency_notes": "All 5 kernels are cleanly written native SYCL with zero DPCT artifacts. They use proper nd_range<1> with WG=256, correct bounds checking, and support FP16 (4 of 5). The primary efficiency loss is from scalar 1-element-per-work-item processing on purely memory-bound operations (0.4-2.0 FLOP/byte, all far below the 27 FLOP/byte ridge point). Vectorized vec4 loads/stores could improve bandwidth utilization by 1.5-2x. The integer division overhead in swiglu_oai adds ~5% cost. Overall optimization potential is LOW because: (1) special unary activations are not on the critical inference path (tiny fraction of total compute time vs matmul kernels), (2) the kernels are already correctly implemented with recommended launch configuration, (3) the main optimization (vectorization) provides modest improvement on already-fast kernels, and (4) native math provides marginal gains on memory-bound operations. These kernels fix 2 latent bugs from the CUDA source (xielu block count off-by-one, silu_back wrong divisor constant)."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 11,
+    "total_kernels_analyzed": 12,
     "high_potential": 4,
     "medium_potential": 4,
-    "low_potential": 3,
+    "low_potential": 4,
     "no_optimization_needed": 0,
     "top_opportunities": [
       {
