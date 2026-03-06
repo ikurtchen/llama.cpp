@@ -3711,13 +3711,125 @@
       "overall_optimization_potential": "medium",
       "estimated_current_efficiency": "40-55%",
       "efficiency_notes": "The SYCL set_rows kernel is a clean manual port from CUDA with correct structure and appropriate WG size (256). However, it has two major gaps vs CUDA: (1) All 7 int64 division/modulo operations use expensive native division where CUDA uses precomputed fast_div_modulo \u2014 the SYCL infrastructure (init_fastdiv_values, fast_div_modulo in common.hpp) already exists but is not used. This is the biggest per-element inefficiency. (2) Missing quantized destination types (Q4_0, Q4_1, Q5_0, Q5_1, Q8_0, IQ4_NL) forces CPU fallback for quantized KV caches \u2014 a critical functional parity gap. (3) Missing ROPE+VIEW+SET_ROWS fusion (a graph-level optimization) costs 2 kernel launches and 2 memory passes per attention head per token. The kernel is used for KV cache scatter operations during inference (every attention layer), so medium optimization potential overall. Scalar loads/stores and missing reqd_sub_group_size are minor issues compared to the integer division and functional parity gaps."
+    },
+    {
+      "kernel_id": "sk_027",
+      "name": "count-equal",
+      "file": "ggml/src/ggml-sycl/count-equal.cpp",
+      "source_cuda_ids": [
+        "ck_040"
+      ],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": [
+            16,
+            1,
+            1
+          ],
+          "work_group_size_total": 16,
+          "sub_group_size": 16,
+          "sub_group_size_specified": true,
+          "global_size_expression": "nblocks * WARP_SIZE, where nblocks = min(4*nsm, ceil(ne/SYCL_COUNT_EQUAL_CHUNK_SIZE)), nsm hardcoded to 64",
+          "notes": "Uses nd_range<1> with WG=WARP_SIZE (16 on Intel, 32 on NVIDIA). Each work-group is exactly 1 sub-group. This is a severely undersized work-group \u2014 only 16 threads per WG on Intel vs recommended 256. The kernel correctly specifies [[sycl::reqd_sub_group_size(WARP_SIZE)]]. SYCL_COUNT_EQUAL_CHUNK_SIZE=128 (from count-equal.hpp). The number of streaming multiprocessors (nsm) is hardcoded to 64 \u2014 should be queried from the device for optimal work distribution."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "coalesced_notes": "Both x[i] and y[i] reads are perfectly coalesced \u2014 adjacent threads in the sub-group read adjacent int32 elements (stride 4 bytes). The loop 'for (i = i0 + tid; i < i1; i += WARP_SIZE)' ensures coalesced access pattern. Each work-item processes dk/WARP_SIZE elements sequentially.",
+          "strided_accesses": [],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "All loads are scalar int32 (4 bytes). No sycl::vec types. Each work-item reads one x[i] and one y[i] per loop iteration. With WARP_SIZE=16, the sub-group reads 16*4=64 bytes per iteration, which is one cache line. vec4 loads could quadruple this to 256 bytes per sub-group per iteration."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes": 0,
+          "potential_bank_conflicts": false,
+          "notes": "No SLM used. The kernel is purely reduction-based: each thread accumulates a local count, then warp_reduce_sum aggregates across the sub-group, then atomic_ref aggregates across work-groups."
+        },
+        "reduction_pattern": {
+          "has_reduction": true,
+          "uses_sub_group_reduce": true,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": true,
+          "notes": "Two-level reduction: (1) warp_reduce_sum(nequal) using sycl::reduce_over_group on the sub-group \u2014 correct and efficient for the int overload. (2) sycl::atomic_ref<int, relaxed, device, global_space> on dst[0] \u2014 each work-group atomically adds its sub-group sum. The atomic is on int (not int64) despite dst being I64 \u2014 the assert 'ne < (1 << 30)' guards against overflow. The reinterpret_cast<int*>(dst) is endianness-dependent but correct on little-endian x86/Intel GPUs."
+        },
+        "data_types": {
+          "compute_type": "int32",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "Source tensors are I32 (int), comparison produces int (0 or 1), reduction is int sum, atomic add is int, result stored in I64 tensor. The entire computation is integer. Only I32 source type is supported (same as CUDA)."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [],
+          "notes": "No math functions. Pure integer comparison (==) and reduction (sum)."
+        },
+        "loop_analysis": {
+          "hot_loops": [
+            {
+              "location": "count-equal.cpp:21",
+              "trip_count": "dk/WARP_SIZE per work-item, where dk = GGML_PAD((ne + 4*nsm - 1) / (4*nsm), 128)",
+              "description": "Main comparison loop: loads x[i] and y[i], compares, accumulates count"
+            }
+          ],
+          "unrolled": false,
+          "notes": "The hot loop processes dk/WARP_SIZE = ~128/16 = 8 elements per work-item for the typical case (ne ~ 32K-128K, nsm=64, nblocks=256). The loop is short enough that #pragma unroll would be beneficial. No unroll hint is present."
+        },
+        "estimated_bottleneck": "launch_overhead",
+        "bottleneck_notes": "count_equal is purely memory-bound with 0 useful FLOPs per byte (integer comparison is essentially free vs memory access cost). With WG=16 (1 sub-group), only 16 threads per EU, significantly underutilizing the hardware. The kernel reads 2 int32 arrays and produces 1 int64 scalar \u2014 arithmetic intensity is essentially 0. For typical tensor sizes in LLM inference (ne ~ 32K), the kernel completes in microseconds and launch overhead + atomic contention dominate. The stream.memset (zeroing dst) before the kernel adds an additional synchronization point.",
+        "anti_patterns": [
+          "Work-group size = WARP_SIZE (16 on Intel) \u2014 far below recommended 256. Only 1 sub-group per work-group means no work-group level parallelism. Should use multiple sub-groups per WG (e.g., WG=256 = 16 sub-groups) with SLM-based inter-sub-group reduction before the final atomic",
+          "Hardcoded nsm=64 \u2014 should query device for actual number of compute units/execution units for optimal work distribution. Intel Arc Pro B60 has different EU count than the assumed 64 SMs",
+          "No vectorized loads \u2014 scalar int32 loads (4 bytes per thread) where vec4 loads (16 bytes per thread) would improve bandwidth utilization",
+          "Missing #pragma unroll on the hot comparison loop (typically ~8 iterations per work-item)",
+          "stream.memset for dst zeroing before kernel \u2014 could initialize dst inside the kernel (first atomic write could be a store instead of fetch_add, or use 0 as initial value via atomic exchange)",
+          "Atomic contention: all nblocks work-groups contend on a single atomic int \u2014 with 256 WGs each doing an atomic add, this is a serial bottleneck. Hierarchical reduction (WG-level \u2192 single atomic) would reduce contention"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_027_001",
+          "category": "launch_config",
+          "priority": "medium",
+          "description": "Increase work-group size from WARP_SIZE (16) to 256 with 16 sub-groups per WG. Use SLM-based inter-sub-group reduction within the work-group, then a single atomic add per work-group to the global result. This reduces atomic contention by 16x (from nblocks atomics to nblocks/16 atomics) and improves EU occupancy by filling more hardware threads per execution unit.",
+          "expected_improvement": "2-4x throughput improvement. The WG=16 configuration severely underutilizes hardware resources. With WG=256, each EU can schedule more concurrent threads, hiding memory latency better. Additionally, 16x reduction in atomic contention eliminates the serialization bottleneck.",
+          "implementation_notes": "Change local_range from WARP_SIZE to 256. Inside the kernel: (1) Each sub-group does warp_reduce_sum as before. (2) Sub-group leaders (lane 0) write their partial sum to SLM[sub_group_id]. (3) Barrier. (4) First sub-group reads SLM and does final warp_reduce_sum across 16 partial sums. (5) Thread 0 does atomic_add to global dst. Need sycl::local_accessor<int, 1> of size 16 (one per sub-group). Adjust nblocks calculation: divide by (256/WARP_SIZE) since each WG now processes 16x more data.",
+          "risk": "low",
+          "risk_notes": "Standard multi-sub-group reduction pattern used in many other kernels (norm, softmax, sumrows). The SLM requirement is trivial (16 * 4 = 64 bytes)."
+        },
+        {
+          "id": "opt_027_002",
+          "category": "vectorization",
+          "priority": "low",
+          "description": "Use sycl::vec<int, 4> (vec4) loads for both x and y arrays to process 4 elements per loop iteration. Each comparison produces 4 int results that can be summed locally before the sub-group reduction. This quadruples the data processed per memory transaction.",
+          "expected_improvement": "1.5-2x throughput improvement for the memory-bound comparison loop. Limited by the fact that the kernel is already bottlenecked on launch overhead and atomic contention for typical tensor sizes.",
+          "implementation_notes": "In the hot loop: load sycl::vec<int,4> from x and y (requires 16-byte aligned addresses). Compare element-wise (vec4 == vec4 produces vec4 of 0/-1), sum the 4 comparison results into the accumulator. Handle tail elements (ne % 4 != 0) with scalar fallback. Must verify that src0->data and src1->data are 16-byte aligned (they are, per ggml allocator guarantees).",
+          "risk": "low",
+          "risk_notes": "Must handle non-multiple-of-4 element counts. Alignment is guaranteed by ggml allocator."
+        },
+        {
+          "id": "opt_027_003",
+          "category": "device_query",
+          "priority": "low",
+          "description": "Replace hardcoded nsm=64 with actual device compute unit count queried from ctx. The Intel Arc Pro B60 has a specific number of Xe-cores (20 Xe-cores / 160 XVEs) which may differ significantly from the assumed 64 CUDA SMs.",
+          "expected_improvement": "0-10% improvement in work distribution. Wrong nsm leads to suboptimal chunk size (dk) and number of work-groups \u2014 either too many small work-groups (atomic contention) or too few large ones (underutilization). The impact depends on how far the actual EU count is from 64.",
+          "implementation_notes": "Query ctx.device().get_info<sycl::info::device::max_compute_units>() or use the SYCL backend's existing device info infrastructure. Set nsm = max_compute_units (or a fraction thereof, depending on how CUs map to the work distribution heuristic). The CUDA version uses ggml_cuda_info().devices[device].nsm which is the actual SM count.",
+          "risk": "low",
+          "risk_notes": "No correctness risk. The heuristic is purely about performance tuning."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "50-65%",
+      "efficiency_notes": "The count_equal kernel is a clean CUDA port with correct sub-group reduction and atomic global accumulation. The main inefficiencies are: (1) WG=WARP_SIZE=16 on Intel \u2014 far below optimal 256, meaning poor EU occupancy and high atomic contention (one atomic per 16-thread WG vs one per 256-thread WG). (2) Hardcoded nsm=64 instead of querying device. (3) No vectorized loads. However, the overall optimization potential is LOW because count_equal is called extremely rarely during inference \u2014 it's used only for model accuracy evaluation (comparing predicted vs actual token IDs), not in the critical inference path. The kernel processes a single 1D tensor comparison, typically ne ~ vocab_size * batch_size, completing in microseconds. Optimizing WG size would improve efficiency but the absolute time savings are negligible in the context of end-to-end inference."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 26,
+    "total_kernels_analyzed": 27,
     "high_potential": 4,
     "medium_potential": 11,
-    "low_potential": 11,
+    "low_potential": 12,
     "no_optimization_needed": 0,
     "top_opportunities": [
       {

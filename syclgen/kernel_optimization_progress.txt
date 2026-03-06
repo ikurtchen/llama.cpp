@@ -5,9 +5,9 @@
 
 ## Summary
 - Total SYCL kernels to analyze: 54
-- Kernels analyzed so far: 26
+- Kernels analyzed so far: 27
 - Analysis complete: No
-- Kernels with optimization potential: 23
+- Kernels with optimization potential: 24
 - Optimization tasks created: 0 (pending finalization)
 
 ## Kernels Analyzed
@@ -37,7 +37,7 @@
 - [x] sk_024: conv — medium potential
 - [x] sk_025: set — low potential
 - [x] sk_026: set_rows — medium potential
-- [ ] sk_027: count-equal — pending
+- [x] sk_027: count-equal — low potential
 - [ ] sk_028: wkv — pending
 - [ ] sk_029: gla — pending
 - [ ] sk_030: tsembd — pending
@@ -67,6 +67,7 @@
 - [ ] sk_054: upscale (inline) — pending
 
 ## Recent Activity
+[2026-03-06] Analyzed count-equal (sk_027). Found 3 optimization opportunities (low potential). Key findings: Clean CUDA port with nd_range<1>, WG=WARP_SIZE (16 on Intel) — only 1 sub-group per WG, far below recommended 256. Uses correct reqd_sub_group_size(WARP_SIZE) and sycl::reduce_over_group for int warp_reduce_sum. Atomic_ref<int> for global accumulation — all nblocks WGs contend on single atomic (serial bottleneck). Hardcoded nsm=64 instead of querying device. No vectorized loads (scalar int32). Missing #pragma unroll on comparison loop. Low potential because count_equal is used only for accuracy evaluation, not in inference critical path.
 [2026-03-06] Analyzed set_rows (sk_026). Found 5 optimization opportunities (medium potential). Key findings: Clean manual CUDA port with nd_range<1>, WG=256, templated on <src_t, idx_t, dst_t>. CRITICAL: 7 expensive int64 divisions per work-item for 4D index decomposition — CUDA uses precomputed fast_div_modulo; SYCL has init_fastdiv_values() in common.hpp but set_rows.cpp does not use it. CRITICAL functional gap: Missing quantized dst types — CUDA supports Q4_0/Q4_1/Q5_0/Q5_1/Q8_0/IQ4_NL via k_set_rows_quant with inline quantization; SYCL only F32/F16/BF16, forcing CPU fallback for quantized KV caches. Missing ROPE+VIEW+SET_ROWS fusion (CUDA graph-level optimization saving 2 kernel launches). No vectorized loads/stores. Missing reqd_sub_group_size(16). ~40-55% estimated efficiency.
 [2026-03-06] Analyzed set (sk_025). Found 2 optimization opportunities (low potential). Key findings: NO dedicated compute kernel — 42-line orchestration function delegating all GPU work to ggml_sycl_cpy() from cpy.cpp. Two operations: (1) stream.memcpy for base tensor (optimal DMA), (2) k_cpy_scalar kernel for strided src1→dst_view copy. Near-identical to CUDA set.cu. The k_cpy_scalar kernel performs 8 expensive int64 divisions per work-item for 4D index decomposition — main bottleneck in strided copy path. Optimizations to cpy.cpp (sk_019) benefit this transitively. ~70-85% estimated efficiency. Low potential because set is called infrequently and has no dedicated kernel to optimize.
 [2026-03-06] Analyzed conv (sk_024). Found 5 optimization opportunities (medium potential). Key findings: 5 convolution kernels (conv_transpose_1d, conv2d, conv2d_dw_whcn, conv2d_dw_cwhn, conv2d_transpose) all using nd_range<1> with WG=256. Zero SLM usage — biggest missed optimization; kernel weights shared across work-items in same c_out group could be tiled in SLM (e.g., 64ch*3*3*4B = 2.3KB, well within 64KB). No loop unrolling on hot inner loops (IC*KH*KW iterations). All scalar loads/stores, no vectorization. Manual global_id computation (CUDA blockIdx*blockDim+threadIdx pattern) in 4 of 5 kernels. Custom sycl_max64/min64 helpers instead of sycl::max/min. Input reads strided by stride parameter in conv2d/dw. Heavy branching in transpose variants causes sub-group divergence. conv2d templated on kernel weight type (F16/F32); conv2d_transpose hardcodes sycl::half weights. No sub-group size specified. Potential im2col+XMX path for large conv2d (high risk, high reward). ~35-55% estimated efficiency.
