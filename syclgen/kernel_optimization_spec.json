@@ -2257,12 +2257,147 @@
       "overall_optimization_potential": "medium",
       "estimated_current_efficiency": "40-55%",
       "efficiency_notes": "The forward softmax kernel is reasonably well-implemented for Intel GPUs: proper WG=256, correct reqd_sub_group_size, SLM caching of intermediate values, and efficient block_reduce for inter-warp communication. The main gaps are: (1) no vectorized loads for a purely memory-bound kernel, (2) no compile-time specialization for common ncols values (CUDA has 8 specializations), (3) hardcoded 48KB SLM threshold missing 16KB of available space on Xe2, (4) missing cooperative column-parallel variant for extreme ncols cases. The backward kernel is weaker: only 16 threads per work-group, pure scalar loads, no vectorization. Overall, the forward kernel is the most important variant (used in every attention layer), and it's at roughly 40-55% of achievable bandwidth for common sequence lengths."
+    },
+    {
+      "kernel_id": "sk_016",
+      "name": "rope",
+      "file": "ggml/src/ggml-sycl/rope.cpp",
+      "source_cuda_ids": [
+        "ck_090",
+        "ck_091",
+        "ck_092",
+        "ck_093"
+      ],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "nd_range_dims": 2,
+          "work_group_size": [1, 256],
+          "work_group_size_total": 256,
+          "sub_group_size": 16,
+          "sub_group_size_specified": true,
+          "sub_group_size_attribute": "[[sycl::reqd_sub_group_size(WARP_SIZE)]]",
+          "global_size_expression": "nd_range<2>(range<2>(nr, n_blocks_x * 256), range<2>(1, 256)) where n_blocks_x = ceil(ne00 / (2*256))",
+          "notes": "All 4 kernel variants (rope_norm, rope_neox, rope_multi, rope_vision) use the same launch configuration: nd_range<2> with WG=(1, 256). Grid dim 0 dispatches one work-item per row (nr = total rows across all batches/heads/seq), dim 1 tiles over element pairs within a row. Each work-item processes exactly 2 elements (one rotation pair). WG=256 is correct for Intel GPUs. All have [[sycl::reqd_sub_group_size(WARP_SIZE)]]. Matches CUDA's dim3(1, CUDA_ROPE_BLOCK_SIZE, 1) = dim3(1, 256, 1) grid layout. The backward pass (rope_back) reuses the same kernels with forward=false template parameter — no separate backward kernel."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "coalesced_notes": "For rope_norm: adjacent work-items in dim 1 process adjacent element pairs (i0=2*global_id(1)), so x[ix+0] and x[ix+1] are strided by 2 elements across work-items — partially coalesced. For rope_neox/multi/vision: the two elements of each pair are at offset n_dims/2 apart (x[ix+0] and x[ix+n_dims/2]), causing two separate cache line accesses per work-item, but within each access, adjacent work-items touch adjacent addresses — coalesced within each half.",
+          "strided_accesses": [
+            "rope_neox/multi/vision read split-half pairs: x[ix+0] and x[ix+n_dims/2] are n_dims/2 elements apart (typically 32-64 elements = 128-256 bytes), causing dual cache line access per work-item",
+            "pos[i2] read is broadcast-like — all work-items in same row read same pos value, but different rows read different pos values. L1 cache handles this well."
+          ],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "All loads and stores are scalar 4-byte (float) or 2-byte (half). CUDA's rope_norm uses ggml_cuda_memcpy_1<8> (float2) / ggml_cuda_memcpy_1<4> (half2) for coalesced paired writes via store_coaelsced lambda. SYCL uses two separate scalar stores: dst[idst+0] and dst[idst+1]. For rope_norm where the pair is adjacent, this could be a single float2/sycl::vec<float,2> store. For neox/multi/vision, the pair is at n_dims/2 offset so paired stores don't help."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes": 0,
+          "potential_bank_conflicts": false,
+          "notes": "No SLM is used. RoPE is an embarrassingly parallel element-wise operation — each work-item independently rotates one pair of elements. No inter-work-item communication needed. pos[] and freq_factors[] are read-only and small enough to fit in L1/L2 cache. SLM would not help here."
+        },
+        "reduction_pattern": {
+          "has_reduction": false,
+          "notes": "No reduction. Each work-item independently reads 2 elements, computes sin/cos rotation, writes 2 elements. No cross-work-item communication."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "input_types": ["float", "sycl::half"],
+          "output_types": ["float", "sycl::half"],
+          "accumulator_type": "float",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "Rotation is always computed in FP32 (input cast to float via static_cast, result cast back to T). This is correct — sin/cos need FP32 precision. SYCL version enforces src0->type == dst->type, so only F32→F32 and F16→F16 are supported. CUDA additionally supports F32→F16 conversion for the fused ROPE+VIEW+SET_ROWS path. No matrix operations, so joint_matrix is not applicable."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [
+            "sycl::pow(theta_scale, i0/2.0f) — called once per work-item in all 4 variants to compute theta_base",
+            "sycl::cos(theta) — called once per work-item via rope_yarn",
+            "sycl::sin(theta) — called once per work-item via rope_yarn",
+            "sycl::fmax — called once per work-item in rope_yarn_ramp (only when ext_factor != 0)",
+            "sycl::fmin — called once per work-item in rope_yarn_ramp (only when ext_factor != 0)",
+            "sycl::log — called once per work-item in rope_yarn (only when ext_factor != 0)"
+          ],
+          "notes": "The dominant transcendentals are sycl::pow, sycl::sin, and sycl::cos, each called once per work-item. sycl::pow(theta_scale, i0/2.0f) computes theta_scale^(i0/2) — this is equivalent to exp(i0/2 * log(theta_scale)) which could use a precomputed log(theta_scale) value and native::exp for significant speedup. sycl::sin and sycl::cos could be replaced with sycl::native::sin/cos or combined via sincos-style computation. For RoPE in inference, ~1-2 ULP error from native math is acceptable since position encodings are approximate by nature. CUDA uses powf/cosf/sinf which are fast-math-compatible device functions."
+        },
+        "loop_analysis": {
+          "hot_loops": [],
+          "unrolled": false,
+          "notes": "No loops in the kernel bodies — each work-item processes exactly one pair of elements. The work is fully distributed across the grid. This is optimal for an element-wise kernel. The rope_multi and rope_vision variants have branching (section selection) but no loops."
+        },
+        "estimated_bottleneck": "memory",
+        "bottleneck_notes": "RoPE is a 1-pass element-wise kernel: read 2 floats (8 bytes), compute rotation (2 FMA + sin/cos), write 2 floats (8 bytes). Arithmetic intensity for the rotation itself: ~4 FLOPs / 16 bytes = 0.25 FLOP/byte — deeply memory-bandwidth bound (threshold is 27 FLOP/byte). However, the sin/cos and pow transcendentals add significant compute cost per work-item (~100-200 cycles each on Intel GPUs). For small head dimensions (ne00=64-128 with typical n_dims=64-128), the ratio of transcendental compute to memory traffic is higher, potentially making the kernel compute-limited on the transcendentals. For large ne00, the out-of-n_dims passthrough branch (i0 >= n_dims: just copy) dilutes the transcendental overhead. Overall: memory-bound for the data movement, but transcendental-latency-sensitive per work-item.",
+        "anti_patterns": [
+          "Missing ROPE+VIEW+SET_ROWS fusion — CUDA supports row_indices and set_rows_stride parameters for a fused kernel that combines RoPE rotation with indirect scatter writes, eliminating an intermediate buffer and a separate SET_ROWS kernel launch. SYCL lacks this entirely, requiring 2 kernel launches instead of 1.",
+          "Missing F32→F16 mixed-precision dispatch — CUDA supports src0=F32, dst=F16 for the fused path. SYCL enforces src0->type == dst->type via GGML_ASSERT. This blocks fusion with F16 KV-cache writes.",
+          "Scalar paired stores in rope_norm — CUDA uses float2/half2 wide stores via ggml_cuda_memcpy_1 for the adjacent-pair norm variant. SYCL uses two separate scalar stores (dst[idst+0], dst[idst+1]), wasting a store instruction and potentially a write-combining opportunity.",
+          "Expensive transcendentals: sycl::pow/sin/cos are full-precision IEEE-compliant. For RoPE, native::sin/cos (~1-2 ULP error) and exp2-based pow replacement would be 3-5x faster per work-item with acceptable accuracy loss.",
+          "Redundant sycl::pow per work-item in rope_multi/vision — the theta_base computation calls sycl::pow(theta_scale, i0/2.0f) in every branch of the sector selection, even though the power base and the relationship between i0 and theta_scale are the same. The pow call could be hoisted before the branch."
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_016_001",
+          "category": "kernel_fusion",
+          "priority": "high",
+          "description": "Implement ROPE+VIEW+SET_ROWS fusion to match CUDA parity. CUDA's rope kernels accept row_indices and set_rows_stride parameters that enable fused ROPE→SET_ROWS operation: the rotated output is written directly to the KV-cache at an indirect offset (row_indices[i2] * set_rows_stride), eliminating an intermediate buffer and a separate SET_ROWS kernel launch. The SYCL version lacks this fusion entirely, requiring 2 separate kernels and an intermediate tensor allocation.",
+          "expected_improvement": "15-30% latency reduction for the combined ROPE+SET_ROWS operation. Eliminates one full read+write pass over the tensor (16 bytes/element saved) and one kernel launch overhead (~5-10us). For a typical LLaMA-7B attention layer with 32 heads, ne00=128, seq_len=1: saves ~32*128*16 = 64KB memory traffic and 1 kernel launch. The benefit scales with batch size and sequence length.",
+          "implementation_notes": "Add row_indices (const int64_t*) and set_rows_stride (int) parameters to all 4 rope kernel variants. In the kernel body, after computing the rotated pair, use the indirect addressing: if (set_rows_stride != 0) { idst = i1*s1 + i0; idst += row_indices[i2] * set_rows_stride; }. Also add a ggml_sycl_rope_fused() entry point that accepts the set_rows tensor. Requires plumbing through the SYCL backend's fused op detection. Reference: CUDA rope.cu lines 80-84 (rope_norm), 152-157 (rope_neox).",
+          "risk": "medium",
+          "risk_notes": "Requires adding fused op detection in the SYCL backend dispatch layer. The kernel-level change is straightforward (add conditional offset computation). The main risk is ensuring row_indices tensor data is on-device and properly synchronized. CUDA implementation provides a working reference."
+        },
+        {
+          "id": "opt_016_002",
+          "category": "native_math",
+          "priority": "medium",
+          "description": "Replace sycl::pow/sin/cos with native-precision alternatives for 3-5x transcendental throughput improvement. (1) Replace sycl::pow(theta_scale, i0/2.0f) with sycl::native::exp2(i0/2.0f * log2_theta_scale) where log2_theta_scale = sycl::native::log2(theta_scale) is precomputed once on the host. (2) Replace sycl::sin/cos pair with sycl::native::sin and sycl::native::cos (or use a sincos-style combined computation). Native math has ~1-2 ULP error which is acceptable for position encodings.",
+          "expected_improvement": "10-25% end-to-end RoPE kernel speedup. The transcendentals (pow, sin, cos) are each ~50-100 cycles on Intel GPUs at full precision vs ~10-20 cycles at native precision. For ne00=128 (64 rotation pairs per row), the transcendental compute is 64 * (pow+sin+cos) per row. With 256 threads/WG, each thread handles 1 pair, so the transcendental latency directly gates the kernel execution time for small head dimensions where memory accesses are fast (data fits in L1).",
+          "implementation_notes": "Precompute on the host: float log2_theta_scale = log2f(powf(freq_base, -2.0f / n_dims)). Pass to kernel. In kernel: float theta_base = pos[i2] * sycl::native::exp2(i0 / 2.0f * log2_theta_scale). In rope_yarn: cos_theta = sycl::native::cos(theta) * mscale; sin_theta = sycl::native::sin(theta) * mscale. Alternatively, compute sin and cos together using the identity sin(x) = cos(pi/2 - x) to save one transcendental call, but this is less portable.",
+          "risk": "low",
+          "risk_notes": "Native math is well-supported on Intel GPUs and produces acceptable results for position encodings. The pow→exp2 transformation is mathematically exact (just different base). Sin/cos native precision (~1-2 ULP) is well within the noise floor of RoPE. CUDA's cosf/sinf already use reduced precision device intrinsics."
+        },
+        {
+          "id": "opt_016_003",
+          "category": "vectorization",
+          "priority": "medium",
+          "description": "Use float2/sycl::vec<float,2> paired stores (and loads) for the rope_norm variant where the element pair (x[i], x[i+1]) is adjacent in memory. CUDA uses ggml_cuda_memcpy_1<8> (float2 = 8 bytes) for float and ggml_cuda_memcpy_1<4> (half2 = 4 bytes) for half, combining two scalar stores into one wider store. This doubles the store throughput for the norm variant. For neox/multi/vision, the pairs are at n_dims/2 offset, so paired stores don't apply.",
+          "expected_improvement": "5-15% throughput improvement for rope_norm variant. The norm variant processes adjacent pairs, so float2 stores write 8 bytes in one transaction instead of two 4-byte transactions. This improves write-combining and reduces store port pressure. The improvement is modest because RoPE is already launching enough work-items to saturate memory bandwidth for typical head dimensions. Larger impact for F16 where half2 (4 bytes) aligns to a single 4-byte store slot.",
+          "implementation_notes": "In rope_norm_sycl kernel body, replace the two scalar stores with: sycl::vec<float,2> result(x0*cos_theta - x1*sin_theta, x0*sin_theta + x1*cos_theta); *reinterpret_cast<sycl::vec<float,2>*>(&dst[idst]) = result; For half: sycl::vec<sycl::half,2> result(...); Similarly, loads of adjacent pairs can use float2: sycl::vec<float,2> xpair = *reinterpret_cast<const sycl::vec<float,2>*>(&x[ix]). Requires idst and ix to be 8-byte aligned (true when ne00 is even, which is asserted).",
+          "risk": "low",
+          "risk_notes": "Alignment is guaranteed by GGML_ASSERT(ne00 % 2 == 0) and contiguous row layout. reinterpret_cast to vec<float,2> is a standard SYCL pattern. Only applies to rope_norm — the other variants have split-half addressing where paired loads/stores don't help."
+        },
+        {
+          "id": "opt_016_004",
+          "category": "mixed_precision",
+          "priority": "medium",
+          "description": "Add F32→F16 mixed-precision dispatch to match CUDA parity. CUDA supports src0=F32, dst=F16 for the fused ROPE+VIEW+SET_ROWS path, where the rotation is computed in FP32 and the result is downcast to FP16 for the KV-cache. SYCL enforces src0->type == dst->type, blocking this optimization. The kernel already computes in FP32 and casts back to T, so the change is to allow separate input and output types.",
+          "expected_improvement": "Functional parity — enables the ROPE+SET_ROWS fusion (opt_016_001) to write directly to F16 KV-cache without a separate type conversion kernel. Saves one full-tensor read+write pass for type conversion. For a LLaMA-7B KV-cache update: 32 heads * 128 dims * 4 bytes = 16KB saved per token per layer.",
+          "implementation_notes": "Add a second template parameter D (destination type) to rope_norm_sycl and rope_neox_sycl (the two variants that support fusion in CUDA). Change dst pointer type from T* to D*. The final cast becomes static_cast<D>(...) instead of static_cast<T>(...). Update dispatch macros DISPATCH_ROPE_FF to handle src0_type != dst_type combinations. Update the GGML_ASSERT to allow F32→F16. Reference: CUDA rope.cu lines 43-44 (template<...typename T, typename D>), 596-600 (F32→F16 dispatch).",
+          "risk": "low",
+          "risk_notes": "The kernel already works in FP32 internally and casts on output. Changing the output cast from T to D is a minimal change. The main work is in the dispatch layer. CUDA provides a working reference for all the type combinations."
+        },
+        {
+          "id": "opt_016_005",
+          "category": "integer_optimization",
+          "priority": "low",
+          "description": "Replace per-work-item integer division for row decomposition (i3 = row_dst / (ne01*ne02), i2 = (...) / ne01) with a 3D nd_range or precomputed reciprocals. Currently each work-item performs 2 integer divisions to decompose the flat row index into (i1, i2, i3). On Intel GPUs, 32-bit integer division is emulated in ~20-30 cycles. CUDA has the same pattern — neither uses a 3D grid for this.",
+          "expected_improvement": "1-3% improvement. The divisions execute once per work-item and are 32-bit (not 64-bit), so the absolute cost is small. For ne01*ne02 that are powers of 2 (common for batch_size * n_heads), the compiler may already optimize to shifts. The benefit is primarily for non-power-of-2 cases.",
+          "implementation_notes": "Option A: Use nd_range<3>(range<3>(ne03, ne02, ne01 * n_blocks_x * block_size), range<3>(1, 1, block_size)) and extract i1, i2, i3 from work-group IDs directly. This requires restructuring the grid to separate the 3 batch/head/seq dimensions. Option B: Pass precomputed magic-number reciprocals for ne01 and ne01*ne02, use multiply-shift for fast division. Option A is cleaner and matches what the CUDA code's dim3 grid naturally provides (though CUDA also uses flat row indexing).",
+          "risk": "low",
+          "risk_notes": "A 3D grid restructuring changes how work is distributed but not the computation. Each work-item still processes the same elements. Only edge case: very large ne03*ne02*ne01 exceeding max grid dimensions (unlikely for typical transformer shapes)."
+        }
+      ],
+      "overall_optimization_potential": "medium",
+      "estimated_current_efficiency": "50-65%",
+      "efficiency_notes": "The RoPE kernel is a clean, well-structured SYCL port with no DPCT artifacts. All 4 variants correctly use WG=256, [[sycl::reqd_sub_group_size(WARP_SIZE)]], and nd_range<2>. The kernel is embarrassingly parallel with no reductions or inter-work-item communication. The main optimization gaps are: (1) missing ROPE+SET_ROWS fusion that CUDA has — this is the highest-impact opportunity as it eliminates an entire kernel launch and buffer, (2) full-precision transcendentals where native math would be 3-5x faster, (3) scalar stores where CUDA uses float2/half2 paired stores for the norm variant, (4) missing F32→F16 mixed-precision support needed for fusion. RoPE is called once per attention layer per token — for a 32-layer model it's 32 kernel launches per token. It's not typically the bottleneck (matmul and softmax dominate), but the fusion opportunity makes the absolute improvement significant. The kernel is purely memory-bandwidth bound for the rotation math but transcendental-latency-sensitive for the per-element sin/cos computation."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 15,
+    "total_kernels_analyzed": 16,
     "high_potential": 4,
-    "medium_potential": 6,
+    "medium_potential": 7,
     "low_potential": 5,
     "no_optimization_needed": 0,
     "top_opportunities": [
@@ -2390,6 +2525,13 @@
         "kernel_name": "softmax",
         "optimization_id": "opt_015_002",
         "description": "Use vectorized vec4 loads/stores for 30-50% throughput improvement on memory-bound softmax",
+        "priority": "high"
+      },
+      {
+        "kernel_id": "sk_016",
+        "kernel_name": "rope",
+        "optimization_id": "opt_016_001",
+        "description": "Implement ROPE+VIEW+SET_ROWS fusion to match CUDA parity — 15-30% latency reduction by eliminating intermediate buffer and kernel launch",
         "priority": "high"
       }
     ]

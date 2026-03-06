@@ -5,9 +5,9 @@
 
 ## Summary
 - Total SYCL kernels to analyze: 54
-- Kernels analyzed so far: 15
+- Kernels analyzed so far: 16
 - Analysis complete: No
-- Kernels with optimization potential: 13
+- Kernels with optimization potential: 14
 - Optimization tasks created: 0 (pending finalization)
 
 ## Kernels Analyzed
@@ -26,7 +26,7 @@
 - [x] sk_013: binbcast — medium potential
 - [x] sk_014: repeat_back — low potential
 - [x] sk_015: softmax — medium potential
-- [ ] sk_016: rope — pending
+- [x] sk_016: rope — medium potential
 - [ ] sk_017: norm — pending
 - [ ] sk_018: getrows — pending
 - [ ] sk_019: cpy — pending
@@ -67,6 +67,7 @@
 - [ ] sk_054: upscale (inline) — pending
 
 ## Recent Activity
+[2026-03-06] Analyzed rope (sk_016). Found 5 optimization opportunities (medium potential). Key findings: Clean native SYCL port with 4 kernel variants (norm, neox, multi, vision) sharing identical launch config: nd_range<2>, WG=256, reqd_sub_group_size(16). No DPCT artifacts. Embarrassingly parallel — each work-item rotates one element pair. CRITICAL missing feature: CUDA has ROPE+VIEW+SET_ROWS fusion (row_indices + set_rows_stride) eliminating an intermediate buffer and kernel launch — SYCL lacks this entirely. Missing F32→F16 mixed-precision dispatch needed for fusion. Full-precision sycl::pow/sin/cos transcendentals (~3-5x slower than native). Scalar stores where CUDA uses float2/half2 paired writes for rope_norm. ~50-65% estimated efficiency.
 [2026-03-06] Analyzed softmax (sk_015). Found 8 optimization opportunities (medium potential). Key findings: Clean native SYCL softmax with 4 kernel variants (forward, backward). Forward uses proper WG=256, SLM caching, block_reduce for inter-warp reduction. Backward uses only WG=16 (1 sub-group). Missing CUDA's compile-time ncols specialization ({32,64,...,4096}) with #pragma unroll. No vectorized loads on a purely memory-bound kernel (~3 FLOP/byte). Hardcoded 48KB SLM threshold (Xe2 has 64KB). Missing cooperative column-parallel variant for large ncols. dpct::permute_sub_group_by_xor in reduction helpers. ~40-55% estimated efficiency.
 [2026-03-06] Analyzed repeat_back (sk_014). Found 3 optimization opportunities (low potential). Key findings: Direct CUDA port of backward-pass repeat summation kernel (96 lines). WG=16 (just WARP_SIZE) — far below recommended 256, only 1 sub-group per work-group. 4-deep nested loop accumulates sum over repeat factors in private register. All scalar loads/stores, no vectorization. 64-bit integer division in hot path (tid23 % ne2, tid23 / ne2). FP32 only, no F16 support. Missing reqd_sub_group_size attribute. ~35-50% estimated efficiency. Low potential because repeat_back is a backward-pass kernel rarely called during inference, with negligible contribution to end-to-end latency.
 [2026-03-06] Analyzed binbcast binary broadcast (sk_013). Found 5 optimization opportunities (medium potential). Key findings: Clean native SYCL covering ADD, SUB, MUL, DIV, REPEAT with 4D broadcasting. WG=128 (below recommended 256). No vectorized loads on purely memory-bound ops (0.08 FLOP/byte). 6 expensive integer modulo operations per work-item where CUDA uses fastdiv. Missing fused multi-source ADD support (CUDA supports up to 8-way fusion). 3D nd_range with dimension collapsing for contiguous tensors. Supports F32/F16 mixed types. ~35-50% estimated efficiency. Medium potential because ADD is the most frequent op in transformer inference (residual connections).
