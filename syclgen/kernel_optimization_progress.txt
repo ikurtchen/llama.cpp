@@ -5,9 +5,9 @@
 
 ## Summary
 - Total SYCL kernels to analyze: 54
-- Kernels analyzed so far: 35
+- Kernels analyzed so far: 41
 - Analysis complete: No
-- Kernels with optimization potential: 29
+- Kernels with optimization potential: 35
 - Optimization tasks created: 0 (pending finalization)
 
 ## Kernels Analyzed
@@ -46,12 +46,12 @@
 - [x] sk_033: ssm_scan — medium potential
 - [x] sk_034: cross-entropy-loss — medium potential
 - [x] sk_035: cumsum — low potential
-- [ ] sk_036: opt-step-adamw — pending
-- [ ] sk_037: opt-step-sgd — pending
-- [ ] sk_038: solve_tri — pending
-- [ ] sk_039: sumrows — pending
-- [ ] sk_040: sum — pending
-- [ ] sk_041: add-id — pending
+- [x] sk_036: opt-step-adamw — low potential
+- [x] sk_037: opt-step-sgd — low potential
+- [x] sk_038: solve_tri — medium potential
+- [x] sk_039: sumrows — low potential
+- [x] sk_040: sum — low potential
+- [x] sk_041: add-id — low potential
 - [ ] sk_042: scale (inline) — pending
 - [ ] sk_043: diag_mask_inf (inline) — pending
 - [ ] sk_044: arange (inline) — pending
@@ -67,6 +67,12 @@
 - [ ] sk_054: upscale (inline) — pending
 
 ## Recent Activity
+[2026-03-06] Analyzed add-id (sk_041). Found 3 optimization opportunities (low potential). Key findings: Clean native SYCL port of scatter-add by index for MoE expert output aggregation. nd_range<2> with WG=min(ne00,768), dim1 local=1 (CUDA grid artifact). Perfectly coalesced element-wise addition. WG=768 exceeds Intel preferred 256-512 max. No vectorized loads. Missing reqd_sub_group_size. Used in MoE models, not on dominant latency path. ~65-80% estimated efficiency.
+[2026-03-06] Analyzed sum (sk_040). Found 1 optimization opportunity (low potential). Key findings: Thin wrapper around reduce_rows_f32_sycl with nrows=1 (single work-group reduces entire tensor). Inherits all properties from sumrows: 8x unrolling, block_reduce, reqd_sub_group_size. Single-WG limitation for large tensors (same as CUDA). Multi-WG hierarchical reduction could be 10-20x faster for 100M+ elements but SUM is rarely called with large tensors. ~60-75% estimated efficiency.
+[2026-03-06] Analyzed sumrows (sk_039). Found 2 optimization opportunities (low potential). Key findings: Well-implemented row reduction with WG=256, reqd_sub_group_size(WARP_SIZE), 8x unrolling matching CUDA reduce_rows.cuh, and block_reduce<SUM>. Handles both SUM_ROWS and MEAN via separate lambda instantiations (norm parameter). CUDA uses adaptive WG sizing (512/32/128 based on nrows vs nsm) — SYCL uses fixed 256. Scalar loads despite 8x unrolling. ~65-80% estimated efficiency.
+[2026-03-06] Analyzed solve_tri (sk_038). Found 4 optimization opportunities (medium potential). Key findings: CRITICAL structural difference from CUDA — SYCL has one general forward-substitution kernel with SLM tiling and n barriers per column. CUDA has TWO paths: (1) warp-based solve_tri_f32_fast with register storage, compile-time specialization for (n=64,k={1..32}), and #pragma unroll, (2) cuBLAS TRSM for large n. SYCL missing oneMKL TRSM path entirely. CRITICAL: MAX_N_SHARED=128 allocates 66KB SLM exceeding 64KB Xe2 limit. Uses fast_div_modulo correctly. ~30-50% estimated efficiency.
+[2026-03-06] Analyzed opt-step-sgd (sk_037). Found 2 optimization opportunities (low potential). Key findings: Simplest possible kernel — one FMA per element (x = x*(1-lr*wd) - lr*g) with 2 reads and 1 write. WG=256, nd_range<1>, zero DPCT artifacts. 1:1 CUDA parity. Missing reqd_sub_group_size and restrict annotations. Training-only. ~75-90% estimated efficiency.
+[2026-03-06] Analyzed opt-step-adamw (sk_036). Found 2 optimization opportunities (low potential). Key findings: Clean 1:1 CUDA port of AdamW optimizer step. WG=256, nd_range<1>, zero DPCT artifacts. Embarrassingly parallel — each work-item updates one parameter using 4 reads + 3 writes (7 memory streams). 0.36 FLOP/byte, deeply memory-bound. Missing reqd_sub_group_size and restrict annotations. Scalar loads where vec4 possible. Training-only. ~70-85% estimated efficiency.
 [2026-03-06] Analyzed cumsum (sk_035). Found 4 optimization opportunities (low potential). Key findings: Clean native SYCL port of inclusive prefix sum with Hillis-Steele sub-group scan + SLM-based WG scan. nd_range<1> with WG=WARP_SIZE=16 — only 1 sub-group per WG, below recommended 256 but acceptable for this scan algorithm. Proper reqd_sub_group_size(WARP_SIZE) and sycl::inclusive_scan_over_group. Scalar 4-byte loads/stores where vec4 could process contiguous segments. Missing #pragma unroll on two constant-trip-count loops (num_warps iterations). No DPCT artifacts. FP32-only (same as CUDA). Cumsum called very infrequently in LLM inference. ~60-75% estimated efficiency.
 [2026-03-06] Analyzed cross-entropy-loss (sk_034). Found 5 optimization opportunities (medium potential). Key findings: Forward (3-pass log-sum-exp) and backward (softmax gradient) kernels for training loss. Both use nd_range<1> with WG=WARP_SIZE=16 — only 1 sub-group per work-group, severely under-utilizing hardware (recommended 256). Uses correct reqd_sub_group_size(WARP_SIZE) and warp_reduce_max/warp_reduce_sum for sub-group reductions. SLM caching of logits when nclasses*4 <= 48KB (well-designed). CRITICAL: WG=16 means only 16 threads process each row — with typical vocabulary sizes (32K-65K), each thread loops 2000-4000 times. Increasing to WG=256 with block_reduce would reduce per-thread iterations by 16x. No vectorized loads (scalar float per iteration). Uses sycl::exp/sycl::log instead of native variants. No #pragma unroll on hot inner loops. Forward pass has extra reduce_rows_f32_sycl kernel launch for summing per-row losses — could be fused with atomicAdd. Training-only kernel, not on inference critical path. ~35-45% estimated efficiency.
 [2026-03-06] Analyzed ssm_scan (sk_033). Found 6 optimization opportunities (medium potential). Key findings: 2 kernel variants — Mamba-1 (ssm_scan_f32_sycl<splitD=128, N=16>) for original Mamba with d_state=16 and SLM-cached B/C vectors, and Mamba-2 (ssm_scan_f32_group_sycl<c_factor, d_state>) for grouped SSMs with warp-level reduction. CRITICAL: Zero #pragma unroll directives (CUDA has 7 across both kernels — all inner loops). CRITICAL: Missing L_template compile-time specialization for Mamba-1 n_tok=1..8 — CUDA has full switch dispatch enabling time-loop elimination for single-token inference (n_tok=1). Compute-bound kernel dominated by exp() calls: Mamba-1 calls sycl::exp 16 times per time step per thread in hot inner loop; sycl::native::exp could be 2-4x faster. DPCT artifact in warp_reduce_sum (dpct::permute_sub_group_by_xor). Mamba-1 missing reqd_sub_group_size(16). 2x register pressure for Mamba-2 on Intel due to WARP_SIZE=16 (c_factor doubled vs CUDA). Missing CUB-equivalent blocked loads for A/s0 arrays. ~40-55% estimated efficiency.

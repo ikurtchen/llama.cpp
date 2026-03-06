@@ -4863,13 +4863,504 @@
       "overall_optimization_potential": "low",
       "estimated_current_efficiency": "60-75%",
       "efficiency_notes": "This is a well-written, clean SYCL port with no DPCT artifacts. The algorithm (tiled prefix sum with Hillis-Steele sub-group scan) is correct and efficient. Work-group size of 256 is appropriate for the target hardware. SLM usage is minimal and well-designed. The main inefficiency is scalar memory access where vectorized 16-byte loads/stores are possible. The missing CUB-equivalent path is noted but the manual kernel is a reasonable alternative. Cumsum is used primarily by Mamba-style SSM models and is not on the critical path for standard transformer inference. The kernel's low arithmetic intensity (0.25 FLOP/byte) makes it purely memory-bandwidth bound, so optimizations should focus on maximizing bandwidth utilization."
+    },
+    {
+      "kernel_id": "sk_036",
+      "name": "opt-step-adamw",
+      "file": "ggml/src/ggml-sycl/opt-step-adamw.cpp",
+      "source_cuda_ids": ["ck_080"],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": 256,
+          "sub_group_size": null,
+          "sub_group_size_specified": false,
+          "sub_group_size_attribute": null,
+          "global_size_expression": "1D: ceil(nelements/256) * 256",
+          "notes": "WG=256 matches CUDA CUDA_OPT_STEP_ADAMW_BLOCK_SIZE=256. Clean nd_range<1> dispatch. Appropriate for Xe2 target."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "coalesced_notes": "Each work-item reads from 4 contiguous arrays (g[i], g_m[i], g_v[i], x[i]) and writes to 3 (g_m[i], g_v[i], x[i]) at global_id(0). Adjacent work-items access adjacent elements — perfectly coalesced.",
+          "strided_accesses": [],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "All 4 reads and 3 writes are scalar 4-byte float. Since all arrays are contiguous FP32, vec4 loads/stores could process 16 bytes per work-item, reducing memory transactions by 4x. However, with 7 independent arrays, the kernel is already bottlenecked by memory bandwidth (7 * 4 = 28 bytes per work-item), so vectorization benefit is limited."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes": 0,
+          "notes": "No SLM needed — embarrassingly parallel with no inter-thread communication. The pars[7] array is read by all work-items from global memory but fits in L1 cache trivially (28 bytes broadcast)."
+        },
+        "sync_patterns": {
+          "barriers": false,
+          "atomics": false,
+          "notes": "No synchronization — each work-item independently updates one parameter element."
+        },
+        "dpct_artifacts": {
+          "has_dpct_artifacts": false,
+          "details": [],
+          "notes": "Clean native SYCL port, zero DPCT artifacts."
+        },
+        "cuda_feature_parity": {
+          "missing_features": [],
+          "missing_feature_details": [],
+          "extra_features": [],
+          "notes": "1:1 feature parity with CUDA. Identical algorithm, identical WG size. SYCL uses sycl::sqrt instead of sqrtf — semantically equivalent. Missing __restrict__ equivalents on pointer captures (CUDA uses __restrict__ on all 5 pointers)."
+        },
+        "arithmetic_intensity": {
+          "flops_per_byte": 0.36,
+          "classification": "memory_bound",
+          "notes": "~10 FLOPs per work-item (2 FMA for gmi, 3 FMA for gvi, 1 mul + 1 sqrt + 1 add + 1 div + 1 FMA for update) across 7 float accesses * 4 bytes = 28 bytes. 10/28 = 0.36 FLOP/byte, far below the 27 FLOP/byte ridge point — purely memory-bound."
+        }
+      },
+      "optimizations": [
+        {
+          "id": "opt_036_001",
+          "category": "vectorized_memory",
+          "priority": "low",
+          "description": "Use vectorized vec4 loads/stores to process 4 elements per work-item instead of 1. Read float4 from each of the 4 input arrays, compute 4 AdamW updates, write float4 to each of the 3 output arrays. This reduces the total number of memory transactions by ~4x.",
+          "expected_improvement": "5-15% throughput improvement. The kernel accesses 7 arrays (4 read + 3 write), so it is deeply memory-bound. Vectorization improves cache line utilization but may be limited by the high number of concurrent memory streams.",
+          "implementation_notes": "Change the loop to process 4 elements at a time: int64_t i = item.get_global_id(0) * 4; load sycl::float4 from g, g_m, g_v, x; compute 4 updates; store sycl::float4 to g_m, g_v, x. Handle tail elements (k % 4 != 0) with scalar fallback. Adjust num_blocks to ceil(k/4/256).",
+          "risk": "low",
+          "risk_notes": "Standard vectorization pattern. Tail handling needed when nelements is not a multiple of 4."
+        },
+        {
+          "id": "opt_036_002",
+          "category": "sub_group_ops",
+          "priority": "low",
+          "description": "Add [[sycl::reqd_sub_group_size(WARP_SIZE)]] attribute and [[intel::kernel_args_restrict]] to enable compiler optimizations. The reqd_sub_group_size ensures predictable sub-group behavior. kernel_args_restrict tells the compiler that pointer arguments don't alias, enabling better load/store scheduling (equivalent to CUDA's __restrict__).",
+          "expected_improvement": "2-5% from restrict enabling better instruction scheduling. The compiler may already assume no aliasing for captured pointers, but explicit annotation guarantees it.",
+          "implementation_notes": "Add [[sycl::reqd_sub_group_size(WARP_SIZE)]] [[intel::kernel_args_restrict]] to the lambda: [=](sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(WARP_SIZE)]] [[intel::kernel_args_restrict]] { ... }",
+          "risk": "low",
+          "risk_notes": "Standard SYCL/Intel extensions. reqd_sub_group_size(16) matches Intel native SIMD16. kernel_args_restrict is semantically equivalent to CUDA's __restrict__."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "70-85%",
+      "efficiency_notes": "Near-perfect 1:1 CUDA port. Clean native SYCL with zero DPCT artifacts. WG=256 is appropriate. Embarrassingly parallel with no synchronization. The kernel is deeply memory-bound (0.36 FLOP/byte) with 7 concurrent memory streams per work-item, making it bandwidth-limited regardless of compute optimizations. The pars[7] global read is trivially cached. Missing reqd_sub_group_size and restrict annotations are the only notable gaps. Training-only kernel — not on inference critical path. Very low optimization ROI."
+    },
+    {
+      "kernel_id": "sk_037",
+      "name": "opt-step-sgd",
+      "file": "ggml/src/ggml-sycl/opt-step-sgd.cpp",
+      "source_cuda_ids": ["ck_081"],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": 256,
+          "sub_group_size": null,
+          "sub_group_size_specified": false,
+          "sub_group_size_attribute": null,
+          "global_size_expression": "1D: ceil(nelements/256) * 256",
+          "notes": "WG=256 matches CUDA CUDA_OPT_STEP_SGD_BLOCK_SIZE=256. Clean nd_range<1> dispatch."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "coalesced_notes": "Each work-item reads x[i] and g[i], writes x[i]. Adjacent work-items access adjacent elements — perfectly coalesced.",
+          "strided_accesses": [],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "All loads/stores are scalar 4-byte float. 2 reads + 1 write = 12 bytes per work-item. Vec4 could improve cache line utilization."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes": 0,
+          "notes": "No SLM needed — embarrassingly parallel. pars[2] broadcast trivially cached."
+        },
+        "sync_patterns": {
+          "barriers": false,
+          "atomics": false,
+          "notes": "No synchronization — each work-item independently updates one element."
+        },
+        "dpct_artifacts": {
+          "has_dpct_artifacts": false,
+          "details": [],
+          "notes": "Clean native SYCL port, zero DPCT artifacts."
+        },
+        "cuda_feature_parity": {
+          "missing_features": [],
+          "missing_feature_details": [],
+          "extra_features": [],
+          "notes": "1:1 feature parity with CUDA. Identical algorithm (SGD with weight decay: x = x*(1-lr*wd) - lr*g). Missing __restrict__ equivalents."
+        },
+        "arithmetic_intensity": {
+          "flops_per_byte": 0.33,
+          "classification": "memory_bound",
+          "notes": "~4 FLOPs per work-item (1 mul for lr*wd, 1 sub, 1 mul for x*(1-lr*wd), 1 FMA for -lr*g) across 3 float accesses * 4 bytes = 12 bytes. 4/12 = 0.33 FLOP/byte — purely memory-bound."
+        }
+      },
+      "optimizations": [
+        {
+          "id": "opt_037_001",
+          "category": "sub_group_ops",
+          "priority": "low",
+          "description": "Add [[sycl::reqd_sub_group_size(WARP_SIZE)]] and [[intel::kernel_args_restrict]] attributes to the kernel lambda. Same rationale as opt_036_002.",
+          "expected_improvement": "2-5% from restrict enabling better load/store scheduling.",
+          "implementation_notes": "Add attributes to lambda signature.",
+          "risk": "low",
+          "risk_notes": "Standard SYCL/Intel extensions."
+        },
+        {
+          "id": "opt_037_002",
+          "category": "vectorized_memory",
+          "priority": "low",
+          "description": "Use vec4 loads/stores to process 4 elements per work-item. Read float4 from x and g, compute 4 SGD updates, write float4 to x.",
+          "expected_improvement": "5-15% throughput from better cache line utilization. Only 3 memory streams (2 read + 1 write), so simpler than AdamW.",
+          "implementation_notes": "Process 4 elements per work-item with sycl::float4. Handle tail with scalar fallback.",
+          "risk": "low",
+          "risk_notes": "Standard vectorization pattern."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "75-90%",
+      "efficiency_notes": "The simplest possible kernel — one FMA per element with 2 reads and 1 write. Near-perfect CUDA port, zero DPCT artifacts, WG=256. Even simpler than AdamW (fewer arrays, fewer FLOPs). The only meaningful optimizations are vec4 loads and restrict annotations. Training-only kernel — not on inference critical path. Negligible optimization ROI."
+    },
+    {
+      "kernel_id": "sk_038",
+      "name": "solve_tri",
+      "file": "ggml/src/ggml-sycl/solve_tri.cpp",
+      "source_cuda_ids": ["ck_101", "ck_102"],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": "dynamic: WARP_SIZE to 256 based on n",
+          "work_group_size_max": 256,
+          "work_group_size_min": 16,
+          "sub_group_size": null,
+          "sub_group_size_specified": false,
+          "sub_group_size_attribute": null,
+          "global_size_expression": "1D: n_work_groups * block_size, where n_work_groups = total_batches * k (one WG per batch-column pair)",
+          "notes": "WG size is dynamically chosen based on n: WG=16 for n<=16, 32 for n<=32, 64 for n<=64, 128 for n<=128, 256 for n>128. This is a reasonable heuristic since the inner dot-product loop length is 0..n-1. Each work-group processes one (batch, column) pair doing sequential forward substitution."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "coalesced_notes": "A matrix load into SLM is coalesced (consecutive threads load consecutive elements). Row dot-products in the inner loop have adjacent threads accessing A_row[tid], A_row[tid+block_size], etc. — coalesced at cache-line level. B column reads and X column writes are strided by k (B_batch[i*k+col_idx]) — non-coalesced for k>1.",
+          "strided_accesses": ["B column reads strided by k", "X column writes strided by k"],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "All loads/stores are scalar 4-byte float. The A matrix load into SLM could use vec4 for coalesced tile loading. B/X column accesses are inherently strided (column-major within row-major storage)."
+        },
+        "slm_usage": {
+          "uses_slm": true,
+          "slm_bytes": "dynamic: (n*n + n + ceil(block_size/WARP_SIZE)) * 4 bytes when n<=128, else (n + ceil(block_size/WARP_SIZE)) * 4 bytes",
+          "slm_bytes_formula": "For n=128: (128*128 + 128 + 16) * 4 = 66,176 bytes (exceeds 64KB SLM!). For n=64: (64*64 + 64 + 16) * 4 = 16,704 bytes.",
+          "potential_bank_conflicts": false,
+          "notes": "CRITICAL: MAX_N_SHARED=128 means for n=128, the SLM allocation is 128*128*4 + 128*4 + 64 = 66,176 bytes, which exceeds the Intel Xe2 64KB SLM limit. This will cause the kernel to fail or fall back to global memory. The CUDA equivalent uses cuBLAS TRSM for large n (>64) and only uses shared memory for n<=64 via the fast kernel. SYCL should lower MAX_N_SHARED to 64 or use oneMKL TRSM for large n."
+        },
+        "sync_patterns": {
+          "barriers": true,
+          "atomics": false,
+          "notes": "Heavy barrier usage — one sycl::group_barrier per row of the triangular system (n barriers total in the forward substitution loop). For n=128 this is 128 barriers, each synchronizing the entire work-group. The warp_reduce_sum helper may use sub-group collective operations internally."
+        },
+        "dpct_artifacts": {
+          "has_dpct_artifacts": false,
+          "details": [],
+          "notes": "Clean native SYCL implementation. Uses proper sycl::local_accessor, nd_item, barrier, and fast_div_modulo from common.hpp. No DPCT remnants."
+        },
+        "cuda_feature_parity": {
+          "missing_features": ["cuBLAS/oneMKL batched TRSM for large n", "compile-time template specialization for common (n,k) pairs"],
+          "missing_feature_details": [
+            "CUDA uses cuBLAS cublasStrsmBatched for n > MAX_N_FAST(64) or k > MAX_K_FAST(32) — hardware-optimized triangular solve. SYCL uses a general-purpose forward-substitution kernel for ALL sizes, which is O(n^2) serial work per column with n barriers. For large n this is dramatically slower than oneMKL's optimized TRSM.",
+            "CUDA has solve_tri_f32_fast<n_template, k_template> with compile-time specializations for n=64, k={1,2,4,6,8,10,12,14,16,32}. This enables full #pragma unroll on all loops. SYCL has no template specialization — all loop bounds are runtime values, preventing unrolling."
+          ],
+          "extra_features": [],
+          "notes": "CRITICAL: The SYCL implementation is structurally different from CUDA. CUDA has TWO paths: (1) solve_tri_f32_fast for small n,k using warp-based parallel reduction with __shared__ sA[64*64] and #pragma unroll, and (2) cuBLAS TRSM for large n,k. SYCL has only ONE path: a general forward-substitution kernel that works for all sizes but is optimized for none. For n<=64, CUDA's warp-based approach with 2-register per-thread storage (x_low, x_high) and compile-time loop unrolling is significantly more efficient. For n>64, CUDA falls back to cuBLAS TRSM (hardware-optimized). SYCL's sequential row-by-row approach with n barriers is fundamentally slower."
+        },
+        "arithmetic_intensity": {
+          "flops_per_byte": "variable: ~0.5-2.0 depending on n",
+          "classification": "latency_bound",
+          "notes": "For n=64, k=1: each row r requires r FMAs in the dot product, summing to n*(n-1)/2 = 2016 FLOPs. Memory: n*n + 2*n floats = 4224 * 4 = 16,896 bytes. Intensity = 2016/16896 = 0.12 FLOP/byte for initial load, but the hot computation operates from SLM. The kernel is not compute-bound or memory-bound in the traditional sense — it is latency-bound due to the serial dependency chain (each row depends on all previous rows) with n barriers."
+        }
+      },
+      "optimizations": [
+        {
+          "id": "opt_038_001",
+          "category": "missing_feature",
+          "priority": "high",
+          "description": "Add oneMKL batched TRSM path for large n (n > 64). CUDA uses cuBLAS cublasStrsmBatched for n > MAX_N_FAST(64) or k > MAX_K_FAST(32). The current SYCL forward-substitution kernel has O(n^2) serial work per column with n barriers — cuBLAS/oneMKL TRSM is dramatically faster for large systems. Use onemkl::blas::trsm or onemkl::blas::trsm_batch.",
+          "expected_improvement": "5-50x speedup for n > 64. cuBLAS TRSM is hardware-optimized and avoids the serial row-by-row dependency. For n=128, the SYCL kernel does 128 barriers and 8K FMAs sequentially per column; TRSM uses block-recursive algorithms with much better parallelism.",
+          "implementation_notes": "Copy B to X (async memcpy). Build A_ptrs/X_ptrs arrays for batched dispatch. Call onemkl::blas::column_major::trsm_batch with side=right, uplo=upper, trans=nontrans, diag=nonunit (matching the CUDA cublasSide_t=CUBLAS_SIDE_RIGHT, cublasFillMode_t=CUBLAS_FILL_MODE_UPPER). Requires oneMKL dependency which is already available for outprod (sk_005).",
+          "risk": "medium",
+          "risk_notes": "oneMKL TRSM API differs slightly from cuBLAS. Need to verify the triangular orientation (lower vs upper, transpose) matches the CUDA cublas call. The CUDA code uses CUBLAS_SIDE_RIGHT, CUBLAS_FILL_MODE_UPPER, CUBLAS_OP_N, CUBLAS_DIAG_NON_UNIT — map these to the equivalent oneMKL enums."
+        },
+        {
+          "id": "opt_038_002",
+          "category": "compile_time_specialization",
+          "priority": "medium",
+          "description": "Add compile-time template specialization for common (n, k) pairs to match CUDA's solve_tri_f32_fast<n_template, k_template>. CUDA specializes for n=64 with k={1,2,4,6,8,10,12,14,16,32}, enabling #pragma unroll on all loops. The SYCL kernel uses runtime loop bounds preventing any unrolling.",
+          "expected_improvement": "20-40% improvement for the small-n path (n<=64). Loop unrolling eliminates branch overhead and enables better instruction scheduling. The inner dot-product loop (for j < row; j += block_sz) benefits most.",
+          "implementation_notes": "Create a templated version: template <int n_template, int k_template> with #pragma unroll on all inner loops. Add a dispatch switch matching CUDA's pattern: if (n==64) { switch(k) { case 32: ...; case 16: ...; etc. } }. For the general case, fall through to the untemplated version.",
+          "risk": "medium",
+          "risk_notes": "Significant code complexity increase for a niche kernel. solve_tri is used for LoRA/fine-tuning, not standard inference. The SYCL algorithm is structurally different from CUDA's warp-based approach (uses SLM + barriers vs CUDA's register-based x_low/x_high), so the template specialization would be different."
+        },
+        {
+          "id": "opt_038_003",
+          "category": "work_group_size",
+          "priority": "medium",
+          "description": "Fix MAX_N_SHARED from 128 to 64 to stay within Intel Xe2 64KB SLM limit. Currently for n=128: sA[128*128] + sX[128] + reduce_buf[16] = (16384 + 128 + 16) * 4 = 66,112 bytes, which exceeds the 64KB (65,536 bytes) SLM capacity. This will cause runtime failure or severe performance degradation.",
+          "expected_improvement": "Correctness fix for n=128. With MAX_N_SHARED=128 the kernel may fail silently or cause undefined behavior on Intel GPUs with 64KB SLM.",
+          "implementation_notes": "Change #define MAX_N_SHARED 128 to #define MAX_N_SHARED 64. For n=65..128, the kernel will read A from global memory instead of SLM. Better: add the oneMKL TRSM path (opt_038_001) for n>64 and make the SLM path handle only n<=64.",
+          "risk": "low",
+          "risk_notes": "Simple constant change. The global-memory fallback path already exists in the kernel (use_shared_A = n <= MAX_N_SHARED). Lowering the threshold just forces n=65..128 to use the slower global memory path, which is still correct."
+        },
+        {
+          "id": "opt_038_004",
+          "category": "sub_group_ops",
+          "priority": "low",
+          "description": "Add [[sycl::reqd_sub_group_size(WARP_SIZE)]] to the kernel lambda. The warp_reduce_sum helper assumes WARP_SIZE sub-groups but the kernel does not enforce it.",
+          "expected_improvement": "Correctness guarantee + 0-5% improvement.",
+          "implementation_notes": "Add the attribute to the parallel_for lambda.",
+          "risk": "low",
+          "risk_notes": "Standard practice."
+        }
+      ],
+      "overall_optimization_potential": "medium",
+      "estimated_current_efficiency": "30-50%",
+      "efficiency_notes": "The SYCL solve_tri implementation is structurally weaker than CUDA's. CUDA has two optimized paths: (1) warp-based solve_tri_f32_fast with register-based x_low/x_high storage, compile-time specialization, and #pragma unroll for n<=64/k<=32, and (2) cuBLAS TRSM for large systems. SYCL has a single general-purpose forward-substitution kernel with SLM tiling, n barriers per column, and no template specialization. The SLM sizing bug (MAX_N_SHARED=128 exceeds 64KB) is a correctness concern. The kernel uses fast_div_modulo correctly and has clean SYCL code, but the algorithmic approach is fundamentally less efficient than CUDA's warp-based method. solve_tri is used for LoRA/fine-tuning workloads, not standard inference."
+    },
+    {
+      "kernel_id": "sk_039",
+      "name": "sumrows",
+      "file": "ggml/src/ggml-sycl/sumrows.cpp",
+      "source_cuda_ids": ["ck_088", "ck_067"],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": 256,
+          "sub_group_size": 16,
+          "sub_group_size_specified": true,
+          "sub_group_size_attribute": "[[sycl::reqd_sub_group_size(WARP_SIZE)]]",
+          "global_size_expression": "1D: nrows * 256 — one work-group per row",
+          "notes": "WG=256 is fixed. CUDA uses adaptive WG sizing: 512 when nrows/nsm < 2 (few rows, maximize per-row parallelism), 32 or 128 otherwise (many rows, better scheduling). The SYCL fixed WG=256 is a reasonable middle ground but misses the adaptive optimization."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "coalesced_notes": "Inner loop reads x[row*ncols + i] where i starts at threadIdx and strides by SUMROWS_BLOCK_SIZE (256). Adjacent threads read adjacent elements — perfectly coalesced.",
+          "strided_accesses": [],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "Uses 8x software unrolling (num_unroll=8) to reduce loop overhead and improve ILP, matching CUDA reduce_rows.cuh pattern exactly. All loads are scalar 4-byte float despite the 8x unrolling — vectorized float4 loads could further improve bandwidth."
+        },
+        "slm_usage": {
+          "uses_slm": true,
+          "slm_bytes": 64,
+          "slm_bytes_formula": "num_warps * 4 = (256/16) * 4 = 64 bytes",
+          "potential_bank_conflicts": false,
+          "notes": "Minimal SLM for block_reduce inter-warp communication (16 floats for 16 sub-groups). Well within 64KB limit."
+        },
+        "sync_patterns": {
+          "barriers": true,
+          "atomics": false,
+          "notes": "Barriers inside block_reduce for inter-sub-group reduction. One reduction per row — standard pattern."
+        },
+        "dpct_artifacts": {
+          "has_dpct_artifacts": false,
+          "details": [],
+          "notes": "Clean native SYCL. Uses block_reduce<SUM> from common.hpp which itself may have DPCT artifacts internally, but the kernel code is clean."
+        },
+        "cuda_feature_parity": {
+          "missing_features": ["adaptive work-group sizing based on SM occupancy"],
+          "missing_feature_details": [
+            "CUDA adapts block size based on nrows relative to SM count: WG=512 for nrows/nsm < 2 (few rows — maximize per-row threads), WG=32 for ncols<1024 (short rows — minimize overhead), WG=128 otherwise. SYCL uses fixed WG=256 for all cases. This means: (1) for very few rows with large ncols, SYCL uses 256 threads where CUDA uses 512 (half the per-row parallelism), (2) for many short rows (ncols<1024), SYCL uses 256 threads where CUDA uses 32 (8x more threads than needed, wasting resources)."
+          ],
+          "extra_features": ["MEAN operation integrated into same kernel via norm parameter"],
+          "notes": "The SYCL kernel handles both SUM_ROWS and MEAN via a runtime 'norm' bool parameter with separate lambda instantiations. CUDA uses a template<bool norm> parameter achieving the same compile-time specialization. The SYCL approach with two separate parallel_for lambdas achieves equivalent specialization — well done."
+        },
+        "arithmetic_intensity": {
+          "flops_per_byte": 0.25,
+          "classification": "memory_bound",
+          "notes": "~1 FLOP (addition) per 4-byte float read. 0.25 FLOP/byte — purely memory-bound. The 8x unrolling + block_reduce adds some FLOPs but doesn't change the fundamental memory-bound nature."
+        }
+      },
+      "optimizations": [
+        {
+          "id": "opt_039_001",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Add adaptive work-group sizing matching CUDA's pattern: WG=512 when nrows is small (nrows/n_xe_cores < 2), WG=32 for short rows (ncols < 1024) with many rows, WG=256 default. Query device Xe-core count instead of hardcoding.",
+          "expected_improvement": "5-15% for edge cases (very few rows or many short rows). For typical transformer usage (ncols=4096+, nrows=moderate), the fixed WG=256 is already reasonable.",
+          "implementation_notes": "Add n_xe_cores query via sycl::device::get_info<sycl::info::device::max_compute_units>(). Replicate CUDA's adaptive logic. Requires templating the block_reduce on block_size or using a runtime-configurable variant.",
+          "risk": "low",
+          "risk_notes": "Standard optimization. The block_reduce helper may need to be parameterized on block_size if it currently assumes SUMROWS_BLOCK_SIZE."
+        },
+        {
+          "id": "opt_039_002",
+          "category": "vectorized_memory",
+          "priority": "low",
+          "description": "Use vec4 loads in the 8x-unrolled inner loop. Currently each of the 8 unrolled iterations loads one scalar float. Since the 8 loads access elements at i, i+256, i+512, etc., they are NOT contiguous and cannot be directly vectorized into a single vec4. However, the iteration structure could be reorganized: instead of 8 loads at stride-256, do 2 iterations of vec4 at stride-256, loading 4 contiguous elements each time.",
+          "expected_improvement": "5-10% improvement from better cache line utilization for the contiguous elements within each vec4 load.",
+          "implementation_notes": "Restructure inner loop: for each iteration, load sycl::float4 from x[row*ncols + i] (4 contiguous elements), then advance i by 4*SUMROWS_BLOCK_SIZE. Reduces num_unroll from 8 scalar loads to 2 vec4 loads per iteration. Need bounds-checking per element within the vec4.",
+          "risk": "low",
+          "risk_notes": "Standard pattern. The 8x unrolling already handles bounds checking (temp[j] = (i < ncols) ? x[...] : 0.0f) — same pattern applies to vec4."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "65-80%",
+      "efficiency_notes": "Well-implemented SYCL row-reduction kernel. Uses 8x unrolling matching CUDA, proper reqd_sub_group_size(WARP_SIZE), block_reduce<SUM> for inter-warp reduction, and separate lambda instantiations for norm/non-norm paths. WG=256 is reasonable for most cases but misses CUDA's adaptive sizing. The kernel is purely memory-bound (0.25 FLOP/byte) and already well-optimized for bandwidth. SUM_ROWS is used frequently in transformer inference (loss computation, attention normalization) but is not on the latency-critical path. MEAN is also provided via the same kernel."
+    },
+    {
+      "kernel_id": "sk_040",
+      "name": "sum",
+      "file": "ggml/src/ggml-sycl/sum.cpp",
+      "source_cuda_ids": ["ck_088"],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": 256,
+          "sub_group_size": 16,
+          "sub_group_size_specified": true,
+          "sub_group_size_attribute": "[[sycl::reqd_sub_group_size(WARP_SIZE)]] (inherited from reduce_rows_f32_sycl)",
+          "global_size_expression": "1D: 1 * 256 — a single work-group reducing all elements",
+          "notes": "Delegates entirely to reduce_rows_f32_sycl(src0_d, dst_d, ncols=nelements, nrows=1, norm=false). A single work-group of 256 threads reduces the entire tensor. For large tensors (millions of elements), a single WG is severely underutilizing the GPU — a two-pass hierarchical reduction would be more efficient."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "coalesced_notes": "Inherited from sumrows — coalesced sequential reads with 8x unrolling.",
+          "strided_accesses": [],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "Same as sumrows (sk_039) — scalar loads with 8x unrolling."
+        },
+        "slm_usage": {
+          "uses_slm": true,
+          "slm_bytes": 64,
+          "notes": "Inherited from sumrows block_reduce."
+        },
+        "sync_patterns": {
+          "barriers": true,
+          "atomics": false,
+          "notes": "Single block_reduce barrier in the one work-group."
+        },
+        "dpct_artifacts": {
+          "has_dpct_artifacts": false,
+          "details": [],
+          "notes": "Clean — delegates to clean sumrows kernel."
+        },
+        "cuda_feature_parity": {
+          "missing_features": ["multi-WG hierarchical reduction for large tensors"],
+          "missing_feature_details": [
+            "For SUM over a large tensor (e.g., 100M elements), a single WG of 256 threads must iterate 100M/256/8 = ~49K loop iterations. This takes ~49K * memory_latency. CUDA's sumrows.cu also uses a single block for SUM, but CUDA has higher per-thread throughput (512 threads). A proper two-pass reduction would be: pass 1 = many WGs each reducing a tile, pass 2 = one WG reducing the partial sums."
+          ],
+          "extra_features": [],
+          "notes": "Both CUDA and SYCL use the same approach (SUM = reduce_rows with nrows=1). The single-WG bottleneck is shared with CUDA."
+        },
+        "arithmetic_intensity": {
+          "flops_per_byte": 0.25,
+          "classification": "memory_bound",
+          "notes": "Same as sumrows — 0.25 FLOP/byte."
+        }
+      },
+      "optimizations": [
+        {
+          "id": "opt_040_001",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "For large tensors (nelements > threshold), use a two-pass hierarchical reduction: pass 1 launches many WGs each reducing a tile to a partial sum, pass 2 reduces the partial sums with a single WG. This utilizes all 20 Xe-cores instead of just 1.",
+          "expected_improvement": "10-20x speedup for large tensors (100M+ elements). For small tensors, no benefit. SUM is rarely called with very large tensors in LLM inference.",
+          "implementation_notes": "Pass 1: N WGs (e.g., 160 = 20 Xe-cores * 8 WGs) each reduce nelements/N elements using the existing 8x-unrolled pattern, writing partial sums to a scratch buffer. Pass 2: 1 WG reduces N partial sums. The scratch buffer is N*4 bytes (trivial). Need to allocate scratch from the SYCL pool.",
+          "risk": "medium",
+          "risk_notes": "Requires scratch memory allocation and two kernel launches. The CUDA implementation also uses a single block, so this would be a SYCL-specific enhancement. Only worthwhile if SUM is called with very large tensors — verify usage patterns first."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "60-75%",
+      "efficiency_notes": "Thin wrapper around reduce_rows_f32_sycl with nrows=1. Inherits all the good properties of sumrows (8x unrolling, block_reduce, reqd_sub_group_size). The single-WG limitation for full-tensor reduction is shared with CUDA and only matters for very large tensors. SUM is called infrequently in LLM inference (typically only for loss computation during training). Very low optimization priority."
+    },
+    {
+      "kernel_id": "sk_041",
+      "name": "add-id",
+      "file": "ggml/src/ggml-sycl/add-id.cpp",
+      "source_cuda_ids": ["ck_002"],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": "dynamic: min(ne00, 768)",
+          "work_group_size_max": 768,
+          "work_group_size_min": 1,
+          "sub_group_size": null,
+          "sub_group_size_specified": false,
+          "sub_group_size_attribute": null,
+          "global_size_expression": "2D: (ne01 * threads, ne02) with local (threads, 1) — one work-group per (expert, token) pair",
+          "notes": "WG size = min(ne00, 768) where ne00 is the hidden dimension. For typical LLM hidden sizes (4096), WG=768 (capped). nd_range<2> with dim1 having local_range=1 is a CUDA grid mapping artifact (blockIdx.y). Note: WG=768 = 48 sub-groups of 16 — this is unusually large. Intel GPUs typically prefer WG=256-512 for best occupancy."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "coalesced_notes": "dst_row[i0] = src0_row[i0] + src1_row[i0] where i0 strides by local_range (threads). Adjacent work-items write adjacent elements — perfectly coalesced.",
+          "strided_accesses": ["src2_d index lookup: i1*sizeof(int32_t) + i2*nb21 — one scalar int32 read per work-group (negligible)"],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "All loads/stores are scalar 4-byte float. Since all arrays are contiguous, vec4 loads/stores could process 16 bytes per work-item."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes": 0,
+          "notes": "No SLM needed — embarrassingly parallel element-wise addition with per-row index lookup."
+        },
+        "sync_patterns": {
+          "barriers": false,
+          "atomics": false,
+          "notes": "No synchronization — each work-item independently computes one addition."
+        },
+        "dpct_artifacts": {
+          "has_dpct_artifacts": false,
+          "details": [],
+          "notes": "Clean native SYCL port. Well-commented with CUDA mapping explanations."
+        },
+        "cuda_feature_parity": {
+          "missing_features": [],
+          "missing_feature_details": [],
+          "extra_features": [],
+          "notes": "1:1 feature parity with CUDA. Identical algorithm (scatter-add by index). The SYCL code is cleaner with more comments and explicit device pointer extraction."
+        },
+        "arithmetic_intensity": {
+          "flops_per_byte": 0.08,
+          "classification": "memory_bound",
+          "notes": "1 FLOP (addition) per 3 float accesses (2 reads + 1 write) * 4 bytes = 12 bytes. 1/12 = 0.08 FLOP/byte — purely memory-bound."
+        }
+      },
+      "optimizations": [
+        {
+          "id": "opt_041_001",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Cap WG size at 512 instead of 768. Intel Xe2 prefers 256-512 work-items per work-group for best occupancy. WG=768 = 48 sub-groups of 16, which may exceed hardware scheduling limits and reduce occupancy.",
+          "expected_improvement": "0-5% improvement from better occupancy. The kernel is so simple that occupancy effects are minimal.",
+          "implementation_notes": "Change 'const int threads = std::min(static_cast<int>(ne00), 768)' to 'const int threads = std::min(static_cast<int>(ne00), 512)'. Alternatively, use 256 for a more conservative choice.",
+          "risk": "low",
+          "risk_notes": "Simple constant change. The strided loop (i0 += local_range) handles any WG size correctly."
+        },
+        {
+          "id": "opt_041_002",
+          "category": "vectorized_memory",
+          "priority": "low",
+          "description": "Use vec4 loads/stores for the element-wise addition. Read float4 from src0 and src1, add, write float4 to dst.",
+          "expected_improvement": "5-15% throughput improvement from better cache line utilization on this purely memory-bound kernel.",
+          "implementation_notes": "Process 4 elements per work-item. Handle tail (ne00 % 4 != 0) with scalar fallback. Adjust threads to process ne00/4 elements.",
+          "risk": "low",
+          "risk_notes": "Standard vectorization pattern."
+        },
+        {
+          "id": "opt_041_003",
+          "category": "sub_group_ops",
+          "priority": "low",
+          "description": "Add [[sycl::reqd_sub_group_size(WARP_SIZE)]] attribute to the kernel lambda.",
+          "expected_improvement": "0-2% — standard best practice for Intel GPU kernels.",
+          "implementation_notes": "Add attribute to lambda signature.",
+          "risk": "low",
+          "risk_notes": "Standard practice."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "65-80%",
+      "efficiency_notes": "Clean native SYCL port with 1:1 CUDA parity. Embarrassingly parallel element-wise addition with per-row index lookup. The only meaningful optimizations are vec4 vectorization and WG size capping. The kernel is used in MoE models for scatter-adding expert outputs — called once per MoE layer but not on the dominant latency path (the MUL_MAT within each expert is much more expensive). Very low optimization ROI."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 35,
+    "total_kernels_analyzed": 41,
     "high_potential": 4,
-    "medium_potential": 16,
-    "low_potential": 15,
+    "medium_potential": 17,
+    "low_potential": 20,
     "no_optimization_needed": 0,
     "top_opportunities": [
       {
