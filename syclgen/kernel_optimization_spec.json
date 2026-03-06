@@ -2392,12 +2392,159 @@
       "overall_optimization_potential": "medium",
       "estimated_current_efficiency": "50-65%",
       "efficiency_notes": "The RoPE kernel is a clean, well-structured SYCL port with no DPCT artifacts. All 4 variants correctly use WG=256, [[sycl::reqd_sub_group_size(WARP_SIZE)]], and nd_range<2>. The kernel is embarrassingly parallel with no reductions or inter-work-item communication. The main optimization gaps are: (1) missing ROPE+SET_ROWS fusion that CUDA has — this is the highest-impact opportunity as it eliminates an entire kernel launch and buffer, (2) full-precision transcendentals where native math would be 3-5x faster, (3) scalar stores where CUDA uses float2/half2 paired stores for the norm variant, (4) missing F32→F16 mixed-precision support needed for fusion. RoPE is called once per attention layer per token — for a 32-layer model it's 32 kernel launches per token. It's not typically the bottleneck (matmul and softmax dominate), but the fusion opportunity makes the absolute improvement significant. The kernel is purely memory-bandwidth bound for the rotation math but transcendental-latency-sensitive for the per-element sin/cos computation."
+    },
+    {
+      "kernel_id": "sk_017",
+      "name": "norm (normalization kernels)",
+      "file": "ggml/src/ggml-sycl/norm.cpp",
+      "source_cuda_ids": ["ck_075", "ck_076", "ck_077", "ck_078", "ck_079"],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "nd_range_dims": 1,
+          "work_group_size": [256],
+          "work_group_size_total": 256,
+          "sub_group_size": 16,
+          "sub_group_size_specified": true,
+          "sub_group_size_attribute": "[[sycl::reqd_sub_group_size(WARP_SIZE)]]",
+          "global_size_expression": "nd_range<1>(num_groups * block_size, block_size) where num_groups = nrows * nchannels * nsamples (NORM/RMS_NORM/L2_NORM) or total_groups = num_groups * ne[3] (GROUP_NORM) or nrows (RMS_NORM_BACK)",
+          "notes": "All 5 kernel variants (NORM, GROUP_NORM, RMS_NORM, RMS_NORM_BACK, L2_NORM) use identical launch configuration: nd_range<1> with WG=256, [[sycl::reqd_sub_group_size(WARP_SIZE)]]. This is correct and matches the block_reduce limit of WARP_SIZE^2=256 on Intel. However, CUDA's norm.cu uses adaptive block_size: WARP_SIZE (32) for small ncols, up to 1024 for large ncols. SYCL always uses 256 regardless of ncols. For very small ncols (e.g., 64), 256 threads means most are idle (only 4 columns per thread with 64/256 < 1). For large ncols (e.g., 8192), 512 would give better occupancy. The block_reduce implementation in common.hpp limits max WG to WARP_SIZE^2=256, so using 512 would require a 3-level reduction or different approach."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "coalesced_notes": "Adjacent work-items access adjacent columns: x_row[tid], x_row[tid+block_size], etc. This is perfectly coalesced for contiguous rows. For NORM/RMS_NORM/L2_NORM with non-contiguous src (nb01 != ne00*sizeof(float)), the source stride s01 may cause non-unit-stride access, but the column-within-row access pattern is still coalesced since nb00 == sizeof(float) is asserted.",
+          "strided_accesses": [
+            "Source tensor may have non-contiguous row strides (s01, s02, s03 computed from byte strides). The column-within-row access is contiguous, but the base pointer computation uses potentially non-unit strides for the higher dimensions.",
+            "GROUP_NORM accesses src0_d[gid * group_size + tid + j*block_size] which is contiguous within the group, but group boundaries may not align to cache lines."
+          ],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "All loads and stores are scalar 4-byte (float). No sycl::vec or multi-element loads. This is a purely memory-bandwidth-bound kernel family (arithmetic intensity: NORM ~3 FLOP/8 bytes ≈ 0.375 FLOP/byte, RMS_NORM ~2 FLOP/8 bytes ≈ 0.25 FLOP/byte). Vectorized vec4 loads (sycl::vec<float,4>) could improve effective bandwidth utilization by 1.5-2x. CUDA also uses scalar loads, so this is a SYCL-specific opportunity since Intel GPUs benefit more from wider loads due to the instruction issue model."
+        },
+        "slm_usage": {
+          "uses_slm": true,
+          "slm_bytes_expression": "num_warps * sizeof(float) = 16 * 4 = 64 bytes (RMS_NORM/L2_NORM) or num_warps * sizeof(sycl::float2) = 16 * 8 = 128 bytes (NORM/RMS_NORM_BACK) or num_warps * sizeof(float) = 64 bytes (GROUP_NORM)",
+          "slm_bytes": 128,
+          "potential_bank_conflicts": false,
+          "notes": "SLM usage is minimal — only for the inter-warp reduction in block_reduce (one float or float2 per warp). 64-128 bytes out of 64KB available (0.1% utilization). No bank conflicts since each warp writes to its own index. The SLM is efficiently used for its purpose. No opportunity to cache input data in SLM since each element is read only 1-2 times per pass (no reuse across work-items within a row)."
+        },
+        "reduction_pattern": {
+          "has_reduction": true,
+          "reduction_type": "block_reduce (2-level: sub-group shuffle + SLM + sub-group shuffle)",
+          "reduction_elements": "ncols (one sum per row)",
+          "notes": "Each work-item accumulates a partial sum over its strided columns, then block_reduce performs a hierarchical reduction: (1) sub-group shuffle reduction within each of the 16 sub-groups, (2) write per-sub-group results to SLM, barrier, (3) sub-group 0 reads from SLM and does a final shuffle reduction. The result is broadcast via SLM write + barrier + SLM read. This is a correct and efficient 2-level reduction for WG=256 with WARP_SIZE=16. NORM and RMS_NORM_BACK use float2 reductions (sum and sum-of-squares or sum-of-squares and sum-of-x*grad simultaneously), which is efficient — avoids two separate reductions."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "input_types": ["float"],
+          "output_types": ["float"],
+          "accumulator_type": "float",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "All normalization kernels are FP32-only, matching CUDA. GGML_ASSERT enforces src0->type == GGML_TYPE_F32 and dst->type == GGML_TYPE_F32. The reduction accumulator and intermediate values are all float. Half-precision normalization is not supported (nor is it in CUDA's norm.cu). Joint matrix is not applicable — these are reduction + element-wise operations, not matrix multiplications."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [
+            "sycl::rsqrt(var + eps) — called once per work-group in NORM (inverse standard deviation)",
+            "sycl::rsqrt(mean + eps) — called once per work-group in RMS_NORM and L2_NORM (inverse RMS)",
+            "sycl::rsqrt(variance + eps) — called once per work-group in GROUP_NORM",
+            "sycl::rsqrt(mean_eps) — called once per work-group in RMS_NORM_BACK",
+            "sycl::fmax(tmp, eps*eps) — called once per work-group in L2_NORM",
+            "sycl::min(end, ne_elements) — called once per work-group in GROUP_NORM"
+          ],
+          "notes": "Math function usage is minimal — only sycl::rsqrt called once per work-group (after the reduction). This is the correct function for normalization (1/sqrt(x)). No per-element transcendentals. The rsqrt call is not a bottleneck since it's called once per row, not per element. Using sycl::native::rsqrt would save a few cycles per work-group but is negligible in the overall kernel time."
+        },
+        "synchronization": {
+          "barriers": [
+            "item.barrier(sycl::access::fence_space::local_space) — called once after block_reduce broadcast (tid==0 writes result to SLM, all threads read it)",
+            "GROUP_NORM has 2 additional barriers (one after mean reduction broadcast, one after variance reduction broadcast)"
+          ],
+          "notes": "Barrier usage is minimal and correct. NORM/RMS_NORM/L2_NORM/RMS_NORM_BACK each have 1 barrier (plus the internal barrier in block_reduce). GROUP_NORM has 3 barriers total (2 for the two separate reductions plus their broadcasts, and the internal block_reduce barriers). No unnecessary barriers."
+        },
+        "loop_analysis": {
+          "hot_loops": [
+            "NORM: 2 loops over ncols (Pass 1: accumulate sum and sum-of-squares; Pass 2: normalize output)",
+            "GROUP_NORM: 3 loops over group_size (Pass 1: accumulate mean; Pass 2: subtract mean + accumulate variance; Pass 3: scale by inv_std)",
+            "RMS_NORM: 2 loops over ncols (Pass 1: accumulate sum of squares; Pass 2: scale output)",
+            "RMS_NORM_BACK: 2 loops over ncols (Pass 1: accumulate sum_xx and sum_xg; Pass 2: compute gradient)",
+            "L2_NORM: 2 loops over ncols (Pass 1: accumulate sum of squares; Pass 2: scale output)"
+          ],
+          "unrolled": false,
+          "notes": "No #pragma unroll on any loop. All loops are col-strided (col += block_size) which is a standard parallel reduction pattern. For typical ncols values (4096-8192), each work-item processes 16-32 iterations. Unrolling could reduce loop overhead and enable instruction-level parallelism. GROUP_NORM makes 3 passes over data while NORM/RMS_NORM only make 2 — GROUP_NORM could potentially merge pass 2 and pass 3 into a single pass (compute mean, then in pass 2: subtract mean, accumulate variance, AND scale in one pass by deferring writes to a register). However, this would require knowing the scale before the pass completes, which creates a dependency. The current 3-pass approach is correct but makes 50% more memory traffic than necessary."
+        },
+        "estimated_bottleneck": "memory",
+        "bottleneck_notes": "All normalization kernels are deeply memory-bandwidth bound. Arithmetic intensity: NORM reads N floats and writes N floats in 2 passes = 4N reads + N writes = 20N bytes for ~3N FLOPs = 0.15 FLOP/byte. RMS_NORM: 2 passes = 3N reads + N writes = 16N bytes for ~2N FLOPs = 0.125 FLOP/byte. GROUP_NORM: 3 passes = 4N reads + 2N writes = 24N bytes for ~3N FLOPs = 0.125 FLOP/byte. All far below the 27 FLOP/byte ridge point. Memory bandwidth is the sole bottleneck. For ncols=4096 (typical hidden dim), each row is 16KB — fits in L1 cache (48KB per EU) for the second pass, so the effective bandwidth is likely limited by L1 rather than DRAM.",
+        "anti_patterns": [
+          "MISSING kernel fusion: CUDA has fused rms_norm_f32<block_size, do_multiply, do_add> variants that combine RMS_NORM with element-wise MUL (weight scaling) and ADD (bias) in a single kernel. In transformer models, RMS_NORM is always followed by element-wise MUL (weight * normalized_x). The SYCL version lacks this fusion entirely, requiring 2 separate kernel launches and an extra read+write pass over the tensor. This is the highest-impact optimization opportunity.",
+          "MISSING adaptive block_size: CUDA's norm.cu selects block_size based on ncols: WARP_SIZE for ncols <= WARP_SIZE, 128 for ncols <= 128*WARP_SIZE, otherwise 1024. SYCL always uses 256 regardless of ncols. For small ncols (e.g., 64), 256 threads means each thread processes < 1 element on average, wasting sub-group slots. For large ncols (e.g., 8192+), 512 threads would process fewer elements per thread with better pipelining.",
+          "No vectorized loads/stores: All memory accesses are scalar float (4 bytes). For a memory-bandwidth-bound kernel, using sycl::vec<float,4> loads could improve effective bandwidth by 1.5-2x on Intel GPUs. The column loop is strided by block_size, so vec4 loads would require restructuring to process 4 consecutive columns per iteration.",
+          "GROUP_NORM makes 3 passes over data: Pass 1 (mean), Pass 2 (variance + mean subtraction), Pass 3 (scale). NORM uses a clever float2 accumulator to compute mean and variance in a single pass, then writes in pass 2. GROUP_NORM could use the same float2 trick to merge mean and sum-of-squares into pass 1, then merge mean-subtraction and scaling into pass 2, reducing from 3 passes to 2 passes (33% less memory traffic).",
+          "Integer division/modulo in group_id decomposition: group_id % nrows, (group_id / nrows) % nchannels, group_id / (nrows * nchannels) — 3 integer divisions per work-group (executed by all work-items). On Intel GPUs, 32-bit integer division is ~20-30 cycles. Could use fast-division multiply-shift trick or 3D nd_range. However, this is per-work-group, not per-element, so the impact is negligible.",
+          "block_reduce limits WG to 256 on Intel: The 2-level hierarchical reduction (sub-group shuffle → SLM → sub-group shuffle) supports at most WARP_SIZE^2 = 16^2 = 256 work-items. To use WG=512, a 3-level reduction would be needed. This is a systemic limitation affecting all reduction kernels, not specific to norm."
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_017_001",
+          "category": "kernel_fusion",
+          "priority": "high",
+          "description": "Implement fused RMS_NORM+MUL kernel to match CUDA's rms_norm_f32<block_size, true, false> variant. In transformer models, RMS_NORM is always followed by element-wise multiplication with a weight vector (x_normalized * weight). The fused kernel reads src0 (input), reads src1 (weight vector), computes RMS normalization, and writes dst = scale * src0[col] * src1[col] in a single pass — eliminating one full read+write pass over the tensor and one kernel launch. CUDA also has a do_add variant for RMS_NORM+MUL+ADD (with bias), though bias is less common in modern transformers.",
+          "expected_improvement": "20-40% latency reduction for the RMS_NORM+MUL operation pair. Eliminates one full tensor read+write (8 bytes/element) and one kernel launch (~5-10us). For typical hidden_dim=4096: saves 4096*4*2 = 32KB memory traffic per row. With 32 layers and batch_size=1, that's 32*32KB = 1MB saved per token. The fusion also improves cache utilization since the normalized values are consumed immediately rather than written to DRAM and re-read.",
+          "implementation_notes": "Add template parameters do_multiply and do_add to the RMS_NORM kernel. When do_multiply=true, accept an additional src1_d pointer (the weight vector) and multiply: dst_row[col] = scale * x_row[col] * weight[col]. The weight vector is shared across all rows, so it could be cached in SLM (4096*4 = 16KB fits in 64KB SLM). Add ggml_sycl_op_rms_norm_fused() that detects when the next op is MUL with a 1D weight tensor and fuses them. Reference: CUDA norm.cu rms_norm_f32<block_size, true, false> (line ~180-220).",
+          "risk": "medium",
+          "risk_notes": "Requires fused op detection in the SYCL backend dispatch layer, similar to what CUDA does. The kernel-level change is straightforward (add conditional multiply). The risk is in correctly detecting the fusion opportunity in the graph and ensuring the weight tensor is available. CUDA implementation provides a working reference."
+        },
+        {
+          "id": "opt_017_002",
+          "category": "adaptive_launch",
+          "priority": "medium",
+          "description": "Implement adaptive block_size selection based on ncols, matching CUDA's approach. CUDA selects: WARP_SIZE (32) for ncols <= WARP_SIZE, 128 for ncols <= 128*WARP_SIZE, otherwise 1024. For SYCL with WARP_SIZE=16: use 16 for ncols <= 16 (rare), 128 for ncols <= 2048, 256 for ncols <= 4096, and 256 (current max due to block_reduce limit) for larger. The current fixed 256 is suboptimal for small ncols where fewer threads are needed and for the block_reduce overhead.",
+          "expected_improvement": "5-15% improvement for small ncols (64-256) where the current 256-thread WG has many idle threads. For typical transformer ncols (4096-8192), the current 256 is close to optimal given the block_reduce limit. The primary benefit is for models with small hidden dimensions (e.g., 256-512) or for GROUP_NORM where group_size may be small.",
+          "implementation_notes": "Add a host-side block_size selection: if (ncols <= WARP_SIZE) block_size = WARP_SIZE; else if (ncols <= 128*WARP_SIZE) block_size = 128; else block_size = 256. Each block_size variant needs a separate kernel instantiation (due to the SLM allocation size depending on num_warps). Use template instantiation or if-else dispatch. To go beyond 256, would need to upgrade block_reduce to support 3-level reduction (sub-group → SLM → sub-group → SLM → sub-group) for WG=512.",
+          "risk": "low",
+          "risk_notes": "Block size selection is a host-side change with no impact on correctness. Each variant is independently testable. The block_reduce function already works correctly for any power-of-2 block_size up to 256."
+        },
+        {
+          "id": "opt_017_003",
+          "category": "vectorization",
+          "priority": "medium",
+          "description": "Use vectorized vec4 loads and stores (sycl::vec<float,4>) for the data-pass loops. Currently all loads/stores are scalar 4-byte. For a memory-bandwidth-bound kernel, wider loads improve effective bandwidth utilization by reducing instruction count and enabling better memory coalescing on Intel GPUs. Restructure the column loop from 'for (col = tid; col < ncols; col += block_size)' to 'for (col = tid*4; col < ncols; col += block_size*4)' with vec4 load/accumulate.",
+          "expected_improvement": "10-25% throughput improvement for large ncols (4096+). The improvement comes from reduced load/store instruction count (4x fewer) and better utilization of the memory subsystem. For small ncols where data fits in L1 cache, the improvement is smaller since L1 latency is already low. The vec4 approach also enables better instruction-level parallelism in the accumulation loop.",
+          "implementation_notes": "For the accumulation loop: sycl::vec<float,4> xv = *reinterpret_cast<const sycl::vec<float,4>*>(&x_row[col]); tmp += xv[0]*xv[0] + xv[1]*xv[1] + xv[2]*xv[2] + xv[3]*xv[3]; For the output loop: similar vec4 store. Requires ncols to be a multiple of 4 (add scalar tail handling for non-multiple cases). Most transformer hidden dims (4096, 5120, 8192) are multiples of 4. Alignment should be checked (GGML tensors are typically 32-byte aligned).",
+          "risk": "low",
+          "risk_notes": "Vec4 loads are a standard SYCL optimization pattern. The only risk is for ncols not divisible by 4 (requires scalar tail loop). GGML tensor alignment guarantees make this safe for the common case."
+        },
+        {
+          "id": "opt_017_004",
+          "category": "pass_reduction",
+          "priority": "medium",
+          "description": "Reduce GROUP_NORM from 3 passes to 2 passes using the float2 accumulator technique already used in NORM. Currently GROUP_NORM makes: Pass 1 (sum for mean), Pass 2 (subtract mean + sum squares for variance), Pass 3 (scale by inv_std). Using a float2 accumulator in Pass 1 to compute both sum and sum-of-squares simultaneously (like NORM does), then in Pass 2: subtract mean AND scale by inv_std in one pass. This eliminates Pass 3 entirely, reducing memory traffic by 33%.",
+          "expected_improvement": "25-33% latency reduction for GROUP_NORM specifically. Eliminates one full read+write pass over group_size elements. For typical diffusion model GROUP_NORM with group_size = H*W*C/num_groups (e.g., 64*64*256/32 = 32768 elements), saves 32768*4*2 = 256KB memory traffic per group. GROUP_NORM is critical for diffusion models (Stable Diffusion) but less common in LLM inference.",
+          "implementation_notes": "Replace Pass 1 accumulator with sycl::float2 mean_var(0.0f, 0.0f); accumulating sum and sum-of-squares simultaneously. After reduction: mean = mean_var.x() / group_size; variance = mean_var.y() / group_size - mean*mean; scale = rsqrt(variance + eps). Then single Pass 2: dst_d[j] = (src0_d[j] - mean) * scale. This matches the pattern already used in the NORM kernel (lines 58-63). SLM allocation changes from float to sycl::float2 (128 bytes instead of 64 bytes — negligible).",
+          "risk": "low",
+          "risk_notes": "The float2 accumulation pattern is already proven in the NORM kernel in the same file. The numerical result is identical (Welford's online algorithm is not needed here since sum-of-squares is numerically stable for the typical value ranges in normalization). The only consideration is that the current 3-pass approach writes intermediate (x-mean) values to dst in pass 2 and reads them back in pass 3, while the 2-pass approach would compute (src0_d[j] - mean) * scale directly from src0 — this requires re-reading src0 in pass 2 instead of reading dst, which has identical cost."
+        },
+        {
+          "id": "opt_017_005",
+          "category": "loop_unrolling",
+          "priority": "low",
+          "description": "Add #pragma unroll directives to the column-stride loops in all 5 kernel variants. The inner loops iterate ncols/block_size times (typically 16-32 iterations for ncols=4096-8192, block_size=256). Partial unrolling (#pragma unroll 4) would reduce loop overhead and enable instruction-level parallelism for the accumulation operations.",
+          "expected_improvement": "3-8% throughput improvement. Loop unrolling reduces branch overhead and enables the compiler to interleave independent load-accumulate operations. The improvement is modest because the loops are already simple (1-2 operations per iteration) and the bottleneck is memory bandwidth, not instruction throughput.",
+          "implementation_notes": "Add '#pragma unroll 4' before each 'for (int col = tid; col < ncols; col += block_size)' loop. The unroll factor of 4 matches the vec4 optimization (opt_017_003) — combining both gives 4x fewer loop iterations with vec4 loads in each iteration. Without vec4, unrolling still helps by allowing the compiler to pipeline multiple scalar loads.",
+          "risk": "low",
+          "risk_notes": "Pragma unroll is a compiler hint with no correctness impact. The DPC++ compiler may already unroll these simple loops, in which case the pragma has no effect. If ncols is not a compile-time constant, partial unrolling with a scalar tail is safe."
+        }
+      ],
+      "overall_optimization_potential": "medium",
+      "estimated_current_efficiency": "45-60%",
+      "efficiency_notes": "The normalization kernels are a clean, well-structured native SYCL port with zero DPCT artifacts. All 5 variants correctly use nd_range<1>, WG=256, [[sycl::reqd_sub_group_size(WARP_SIZE)]], sycl::local_accessor for SLM, and proper barrier synchronization. The block_reduce pattern is correct and efficient for the 2-level hierarchical reduction. The NORM kernel cleverly uses float2 to compute mean and sum-of-squares in a single reduction. The primary optimization gaps are: (1) CRITICAL: missing RMS_NORM+MUL fusion — in transformer inference, RMS_NORM is always followed by weight multiplication, and CUDA has fused variants that eliminate an entire kernel launch and memory pass. This is the single highest-impact optimization. (2) No vectorized loads on a purely memory-bandwidth-bound kernel family. (3) GROUP_NORM makes 3 passes where 2 would suffice (the float2 technique from NORM is not applied). (4) Fixed block_size=256 instead of adaptive selection. RMS_NORM is called twice per transformer layer (once for attention, once for FFN), making it a high-frequency kernel. The fusion opportunity alone justifies medium-high priority."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 16,
+    "total_kernels_analyzed": 17,
     "high_potential": 4,
-    "medium_potential": 7,
+    "medium_potential": 8,
     "low_potential": 5,
     "no_optimization_needed": 0,
     "top_opportunities": [
@@ -2533,6 +2680,20 @@
         "optimization_id": "opt_016_001",
         "description": "Implement ROPE+VIEW+SET_ROWS fusion to match CUDA parity — 15-30% latency reduction by eliminating intermediate buffer and kernel launch",
         "priority": "high"
+      },
+      {
+        "kernel_id": "sk_017",
+        "kernel_name": "norm (normalization kernels)",
+        "optimization_id": "opt_017_001",
+        "description": "Implement fused RMS_NORM+MUL kernel to match CUDA parity — 20-40% latency reduction for the RMS_NORM+MUL operation pair, eliminating one full read+write pass and one kernel launch per transformer layer (called 2x per layer)",
+        "priority": "high"
+      },
+      {
+        "kernel_id": "sk_017",
+        "kernel_name": "norm (normalization kernels)",
+        "optimization_id": "opt_017_004",
+        "description": "Reduce GROUP_NORM from 3 passes to 2 passes using float2 accumulator — 25-33% latency reduction for GROUP_NORM (critical for diffusion models)",
+        "priority": "medium"
       }
     ]
   }
