@@ -1152,12 +1152,156 @@
         "blocking_issues": [],
         "correctness_risks": []
       }
+    },
+    {
+      "kernel_id": "sk_008",
+      "name": "vecdotq (vector dot product device functions)",
+      "file": "ggml/src/ggml-sycl/vecdotq.hpp",
+      "source_cuda_ids": [],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": null,
+          "work_group_size": null,
+          "work_group_size_total": null,
+          "sub_group_size": null,
+          "sub_group_size_specified": null,
+          "global_size_expression": "N/A \u2014 device functions only, no kernel launches",
+          "notes": "This file contains ~30 __dpct_inline__ static device functions that are called from MMVQ (sk_002) and DMMV (sk_003) kernels. They are NOT standalone kernels. No parallel_for, no nd_range. Performance characteristics are entirely determined by the calling kernel's launch config."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": null,
+          "strided_accesses": [
+            "Memory access patterns depend on the calling kernel's thread-to-data mapping",
+            "get_int_from_uint8 (line 24) does 4 separate byte loads + shift/OR \u2014 not vectorized",
+            "get_int_from_uint8_aligned (line 68) does aligned 4-byte load \u2014 efficient",
+            "IQ format functions access lookup tables (iq2xxs_grid, iq3xxs_grid, iq1s_grid_gpu, kvalues_iq4nl) with index-based random access \u2014 not cacheable"
+          ],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "All data access uses scalar get_int_from_* helpers that manually pack bytes into int32. The non-aligned variants (get_int_from_uint8, get_int_from_int8) do 2x uint16 loads + shift/OR which is 2x the memory transactions vs the aligned variants. IQ format lookup tables use random-access indexing via grid pointers \u2014 these benefit from L1 cache if the table fits (most do at <2KB)."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes_min": 0,
+          "slm_bytes_max": 0,
+          "slm_bytes_typical": 0,
+          "potential_bank_conflicts": false,
+          "notes": "No SLM used in these device functions. IQ lookup tables (iq2xxs_grid etc.) are in global memory \u2014 potential optimization to cache them in SLM by the calling kernel."
+        },
+        "reduction_pattern": {
+          "has_reduction": false,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "No reductions \u2014 each function computes a scalar dot product for one quantization block pair. The calling kernel (MMVQ/DMMV) handles the reduction across blocks."
+        },
+        "data_types": {
+          "compute_type": "int32 (via dp4a) + float (scaling)",
+          "accumulator_type": "int32 (sumi) then float (final scaling)",
+          "dot_product_type": "int32 via dpct::dp4a (int8x4 dot product)",
+          "scale_type": "sycl::half2 -> float conversion for d/m scale factors",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "The dp4a pattern (4x int8 dot product accumulated to int32) is the core compute primitive across all quantized formats. This maps well to Intel GPU hardware dp4a instructions. For matrix multiply use cases (MMQ), joint_matrix would be superior, but for vec_dot (MMVQ/DMMV), dp4a is the right approach. Float32 accumulation with half scale factors is numerically appropriate."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [],
+          "notes": "No transcendental math. All compute is integer bitwise operations (shift, mask, OR, XOR), dp4a, and float multiply-add."
+        },
+        "loop_analysis": {
+          "hot_loops": [
+            "K-quant vec_dot inner loops (QR2_K=8, QR3_K=4, QR4_K=2, QR5_K=2, QR6_K=2 iterations) \u2014 all #pragma unroll",
+            "IQ format inner loops: 4 iterations each for iq2_xxs, iq2_xs, iq2_s, iq3_xxs, iq3_s, iq1_s, iq1_m \u2014 NOT unrolled (missing #pragma unroll)",
+            "get_int_from_table_16 loop: 2 iterations with #pragma unroll",
+            "Reorder variant Q4_0 loop: vdr_mmvq iterations (1-2) with #pragma unroll"
+          ],
+          "unrolled": false,
+          "notes": "Standard quant format (Q4_0 through Q8_0) loops are properly unrolled. K-quant format loops are properly unrolled. IQ format functions (iq2_xxs, iq2_xs, iq2_s, iq3_xxs, iq3_s, iq1_s, iq1_m) have inner loops WITHOUT #pragma unroll \u2014 these are 4-iteration loops that should be unrolled for better ILP."
+        },
+        "estimated_bottleneck": "compute",
+        "bottleneck_notes": "These functions are compute-bound \u2014 the dp4a operations and bit manipulation dominate. Memory access is already minimal (one quantization block + one q8_1 block per call). The bottleneck is instruction throughput for the bit manipulation (shift, mask, OR) used to unpack quantized values before dp4a. On Intel GPUs, dp4a maps to hardware SIMD instructions with good throughput.",
+        "anti_patterns": [
+          "DPCT artifact: __dpct_inline__ on all 30+ functions (should be 'inline' or removed)",
+          "DPCT artifact: dpct::dp4a instead of ggml_sycl_dp4a or direct sycl equivalent",
+          "DPCT artifact: dpct::vectorized_binary<sycl::char4/uchar4> \u2014 non-standard DPCT wrapper",
+          "DPCT artifact: dpct::byte_level_permute \u2014 non-standard DPCT wrapper for lookup tables",
+          "DPCT artifact: DPCT_COMPATIBILITY_TEMP >= MIN_CC_DP4A \u2014 CUDA compute capability check in SYCL code (lines 1071-1072, 1173-1174)",
+          "Inconsistent get_int_from_* helpers: get_int_from_uint8 (byte-by-byte, 4 loads) vs get_int_from_uint8_aligned (single 4-byte load) \u2014 non-aligned version is unnecessarily slow",
+          "IQ format inner loops missing #pragma unroll (iq2_xxs lines 1050-1058, iq2_xs lines 1082-1091, etc.)",
+          "Missing reorder variants for 17+ quant formats (only Q4_0, Q4_K, Q6_K have reorder support)"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "optimization_id": "opt_008_001",
+          "description": "Replace non-aligned get_int_from_uint8/int8 with aligned variants or reinterpret_cast<const int*> where alignment is guaranteed",
+          "priority": "medium",
+          "estimated_speedup": "2-5% for formats using non-aligned helpers (Q4_0, Q5_0, Q3_K, Q6_K legacy)",
+          "complexity": "low",
+          "requires_algorithm_change": false,
+          "notes": "get_int_from_uint8 (line 23-32) does 4 separate byte loads with shift/OR. get_int_from_int8 (line 35-45) does 2x uint16 loads. Both are slower than the aligned variants which do a single 4-byte load. In practice, quantization block qs arrays are always naturally aligned (they're the first member after the scale/min fields), so alignment is typically guaranteed. Need to verify alignment guarantees per format."
+        },
+        {
+          "optimization_id": "opt_008_002",
+          "description": "Add #pragma unroll to IQ format inner loops for better instruction-level parallelism",
+          "priority": "low",
+          "estimated_speedup": "1-3% for IQ format inference",
+          "complexity": "low",
+          "requires_algorithm_change": false,
+          "notes": "IQ format functions (iq2_xxs, iq2_xs, iq2_s, iq3_xxs, iq3_s, iq1_s, iq1_m) have 4-iteration inner loops without #pragma unroll. The standard quant formats all have unroll pragmas. Adding #pragma unroll to these loops (e.g., lines 1050, 1082, 1094, 1129, 1146, 1184, 1220, 1257, 1286) would allow the compiler to unroll and potentially improve ILP. Impact is small since IQ formats are less commonly used."
+        },
+        {
+          "optimization_id": "opt_008_003",
+          "description": "Remove DPCT artifacts: replace __dpct_inline__, dpct::dp4a, DPCT_COMPATIBILITY_TEMP checks",
+          "priority": "low",
+          "estimated_speedup": "0%",
+          "complexity": "medium",
+          "requires_algorithm_change": false,
+          "notes": "Cosmetic but important for code quality: (1) Replace __dpct_inline__ with inline (30+ occurrences), (2) Replace dpct::dp4a with ggml_sycl_dp4a or direct implementation, (3) Remove DPCT_COMPATIBILITY_TEMP >= MIN_CC_DP4A checks (CUDA artifact \u2014 dp4a is always available on Intel GPUs), (4) Consider replacing dpct::vectorized_binary and dpct::byte_level_permute with direct SYCL implementations. No performance impact since these are compiler hints and wrappers."
+        },
+        {
+          "optimization_id": "opt_008_004",
+          "description": "Add reorder variants for remaining quant formats (Q4_1, Q5_0, Q5_1, Q8_0, Q2_K, Q3_K, Q5_K) to enable cache-friendly MMVQ paths",
+          "priority": "medium",
+          "estimated_speedup": "10-30% for MMVQ with newly-supported reorder formats",
+          "complexity": "high",
+          "requires_algorithm_change": true,
+          "notes": "Currently only Q4_0, Q4_K, Q6_K have reorder_vec_dot_q_sycl specializations. The reorder variants enable Structure-of-Arrays (SoA) memory layout which improves coalescing in MMVQ. Adding reorder support for the remaining common formats (Q4_1, Q5_0, Q5_1, Q8_0 for basic types; Q2_K, Q3_K, Q5_K for K-quants) would allow the MMVQ kernel to use the faster reordered path for all formats. This is a significant effort requiring understanding of each format's memory layout. The IQ formats and MXFP4 can be deferred as they are less commonly used."
+        },
+        {
+          "optimization_id": "opt_008_005",
+          "description": "Cache IQ lookup tables (iq2xxs_grid, iq3xxs_grid, kvalues_iq4nl) in SLM in calling kernels for reduced global memory latency",
+          "priority": "low",
+          "estimated_speedup": "5-15% for IQ format inference only",
+          "complexity": "medium",
+          "requires_algorithm_change": true,
+          "notes": "IQ format vec_dot functions access lookup tables via global memory pointers with random access patterns. These tables are small (iq2xxs_grid: 256*8=2KB, iq3xxs_grid: 256*4=1KB, kvalues_iq4nl: 16B, iq2s_grid: constant array). Loading these into SLM at kernel start would eliminate global memory latency for table lookups. This optimization must be implemented in the calling kernel (MMVQ/DMMV), not in these device functions. Impact is only relevant for IQ format models which are niche."
+        }
+      ],
+      "overall_assessment": {
+        "optimization_potential": "medium",
+        "estimated_current_efficiency": "60-75%",
+        "key_findings": [
+          "Device functions only (not kernels) \u2014 performance is determined by calling kernel's launch config (MMVQ sk_002, DMMV sk_003)",
+          "Heavy DPCT artifact usage (dp4a, vectorized_binary, byte_level_permute, __dpct_inline__, DPCT_COMPATIBILITY_TEMP) \u2014 functional but non-idiomatic SYCL",
+          "Inconsistent memory access helpers: non-aligned get_int_from_uint8 uses 4 byte loads vs aligned version using single 4-byte load",
+          "Only 3 of 20+ quant formats have reorder (SoA) variants \u2014 limiting MMVQ performance for most formats",
+          "IQ format loops missing #pragma unroll \u2014 minor but easy fix",
+          "Core dp4a compute pattern is appropriate for Intel GPU hardware \u2014 no algorithmic change needed for the dot product itself"
+        ],
+        "blocking_issues": [],
+        "correctness_risks": [
+          "DPCT_COMPATIBILITY_TEMP >= MIN_CC_DP4A guards (lines 1071, 1173) may incorrectly disable IQ format support if DPCT_COMPATIBILITY_TEMP is not defined or set too low \u2014 should be removed for SYCL"
+        ]
+      }
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 7,
+    "total_kernels_analyzed": 8,
     "high_potential": 4,
-    "medium_potential": 1,
+    "medium_potential": 2,
     "low_potential": 2,
     "no_optimization_needed": 0,
     "top_opportunities": [
