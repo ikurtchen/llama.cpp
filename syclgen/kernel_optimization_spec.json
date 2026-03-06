@@ -4620,12 +4620,137 @@
       "overall_optimization_potential": "medium",
       "estimated_current_efficiency": "40-55%",
       "efficiency_notes": "Well-structured CUDA port preserving core SSM recurrence algorithm but systematically omitting ALL performance annotations. Zero #pragma unroll (CUDA has 7), no L_template compile-time specialization for n_tok=1..8 (CUDA has full switch dispatch), DPCT artifacts in warp_reduce_sum, no CUB-equivalent blocked loads, full-precision transcendentals. Compute-bound (dominated by exp() in inner loop). 2x c_factor on Intel Mamba-2 due to WARP_SIZE=16 is inherent hardware difference. SSM scan is the core recurrence for ALL Mamba-architecture models, called once per layer -- critical path. Estimated 30-55% improvement possible from combined optimizations."
+    },
+    {
+      "kernel_id": "sk_034",
+      "name": "cross-entropy-loss",
+      "file": "ggml/src/ggml-sycl/cross-entropy-loss.cpp",
+      "source_cuda_ids": [
+        "ck_046",
+        "ck_047"
+      ],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": [
+            16,
+            1,
+            1
+          ],
+          "sub_group_size": 16,
+          "global_size_expression": "nrows * WARP_SIZE (16 threads per row, one sub-group per row)"
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "strided_accesses": [],
+          "vectorized_loads": false,
+          "vector_width": null
+        },
+        "slm_usage": {
+          "uses_slm": true,
+          "slm_bytes": "nclasses * 4 bytes (when nclasses * 4 <= 49152, i.e. nclasses <= 12288)",
+          "potential_bank_conflicts": false
+        },
+        "reduction_pattern": {
+          "has_reduction": true,
+          "uses_sub_group_reduce": true,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false
+        },
+        "data_types": {
+          "compute_type": "float",
+          "could_use_half": false,
+          "could_use_joint_matrix": false
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [
+            "exp",
+            "log",
+            "fmax"
+          ]
+        },
+        "loop_analysis": {
+          "hot_loops": [
+            "Forward pass 1: max reduction over nclasses (line 38-44), iterates nclasses/16 times",
+            "Forward pass 2: sum of exp over nclasses (line 49-52), iterates nclasses/16 times",
+            "Forward pass 3: loss accumulation over nclasses (line 58-61), iterates nclasses/16 times",
+            "Backward pass 1: max + exp over nclasses (line 104-123), iterates nclasses/16 times",
+            "Backward pass 2: output computation over nclasses (line 129-132), iterates nclasses/16 times"
+          ],
+          "unrolled": false
+        },
+        "estimated_bottleneck": "memory",
+        "anti_patterns": [
+          "Work-group size of 16 (WARP_SIZE) \u2014 only one sub-group per work-group, severely under-utilizes hardware. Guide recommends 256 or 512.",
+          "No vectorized memory access \u2014 each work-item loads 1 float per iteration instead of vec2/vec4",
+          "Uses sycl::exp and sycl::log instead of sycl::native variants \u2014 acceptable precision for loss computation",
+          "Forward kernel makes 3 passes over the data (max, sum-exp, loss); backward makes 2-3 passes \u2014 multiple passes increase memory traffic",
+          "No loop unrolling on hot loops iterating over nclasses",
+          "Forward loss uses separate reduce_rows kernel to sum per-row losses \u2014 extra kernel launch and memory traffic for nrows writes + reads"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_034_001",
+          "category": "work_group_size",
+          "priority": "medium",
+          "description": "Increase work-group size from 16 to 256 by processing each row with multiple sub-groups instead of one. Use block_reduce (sub-group reduce + SLM inter-warp exchange) for the max and sum reductions. This is a standard pattern already used by sumrows.cpp in the same codebase.",
+          "expected_improvement": "15-30% throughput improvement from better hardware occupancy and overlapping memory latency across multiple sub-groups within a work-group. More threads per row means fewer loop iterations per thread.",
+          "implementation_notes": "Change work-group size to 256. Replace warp_reduce_max/warp_reduce_sum with block_reduce<SUM>/block_reduce<MAX> from common.hpp. Allocate SLM for num_warps=256/16=16 floats for inter-warp exchange. Keep the existing reqd_sub_group_size(WARP_SIZE) for sub-group shuffles. Adjust global size to nrows * 256.",
+          "risk": "low",
+          "risk_notes": "block_reduce is already used by reduce_rows_f32_sycl in the same codebase \u2014 well-tested pattern. The reduction logic remains the same, just distributed across more threads."
+        },
+        {
+          "id": "opt_034_002",
+          "category": "vectorization",
+          "priority": "medium",
+          "description": "Use vec2 or vec4 loads for the inner loops over nclasses. Each work-item currently loads 1 float per iteration. Loading 4 floats per iteration reduces memory transaction count by 4x and makes better use of the 456 GB/s memory bandwidth.",
+          "expected_improvement": "1.5-2x throughput improvement for the memory-bound inner loops. With vec4, each iteration processes 4 elements, reducing loop overhead and increasing effective bandwidth utilization.",
+          "implementation_notes": "Process 4 elements per iteration using sycl::vec<float, 4> or manual float4 loads via reinterpret_cast. Requires nclasses to be a multiple of 4 * work_group_size for the vectorized path; add a scalar tail loop for the remainder. Accumulate partial max/sum across the 4 elements in registers before the sub-group reduce.",
+          "risk": "low",
+          "risk_notes": "Alignment requirements: nclasses is typically vocabulary size (32000, 50257, 65536 etc.) which are always multiples of 4. Need to handle alignment at load pointer level."
+        },
+        {
+          "id": "opt_034_003",
+          "category": "math_functions",
+          "priority": "low",
+          "description": "Replace sycl::exp and sycl::log with sycl::native::exp and sycl::native::log. Cross-entropy loss computation is numerically stable (uses log-sum-exp trick with max subtraction) and doesn't require full IEEE precision for exp/log.",
+          "expected_improvement": "5-10% compute time reduction for the exp/log operations. The kernel is memory-bound, so the benefit is modest but essentially free.",
+          "implementation_notes": "Replace sycl::exp(x) with sycl::native::exp(x) and sycl::log(x) with sycl::native::log(x) in both forward and backward kernels. The log-sum-exp numerical stability trick (subtracting max) already ensures values are in a well-conditioned range for native approximations.",
+          "risk": "low",
+          "risk_notes": "Native math has lower precision (~1 ULP vs ~0.5 ULP) but this is a training loss computation where such precision differences are negligible. The max-subtraction trick keeps exp inputs in a safe range."
+        },
+        {
+          "id": "opt_034_004",
+          "category": "loop_unroll",
+          "priority": "low",
+          "description": "Add #pragma unroll to the inner loops over nclasses in both forward and backward kernels. This helps the compiler overlap load/compute operations and reduce loop overhead.",
+          "expected_improvement": "5-15% throughput improvement from reduced loop overhead and better instruction scheduling. Combines well with vectorization (opt_034_002).",
+          "implementation_notes": "Add #pragma unroll 4 before each of the for loops over nclasses (lines 38, 49, 58, 104, 115, 129). If combined with vectorization, unroll factor can be 2 (processing 8 elements per unrolled iteration with vec4).",
+          "risk": "low",
+          "risk_notes": "Increases register pressure slightly. With WARP_SIZE=16 work-group, register pressure is not a concern. If combined with larger work-group size (opt_034_001), monitor register usage."
+        },
+        {
+          "id": "opt_034_005",
+          "category": "kernel_fusion",
+          "priority": "low",
+          "description": "Fuse the per-row loss reduction (reduce_rows_f32_sycl) into the forward cross-entropy kernel using atomicAdd. Currently the forward kernel writes per-row losses to a temp buffer, then a separate kernel sums them. With atomicAdd, each work-group can atomically add its row's loss directly to the output scalar, eliminating the temp buffer and second kernel launch.",
+          "expected_improvement": "10-20% latency reduction for the forward pass by eliminating one kernel launch + nrows * sizeof(float) intermediate buffer read/write. Most significant when nrows is small (common in training batch sizes).",
+          "implementation_notes": "Initialize dst[0] = 0 before kernel launch (or use a host-side memset). In the forward kernel, after computing per-row loss, use sycl::atomic_ref<float, ...>(dst[0]).fetch_add(loss) instead of dst[row] = loss. Remove the reduce_rows_f32_sycl call and dst_tmp allocation. The atomic contention is low since only one thread per work-group (tid==0) writes.",
+          "risk": "medium",
+          "risk_notes": "Floating-point atomicAdd is non-deterministic (order of additions varies). For training loss this is acceptable since the value is used for logging/convergence monitoring, not gradient computation. Need to ensure dst[0] is zeroed before kernel launch."
+        }
+      ],
+      "overall_optimization_potential": "medium",
+      "estimated_current_efficiency": "35-45% \u2014 work-group size of 16 severely under-utilizes hardware, no vectorization, standard math functions. However, this is a training-only kernel (not inference-critical), and the SLM caching path is well-designed. The main bottleneck is memory bandwidth from the small work-group size."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 33,
+    "total_kernels_analyzed": 34,
     "high_potential": 4,
-    "medium_potential": 15,
+    "medium_potential": 16,
     "low_potential": 14,
     "no_optimization_needed": 0,
     "top_opportunities": [
