@@ -2539,13 +2539,136 @@
       "overall_optimization_potential": "medium",
       "estimated_current_efficiency": "45-60%",
       "efficiency_notes": "The normalization kernels are a clean, well-structured native SYCL port with zero DPCT artifacts. All 5 variants correctly use nd_range<1>, WG=256, [[sycl::reqd_sub_group_size(WARP_SIZE)]], sycl::local_accessor for SLM, and proper barrier synchronization. The block_reduce pattern is correct and efficient for the 2-level hierarchical reduction. The NORM kernel cleverly uses float2 to compute mean and sum-of-squares in a single reduction. The primary optimization gaps are: (1) CRITICAL: missing RMS_NORM+MUL fusion — in transformer inference, RMS_NORM is always followed by weight multiplication, and CUDA has fused variants that eliminate an entire kernel launch and memory pass. This is the single highest-impact optimization. (2) No vectorized loads on a purely memory-bandwidth-bound kernel family. (3) GROUP_NORM makes 3 passes where 2 would suffice (the float2 technique from NORM is not applied). (4) Fixed block_size=256 instead of adaptive selection. RMS_NORM is called twice per transformer layer (once for attention, once for FFN), making it a high-frequency kernel. The fusion opportunity alone justifies medium-high priority."
+    },
+    {
+      "kernel_id": "sk_018",
+      "name": "getrows (row gathering)",
+      "file": "ggml/src/ggml-sycl/getrows.cpp",
+      "source_cuda_ids": ["ck_060", "ck_061", "ck_062"],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "nd_range_dims": 3,
+          "work_group_size": [1, 1, 256],
+          "work_group_size_total": 256,
+          "sub_group_size": null,
+          "sub_group_size_specified": false,
+          "sub_group_size_attribute": "none — missing on all 3 kernel functions",
+          "global_size_expression": "k_get_rows_quant/float: nd_range<3>((ne10, gridDim_y, gridDim_z * 256), (1, 1, 256)) where gridDim_y = min((ne00+2*256-1)/(2*256), 65535) for quant or min((ne00+256-1)/256, 65535) for float, gridDim_z = min(ne11*ne12, 65535). k_get_rows_back: nd_range<3>((1, ne1, block_num_x * 256), (1, 1, 256)) where block_num_x = ceil(ne00/256).",
+          "notes": "All 3 kernels use nd_range<3> with only dim2 threaded (local_range = (1,1,256)). This is a direct CUDA→SYCL port preserving the dim3 grid structure. The nd_range<3> with unused dimensions (local=1) is a DPCT-style artifact — should be simplified to nd_range<1> with grid loops. WG=256 matches CUDA's CUDA_GET_ROWS_BLOCK_SIZE=256 and is correct for Intel GPUs. CRITICAL: Missing [[sycl::reqd_sub_group_size(WARP_SIZE)]] on all kernel functions. The quant kernel processes 2 elements per work-item (dfloat2), the float kernel processes 1 element per work-item. The backward kernel has 1 work-item per column with a serial loop over all gradient rows."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": "partial",
+          "coalesced_notes": "k_get_rows_float: Adjacent work-items access adjacent columns src0_row[i00] and dst_row[i00] — perfectly coalesced within each gathered row. However, src0 access is inherently random (indirect through src1 row indices), so different work-groups access non-contiguous src0 rows. k_get_rows_quant: Output writes are strided — dst_row[iybs + iqs + 0] and dst_row[iybs + iqs + y_offset] where y_offset = qk/2 for qr>1, causing non-coalesced writes for some formats. k_get_rows_back: grad[i*ncols + col] reads are strided by ncols across the serial loop iterations.",
+          "strided_accesses": [
+            "Quantized kernel output: writes to dst_row[iybs + iqs + 0] and dst_row[iybs + iqs + y_offset] with y_offset = qk/2 — creates stride-16/32 access pattern for non-trivial qr values",
+            "Backward kernel: serial loop reads grad[i*ncols + col] for i=0..nrows_grad — stride = ncols elements between iterations, causing poor spatial locality",
+            "All kernels: src0 rows accessed via indirect index src1[...] — gather pattern, inherently non-coalesced across work-groups"
+          ],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "All loads and stores are scalar. For the float kernel, each work-item copies a single element (4 bytes for F32, 2 bytes for F16/BF16). This is a pure memory copy with type conversion, so vectorized loads (vec4/vec8) would directly improve throughput. For the quantized kernel, the dequantization produces 2 elements per call, but writes them to non-adjacent locations. The SYCL version is functionally identical to CUDA — neither uses vectorized loads."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes": 0,
+          "potential_bank_conflicts": false,
+          "notes": "No SLM used. This is correct — get_rows is an embarrassingly parallel gather operation with no inter-work-item communication. Each work-item independently looks up and copies one or two elements. SLM would not help since there's no data reuse within a work-group (each row index leads to a different src0 row)."
+        },
+        "reduction_pattern": {
+          "has_reduction": false,
+          "notes": "No reduction in the forward kernels. The backward kernel (k_get_rows_back_float) has a pseudo-reduction: it serially sums gradient values from matching row indices. However, this is not a parallel reduction — it's a serial accumulation in a single work-item, iterating over all nrows_grad to find matches. This is O(nrows_grad) per output element and extremely inefficient for large index sets."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "input_types": ["float", "sycl::half", "sycl_bf16", "int32_t", "quantized (Q4_0, Q4_1, Q5_0, Q5_1, Q8_0)"],
+          "output_types": ["float", "sycl::half", "sycl_bf16", "int32_t"],
+          "accumulator_type": "float",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "Supports 9 quantized source types (Q4_0, Q4_1, Q5_0, Q5_1, Q8_0 via traits, plus F16, F32, I32, BF16 via float path) with 4 destination types (F32, F16, BF16, I32). The SYCL version uses compile-time dequant_traits template dispatch instead of CUDA's function pointer approach — this is actually superior since it enables inlining and avoids function pointer overhead on GPUs. All intermediate computation is in FP32. Joint matrix is not applicable — this is a gather/copy operation, not a matrix multiply."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [],
+          "notes": "No math functions used. The kernel is purely memory operations: index lookup, byte offset computation, optional dequantization (bit manipulation only, no transcendentals), and type casting. The sycl_cast helper uses static_cast with float intermediary for type conversion."
+        },
+        "synchronization": {
+          "barriers": [],
+          "notes": "No barriers or synchronization. Each work-item operates independently on different elements. This is correct for a gather/copy operation."
+        },
+        "loop_analysis": {
+          "hot_loops": [
+            "Forward quant: outer loop 'for z = group(2); z < ne11*ne12; z += gridDim_z' — iterates over batch*sequence dimensions beyond grid capacity",
+            "Forward quant: inner loop 'for i00 = 2*(group(1)*block_sz+thread); i00 < ne00; i00 += 2*gridDim_y*block_sz' — iterates over columns beyond grid capacity",
+            "Forward float: same dual-loop structure as quant but processing 1 element per iteration instead of 2",
+            "Backward: 'for i = 0; i < nrows_grad; ++i' with 'if (rows[i] != dst_row) continue' — serial scan of ALL gradient rows per output element"
+          ],
+          "unrolled": false,
+          "notes": "The forward kernel loops handle grid dimension overflow (gridDim_y and gridDim_z are capped at 65535). For typical shapes, these loops execute 1 iteration (the grid is large enough). The backward kernel's serial loop is the main performance concern — it's O(nrows_grad) with branch-heavy execution (if/continue). No #pragma unroll on any loop."
+        },
+        "estimated_bottleneck": "memory",
+        "bottleneck_notes": "The forward kernels are purely memory-bandwidth bound — they perform gather (indirect load) + optional dequantization + scatter (indexed store). Arithmetic intensity: float kernel = 0 FLOP/8 bytes (pure copy), quant kernel = ~2-4 FLOPs/byte (bit extraction + scale/offset). The gather access pattern means L2/L3 cache hit rate depends on the distribution of row indices — for embedding lookups with large vocabulary, cache misses are common. The backward kernel is compute-bound on the serial row-matching loop for large nrows_grad, but memory-bound for the actual gradient accumulation.",
+        "anti_patterns": [
+          "nd_range<3> with local_range=(1,1,256) — only dim2 is threaded, dims 0 and 1 are used as grid-level iteration indices. This is a direct CUDA dim3 port. Should be simplified to nd_range<1> with explicit grid-overflow loops, reducing kernel argument overhead and enabling the SYCL runtime to optimize dispatch.",
+          "Missing [[sycl::reqd_sub_group_size(WARP_SIZE)]] on all 3 kernel functions — the compiler may select a non-optimal sub-group size, and the code implicitly assumes certain work-item ordering that may not hold without this attribute.",
+          "No vectorized loads/stores for the float copy path — k_get_rows_float copies one element per work-item. For F32→F32 (the common case), vec4 loads/stores would process 16 bytes per work-item, reducing instruction count 4x.",
+          "k_get_rows_back_float uses brute-force O(nrows_grad) serial scan per output element — for large index sets (e.g., vocabulary embedding backward), this is extremely slow. Both CUDA and SYCL use this same naive approach (CUDA comments 'TODO: atomicAdd'). An atomic scatter-add approach would be O(nrows_grad) total instead of O(nrows_grad * ne1) total.",
+          "Integer division z / ne12 and z % ne12 in hot path of forward kernels — computed per work-item in every loop iteration. Could use fast-division trick or precompute on host when ne11*ne12 fits in grid."
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_018_001",
+          "category": "vectorization",
+          "priority": "medium",
+          "description": "Use vectorized vec4 loads and stores for k_get_rows_float when src0 and dst types are the same (F32→F32, which is the common case for embedding lookups). Each work-item would process 4 consecutive elements using sycl::vec<float,4>, reducing instruction count 4x and improving memory subsystem utilization for this purely memory-copy kernel.",
+          "expected_improvement": "1.5-2.5x throughput for F32→F32 path. The kernel is a pure memory copy with gather, so wider loads directly translate to higher effective bandwidth. For F16→F32 or quant→F32 paths, vec4 stores on the output side still help.",
+          "implementation_notes": "For the F32→F32 same-type path: change the inner loop to process 4 columns per iteration. sycl::vec<float,4> src = *reinterpret_cast<const sycl::vec<float,4>*>(&src0_row[i00]); *reinterpret_cast<sycl::vec<float,4>*>(&dst_row[i00]) = src; Adjust loop stride to block_sz*4. Add scalar tail for ne00 not divisible by 4. For F16→F32 conversion: load vec4<half> and convert to vec4<float>. Requires GGML tensor alignment (typically 32-byte aligned).",
+          "risk": "low",
+          "risk_notes": "Standard vectorization pattern. Requires ne00 >= 4 (always true for practical shapes). Alignment is guaranteed by GGML tensor allocation."
+        },
+        {
+          "id": "opt_018_002",
+          "category": "nd_range_cleanup",
+          "priority": "low",
+          "description": "Simplify nd_range<3> with local=(1,1,256) to nd_range<1> with local=256. The current 3D range has dimensions 0 and 1 serving as grid-level indices (local_range=1), while only dimension 2 is actually threaded (local_range=256). This is a CUDA dim3 port artifact. Converting to nd_range<1> with explicit grid loops (already present in the kernel code) simplifies the launch configuration and potentially reduces kernel dispatch overhead.",
+          "expected_improvement": "1-3% from reduced kernel dispatch overhead and cleaner code. The nd_range<3> with mostly-1 local ranges creates unnecessary complexity in the SYCL runtime's work-group scheduling. The primary benefit is code maintainability.",
+          "implementation_notes": "Replace nd_range<3>(global, local) with nd_range<1>(total_work_items, 256). In the kernel, replace item.get_group(0) with a computed index from the 1D work-group ID: group_id = item.get_group(0); i10 = group_id / (gridDim_y * gridDim_z); remainder = group_id % (gridDim_y * gridDim_z); ... Or keep the existing loop structure and just use the 1D grid to cover all rows.",
+          "risk": "low",
+          "risk_notes": "Purely structural change — same computation, different launch configuration. The kernel already has grid-overflow loops that handle arbitrary grid sizes."
+        },
+        {
+          "id": "opt_018_003",
+          "category": "sub_group_size",
+          "priority": "medium",
+          "description": "Add [[sycl::reqd_sub_group_size(WARP_SIZE)]] attribute to all 3 kernel functions. Currently none of the kernel functions specify the sub-group size, allowing the compiler to select any supported width. On Intel GPUs, this could result in SIMD32 selection which changes the sub-group behavior and may not match the intended work distribution.",
+          "expected_improvement": "Correctness safeguard + 0-5% performance from guaranteed SIMD16 execution enabling better compiler optimization. The compiler can make stronger assumptions about memory coalescing and register allocation when the sub-group size is known at compile time.",
+          "implementation_notes": "Add [[sycl::reqd_sub_group_size(WARP_SIZE)]] to the parallel_for lambda in all 3 launch sites (get_rows_sycl_q, get_rows_sycl_float, ggml_sycl_op_get_rows_back). The kernel functions themselves are called from within the lambda, so the attribute goes on the lambda.",
+          "risk": "low",
+          "risk_notes": "Adding a sub-group size attribute is a correctness improvement with no functional change when the current execution already uses SIMD16. If the current execution silently uses SIMD32, this change makes the kernel explicitly use SIMD16 which is the intended behavior."
+        },
+        {
+          "id": "opt_018_004",
+          "category": "algorithmic",
+          "priority": "low",
+          "description": "Replace k_get_rows_back_float's brute-force O(nrows_grad) serial scan with an atomic scatter-add approach. Currently each output element serially scans ALL gradient rows to find matching indices, making the total work O(ne1 * nrows_grad * ncols). An atomic scatter-add kernel would iterate over gradient rows (nrows_grad) and atomically add each gradient value to dst[rows[i] * ncols + col], making total work O(nrows_grad * ncols) — a ne1 factor reduction.",
+          "expected_improvement": "5-50x speedup for large nrows_grad (e.g., vocabulary size 32000 with batch*seq_len gradient rows). For small nrows_grad (< 32), the current approach may actually be faster due to atomic overhead. The backward pass is only used during training, not inference.",
+          "implementation_notes": "New kernel: each work-item processes one (gradient_row, col) pair. For each gradient_row i: atomically add grad[i*ncols + col] to dst[rows[i]*ncols + col]. Use sycl::atomic_ref<float, sycl::memory_order::relaxed, sycl::memory_scope::device, sycl::access::address_space::global_space> for the atomic add. Grid: nd_range<1>(nrows_grad * ceil(ncols/256) * 256, 256). Requires zeroing dst first (memset to 0). CUDA's getrows.cu has the same TODO comment suggesting this approach.",
+          "risk": "medium",
+          "risk_notes": "Atomic FP32 adds may have limited hardware support on some Intel GPUs. The relaxed memory ordering is sufficient for commutative addition but needs verification. Numerical results may differ slightly from the serial version due to floating-point non-associativity. This is a training-only kernel, so the risk-reward tradeoff may not justify the effort for inference-focused optimization."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "50-65%",
+      "efficiency_notes": "The getrows kernel is a clean native SYCL port with minimal DPCT artifacts (only the nd_range<3> layout). The template-based dequant_traits dispatch is actually superior to CUDA's function pointer approach. The forward kernels are simple gather operations with WG=256, which is correct for Intel GPUs. The main optimization gaps are: (1) no vectorized loads/stores for the float copy path — this is the highest-impact opportunity since F32→F32 embedding lookup is a pure memory copy. (2) Missing reqd_sub_group_size attribute. (3) nd_range<3> cleanup. (4) The backward kernel uses brute-force serial scan, but this is training-only and both CUDA and SYCL share the same limitation. Overall low optimization potential because: get_rows is called infrequently during inference (only for initial token embedding lookup), the gather pattern means performance is dominated by cache behavior rather than kernel efficiency, and the kernel is already well-structured with correct work-group size."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 17,
+    "total_kernels_analyzed": 18,
     "high_potential": 4,
     "medium_potential": 8,
-    "low_potential": 5,
+    "low_potential": 6,
     "no_optimization_needed": 0,
     "top_opportunities": [
       {

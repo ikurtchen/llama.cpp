@@ -5,9 +5,9 @@
 
 ## Summary
 - Total SYCL kernels to analyze: 54
-- Kernels analyzed so far: 17
+- Kernels analyzed so far: 18
 - Analysis complete: No
-- Kernels with optimization potential: 15
+- Kernels with optimization potential: 16
 - Optimization tasks created: 0 (pending finalization)
 
 ## Kernels Analyzed
@@ -28,7 +28,7 @@
 - [x] sk_015: softmax — medium potential
 - [x] sk_016: rope — medium potential
 - [x] sk_017: norm — medium potential
-- [ ] sk_018: getrows — pending
+- [x] sk_018: getrows — low potential
 - [ ] sk_019: cpy — pending
 - [ ] sk_020: concat — pending
 - [ ] sk_021: im2col — pending
@@ -67,6 +67,7 @@
 - [ ] sk_054: upscale (inline) — pending
 
 ## Recent Activity
+[2026-03-06] Analyzed getrows (sk_018). Found 4 optimization opportunities (low potential). Key findings: Clean native SYCL port with 3 kernel functions — k_get_rows_quant (5 quantized types), k_get_rows_float (F32/F16/BF16/I32), k_get_rows_back_float (backward scatter-add). All use nd_range<3> with local=(1,1,256) — DPCT-style 3D range where only dim2 is threaded. Missing reqd_sub_group_size on all kernels. SYCL dequant_traits template dispatch is superior to CUDA's function pointer approach (enables inlining). No vectorized loads on pure memory-copy float path. Backward kernel uses brute-force O(nrows_grad) serial scan per output element (same as CUDA). ~50-65% estimated efficiency. Low potential because get_rows is called infrequently during inference (only token embedding lookup).
 [2026-03-06] Analyzed norm (sk_017). Found 5 optimization opportunities (medium potential). Key findings: Clean native SYCL port with 5 kernel variants (NORM, GROUP_NORM, RMS_NORM, RMS_NORM_BACK, L2_NORM). All use nd_range<1>, WG=256, reqd_sub_group_size(16), proper sycl::local_accessor and block_reduce. Zero DPCT artifacts. CRITICAL missing feature: CUDA has fused rms_norm_f32<block_size, do_multiply, do_add> variants combining RMS_NORM with element-wise MUL (weight scaling) in a single kernel — SYCL lacks this entirely, requiring 2 kernel launches. RMS_NORM is called 2x per transformer layer. Missing adaptive block_size (CUDA uses WARP_SIZE for small ncols, 1024 for large; SYCL always uses 256). No vectorized loads on memory-bound kernel (0.125-0.375 FLOP/byte). GROUP_NORM makes 3 passes where 2 would suffice (float2 trick from NORM not applied). ~45-60% estimated efficiency.
 [2026-03-06] Analyzed rope (sk_016). Found 5 optimization opportunities (medium potential). Key findings: Clean native SYCL port with 4 kernel variants (norm, neox, multi, vision) sharing identical launch config: nd_range<2>, WG=256, reqd_sub_group_size(16). No DPCT artifacts. Embarrassingly parallel — each work-item rotates one element pair. CRITICAL missing feature: CUDA has ROPE+VIEW+SET_ROWS fusion (row_indices + set_rows_stride) eliminating an intermediate buffer and kernel launch — SYCL lacks this entirely. Missing F32→F16 mixed-precision dispatch needed for fusion. Full-precision sycl::pow/sin/cos transcendentals (~3-5x slower than native). Scalar stores where CUDA uses float2/half2 paired writes for rope_norm. ~50-65% estimated efficiency.
 [2026-03-06] Analyzed softmax (sk_015). Found 8 optimization opportunities (medium potential). Key findings: Clean native SYCL softmax with 4 kernel variants (forward, backward). Forward uses proper WG=256, SLM caching, block_reduce for inter-warp reduction. Backward uses only WG=16 (1 sub-group). Missing CUDA's compile-time ncols specialization ({32,64,...,4096}) with #pragma unroll. No vectorized loads on a purely memory-bound kernel (~3 FLOP/byte). Hardcoded 48KB SLM threshold (Xe2 has 64KB). Missing cooperative column-parallel variant for large ncols. dpct::permute_sub_group_by_xor in reduction helpers. ~40-55% estimated efficiency.
