@@ -1151,6 +1151,21 @@
         ],
         "blocking_issues": [],
         "correctness_risks": []
+      },
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "70-85%",
+      "efficiency_notes": {
+        "optimization_potential": "low",
+        "estimated_current_efficiency": "70-85%",
+        "key_findings": [
+          "The quantize kernel is already well-implemented with correct sub-group size, vectorized loads/stores, and proper sub-group reductions",
+          "The kernel is purely memory-bandwidth bound (0.16 ops/byte) \u2014 compute optimizations have no impact",
+          "Work-group size of 16 is suboptimal but hardware compensates by scheduling many concurrent single-sub-group work-groups",
+          "The SoA reorder variant (quantize_and_reorder_q8_1_soa) enables cache-friendly layout for downstream consumers \u2014 good design",
+          "This kernel is a utility for mul_mat paths, not a standalone performance-critical kernel \u2014 optimization ROI is low"
+        ],
+        "blocking_issues": [],
+        "correctness_risks": []
       }
     },
     {
@@ -1281,6 +1296,24 @@
         }
       ],
       "overall_assessment": {
+        "optimization_potential": "medium",
+        "estimated_current_efficiency": "60-75%",
+        "key_findings": [
+          "Device functions only (not kernels) \u2014 performance is determined by calling kernel's launch config (MMVQ sk_002, DMMV sk_003)",
+          "Heavy DPCT artifact usage (dp4a, vectorized_binary, byte_level_permute, __dpct_inline__, DPCT_COMPATIBILITY_TEMP) \u2014 functional but non-idiomatic SYCL",
+          "Inconsistent memory access helpers: non-aligned get_int_from_uint8 uses 4 byte loads vs aligned version using single 4-byte load",
+          "Only 3 of 20+ quant formats have reorder (SoA) variants \u2014 limiting MMVQ performance for most formats",
+          "IQ format loops missing #pragma unroll \u2014 minor but easy fix",
+          "Core dp4a compute pattern is appropriate for Intel GPU hardware \u2014 no algorithmic change needed for the dot product itself"
+        ],
+        "blocking_issues": [],
+        "correctness_risks": [
+          "DPCT_COMPATIBILITY_TEMP >= MIN_CC_DP4A guards (lines 1071, 1173) may incorrectly disable IQ format support if DPCT_COMPATIBILITY_TEMP is not defined or set too low \u2014 should be removed for SYCL"
+        ]
+      },
+      "overall_optimization_potential": "medium",
+      "estimated_current_efficiency": "40-55%",
+      "efficiency_notes": {
         "optimization_potential": "medium",
         "estimated_current_efficiency": "60-75%",
         "key_findings": [
@@ -1429,6 +1462,23 @@
         }
       ],
       "overall_assessment": {
+        "optimization_potential": "medium",
+        "estimated_current_efficiency": "50-70%",
+        "key_findings": [
+          "Mix of per-element device helpers (6 functions) and block dequantization kernel bodies (17 functions) used by DMMV and convert.cpp respectively",
+          "Purely memory-bandwidth bound \u2014 dequantization compute is trivial (1-3 multiply-adds per element)",
+          "Strided output writes (stride 32) in most non-reorder formats waste memory bandwidth",
+          "Only Q4_K reorder uses vectorized loads \u2014 all other formats use scalar byte loads",
+          "Inconsistent #pragma unroll across formats with identical loop structures",
+          "Only 3 of 17+ formats have reorder (SoA) variants \u2014 limits optimization scope for MMVQ",
+          "nd_item<3> DPCT artifact pervasive in non-reorder functions"
+        ],
+        "blocking_issues": [],
+        "correctness_risks": []
+      },
+      "overall_optimization_potential": "medium",
+      "estimated_current_efficiency": "35-50%",
+      "efficiency_notes": {
         "optimization_potential": "medium",
         "estimated_current_efficiency": "50-70%",
         "key_findings": [
@@ -4184,12 +4234,14 @@
       "current_analysis": {
         "launch_config": {
           "uses_nd_range": true,
-          "work_group_size": [256],
+          "work_group_size": [
+            256
+          ],
           "work_group_size_total": 256,
           "sub_group_size": null,
           "sub_group_size_specified": false,
           "global_size_expression": "nd_range<1>(num_blocks * SYCL_ROLL_BLOCK_SIZE, SYCL_ROLL_BLOCK_SIZE) where num_blocks = ceil(n_elements / 256)",
-          "notes": "Correct nd_range<1> with WG=256 (SYCL_ROLL_BLOCK_SIZE). Matches CUDA's CUDA_ROLL_BLOCK_SIZE=256. 1D dispatch over all elements in a flat 4D tensor. No reqd_sub_group_size — acceptable since kernel has no sub-group-level operations. Clean and idiomatic."
+          "notes": "Correct nd_range<1> with WG=256 (SYCL_ROLL_BLOCK_SIZE). Matches CUDA's CUDA_ROLL_BLOCK_SIZE=256. 1D dispatch over all elements in a flat 4D tensor. No reqd_sub_group_size \u2014 acceptable since kernel has no sub-group-level operations. Clean and idiomatic."
         },
         "memory_patterns": {
           "coalesced_accesses": true,
@@ -4203,7 +4255,7 @@
           "uses_slm": false,
           "slm_bytes": 0,
           "potential_bank_conflicts": false,
-          "notes": "No SLM used. Appropriate — this is a simple 1:1 element copy with index remapping, no data reuse."
+          "notes": "No SLM used. Appropriate \u2014 this is a simple 1:1 element copy with index remapping, no data reuse."
         },
         "reduction_pattern": {
           "has_reduction": false,
@@ -4211,18 +4263,18 @@
           "uses_work_group_reduce": false,
           "uses_slm_manual_reduce": false,
           "uses_atomic": false,
-          "notes": "No reduction. Embarrassingly parallel — each work-item independently reads one element and writes one element."
+          "notes": "No reduction. Embarrassingly parallel \u2014 each work-item independently reads one element and writes one element."
         },
         "data_types": {
           "compute_type": "float32",
           "could_use_half": false,
           "could_use_joint_matrix": false,
-          "notes": "FP32 only. Host wrapper asserts src0->type == GGML_TYPE_F32. No F16/BF16 support (same as CUDA). The roll operation is a pure copy — data type does not affect compute, only bandwidth."
+          "notes": "FP32 only. Host wrapper asserts src0->type == GGML_TYPE_F32. No F16/BF16 support (same as CUDA). The roll operation is a pure copy \u2014 data type does not affect compute, only bandwidth."
         },
         "math_functions": {
           "uses_native_math": false,
           "functions": [],
-          "notes": "No transcendental math. All computation is integer arithmetic for 4D index decomposition and wrap_index (comparison + add/subtract). The kernel performs zero floating-point computation — it's a pure data movement kernel."
+          "notes": "No transcendental math. All computation is integer arithmetic for 4D index decomposition and wrap_index (comparison + add/subtract). The kernel performs zero floating-point computation \u2014 it's a pure data movement kernel."
         },
         "loop_analysis": {
           "hot_loops": [],
@@ -4232,9 +4284,9 @@
         "estimated_bottleneck": "memory",
         "bottleneck_notes": "Pure memory-bound kernel with zero floating-point computation: 4 bytes read + 4 bytes written = 8 bytes per work-item, 0 FLOPs (only integer index math). Arithmetic intensity is exactly 0 ops/byte for floating-point, far below the 27 ops/byte compute threshold. Performance is limited entirely by memory bandwidth. The 4 int64 division/modulo operations for index decomposition add some integer compute overhead but this is secondary to memory latency.",
         "anti_patterns": [
-          "Expensive 64-bit integer division/modulo for 4D index decomposition (4 divisions per work-item) — all dimension values likely fit in int32, and could use multiply-shift trick (fast_div) for further speedup",
-          "No vectorized loads/stores — could process 4 floats per work-item with sycl::vec<float,4> for simple roll along dim0 only",
-          "FP32-only — no F16/BF16 support for half-precision tensors (same limitation as CUDA)",
+          "Expensive 64-bit integer division/modulo for 4D index decomposition (4 divisions per work-item) \u2014 all dimension values likely fit in int32, and could use multiply-shift trick (fast_div) for further speedup",
+          "No vectorized loads/stores \u2014 could process 4 floats per work-item with sycl::vec<float,4> for simple roll along dim0 only",
+          "FP32-only \u2014 no F16/BF16 support for half-precision tensors (same limitation as CUDA)",
           "Redundant destination index computation: dst[i3*(...)+i2*(...)+i1*ne00+i0] is identical to dst[idx] since idx = i0 + i1*ne00 + i2*(ne00*ne01) + i3*(ne00*ne01*ne02)"
         ]
       },
@@ -4257,34 +4309,45 @@
           "expected_improvement": "1.5-2x throughput improvement for the s0==0 case (vec4 loads/stores). No improvement when s0 != 0 since consecutive elements in dim0 may wrap to non-contiguous source addresses. Most practical roll operations shift along a single dimension, so the fast path would be hit frequently.",
           "implementation_notes": "Add a fast path: if (s0 == 0 && ne00 % 4 == 0) { process 4 elements per work-item using sycl::vec<float,4> }. Adjust global range to n_elements/4 for the fast path. Fall back to scalar for s0 != 0 or ne00 % 4 != 0.",
           "risk": "low",
-          "risk_notes": "Conditional fast path — scalar fallback ensures correctness for all cases. 16-byte alignment of float arrays is guaranteed by the allocator."
+          "risk_notes": "Conditional fast path \u2014 scalar fallback ensures correctness for all cases. 16-byte alignment of float arrays is guaranteed by the allocator."
         },
         {
           "id": "opt_031_003",
           "category": "data_type",
           "priority": "low",
-          "description": "Add F16/BF16 support via template to match potential future CUDA expansion. Currently both CUDA and SYCL only support F32. For models using half-precision tensors, the roll operation would need to convert F16→F32→roll→F32→F16, which wastes bandwidth. A templated kernel processing sycl::half directly would halve the bandwidth requirement.",
+          "description": "Add F16/BF16 support via template to match potential future CUDA expansion. Currently both CUDA and SYCL only support F32. For models using half-precision tensors, the roll operation would need to convert F16\u2192F32\u2192roll\u2192F32\u2192F16, which wastes bandwidth. A templated kernel processing sycl::half directly would halve the bandwidth requirement.",
           "expected_improvement": "2x bandwidth improvement when processing F16 tensors (2 bytes vs 4 bytes per element). However, this is only useful if the upstream model uses F16 tensors, which is not the current default.",
           "implementation_notes": "Template the kernel on data type: template<typename T> roll_sycl(const T* src, T* dst, ...). Instantiate for float, sycl::half, sycl::ext::oneapi::bfloat16. Update the host wrapper to dispatch based on src0->type.",
           "risk": "low",
-          "risk_notes": "Pure code expansion — no algorithmic changes. The roll operation is a copy, so there are no precision concerns with F16/BF16."
+          "risk_notes": "Pure code expansion \u2014 no algorithmic changes. The roll operation is a copy, so there are no precision concerns with F16/BF16."
         }
       ],
       "overall_optimization_potential": "low",
       "estimated_current_efficiency": "70-85%",
-      "efficiency_notes": "The roll kernel is a near-perfect 1:1 CUDA port. Clean hand-written SYCL (no DPCT artifacts), correct nd_range<1> with WG=256, proper bounds checking. Embarrassingly parallel with zero floating-point computation — a pure memory-bound data movement kernel. Writes are perfectly coalesced; reads are mostly coalesced except at wrap boundaries. The only inefficiencies are: (1) expensive int64 division for index decomposition, (2) scalar 1-element-per-thread processing where vec4 could be used for the common s0==0 case. Low potential because: (1) roll is called infrequently in LLM inference, (2) the kernel is already well-structured, (3) absolute time per call is small for typical tensor sizes. The primary optimization value is in integer arithmetic (fast_div) which would benefit many similar kernels."
+      "efficiency_notes": "The roll kernel is a near-perfect 1:1 CUDA port. Clean hand-written SYCL (no DPCT artifacts), correct nd_range<1> with WG=256, proper bounds checking. Embarrassingly parallel with zero floating-point computation \u2014 a pure memory-bound data movement kernel. Writes are perfectly coalesced; reads are mostly coalesced except at wrap boundaries. The only inefficiencies are: (1) expensive int64 division for index decomposition, (2) scalar 1-element-per-thread processing where vec4 could be used for the common s0==0 case. Low potential because: (1) roll is called infrequently in LLM inference, (2) the kernel is already well-structured, (3) absolute time per call is small for typical tensor sizes. The primary optimization value is in integer arithmetic (fast_div) which would benefit many similar kernels."
     },
     {
       "kernel_id": "sk_032",
       "name": "ssm_conv",
       "file": "ggml/src/ggml-sycl/ssm_conv.cpp",
-      "source_cuda_ids": ["ck_103", "ck_104"],
+      "source_cuda_ids": [
+        "ck_103",
+        "ck_104"
+      ],
       "current_analysis": {
         "launch_config": {
           "uses_nd_range": true,
-          "work_group_size_short": [1, 128, 1],
+          "work_group_size_short": [
+            1,
+            128,
+            1
+          ],
           "work_group_size_short_total": 128,
-          "work_group_size_long": [1, 128, 1],
+          "work_group_size_long": [
+            1,
+            128,
+            1
+          ],
           "work_group_size_long_total": 128,
           "sub_group_size": null,
           "sub_group_size_specified": false,
@@ -4294,9 +4357,9 @@
         "memory_patterns": {
           "coalesced_accesses": false,
           "strided_accesses": [
-            "Weight loads: w_block[tid * stride_w + j] — adjacent threads access memory separated by stride_w floats (stride_w = src1_nb1/4, typically = d_conv = 3 or 4). This means threads 0 and 1 access addresses d_conv apart — strided by d_conv, NOT coalesced",
-            "Input loads: x_block[tid * stride_x + j] — same strided pattern, adjacent threads separated by stride_x = src0_nb1/4 = nc (d_conv) floats",
-            "Output writes: y_block[i * stride_y + tid] — adjacent threads write adjacent elements — COALESCED"
+            "Weight loads: w_block[tid * stride_w + j] \u2014 adjacent threads access memory separated by stride_w floats (stride_w = src1_nb1/4, typically = d_conv = 3 or 4). This means threads 0 and 1 access addresses d_conv apart \u2014 strided by d_conv, NOT coalesced",
+            "Input loads: x_block[tid * stride_x + j] \u2014 same strided pattern, adjacent threads separated by stride_x = src0_nb1/4 = nc (d_conv) floats",
+            "Output writes: y_block[i * stride_y + tid] \u2014 adjacent threads write adjacent elements \u2014 COALESCED"
           ],
           "vectorized_loads": false,
           "vector_width": null,
@@ -4321,7 +4384,7 @@
           "accumulator_type": "float",
           "could_use_half": false,
           "could_use_joint_matrix": false,
-          "notes": "FP32 throughout — same as CUDA. The convolution is a very short dot product (3-9 elements), so FP16 accumulation could lose precision for accumulated values. The compute is trivial (nc multiply-adds per output element). joint_matrix not applicable — the d_conv dimension (3-9) is far too small for matrix hardware."
+          "notes": "FP32 throughout \u2014 same as CUDA. The convolution is a very short dot product (3-9 elements), so FP16 accumulation could lose precision for accumulated values. The compute is trivial (nc multiply-adds per output element). joint_matrix not applicable \u2014 the d_conv dimension (3-9) is far too small for matrix hardware."
         },
         "math_functions": {
           "uses_native_math": false,
@@ -4330,25 +4393,25 @@
         },
         "loop_analysis": {
           "hot_loops": [
-            "Weight load loop (line 53, short; line 123, long): iterates nc times (3-9), NOT unrolled — CUDA has #pragma unroll and compile-time nc via template",
-            "Time-step loop (line 58, short): iterates n_t times (1-32 for short), NOT unrolled — CUDA also dynamic, not unrolled",
-            "Initial x load loop (line 62, short; line 132, long): iterates nc times, NOT unrolled — CUDA has compile-time nc so compiler can auto-unroll",
-            "Dot product inner loop (line 69, short; line 139, long): iterates nc times (3-9), NOT unrolled — CRITICAL: CUDA has #pragma unroll with compile-time nc, enabling full unroll and modulo optimization. This is the hot inner loop executing n_t * nc times per thread",
-            "Split time loop (line 127, long): iterates split_n_t=32 times, NOT unrolled — CUDA has #pragma unroll with compile-time split_n_t"
+            "Weight load loop (line 53, short; line 123, long): iterates nc times (3-9), NOT unrolled \u2014 CUDA has #pragma unroll and compile-time nc via template",
+            "Time-step loop (line 58, short): iterates n_t times (1-32 for short), NOT unrolled \u2014 CUDA also dynamic, not unrolled",
+            "Initial x load loop (line 62, short; line 132, long): iterates nc times, NOT unrolled \u2014 CUDA has compile-time nc so compiler can auto-unroll",
+            "Dot product inner loop (line 69, short; line 139, long): iterates nc times (3-9), NOT unrolled \u2014 CRITICAL: CUDA has #pragma unroll with compile-time nc, enabling full unroll and modulo optimization. This is the hot inner loop executing n_t * nc times per thread",
+            "Split time loop (line 127, long): iterates split_n_t=32 times, NOT unrolled \u2014 CUDA has #pragma unroll with compile-time split_n_t"
           ],
           "unrolled": false,
           "notes": "CRITICAL: NONE of the inner loops have #pragma unroll, unlike the CUDA version which has #pragma unroll on all performance-critical loops. More importantly, CUDA uses compile-time template specialization for d_conv (3, 4, 9) and split_n_t (32), allowing the compiler to fully unroll and optimize. SYCL uses runtime nc with SSM_CONV_MAX_D_CONV=9 fixed-size arrays, preventing the compiler from knowing the loop trip count. The inner dot product loop has modulo operations ((i + j) % nc) that could be optimized away with compile-time nc but are expensive at runtime."
         },
         "estimated_bottleneck": "memory",
-        "bottleneck_notes": "SSM convolution has low arithmetic intensity: nc multiply-adds per input element loaded, where nc = 3-9. For nc=4, that's 4 FLOPs per 4-byte load = 1 FLOP/byte, far below the 27 FLOP/byte compute intensity threshold. The kernel is memory-bandwidth bound. However, the strided input/weight access pattern means actual bandwidth utilization is poor — adjacent threads access data d_conv floats apart rather than adjacent addresses. The private register arrays (x[] and w[]) eliminate repeated global loads of weights, which is good. The circular buffer approach avoids loading the full window for each time step, reducing total loads from n_t * nc to n_t + nc - 1 per thread.",
+        "bottleneck_notes": "SSM convolution has low arithmetic intensity: nc multiply-adds per input element loaded, where nc = 3-9. For nc=4, that's 4 FLOPs per 4-byte load = 1 FLOP/byte, far below the 27 FLOP/byte compute intensity threshold. The kernel is memory-bandwidth bound. However, the strided input/weight access pattern means actual bandwidth utilization is poor \u2014 adjacent threads access data d_conv floats apart rather than adjacent addresses. The private register arrays (x[] and w[]) eliminate repeated global loads of weights, which is good. The circular buffer approach avoids loading the full window for each time step, reducing total loads from n_t * nc to n_t + nc - 1 per thread.",
         "anti_patterns": [
-          "CRITICAL: No #pragma unroll on any loop — CUDA has #pragma unroll on weight load, dot product, and split_n_t loops. This causes the compiler to generate loop overhead instructions and prevents modulo optimization",
-          "Runtime d_conv (nc) instead of compile-time template specialization — CUDA templates on d_conv = {3, 4, 9}, enabling the compiler to optimize modulo to bitwise AND (for power-of-2 nc=4) or eliminate it entirely via full unrolling. SYCL uses SSM_CONV_MAX_D_CONV=9 fixed arrays with runtime nc, preventing these optimizations",
+          "CRITICAL: No #pragma unroll on any loop \u2014 CUDA has #pragma unroll on weight load, dot product, and split_n_t loops. This causes the compiler to generate loop overhead instructions and prevents modulo optimization",
+          "Runtime d_conv (nc) instead of compile-time template specialization \u2014 CUDA templates on d_conv = {3, 4, 9}, enabling the compiler to optimize modulo to bitwise AND (for power-of-2 nc=4) or eliminate it entirely via full unrolling. SYCL uses SSM_CONV_MAX_D_CONV=9 fixed arrays with runtime nc, preventing these optimizations",
           "Modulo operations (i + j) % nc and (i - 1) % nc in the hot inner loop are expensive at runtime (integer division) but would be free with compile-time nc",
-          "Missing [[intel::reqd_sub_group_size(16)]] — no sub-group size specified",
-          "Work-group size 128 is below Intel's recommended 256 — but may be acceptable given the 72 bytes of private register usage per thread",
-          "Strided weight and input loads (stride = d_conv) — adjacent threads access non-adjacent memory. Not fixable without data layout change since d_conv is the innermost storage dimension",
-          "SSM_CONV_MAX_D_CONV=9 allocates 9-element arrays even when nc=3 or nc=4 — wastes 5-6 register slots per array (10-12 total wasted registers per thread). With compile-time nc, the compiler would allocate exactly nc registers"
+          "Missing [[intel::reqd_sub_group_size(16)]] \u2014 no sub-group size specified",
+          "Work-group size 128 is below Intel's recommended 256 \u2014 but may be acceptable given the 72 bytes of private register usage per thread",
+          "Strided weight and input loads (stride = d_conv) \u2014 adjacent threads access non-adjacent memory. Not fixable without data layout change since d_conv is the innermost storage dimension",
+          "SSM_CONV_MAX_D_CONV=9 allocates 9-element arrays even when nc=3 or nc=4 \u2014 wastes 5-6 register slots per array (10-12 total wasted registers per thread). With compile-time nc, the compiler would allocate exactly nc registers"
         ]
       },
       "optimization_opportunities": [
@@ -4356,7 +4419,7 @@
           "id": "opt_032_001",
           "category": "loop_unroll",
           "priority": "high",
-          "description": "Add compile-time template specialization for d_conv (nc) values 3, 4, and 9, matching the CUDA approach. This enables the compiler to: (1) fully unroll all nc-dependent loops (weight load, dot product, x load), (2) optimize modulo operations away (% 4 becomes & 3 for nc=4, or eliminated entirely for nc=3/9 via full unrolling), (3) allocate exactly nc registers per array instead of SSM_CONV_MAX_D_CONV=9. The dot product inner loop is the hot path executing n_t * nc times per thread — even small per-iteration savings compound significantly.",
+          "description": "Add compile-time template specialization for d_conv (nc) values 3, 4, and 9, matching the CUDA approach. This enables the compiler to: (1) fully unroll all nc-dependent loops (weight load, dot product, x load), (2) optimize modulo operations away (% 4 becomes & 3 for nc=4, or eliminated entirely for nc=3/9 via full unrolling), (3) allocate exactly nc registers per array instead of SSM_CONV_MAX_D_CONV=9. The dot product inner loop is the hot path executing n_t * nc times per thread \u2014 even small per-iteration savings compound significantly.",
           "expected_improvement": "15-30% throughput improvement. The modulo elimination alone saves 2 integer divisions per inner loop iteration. Full unrolling of the nc=4 dot product reduces 4 iterations of loop control to 4 straight-line multiply-adds. Register savings (18 floats at nc=3 vs 10 actually needed) improve occupancy. CUDA performance data shows measurable benefit from these compile-time optimizations.",
           "implementation_notes": "Convert ssm_conv_f32_sycl and ssm_conv_long_token_f32_sycl to function templates: template<int NC> static void ssm_conv_f32_sycl(...). Replace 'nc' with NC inside the kernel lambda. Replace 'float x[SSM_CONV_MAX_D_CONV]' with 'float x[NC]'. Add #pragma unroll before the weight load loop, dot product loop, and (for long kernel) the split_n_t loop. In the dispatcher (ggml_sycl_ssm_conv), use a switch on nc: case 3: ssm_conv_f32_sycl<3>(...); break; case 4: ssm_conv_f32_sycl<4>(...); break; case 9: ssm_conv_f32_sycl<9>(...); break; default: GGML_ABORT(). This mirrors the CUDA dispatch exactly.",
           "risk": "low",
@@ -4366,9 +4429,9 @@
           "id": "opt_032_002",
           "category": "work_group_size",
           "priority": "medium",
-          "description": "Increase work-group size from 128 to 256 to better match Intel GPU's preferred work-group size. Currently each work-group has 128/16 = 8 sub-groups. Doubling to 256 gives 16 sub-groups, improving occupancy and latency hiding. The private register usage per thread is 72 bytes (18 floats for x[] and w[] at nc=9), so 256 threads would use 256*72 = 18KB total private memory — well within hardware limits. With compile-time nc (opt_032_001), register usage drops to 2*nc*4 = 24-72 bytes per thread.",
+          "description": "Increase work-group size from 128 to 256 to better match Intel GPU's preferred work-group size. Currently each work-group has 128/16 = 8 sub-groups. Doubling to 256 gives 16 sub-groups, improving occupancy and latency hiding. The private register usage per thread is 72 bytes (18 floats for x[] and w[] at nc=9), so 256 threads would use 256*72 = 18KB total private memory \u2014 well within hardware limits. With compile-time nc (opt_032_001), register usage drops to 2*nc*4 = 24-72 bytes per thread.",
           "expected_improvement": "5-15% throughput improvement from better occupancy. The kernel is memory-bound, so more concurrent threads help hide memory latency. Diminishing returns beyond 256 due to register pressure.",
-          "implementation_notes": "Change SSM_CONV_BLOCK_SIZE from 128 to 256. Verify that nr (d_inner) is always divisible by 256 — Mamba models typically use d_inner = 768, 1536, 2048, 3072 which are all multiples of 256. If not always divisible, add a bounds check (tid < nr_per_block) or keep 128 as fallback. The CUDA version also uses 128, but Intel GPUs benefit from larger work-groups more than NVIDIA GPUs.",
+          "implementation_notes": "Change SSM_CONV_BLOCK_SIZE from 128 to 256. Verify that nr (d_inner) is always divisible by 256 \u2014 Mamba models typically use d_inner = 768, 1536, 2048, 3072 which are all multiples of 256. If not always divisible, add a bounds check (tid < nr_per_block) or keep 128 as fallback. The CUDA version also uses 128, but Intel GPUs benefit from larger work-groups more than NVIDIA GPUs.",
           "risk": "low",
           "risk_notes": "The GGML_ASSERT(nr % threads == 0) check will catch any d_inner values not divisible by 256. If common Mamba models use d_inner values not divisible by 256, this would need a bounds-checked version. Can verify by testing with actual Mamba model configurations."
         },
@@ -4380,7 +4443,7 @@
           "expected_improvement": "0-5% improvement. Mostly a correctness/consistency measure. The compiler likely already chooses SIMD16 for this kernel since it has no sub-group-specific operations, but making it explicit prevents regressions from compiler changes.",
           "implementation_notes": "Add [[intel::reqd_sub_group_size(16)]] attribute to both kernel lambdas: the short-token kernel (line 35) and the long-token kernel (line 102). Alternatively, use [[sycl::reqd_sub_group_size(16)]] for standard SYCL syntax.",
           "risk": "low",
-          "risk_notes": "No algorithmic impact. If the compiler was already selecting SIMD16, this is a no-op. If it was selecting a different width, this could cause either improvement or regression — benchmark to verify."
+          "risk_notes": "No algorithmic impact. If the compiler was already selecting SIMD16, this is a no-op. If it was selecting a different width, this could cause either improvement or regression \u2014 benchmark to verify."
         },
         {
           "id": "opt_032_004",
@@ -4388,20 +4451,181 @@
           "priority": "low",
           "description": "Cache convolution weights in SLM for the sub-group to reduce strided global memory reads. Currently each thread independently loads its own d_conv weights from global memory with stride-d_conv access. If the weight tensor is transposed or if a sub-group cooperatively loads a tile of weights into SLM, the global reads could be coalesced. However, the weight data is small (d_conv * d_inner * 4 bytes = 4 * 768 * 4 = 12KB for nc=4) and loaded only once per thread, so the benefit is limited.",
           "expected_improvement": "2-8% throughput improvement. The weight load is a one-time cost per thread, not per time step. The strided input loads (per time step) are the bigger bandwidth waste, but those can't easily be coalesced without changing the tensor layout.",
-          "implementation_notes": "Allocate sycl::local_accessor<float, 2>(threads, nc, h) for weights. Have all threads cooperatively load weight data from global memory into SLM with coalesced pattern, then barrier, then each thread reads its own weights from SLM. This converts stride-d_conv global reads to stride-d_conv SLM reads (fast) preceded by coalesced global reads. Net effect: global read traffic unchanged but better coalesced. Alternatively, transpose the weight storage to [d_conv][d_inner] so that adjacent threads access adjacent weights — this requires upstream layout change.",
+          "implementation_notes": "Allocate sycl::local_accessor<float, 2>(threads, nc, h) for weights. Have all threads cooperatively load weight data from global memory into SLM with coalesced pattern, then barrier, then each thread reads its own weights from SLM. This converts stride-d_conv global reads to stride-d_conv SLM reads (fast) preceded by coalesced global reads. Net effect: global read traffic unchanged but better coalesced. Alternatively, transpose the weight storage to [d_conv][d_inner] so that adjacent threads access adjacent weights \u2014 this requires upstream layout change.",
           "risk": "low",
           "risk_notes": "Minor code change. SLM usage is tiny (128 * 9 * 4 = 4.5KB max). Barrier overhead for one-time weight loading is negligible compared to the n_t time-step loop."
         }
       ],
       "overall_optimization_potential": "medium",
       "estimated_current_efficiency": "45-60%",
-      "efficiency_notes": "The SSM conv kernel is a clean manual port from CUDA with correct logic but missing critical compile-time optimizations. The SYCL version is structurally identical to CUDA but loses 15-30% performance due to: (1) runtime nc instead of compile-time template specialization — the single biggest gap, (2) no #pragma unroll on any loop — prevents compiler from optimizing short fixed-trip-count loops, (3) expensive runtime modulo operations that CUDA eliminates via compile-time constants. The kernel is memory-bound with low arithmetic intensity (1-2.25 FLOP/byte for nc=4-9), so bandwidth utilization is key. Strided input/weight loads (stride-d_conv pattern) waste bandwidth but are inherent to the [d_inner][d_conv] storage layout. Work-group size of 128 is slightly below optimal for Intel. SSM conv is the core convolution step in Mamba-architecture models, called once per layer — critical path for Mamba inference. The kernel's simplicity (no SLM, no reductions, no sub-group ops) means the optimization surface is narrow but the compile-time specialization opportunity is high-impact and low-risk."
+      "efficiency_notes": "The SSM conv kernel is a clean manual port from CUDA with correct logic but missing critical compile-time optimizations. The SYCL version is structurally identical to CUDA but loses 15-30% performance due to: (1) runtime nc instead of compile-time template specialization \u2014 the single biggest gap, (2) no #pragma unroll on any loop \u2014 prevents compiler from optimizing short fixed-trip-count loops, (3) expensive runtime modulo operations that CUDA eliminates via compile-time constants. The kernel is memory-bound with low arithmetic intensity (1-2.25 FLOP/byte for nc=4-9), so bandwidth utilization is key. Strided input/weight loads (stride-d_conv pattern) waste bandwidth but are inherent to the [d_inner][d_conv] storage layout. Work-group size of 128 is slightly below optimal for Intel. SSM conv is the core convolution step in Mamba-architecture models, called once per layer \u2014 critical path for Mamba inference. The kernel's simplicity (no SLM, no reductions, no sub-group ops) means the optimization surface is narrow but the compile-time specialization opportunity is high-impact and low-risk."
+    },
+    {
+      "kernel_id": "sk_033",
+      "name": "ssm_scan",
+      "file": "ggml/src/ggml-sycl/ssm_scan.cpp",
+      "source_cuda_ids": [
+        "ck_105",
+        "ck_106"
+      ],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size_short": [
+            1,
+            128,
+            1
+          ],
+          "work_group_size_short_total": 128,
+          "work_group_size_long": [
+            1,
+            128,
+            1
+          ],
+          "work_group_size_long_total": 128,
+          "sub_group_size": 16,
+          "sub_group_size_specified": "only Mamba-2 kernel (reqd_sub_group_size(WARP_SIZE)). Mamba-1 kernel: not specified.",
+          "global_size_expression": "Mamba-1: (n_seq, num_head_chunks * splitD) * (1, splitD=128). Mamba-2 nc=128: (n_seq, n_blocks * 128) * (1, 128). Mamba-2 nc=256: (n_seq, n_blocks * 256) * (1, 256).",
+          "notes": "Two kernel variants: Mamba-1 (ssm_scan_f32_sycl<splitD=128, N=16>) for original Mamba with d_state=16, and Mamba-2 (ssm_scan_f32_group_sycl<c_factor, d_state>) for grouped SSM with d_state=128 or 256. Mamba-1 uses WG=128 (8 sub-groups on Intel SIMD16) with SLM for B/C vectors. Mamba-2 uses WG=d_state (128 or 256) with warp-level reduction. On Intel with WARP_SIZE=16, c_factor is 8 (nc=128) or 16 (nc=256) -- double CUDA because Intel sub-groups are half CUDA warp size. Mamba-2 has reqd_sub_group_size(WARP_SIZE), Mamba-1 does not."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "strided_accesses": [
+            "Mamba-1: A_block[tid * stride_A + n] and s0_block[tid * stride_s0 + n] -- strided by N=16 between adjacent threads",
+            "Mamba-1: x_block[i * stride_x + tid] and dt_block[i * stride_dt + tid] -- coalesced",
+            "Mamba-2: s0_warp[WARP_SIZE * j + lane] -- coalesced within each sub-group",
+            "Mamba-2: B_warp[i * stride_B + WARP_SIZE * j + lane] -- coalesced within each sub-group"
+          ],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "Both kernels have same memory access patterns as CUDA. CUDA uses CUB BlockLoad/BlockStore with WARP_TRANSPOSE for Mamba-1's A/s0 loads -- optimized coalesced blocked load. SYCL uses scalar strided loads instead. No vectorized loads in either version."
+        },
+        "slm_usage": {
+          "uses_slm": true,
+          "slm_bytes": "Mamba-1: 2 * N * 4 = 128 bytes (smemB[16] + smemC[16]). Mamba-2: 0 bytes.",
+          "potential_bank_conflicts": false,
+          "notes": "Mamba-1 caches B and C vectors (d_state=16 floats each) in SLM per time step -- broadcast pattern, no bank conflicts. Mamba-2 uses no SLM, relies on warp-level reduction."
+        },
+        "reduction_pattern": {
+          "has_reduction": true,
+          "uses_sub_group_reduce": true,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "Mamba-1: No reduction. Mamba-2: warp_reduce_sum(state_sum) reduces across lanes within sub-group. Implementation uses dpct::permute_sub_group_by_xor (DPCT artifact) instead of sycl::reduce_over_group."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "accumulator_type": "float",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "FP32 throughout. Sequential recurrence requires full FP32 precision to avoid state divergence. joint_matrix not applicable."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [
+            "sycl::log1p(sycl::exp(dt_soft_plus)) -- softplus, once per (thread, time_step)",
+            "sycl::exp(dt_soft_plus * regA[n]) -- state decay, N=16 times per (thread, time_step) in Mamba-1, once in Mamba-2"
+          ],
+          "notes": "Mamba-1 inner loop calls sycl::exp N=16 times per time step per thread -- dominant transcendental cost. CUDA uses single-precision expf/log1pf. sycl::native::exp could be 2-4x faster with acceptable precision loss."
+        },
+        "loop_analysis": {
+          "hot_loops": [
+            "Mamba-1 time-step loop (line 62): for i=0..n_tok -- sequential, NOT unrolled. CUDA has L_template specialization for n_tok=1..8 with #pragma unroll. SYCL has NO L_template.",
+            "Mamba-1 inner dot product (line 76): for n=0..N=16 -- N compile-time, NO #pragma unroll. CUDA has #pragma unroll. Hottest loop: exp + 4 ops per iteration.",
+            "Mamba-1 A/s0 load (line 56): for n=0..N=16 -- NO #pragma unroll. CUDA has #pragma unroll.",
+            "Mamba-1 state store (line 86): for n=0..N=16 -- NO #pragma unroll. CUDA has #pragma unroll.",
+            "Mamba-2 state init (line 149): for j=0..c_factor -- NO #pragma unroll. CUDA has #pragma unroll.",
+            "Mamba-2 inner state update (line 161): for j=0..c_factor -- NO #pragma unroll. CUDA has #pragma unroll.",
+            "Mamba-2 state store (line 177): for j=0..c_factor -- NO #pragma unroll. CUDA has #pragma unroll."
+          ],
+          "unrolled": false,
+          "notes": "CRITICAL: SYCL has ZERO #pragma unroll across both kernels. CUDA has #pragma unroll on ALL 7 inner loops. All bounds are compile-time template params. ADDITIONALLY: CUDA has L_template compile-time specialization for n_tok=1..8 in Mamba-1 (common single-token inference case). SYCL entirely lacks this."
+        },
+        "estimated_bottleneck": "compute",
+        "bottleneck_notes": "Compute-bound due to exp() calls in inner loop. Mamba-1: 17 transcendentals per time step per thread (16 exp + 1 softplus). Sequential recurrence prevents time-step parallelism. Mamba-2: 1 exp per time step per warp plus warp_reduce_sum communication cost.",
+        "anti_patterns": [
+          "CRITICAL: No #pragma unroll on ANY loop -- CUDA has #pragma unroll on all 7 inner loops",
+          "CRITICAL: Missing L_template compile-time specialization for Mamba-1 n_tok=1..8 -- CUDA specializes via switch, SYCL always runtime n_tok",
+          "Missing CUB-equivalent BlockLoad/BlockStore for coalesced blocked loads of A and s0 arrays",
+          "DPCT artifact in warp_reduce_sum: dpct::permute_sub_group_by_xor instead of sycl::reduce_over_group",
+          "Missing __restrict__ equivalent on kernel lambda captures",
+          "Mamba-1 missing [[intel::reqd_sub_group_size(16)]]",
+          "2x register pressure for Mamba-2 state[] on Intel: c_factor = d_state/WARP_SIZE, Intel WARP_SIZE=16 vs CUDA 32",
+          "Full-precision sycl::exp where sycl::native::exp could suffice for state decay"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_033_001",
+          "category": "loop_unroll",
+          "priority": "high",
+          "description": "Add #pragma unroll to all 7 compile-time-bounded inner loops in both Mamba-1 and Mamba-2 kernels, matching CUDA. Targets: Mamba-1 A/s0 load (N=16), inner dot product (N=16), state store (N=16); Mamba-2 state init (c_factor), inner update (c_factor), state store (c_factor). The N=16 inner dot product containing exp() is highest-impact.",
+          "expected_improvement": "10-25% throughput improvement. Eliminates 15 branch+increment instructions per N=16 loop and enables ILP for interleaved exp() computations.",
+          "implementation_notes": "Add '#pragma unroll' before each of the 6 for-loops. All bounds are already compile-time template parameters. No other code changes needed.",
+          "risk": "low",
+          "risk_notes": "Standard optimization with no correctness impact. DPC++ may already auto-unroll some since bounds are constexpr, in which case the pragma is a no-op."
+        },
+        {
+          "id": "opt_033_002",
+          "category": "template_specialization",
+          "priority": "high",
+          "description": "Add compile-time L_template specialization for Mamba-1 time-step loop (n_tok dimension), matching CUDA's switch on n_tok=1..8. For single-token inference (n_tok=1, dominant generation case), CUDA eliminates the entire time loop; SYCL pays full loop overhead + branch every iteration.",
+          "expected_improvement": "15-35% throughput for n_tok=1 (single-token inference). 5-15% for n_tok=2..8. No improvement for n_tok>8.",
+          "implementation_notes": "Add third template parameter: template <int splitD, int N, int L_template>. Change time loop to: const int64_t L = L_template == 0 ? n_tok : L_template; for (int64_t i = 0; i < L; i++). Add switch on n_t in dispatch: case 1..8 dispatch specialized, default uses L_template=0.",
+          "risk": "low",
+          "risk_notes": "Direct translation of CUDA's proven approach. 8 additional template instantiations (~50-100KB binary size increase)."
+        },
+        {
+          "id": "opt_033_003",
+          "category": "sub_group_ops",
+          "priority": "medium",
+          "description": "Replace DPCT-based warp_reduce_sum with sycl::reduce_over_group(sub_group) in Mamba-2, and add [[intel::reqd_sub_group_size(16)]] to Mamba-1 kernel lambda.",
+          "expected_improvement": "3-8% for Mamba-2 (hardware-accelerated reduction). 0-3% for Mamba-1 sub-group size attribute.",
+          "implementation_notes": "Mamba-2: Replace 'state_sum = warp_reduce_sum(state_sum)' with 'auto sg = item.get_sub_group(); state_sum = sycl::reduce_over_group(sg, state_sum, sycl::plus<float>())'. Mamba-1: Add [[intel::reqd_sub_group_size(16)]] to kernel lambda.",
+          "risk": "low",
+          "risk_notes": "sycl::reduce_over_group is standard SYCL 2020 API, well-tested on Intel GPUs. Produces identical results."
+        },
+        {
+          "id": "opt_033_004",
+          "category": "native_math",
+          "priority": "medium",
+          "description": "Replace sycl::exp/sycl::log1p with sycl::native::exp and sycl::native::log(1+x) in SSM state transition. The exp() is in the hottest inner loop of Mamba-1 (16 calls per time step per thread).",
+          "expected_improvement": "5-15% for Mamba-1, 2-5% for Mamba-2. On Intel Xe2, native transcendentals can be 2-4x faster.",
+          "implementation_notes": "Replace sycl::exp with sycl::native::exp in inner loops. Replace sycl::log1p(sycl::exp(x)) with sycl::native::log(1.0f + sycl::native::exp(x)) for softplus. Note: sycl::native::log1p does not exist in SYCL spec.",
+          "risk": "medium",
+          "risk_notes": "~1-3 ULP error. Accumulated precision loss over long sequences could cause state divergence. Needs accuracy benchmarking on Mamba models."
+        },
+        {
+          "id": "opt_033_005",
+          "category": "memory_coalescing",
+          "priority": "low",
+          "description": "Implement cooperative blocked load for Mamba-1's A and s0 arrays (CUB BlockLoad equivalent). Currently uses scalar strided loads with stride N between adjacent threads.",
+          "expected_improvement": "3-8% throughput. A/s0 loads are one-time cost before time loop. Higher impact for n_tok=1, negligible for large n_tok.",
+          "implementation_notes": "Allocate 8KB SLM buffer (splitD * N * 4 bytes). Cooperative coalesced load from global to SLM, barrier, then each thread copies N elements from SLM to registers. Reuse buffer between A and s0 loads.",
+          "risk": "low",
+          "risk_notes": "Standard SLM-based transpose pattern. 8KB SLM is well within 64KB limit. Two additional barriers for entire kernel lifetime."
+        },
+        {
+          "id": "opt_033_006",
+          "category": "register_pressure",
+          "priority": "low",
+          "description": "Address 2x register pressure in Mamba-2 on Intel (c_factor doubled due to WARP_SIZE=16 vs CUDA 32). For nc=256, each thread holds state[16]=64 bytes. Consider two-pass approach with halved state[] array.",
+          "expected_improvement": "0-10%, highly hardware-dependent. Only helps if register pressure limits occupancy.",
+          "implementation_notes": "For nc=256: Split c_factor=16 into two passes of c_factor=8, accumulating partial sums via SLM between passes. Halves per-thread registers at cost of one barrier + SLM read/write per time step.",
+          "risk": "medium",
+          "risk_notes": "Adds complexity and SLM overhead. Needs profiling with Intel VTune to determine if register pressure is actually the bottleneck."
+        }
+      ],
+      "overall_optimization_potential": "medium",
+      "estimated_current_efficiency": "40-55%",
+      "efficiency_notes": "Well-structured CUDA port preserving core SSM recurrence algorithm but systematically omitting ALL performance annotations. Zero #pragma unroll (CUDA has 7), no L_template compile-time specialization for n_tok=1..8 (CUDA has full switch dispatch), DPCT artifacts in warp_reduce_sum, no CUB-equivalent blocked loads, full-precision transcendentals. Compute-bound (dominated by exp() in inner loop). 2x c_factor on Intel Mamba-2 due to WARP_SIZE=16 is inherent hardware difference. SSM scan is the core recurrence for ALL Mamba-architecture models, called once per layer -- critical path. Estimated 30-55% improvement possible from combined optimizations."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 32,
+    "total_kernels_analyzed": 33,
     "high_potential": 4,
-    "medium_potential": 14,
+    "medium_potential": 15,
     "low_potential": 14,
     "no_optimization_needed": 0,
     "top_opportunities": [
