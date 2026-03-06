@@ -333,11 +333,187 @@
       "overall_optimization_potential": "high",
       "estimated_current_efficiency": "20-30%",
       "efficiency_notes": "MMVQ is inherently memory-bandwidth bound (arithmetic intensity ~0.5 ops/byte for Q4 formats vs the 27 ops/byte compute intensity threshold). The key to performance is maximizing memory bandwidth utilization. The legacy kernel path (17 of 20 formats) uses only 16 work-items per work-group — a severe occupancy limitation on Intel GPUs. The reordered kernels (3 formats) are much better at 256 work-items and SoA layout, but still miss SLM caching of the shared Y vector. The kernel is critical for single-token inference (autoregressive decoding), where the matrix is weights and the vector is the hidden state — this path dominates inference latency."
+    },
+    {
+      "kernel_id": "sk_003",
+      "name": "dequantize_mul_mat_vec (DMMV)",
+      "file": "ggml/src/ggml-sycl/dmmv.cpp",
+      "source_cuda_ids": ["ck_020", "ck_022", "ck_023", "ck_024", "ck_025", "ck_026", "ck_027", "ck_028"],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size_generic": [1, 1, 16],
+          "work_group_size_generic_total": 16,
+          "work_group_size_kquant": [1, 2, 32],
+          "work_group_size_kquant_total": 64,
+          "sub_group_size_generic": 16,
+          "sub_group_size_generic_specified": true,
+          "sub_group_size_kquant": 32,
+          "sub_group_size_kquant_specified": true,
+          "global_size_expression": "Generic: (1, 1, nrows/GGML_SYCL_MMV_Y) * (1, 1, WARP_SIZE). K-quant: (1, ny, nrows) * (1, ny, QK_WARP_SIZE)",
+          "notes": "Two distinct launch families. Generic kernels (Q4_0, Q4_1, Q5_0, Q5_1, Q8_0, F16) use work-group size 16 (1 sub-group of WARP_SIZE=16). K-quant kernels (Q2_K through Q6_K) use QK_WARP_SIZE=32 with [[sycl::reqd_sub_group_size(32)]] — CRITICAL: requesting sub-group size 32 on Intel where native width is 16. Both families are far below the recommended 256-512 work-group size. 3D nd_range with unused dimensions (CUDA artifact)."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": false,
+          "strided_accesses": [
+            "Generic: adjacent threads access blocks spaced vals_per_iter columns apart — strided, not coalesced across blocks",
+            "Generic: Y vector accessed with stride of vals_per_iter between adjacent threads",
+            "K-quant: AoS block layout means quantization block fields (qs, scales, hmask, d) are interleaved — strided access to each field",
+            "K-quant: Y vector accessed with large strides (16, 32, 48, ..., 128 elements from base) — very poor spatial locality"
+          ],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "All loads are scalar 4-byte or smaller via get_int_from_uint8/get_int_from_int8_aligned helpers or direct byte/half loads. No sycl::vec types for memory loads. The reorder variant (Q4_0 only) separates scales from quant data for better access locality but still uses scalar loads."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes": 0,
+          "potential_bank_conflicts": false,
+          "notes": "Zero SLM used in any DMMV kernel variant. All reduction via sub-group shuffles. No cross-sub-group communication mechanism. This means no Y vector sharing across sub-groups in a work-group, and limits the effective work-group size to 1 sub-group for the generic kernels."
+        },
+        "reduction_pattern": {
+          "has_reduction": true,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "reduction_details": "All kernels use manual butterfly reduction via dpct::permute_sub_group_by_xor (DPCT artifact of CUDA __shfl_xor_sync). Generic kernel: log2(WARP_SIZE) iterations with mask starting at WARP_SIZE/2 or WARP_SIZE/4. K-quant kernels: log2(QK_WARP_SIZE)=5 iterations — the mask=16 iteration XORs beyond sub-group width 16 on Intel, producing undefined/identity values. This is a latent correctness issue for K-quant kernels on Intel GPUs."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "accumulator_type": "float (dfloat when GGML_SYCL_F16 is set: sycl::half)",
+          "dot_product_type": "float multiply-accumulate (no dp4a — dequantize first, then float mul-add)",
+          "scale_type": "sycl::half -> float",
+          "could_use_half": true,
+          "could_use_joint_matrix": false,
+          "notes": "Default path uses float32 for all compute. GGML_SYCL_F16 compile flag enables half-precision accumulation for generic kernels only — K-quant kernels always use float32 regardless of flag. No integer dot products (dp4a) — unlike MMVQ/MMQ, DMMV dequantizes to float first then multiplies. This is inherently less compute-efficient than fused quantized multiply paths."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": ["sycl::fma (in dequantize helpers for Q4_1, Q5_1)"],
+          "notes": "No transcendental math functions. All compute is bit manipulation (dequantization) followed by float multiply-accumulate. sycl::fma used in some dequantize helpers."
+        },
+        "loop_analysis": {
+          "hot_loops": [
+            "Generic outer loop (line 47): iterates ncols/64 times, NOT unrolled (dynamic trip count)",
+            "Generic inner loop (line 55): 2 iterations on Intel (vals_per_iter=4, step=2), UNROLLED via #pragma unroll",
+            "Reorder outer loop (line 122): iterates ncols/512 times, NOT unrolled",
+            "Reorder inner loop (line 129): 16 iterations on Intel (vals_per_iter=32, step=2), UNROLLED via #pragma unroll",
+            "K-quant block loop (e.g., Q2_K line 266): iterates num_blocks_per_row times, NOT unrolled",
+            "K-quant inner computation: small fixed-count loops (1-4 iterations) over K_QUANTS_PER_ITERATION — NOT explicitly unrolled in most K-quant kernels"
+          ],
+          "unrolled": false,
+          "notes": "Only the generic/reorder inner loops and reduction loops have #pragma unroll. K-quant computation inner loops are NOT marked with #pragma unroll, despite having small fixed trip counts that would benefit from unrolling."
+        },
+        "estimated_bottleneck": "memory",
+        "bottleneck_notes": "DMMV is a matrix-vector product — inherently memory-bandwidth bound. Arithmetic intensity is ~1 op/byte for dequantize+multiply (even lower than fused MMVQ since DMMV dequantizes to float first, doubling the intermediate data width). With Intel's compute intensity threshold at ~27 ops/byte, DMMV needs maximum bandwidth utilization. The tiny work-group sizes (16 or 64), strided memory access, and no SLM caching severely limit actual bandwidth achieved.",
+        "anti_patterns": [
+          "CRITICAL: K-quant kernels request [[sycl::reqd_sub_group_size(32)]] (QK_WARP_SIZE=32) on Intel where native sub-group width is 16 — correctness risk with butterfly reduction reaching beyond actual sub-group boundaries",
+          "Generic kernels: work-group size of 16 (1 sub-group) — far below Intel's recommended 256-512",
+          "K-quant kernels: work-group size of 64 (2 rows * 32 threads) — still below recommended",
+          "3D nd_range with 2 unused dimensions — CUDA migration artifact, should be 1D",
+          "dpct::permute_sub_group_by_xor butterfly reduction instead of sycl::reduce_over_group — DPCT artifact",
+          "dpct::has_capability_or_fail(fp16) called even when F16 is not used for computation",
+          "dpct::queue_ptr, item_ct1, __dpct_inline__ naming — DPCT artifacts throughout",
+          "DPCT1110 register pressure warning comments preserved in source (lines 220-226, 346-352, etc.)",
+          "No vectorized loads — all scalar byte/int loads",
+          "No SLM caching of Y vector — each sub-group independently loads Y from global memory",
+          "Strided memory access patterns for both weight and Y vector loads",
+          "Off-by-one: K-quant kernels use 'row > nrows' instead of 'row >= nrows' (likely benign due to grid sizing)",
+          "Reorder support limited to Q4_0 only — other formats stuck with AoS layout",
+          "GGML_SYCL_F16 half-precision path not applied to K-quant kernels"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_003_001",
+          "category": "sub_group_ops",
+          "priority": "high",
+          "description": "Fix K-quant sub-group size mismatch: QK_WARP_SIZE=32 is hard-coded in presets.hpp but Intel native sub-group size is 16. The K-quant kernels request [[sycl::reqd_sub_group_size(32)]] and perform butterfly reduction with masks up to 16, which exceeds the actual sub-group width. Either: (a) rewrite K-quant kernels to use WARP_SIZE=16 sub-groups with adjusted indexing, or (b) restructure to use 2 cooperating sub-groups of 16 with SLM-based inter-sub-group reduction. Option (a) is simpler and aligns with MMVQ's approach.",
+          "expected_improvement": "Correctness fix — ensures K-quant DMMV produces correct results on Intel GPUs. May also improve performance by 10-20% by running at native SIMD16 width instead of emulated SIMD32.",
+          "implementation_notes": "In presets.hpp, make QK_WARP_SIZE equal to GGML_SYCL_WARP_SIZE (16 on Intel). Adjust K-quant kernel indexing: tid = item_ct1.get_local_id(2) % 16 (was %32). Each thread processes more elements per row to compensate for fewer threads. Adjust reduction to log2(16)=4 iterations. Change [[sycl::reqd_sub_group_size(QK_WARP_SIZE)]] to use 16. Adjust ny (number of rows per work-group) and grid dimensions accordingly.",
+          "risk": "high",
+          "risk_notes": "Requires restructuring the data access patterns in all 5 K-quant kernels (Q2_K through Q6_K). Each has format-specific bit manipulation that assumes 32 lanes. Extensive testing needed for all K-quant formats."
+        },
+        {
+          "id": "opt_003_002",
+          "category": "work_group_size",
+          "priority": "high",
+          "description": "Increase work-group size from 16 (generic) or 64 (K-quant) to 256 by grouping 16 sub-groups per work-group. Each sub-group independently computes one row's dot product. This is the same optimization as opt_002_001 for MMVQ and has been proven to work in the MMVQ reordered kernels. Current single-sub-group work-groups severely underutilize Intel GPU occupancy.",
+          "expected_improvement": "25-50% throughput improvement from better occupancy, memory-level parallelism, and hardware thread utilization. The B60 has 64 hardware threads per Xe-core; with 16-thread work-groups, only 1 work-group occupies 1 hardware thread slot.",
+          "implementation_notes": "Change block_dims from (1,1,WARP_SIZE) to (1,1,num_subgroups*WARP_SIZE) with num_subgroups=16. Each sub-group uses sub_group_id to compute a different row. Adjust grid to block_num_y = ceil(nrows / num_subgroups). The MMVQ reordered kernels (mmvq.cpp lines 537-554) serve as a proven template. For K-quant kernels, first fix the sub-group size issue (opt_003_001), then apply the same multi-sub-group pattern.",
+          "risk": "low",
+          "risk_notes": "Sub-groups are independent (each computes a different row), so grouping them is straightforward. Only risk is if nrows < num_subgroups — need bounds checking (row < nrows guard)."
+        },
+        {
+          "id": "opt_003_003",
+          "category": "slm_tuning",
+          "priority": "high",
+          "description": "Cache Y vector in SLM for multi-sub-group work-groups. When 16 sub-groups in one work-group all compute dot products against the same Y vector, each sub-group currently redundantly loads Y from global memory (16x bandwidth waste). Load Y into SLM once per work-group, then all sub-groups read from SLM. For DMMV which is purely memory-bandwidth bound, this is a critical optimization.",
+          "expected_improvement": "20-35% overall throughput improvement. Y vector typically occupies ncols*sizeof(float) bytes (e.g., 4096*4=16KB for a 4096-column matrix) — fits well within the 64KB SLM budget. The weight matrix bandwidth is unchanged, but Y bandwidth drops by ~16x.",
+          "implementation_notes": "Allocate sycl::local_accessor<float, 1>(ncols, h) for Y data. Have all sub-groups cooperatively load Y into SLM (each sub-group loads ncols/num_subgroups elements). Insert group_barrier(). Then all sub-groups read Y from SLM. For matrices wider than ~16K columns, use tiled loading (load a chunk of Y into SLM per iteration). Depends on opt_003_002 (multi-sub-group work-groups).",
+          "risk": "medium",
+          "risk_notes": "SLM allocation size depends on ncols — must handle dynamically sized matrices. For very wide matrices (ncols > 16K), SLM cannot hold entire Y vector — need tiled approach with barriers per tile. The barrier overhead must not exceed the bandwidth savings."
+        },
+        {
+          "id": "opt_003_004",
+          "category": "memory_coalescing",
+          "priority": "medium",
+          "description": "Extend reorder (SoA) layout support from Q4_0 only to all commonly-used quantization formats. The current AoS (array-of-structures) layout interleaves quantization fields (qs, d, scales, qh) within each block, causing strided access patterns. The SoA layout stores all qs bytes contiguously, all scales contiguously, etc., enabling coalesced reads where adjacent threads access adjacent memory addresses.",
+          "expected_improvement": "15-30% throughput improvement per format. The Q4_0 reorder variant in dmmv.cpp already demonstrates this pattern. Extending to Q4_1, Q5_0, Q5_1, Q8_0 is straightforward; K-quant formats (Q2_K-Q6_K) are more complex due to multi-level scales.",
+          "implementation_notes": "For each format: 1) Add reorder_tensor support in quants.hpp/cpp (SoA packing for the format's fields). 2) Implement dequantize_mul_mat_vec_reorder template instantiation or hand-coded reorder kernel. 3) Wire into the dispatcher switch in ggml_sycl_op_dequantize_mul_mat_vec. The existing Q4_0 reorder implementation (dmmv.cpp lines 93-197) serves as the template. Priority: Q8_0 and Q4_1 first (simple block structures), then K-quant formats.",
+          "risk": "medium",
+          "risk_notes": "Each format has a different block structure requiring format-specific reorder logic. Must ensure reorder/dereorder is compatible with other kernel paths. K-quant formats have multi-level scales that complicate the SoA layout."
+        },
+        {
+          "id": "opt_003_005",
+          "category": "sub_group_ops",
+          "priority": "medium",
+          "description": "Replace all dpct::permute_sub_group_by_xor butterfly reductions with sycl::reduce_over_group(sub_group, val, sycl::plus<float>()). This applies to both generic kernels (~3 instances) and K-quant kernels (~5 instances). The manual butterfly reduction is a DPCT artifact and may not compile to optimal code on Intel GPUs.",
+          "expected_improvement": "3-8% improvement. The compiler can generate optimal reduction code from the high-level reduce_over_group API. More importantly, this eliminates the DPCT dependency and fixes the correctness issue where K-quant butterfly reductions exceed sub-group width.",
+          "implementation_notes": "Replace each '#pragma unroll for (mask = ...; mask > 0; mask >>= 1) { tmp += dpct::permute_sub_group_by_xor(..., tmp, mask); }' block with 'tmp = sycl::reduce_over_group(item_ct1.get_sub_group(), tmp, sycl::plus<float>());'. This is the same fix as opt_002_003 for MMVQ. Approximately 8 replacement sites across the file.",
+          "risk": "low",
+          "risk_notes": "Direct replacement with standard SYCL API. sycl::reduce_over_group handles the sub-group width automatically, fixing the QK_WARP_SIZE=32 vs actual-size=16 mismatch."
+        },
+        {
+          "id": "opt_003_006",
+          "category": "vectorization",
+          "priority": "medium",
+          "description": "Use vectorized 8-byte or 16-byte loads (sycl::vec<uint32_t, 2> or sycl::vec<uint32_t, 4>) for loading quantization blocks and Y vector from global memory. Currently all loads are scalar (1 or 4 bytes). Wider loads reduce memory transactions and better utilize the memory bus width. Particularly impactful for the Y vector which is float32 and easily amenable to vec4 loads.",
+          "expected_improvement": "10-20% improvement in memory throughput. Y vector vec4 loads (16 bytes each) would reduce Y memory transactions by 4x. Weight loads benefit varies by format — simpler formats (Q4_0, Q8_0) benefit more.",
+          "implementation_notes": "For Y vector: replace sequential y[idx], y[idx+1], ... with sycl::vec<float,4> loads via reinterpret_cast. For weights: format-specific — Q8_0 has contiguous qs bytes amenable to vec4 loads; Q4_0 can load 2 bytes as a single short. Must verify alignment requirements. The reorder variant's contiguous data layout is more amenable to vectorization.",
+          "risk": "medium",
+          "risk_notes": "Alignment requirements must be verified. The Y vector (float array) should be naturally 4-byte aligned but may not be 16-byte aligned for vec4. Use __attribute__((aligned(16))) or runtime alignment checks."
+        },
+        {
+          "id": "opt_003_007",
+          "category": "loop_unroll",
+          "priority": "low",
+          "description": "Add #pragma unroll to K-quant inner computation loops. The K-quant kernels (Q2_K through Q6_K) have small fixed-count inner loops (1-4 iterations) that are not explicitly unrolled, unlike the generic kernel's inner loop which has #pragma unroll. Unrolling these constant-trip-count loops eliminates loop overhead and enables better instruction scheduling.",
+          "expected_improvement": "3-7% improvement. The inner loops are small (1-4 iterations) so the loop overhead is proportionally significant. Combined effect across all K-quant formats.",
+          "implementation_notes": "Add #pragma unroll before the inner computation loops in each K-quant kernel: Q2_K (line ~281), Q3_K (line ~411), Q4_K (line ~522), Q5_K (line ~667), Q6_K (line ~813). These loops iterate K_QUANTS_PER_ITERATION or fixed constants. Only unroll the innermost computation loops, not the outer block iteration loop (dynamic trip count).",
+          "risk": "low",
+          "risk_notes": "Minimal risk — unrolling small constant-count loops is a standard optimization. May slightly increase register pressure but the loops are very small."
+        },
+        {
+          "id": "opt_003_008",
+          "category": "data_type",
+          "priority": "low",
+          "description": "Enable GGML_SYCL_F16 by default and extend half-precision support to K-quant kernels. The generic kernels already have half-precision paths under the GGML_SYCL_F16 flag, but K-quant kernels always use float32. On Intel Xe2, FP16 compute is 2x faster than FP32, so using half-precision for the multiply-accumulate phase would double the effective compute throughput.",
+          "expected_improvement": "5-15% overall improvement. DMMV is memory-bound, so compute speedup has limited impact. But for wider matrices where compute becomes more significant, FP16 accumulation helps. K-quant formats have enough precision in their scales that FP16 accumulation should not introduce meaningful errors.",
+          "implementation_notes": "1) Add -DGGML_SYCL_F16=ON to default CMake build flags. 2) For K-quant kernels, change accumulator from float to sycl::half and use half-precision multiply-accumulate. 3) Convert final reduction result back to float for output. Must validate numerical accuracy with full test suite.",
+          "risk": "medium",
+          "risk_notes": "FP16 has ~3.3 decimal digits of precision vs ~7 for FP32. For long rows (large ncols), accumulation error may grow. Need to test with large models (7B+ parameters) to verify accuracy is acceptable. May need Kahan summation or periodic float32 accumulation for long rows."
+        }
+      ],
+      "overall_optimization_potential": "high",
+      "estimated_current_efficiency": "15-25%",
+      "efficiency_notes": "DMMV is a fallback path for matrix-vector multiplication when the fused MMVQ path is not available or not optimal. It dequantizes to float first then multiplies, which is inherently less efficient than MMVQ's fused quantized dot product. The kernel has severe issues: K-quant sub-group size mismatch (QK_WARP_SIZE=32 on Intel native SIMD16), tiny work-group sizes (16 or 64), no SLM caching, no vectorized loads, strided memory access, and extensive DPCT artifacts. On the B60, memory bandwidth is the bottleneck (~0.5-1 ops/byte arithmetic intensity vs 27 ops/byte threshold), so maximizing bandwidth utilization through coalesced access, vectorized loads, and Y vector caching is critical. The kernel is used for single-token inference with quantized models."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 2,
-    "high_potential": 2,
+    "total_kernels_analyzed": 3,
+    "high_potential": 3,
     "medium_potential": 0,
     "low_potential": 0,
     "no_optimization_needed": 0,
@@ -375,6 +551,27 @@
         "kernel_name": "mul_mat_vec_q (MMVQ)",
         "optimization_id": "opt_002_002",
         "description": "Cache Y vector in SLM to eliminate 16x redundant global memory loads across sub-groups",
+        "priority": "high"
+      },
+      {
+        "kernel_id": "sk_003",
+        "kernel_name": "dequantize_mul_mat_vec (DMMV)",
+        "optimization_id": "opt_003_001",
+        "description": "Fix K-quant sub-group size mismatch: QK_WARP_SIZE=32 vs Intel native SIMD16 — correctness fix",
+        "priority": "high"
+      },
+      {
+        "kernel_id": "sk_003",
+        "kernel_name": "dequantize_mul_mat_vec (DMMV)",
+        "optimization_id": "opt_003_002",
+        "description": "Increase work-group size from 16/64 to 256 with multi-sub-group pattern",
+        "priority": "high"
+      },
+      {
+        "kernel_id": "sk_003",
+        "kernel_name": "dequantize_mul_mat_vec (DMMV)",
+        "optimization_id": "opt_003_003",
+        "description": "Cache Y vector in SLM to eliminate 16x redundant global memory loads",
         "priority": "high"
       }
     ]

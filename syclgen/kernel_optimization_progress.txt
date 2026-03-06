@@ -5,15 +5,15 @@
 
 ## Summary
 - Total SYCL kernels to analyze: 54
-- Kernels analyzed so far: 2
+- Kernels analyzed so far: 3
 - Analysis complete: No
-- Kernels with optimization potential: 2
+- Kernels with optimization potential: 3
 - Optimization tasks created: 0 (pending finalization)
 
 ## Kernels Analyzed
 - [x] sk_001: mul_mat_q (MMQ) — high potential
 - [x] sk_002: mul_mat_vec_q (MMVQ) — high potential
-- [ ] sk_003: dequantize_mul_mat_vec (DMMV) — pending
+- [x] sk_003: dequantize_mul_mat_vec (DMMV) — high potential
 - [ ] sk_004: dequantize_block_sycl (convert) — pending
 - [ ] sk_005: outprod (oneMKL GEMM) — pending
 - [ ] sk_006: MUL_MAT_ID kernels — pending
@@ -67,5 +67,6 @@
 - [ ] sk_054: upscale (inline) — pending
 
 ## Recent Activity
+[2026-03-06] Analyzed kernel dequantize_mul_mat_vec (DMMV) (sk_003). Found 8 optimization opportunities (high potential). Key findings: CRITICAL K-quant sub-group size mismatch (QK_WARP_SIZE=32 vs Intel native SIMD16 — correctness risk), tiny work-group sizes (16 or 64), no SLM caching, no vectorized loads, strided memory access, extensive DPCT artifacts. Butterfly reduction exceeds sub-group width in K-quant kernels.
 [2026-03-06] Analyzed kernel mul_mat_vec_q (MMVQ) (sk_002). Found 7 optimization opportunities (high potential). Key findings: legacy kernels use work-group size of only 16 (should be 256), no SLM caching of shared Y vector, manual shuffle reduction (DPCT artifact), no vectorized loads, reorder support limited to 3/20 formats. This kernel is critical for single-token inference latency.
 [2026-03-06] Analyzed kernel mul_mat_q (MMQ) (sk_001). Found 8 optimization opportunities (high potential). Key findings: work-group size 64 (should be 256+), missing reqd_sub_group_size, no XMX/joint_matrix usage, no vectorized loads, CUDA SLM padding patterns.
