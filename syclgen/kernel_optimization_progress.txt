@@ -5,9 +5,9 @@
 
 ## Summary
 - Total SYCL kernels to analyze: 54
-- Kernels analyzed so far: 5
+- Kernels analyzed so far: 6
 - Analysis complete: No
-- Kernels with optimization potential: 5
+- Kernels with optimization potential: 6
 - Optimization tasks created: 0 (pending finalization)
 
 ## Kernels Analyzed
@@ -16,7 +16,7 @@
 - [x] sk_003: dequantize_mul_mat_vec (DMMV) — high potential
 - [x] sk_004: dequantize_block_sycl (convert) — medium potential
 - [x] sk_005: outprod (oneMKL GEMM) — low potential
-- [ ] sk_006: MUL_MAT_ID kernels — pending
+- [x] sk_006: MUL_MAT_ID kernels — high potential
 - [ ] sk_007: quantize_sycl — pending
 - [ ] sk_008: vecdotq — pending
 - [ ] sk_009: dequantize device functions — pending
@@ -67,6 +67,7 @@
 - [ ] sk_054: upscale (inline) — pending
 
 ## Recent Activity
+[2026-03-06] Analyzed kernel MUL_MAT_ID (sk_006). Found 5 optimization opportunities (high potential). Key findings: CRITICAL blocking D2H copy of ids tensor creates pipeline stall (30-60% latency). ne12==1 path launches individual MUL_MAT per token-expert pair instead of batched compaction. No GPU-side mm_ids_helper equivalent — host-side sequential expert processing. k_copy_src1_to_contiguous/k_copy_dst_from_contiguous are simple copy kernels but are launched per-expert serially. ~10-20% hardware efficiency.
 [2026-03-06] Analyzed kernel outprod (oneMKL GEMM) (sk_005). Found 3 optimization opportunities (low potential). Key findings: This is a oneMKL GEMM wrapper — not a custom kernel, so the GEMM itself is already near-optimal. CRITICAL: missing batch dimension support (ne2>1, ne3>1) forces CPU fallback for batched outprod. Missing GQA broadcasting support. F16 not supported. Hardcoded leading dimensions instead of stride-based. The primary optimization is functional parity with CUDA (batching, F16), not compute performance.
 [2026-03-06] Analyzed kernel dequantize_block_sycl (convert) (sk_004). Found 8 optimization opportunities (medium potential). Key findings: inconsistent work-group sizes (16-256) across 22+ kernel variants, pervasive nd_range<3> DPCT artifacts (only 1 of 22 uses nd_range<1>), missing reqd_sub_group_size on 20+ kernels, strided output writes in K-quant formats (stride 32), no vectorized loads except Q4_K, inconsistent #pragma unroll, IQ format lookup tables not cached in SLM. The kernel is purely memory-bandwidth bound (dequantization is trivial compute). Medium potential because the generic path already uses WG=256 and some formats have reorder variants.
 [2026-03-06] Analyzed kernel dequantize_mul_mat_vec (DMMV) (sk_003). Found 8 optimization opportunities (high potential). Key findings: CRITICAL K-quant sub-group size mismatch (QK_WARP_SIZE=32 vs Intel native SIMD16 — correctness risk), tiny work-group sizes (16 or 64), no SLM caching, no vectorized loads, strided memory access, extensive DPCT artifacts. Butterfly reduction exceeds sub-group width in K-quant kernels.

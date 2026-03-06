@@ -793,11 +793,175 @@
       "overall_optimization_potential": "low",
       "estimated_current_efficiency": "85-95%",
       "efficiency_notes": "For the supported case (2D F32 outer product), this kernel delegates entirely to oneMKL GEMM which is a highly-optimized vendor library. The oneMKL GEMM implementation for Intel GPUs uses XMX engines, tiled algorithms, and SLM caching internally — there is little room for user-level optimization of the GEMM itself. The kernel's efficiency is near-optimal for what it does. However, the kernel's SCOPE is severely limited: it only handles 2D F32 outer products while CUDA handles batched, broadcasted, and (potentially) F16 outer products. The primary optimization is not performance but functionality — adding batch support and F16 types to match CUDA parity and avoid CPU fallbacks. The 'low' optimization potential rating reflects that the actual GEMM compute is already near-optimal; the improvements are about expanding supported configurations."
+    },
+    {
+      "kernel_id": "sk_006",
+      "name": "MUL_MAT_ID kernels",
+      "file": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "source_cuda_ids": ["ck_063", "ck_070"],
+      "current_analysis": {
+        "launch_config": {
+          "k_copy_src1_to_contiguous": {
+            "uses_nd_range": true,
+            "work_group_size": "min(ne10, max_work_group_size) — typically ne10 (e.g. 4096 for hidden dim) clamped to 1024",
+            "work_group_size_total": "up to 1024",
+            "sub_group_size": null,
+            "sub_group_size_specified": false,
+            "grid_dims": "(1, n_ids, ids->ne[1]) — one work-group per (token, expert-selection) pair",
+            "notes": "3D nd_range with dimension 0 unused (CUDA artifact). Work-group size is reasonable (up to 1024) but not tuned — min(ne10, max) means for small ne10 the WG is undersized. Early-exit via return when row_id != i02 means most work-groups immediately exit, wasting launch overhead."
+          },
+          "k_copy_dst_from_contiguous": {
+            "uses_nd_range": true,
+            "work_group_size": "min(ne0, max_work_group_size) — typically ne0 (e.g. 4096) clamped to 1024",
+            "work_group_size_total": "up to 1024",
+            "sub_group_size": null,
+            "sub_group_size_specified": false,
+            "grid_dims": "(1, 1, num_src1_rows) — one work-group per compacted row",
+            "notes": "3D nd_range with dimensions 0 and 1 unused (CUDA artifact). Simple scatter kernel, well-sized WG."
+          },
+          "dispatcher_pattern": "Host-side sequential loop over n_as (number of experts), launching gather kernel + ggml_sycl_mul_mat + scatter kernel per expert. Total kernel launches = 3 * n_active_experts per MUL_MAT_ID call.",
+          "notes": "The dispatcher has two paths: ne12==1 (scalar path — individual MUL_MAT calls per token-expert pair, extremely serial) and ne12>1 (batched compaction path — gather/compute/scatter per expert). Both paths begin with a blocking D2H copy of the ids tensor. The ne12==1 path is the common inference case and is severely inefficient."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "coalesced_notes": "k_copy_src1_to_contiguous: adjacent threads copy adjacent float elements (src1_row_contiguous[i] and src1_row_original[i]) — coalesced writes and reads within each row. k_copy_dst_from_contiguous: same pattern — coalesced reads from contiguous buffer and writes to original (though the original write address varies per work-group due to scatter).",
+          "strided_accesses": ["k_copy_src1_to_contiguous gather: source rows may be arbitrarily strided in src1_original depending on i11*nb11 + i12*nb12", "k_copy_dst_from_contiguous scatter: destination rows are strided by i1*nb1 + i2*nb2 which is non-contiguous across work-groups"],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "All loads/stores are scalar float (4 bytes). No sycl::vec types. The copy loops process one float per thread iteration. With ne10 or ne0 typically being 4096+ and max 1024 threads, each thread copies ~4 elements — 16 bytes total, sub-optimal for the memory bus width."
+        },
+        "slm_usage": {
+          "uses_slm": true,
+          "slm_bytes": 4,
+          "potential_bank_conflicts": false,
+          "notes": "k_copy_src1_to_contiguous uses a single int (4 bytes) of SLM via sycl::local_accessor<int, 0> to broadcast the atomically-obtained row index from thread 0 to all threads in the work-group. k_copy_dst_from_contiguous uses no SLM. The SLM usage is trivial and does not limit occupancy."
+        },
+        "reduction_pattern": {
+          "has_reduction": false,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": true,
+          "atomic_details": "k_copy_src1_to_contiguous uses dpct::atomic_fetch_add on global memory (cur_src1_row) in thread 0 of each work-group to claim a contiguous row slot. This is a global atomic on a heavily-contended counter when many tokens route to the same expert.",
+          "notes": "No mathematical reduction. The atomic is used for row allocation, not for sum/min/max reduction. With n_ids*ne[1] work-groups all potentially hitting the same counter (filtered by early-exit), contention is moderate."
+        },
+        "data_types": {
+          "compute_type": "float",
+          "could_use_half": false,
+          "could_use_joint_matrix": false,
+          "notes": "Copy kernels — no compute, just data movement. The actual matrix multiply is delegated to ggml_sycl_mul_mat which handles data types internally. The ids tensor is int32."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [],
+          "notes": "No math functions — these are pure copy/scatter/gather kernels."
+        },
+        "loop_analysis": {
+          "hot_loops": [
+            "k_copy_src1_to_contiguous copy loop (line 2924): iterates ne10/WG_size times (~4 iterations for ne10=4096, WG=1024). Has #pragma unroll but trip count is dynamic — unroll hint may not be effective.",
+            "k_copy_dst_from_contiguous copy loop (line 2943): iterates ne0/WG_size times (~4 iterations). Same #pragma unroll with dynamic trip count.",
+            "Host-side expert loop (line 3020): iterates n_as times (number of experts, e.g. 8-64 in MoE models). Each iteration launches 3 kernels + does host-side counting.",
+            "Host-side row counting loop (line 3022-3034): O(n_as * ne[1] * n_ids) triple-nested loop on CPU for counting rows per expert."
+          ],
+          "unrolled": false,
+          "notes": "The kernel copy loops have #pragma unroll but the trip count is dynamic (ne10/WG_size), so the compiler cannot unroll them. The main performance bottleneck is NOT the kernel loops but the dispatcher's host-side loops and blocking synchronization."
+        },
+        "estimated_bottleneck": "launch_overhead",
+        "bottleneck_notes": "The primary bottleneck is NOT the copy kernels themselves but the dispatcher architecture: (1) Blocking D2H copy of ids tensor with stream->wait() — creates a pipeline bubble every MUL_MAT_ID call. (2) ne12==1 path: O(n_ids * ne[1]) individual ggml_sycl_mul_mat calls, each launching separate kernels — extreme launch overhead for MoE with many tokens. (3) ne12>1 path: host-side triple-nested loop for row counting, plus sequential per-expert kernel launches (3 launches per active expert). (4) No overlap between experts — each expert's gather/compute/scatter must complete before the next. CUDA's mm_ids_helper avoids most of this overhead by doing everything on GPU without host sync.",
+        "anti_patterns": [
+          "CRITICAL: Blocking D2H copy of ids tensor (stream->memcpy + stream->wait()) at line 2967-2969 — creates a pipeline stall every MUL_MAT_ID call, preventing overlap with prior compute. This is the single biggest performance issue.",
+          "CRITICAL: ne12==1 path (lines 2994-3012) dispatches individual MUL_MAT calls per token-expert pair — O(n_ids * ne[1]) separate kernel launches. For a typical MoE with 128 tokens and top-2 routing, this is 256 individual matrix-vector products launched serially.",
+          "Host-side row counting (lines 3021-3034) — triple-nested loop on CPU that could be a single GPU kernel or eliminated entirely by pre-computing bounds on GPU (like CUDA's mm_ids_helper)",
+          "Per-expert sequential processing (line 3020) — no overlap between experts' gather/compute/scatter. All n_as iterations are serialized.",
+          "3D nd_range with unused dimensions — DPCT artifact in both kernels",
+          "dpct::atomic_fetch_add artifact — should use sycl::atomic_ref directly",
+          "k_copy_src1_to_contiguous: most work-groups early-exit (row_id_i != i02) — launches ids->ne[1]*n_ids work-groups but only num_src1_rows actually do work. Massive wasted launch for models with many experts (n_as=64, only ~2 experts active per token).",
+          "No vectorized copies — scalar float copies in the gather/scatter kernels",
+          "SLM barrier uses global fence instead of local_space fence (DPCT1065 warning preserved in source)",
+          "No mm_ids_helper equivalent — CUDA uses a GPU-side kernel to build compacted indices and expert bounds, avoiding all host-side synchronization and counting",
+          "Pool allocation per expert iteration (lines 3041-3042) — allocates dev_cur_src1_row and dev_row_mapping inside the expert loop, potentially causing repeated allocation/deallocation"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_006_001",
+          "category": "kernel_fusion",
+          "priority": "high",
+          "description": "Eliminate the blocking D2H copy of the ids tensor (stream->memcpy + stream->wait()) by implementing a GPU-side mm_ids_helper kernel equivalent to CUDA's mmid.cu. This kernel would: (1) scan the ids tensor on GPU to compute per-expert row counts and cumulative offsets, (2) build the row_mapping array directly on GPU, (3) perform the src1 gather into contiguous buffers — all without any host synchronization. The current blocking wait creates a pipeline bubble that stalls the entire GPU every MUL_MAT_ID call.",
+          "expected_improvement": "30-60% latency reduction for the MUL_MAT_ID operation by eliminating the pipeline stall. The D2H copy + host wait + host-side counting loop adds ~50-200us of dead time per call depending on the queue depth and number of prior in-flight kernels. For MoE models where MUL_MAT_ID is called multiple times per layer, this compounds significantly.",
+          "implementation_notes": "Implement a new kernel (e.g., mmid_prepare_sycl) that: 1) Each thread reads ids[iid1][id] and compares to target expert. 2) Use work-group-level scan (sycl::exclusive_scan_over_group) to compute per-expert prefix sums. 3) Write row_mapping and contiguous src1 in a single fused kernel. 4) Use device-side memory for expert bounds (no host copy). The CUDA mm_ids_helper kernel in ggml/src/ggml-cuda/mmid.cu (line 28) serves as a reference implementation. Key change: remove stream->wait() at line 2969 and the host-side ids_host vector entirely.",
+          "risk": "medium",
+          "risk_notes": "Requires a new kernel plus refactoring the dispatcher control flow. The CUDA implementation has been battle-tested, so the algorithm is proven. Risk is in the SYCL-specific implementation (atomic ordering, memory model differences). Must handle the case where expert counts are needed for dst buffer sizing — may need a two-pass approach (count first, then gather)."
+        },
+        {
+          "id": "opt_006_002",
+          "category": "kernel_fusion",
+          "priority": "high",
+          "description": "Replace the ne12==1 path (lines 2994-3012) which launches O(n_ids * ne[1]) individual MUL_MAT calls with the batched compaction path (ne12>1 style). The ne12==1 path dispatches each token-expert pair as a separate matrix-vector product — for a typical MoE inference with 128 tokens and top-2 routing, this means 256 individual kernel launches (each launching DMMV or MMVQ internally). The batched path groups all tokens for the same expert into one matrix multiply, reducing kernel launches to 3 * n_active_experts.",
+          "expected_improvement": "5-20x speedup for the ne12==1 path by reducing kernel launch count from O(n_ids * ne[1]) to O(n_active_experts). For 128 tokens with top-2 routing across 8 experts: from 256 GEMV launches to ~24 kernel launches (3 * 8 experts). Each batched GEMM is also more compute-efficient than individual GEMVs.",
+          "implementation_notes": "Unify both paths to always use the compaction approach. The ne12==1 case just means src1 has batch_size=1, but the compaction code handles this correctly already (it treats each iid1 as a separate token). Remove the ne12==1 special case entirely and always use the ne12>1 path. This also enables the mm_ids_helper optimization (opt_006_001) to cover all cases.",
+          "risk": "low",
+          "risk_notes": "The ne12>1 path already handles all the indexing correctly for ne12==1 (the inner loop still iterates over iid1 and id). The main risk is if there's an edge case where ne12==1 requires different tensor layout assumptions — verify with the GGML_ASSERT checks on nb11 and nb1 at lines 3079-3080."
+        },
+        {
+          "id": "opt_006_003",
+          "category": "vectorization",
+          "priority": "medium",
+          "description": "Use vectorized 16-byte loads/stores (sycl::vec<float, 4>) in the gather (k_copy_src1_to_contiguous) and scatter (k_copy_dst_from_contiguous) kernels. Currently each thread copies one float (4 bytes) per loop iteration. With vec4, each thread would copy 4 floats (16 bytes) per iteration, reducing the number of memory transactions by 4x and better utilizing the memory bus.",
+          "expected_improvement": "2-3x speedup for the copy kernels themselves. Since copy kernels are a fraction of total MUL_MAT_ID time (the GEMM dominates), overall impact is 5-10% reduction in MUL_MAT_ID latency. More impactful for large hidden dimensions (ne10 or ne0 = 4096+).",
+          "implementation_notes": "Replace the scalar copy loop: `for (int i = tid; i < ne10; i += WG) { dst[i] = src[i]; }` with: `int vec_ne10 = ne10 / 4; for (int i = tid; i < vec_ne10; i += WG) { reinterpret_cast<sycl::vec<float,4>*>(dst)[i] = reinterpret_cast<const sycl::vec<float,4>*>(src)[i]; } // handle remainder`. Must verify 16-byte alignment of src1 and dst buffers. The contiguous buffers are pool-allocated and likely aligned; the original buffers depend on the allocator.",
+          "risk": "low",
+          "risk_notes": "Straightforward vectorization of a copy loop. Must handle ne10 not divisible by 4 (tail elements). Alignment should be verified but pool-allocated buffers are typically well-aligned."
+        },
+        {
+          "id": "opt_006_004",
+          "category": "work_group_size",
+          "priority": "medium",
+          "description": "Reduce wasted work-groups in k_copy_src1_to_contiguous by restructuring the launch. Currently the kernel launches ids->ne[1] * n_ids work-groups (one per token-expert pair), but most immediately early-exit because row_id_i != i02. For a model with 64 experts and top-2 routing, only ~2/64 = 3% of work-groups do useful work. Instead, use a two-phase approach: (1) a small kernel to scan ids and compute per-expert row lists, then (2) launch exactly num_src1_rows work-groups for the actual copy.",
+          "expected_improvement": "10-20% reduction in gather phase latency by eliminating wasted work-group launches. More impactful for models with many experts (n_as=64) where 97% of WGs are no-ops. The actual improvement depends on the GPU's work-group scheduling overhead.",
+          "implementation_notes": "This optimization naturally falls out of implementing the mm_ids_helper kernel (opt_006_001). If the helper kernel pre-computes the list of row indices for each expert, the copy kernel can be launched with exactly num_src1_rows work-groups, each knowing exactly which source row to copy. No early-exit needed.",
+          "risk": "low",
+          "risk_notes": "This is a natural consequence of opt_006_001. As a standalone optimization (without mm_ids_helper), it requires an extra scan kernel pass, which adds complexity. Better to implement as part of opt_006_001."
+        },
+        {
+          "id": "opt_006_005",
+          "category": "reduction",
+          "priority": "medium",
+          "description": "Replace dpct::atomic_fetch_add on global memory with a work-group-local atomic or scan-based row assignment in k_copy_src1_to_contiguous. Currently each matching work-group's thread 0 atomically increments a global counter. With many tokens routed to the same popular expert, this creates a serial bottleneck on the global atomic. Using sycl::atomic_ref<int, sycl::memory_order::relaxed, sycl::memory_scope::device, sycl::access::address_space::global_space> would be more correct, and using a scan-based approach would eliminate contention entirely.",
+          "expected_improvement": "5-10% improvement in the gather phase for popular experts with many routed tokens. The global atomic creates a serialization point — with 128 tokens and top-2 routing, up to ~256/n_experts = 32 work-groups may contend on the same counter.",
+          "implementation_notes": "Option A (simple): Replace dpct::atomic_fetch_add with sycl::atomic_ref — more portable and allows relaxed memory ordering. Option B (better): Pre-compute the row index for each work-group using a prefix-sum scan of the ids tensor (part of opt_006_001), eliminating the runtime atomic entirely. Option C (intermediate): Each work-group determines its own row index without atomics by counting the number of matching rows with iid1 < current_iid1 or (iid1 == current_iid1 && id < current_id) — deterministic ordering without atomics.",
+          "risk": "low",
+          "risk_notes": "The dpct::atomic_fetch_add is already functionally correct — the change is for performance and code quality. sycl::atomic_ref is the standard SYCL way. The scan-based approach requires more refactoring but eliminates the serialization point."
+        },
+        {
+          "id": "opt_006_006",
+          "category": "slm_tuning",
+          "priority": "low",
+          "description": "Use sycl::access::fence_space::local_space in the barrier call (line 2918) instead of the default global fence. The DPCT1065 comment at line 2913-2917 correctly identifies this opportunity. The barrier only synchronizes access to the SLM src1_row variable — no global memory coherence is needed at that point.",
+          "expected_improvement": "1-2% improvement in the gather kernel. The barrier is executed once per work-group, and the fence scope change reduces the hardware synchronization overhead slightly.",
+          "implementation_notes": "Change `item_ct1.barrier()` at line 2918 to `item_ct1.barrier(sycl::access::fence_space::local_space)`. Remove the DPCT1065 comment.",
+          "risk": "low",
+          "risk_notes": "The barrier protects only the SLM src1_row value written by thread 0. Global memory writes (row_mapping[src1_row]) happen in thread 0 before the barrier, but other threads don't read row_mapping — they only need src1_row. The local_space fence is sufficient."
+        },
+        {
+          "id": "opt_006_007",
+          "category": "kernel_fusion",
+          "priority": "low",
+          "description": "Overlap expert processing by using multiple SYCL queues or out-of-order queue with event dependencies. Currently the expert loop (line 3020) processes experts sequentially: gather(expert_i) → GEMM(expert_i) → scatter(expert_i) → gather(expert_i+1) → ... With independent queues per expert, the gather for expert_i+1 could overlap with the GEMM for expert_i, hiding copy latency behind compute.",
+          "expected_improvement": "10-20% latency reduction for the batched path by overlapping gather/scatter of one expert with compute of another. More impactful when many experts are active and GEMM time is comparable to copy time (small batch sizes per expert).",
+          "implementation_notes": "Use multiple SYCL queues (one per active expert, up to a cap) with event-based dependencies: copy_event[i] = launch_gather(q[i], ...); gemm_event[i] = launch_gemm(q[i], ..., {copy_event[i]}); scatter_event[i] = launch_scatter(q[i], ..., {gemm_event[i]}). The contiguous buffers need to be per-expert (not shared). Alternatively, use a single out-of-order queue with explicit dependencies. This requires significant refactoring of the dispatcher.",
+          "risk": "high",
+          "risk_notes": "Multiple concurrent queues add complexity for buffer management (each expert needs its own contiguous src1/dst buffer). SYCL event dependencies must be correct to avoid data races. The ggml_sycl_mul_mat function may have internal state/synchronization assumptions that prevent safe concurrent use from multiple queues. Also, pool_alloc may not be thread-safe across queues."
+        }
+      ],
+      "overall_optimization_potential": "high",
+      "estimated_current_efficiency": "10-20%",
+      "efficiency_notes": "The MUL_MAT_ID implementation is critically inefficient due to architectural issues, not kernel-level compute issues. The two copy kernels (gather and scatter) are simple and reasonably well-written, but the dispatcher architecture creates severe performance bottlenecks: (1) blocking D2H copy of ids tensor creates a pipeline stall, (2) ne12==1 path (the common inference case) launches individual MUL_MAT per token-expert pair, (3) host-side row counting and sequential expert processing add latency. The CUDA backend avoids all of these issues with the mm_ids_helper GPU kernel that pre-computes indices without host synchronization. For MoE models (Mixtral, DeepSeek, etc.), MUL_MAT_ID is on the critical path for every MoE layer, making these inefficiencies particularly impactful. The estimated 10-20% efficiency accounts for the pipeline stalls and excessive kernel launch overhead — the actual GEMM compute (once dispatched) may be reasonably efficient via MMVQ or oneMKL GEMM, but the overhead per-call dominates."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 5,
-    "high_potential": 3,
+    "total_kernels_analyzed": 6,
+    "high_potential": 4,
     "medium_potential": 1,
     "low_potential": 1,
     "no_optimization_needed": 0,
@@ -877,6 +1041,20 @@
         "kernel_name": "outprod (oneMKL GEMM)",
         "optimization_id": "opt_005_001",
         "description": "Add batch dimension support (ne2 > 1, ne3 > 1) and GQA broadcasting to match CUDA parity — currently rejects batched outprod forcing CPU fallback",
+        "priority": "high"
+      },
+      {
+        "kernel_id": "sk_006",
+        "kernel_name": "MUL_MAT_ID kernels",
+        "optimization_id": "opt_006_001",
+        "description": "Implement GPU-side mm_ids_helper to eliminate blocking D2H copy and host-side counting — 30-60% latency reduction",
+        "priority": "high"
+      },
+      {
+        "kernel_id": "sk_006",
+        "kernel_name": "MUL_MAT_ID kernels",
+        "optimization_id": "opt_006_002",
+        "description": "Replace ne12==1 serial path with batched compaction — 5-20x speedup for common MoE inference case",
         "priority": "high"
       }
     ]
