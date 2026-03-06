@@ -5354,13 +5354,995 @@
       "overall_optimization_potential": "low",
       "estimated_current_efficiency": "65-80%",
       "efficiency_notes": "Clean native SYCL port with 1:1 CUDA parity. Embarrassingly parallel element-wise addition with per-row index lookup. The only meaningful optimizations are vec4 vectorization and WG size capping. The kernel is used in MoE models for scatter-adding expert outputs — called once per MoE layer but not on the dominant latency path (the MUL_MAT within each expert is much more expensive). Very low optimization ROI."
+    },
+    {
+      "kernel_id": "sk_042",
+      "kernel_name": "scale (inline in ggml-sycl.cpp)",
+      "file": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "line_range": "3143-3173",
+      "ops": ["GGML_OP_SCALE"],
+      "source_cuda_ids": ["ck_094"],
+      "launch_config": {
+        "nd_range_dims": 1,
+        "work_group_size": 256,
+        "work_group_size_source": "hardcoded const int block_size = 256",
+        "grid_size": "min(0x7FFFFFFF, ceil(nelements / 256))",
+        "grid_size_notes": "Grid-stride loop with MAX_GRIDDIM_X cap — matches CUDA exactly."
+      },
+      "memory_patterns": {
+        "global_reads": "1 float per element (src0_d[i])",
+        "global_writes": "1 float per element (dst_d[i])",
+        "arithmetic_intensity_flop_per_byte": 0.25,
+        "arithmetic_intensity_notes": "2 FLOPs (multiply + add for FMA) per 8 bytes (1 read + 1 write). Deeply memory-bound.",
+        "coalescing": "perfect — linear stride-1 access on both src and dst",
+        "vectorization": "none — scalar 4-byte loads/stores"
+      },
+      "slm_usage": {
+        "uses_slm": false
+      },
+      "sync_patterns": {
+        "barriers": 0,
+        "atomics": 0,
+        "sub_group_ops": 0,
+        "notes": "Embarrassingly parallel, no synchronization needed."
+      },
+      "dpct_artifacts": {
+        "count": 0,
+        "details": "Clean native SYCL. No DPCT artifacts."
+      },
+      "cuda_feature_parity": {
+        "parity_level": "full",
+        "missing_features": [],
+        "notes": "1:1 match with CUDA scale.cu. Both use WG=256, grid-stride loop, MAX_GRIDDIM_X cap, scale*x+bias FMA."
+      },
+      "arithmetic_intensity": {
+        "flop_per_byte": 0.25,
+        "classification": "memory_bound",
+        "ridge_point_note": "Far below 27 FLOP/byte ridge point. Bandwidth-limited."
+      },
+      "optimizations": [
+        {
+          "id": "opt_042_001",
+          "category": "vectorization",
+          "priority": "low",
+          "description": "Use vec4 (sycl::float4) loads/stores to process 4 elements per work-item iteration, reducing memory transactions by 4x.",
+          "expected_improvement": "5-15% — bandwidth utilization improvement on deeply memory-bound kernel.",
+          "implementation_notes": "Cast src0_d/dst_d to sycl::float4*, process 4 elements per iteration. Handle tail elements with scalar fallback. Grid-stride loop already in place makes this straightforward.",
+          "risk": "low",
+          "risk_notes": "Standard vectorization pattern. Must handle nelements not divisible by 4."
+        },
+        {
+          "id": "opt_042_002",
+          "category": "sub_group_ops",
+          "priority": "low",
+          "description": "Add [[sycl::reqd_sub_group_size(WARP_SIZE)]] attribute to the kernel lambda.",
+          "expected_improvement": "0-2% — standard best practice for Intel GPU kernels.",
+          "implementation_notes": "Add attribute to lambda signature. Requires handler.parallel_for pattern (currently uses stream.parallel_for shortcut — would need conversion).",
+          "risk": "low",
+          "risk_notes": "Standard practice."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "75-90%",
+      "efficiency_notes": "Near-optimal implementation with 1:1 CUDA parity. Grid-stride loop, proper grid capping, FMA fusion. The only meaningful improvement is vec4 vectorization. Scale is called once per attention layer (Q*K scaling) but is a trivial O(n) operation dwarfed by the O(n*d) matmul. Extremely low optimization ROI."
+    },
+    {
+      "kernel_id": "sk_043",
+      "kernel_name": "diag_mask_inf (inline in ggml-sycl.cpp)",
+      "file": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "line_range": "3175-3211",
+      "ops": ["GGML_OP_DIAG_MASK_INF"],
+      "source_cuda_ids": ["ck_051"],
+      "launch_config": {
+        "nd_range_dims": 2,
+        "work_group_size": 32,
+        "work_group_size_source": "hardcoded const int block_size = 32; local_range(1, 32)",
+        "grid_size": "dim0=nrows, dim1=ceil(ncols/32)*32",
+        "grid_size_notes": "2D layout: one work-group per row-column tile. local_range(1, 32) matches CUDA dim3(1, 32, 1)."
+      },
+      "memory_patterns": {
+        "global_reads": "1 float per element (src0_d[i])",
+        "global_writes": "1 float per element (dst_d[i])",
+        "arithmetic_intensity_flop_per_byte": 0.25,
+        "arithmetic_intensity_notes": "2 FLOPs (subtract + branchless multiply) per 8 bytes. Memory-bound.",
+        "coalescing": "perfect — adjacent threads access adjacent columns within the same row",
+        "vectorization": "none — scalar 4-byte loads/stores"
+      },
+      "slm_usage": {
+        "uses_slm": false
+      },
+      "sync_patterns": {
+        "barriers": 0,
+        "atomics": 0,
+        "sub_group_ops": 0,
+        "notes": "Embarrassingly parallel."
+      },
+      "dpct_artifacts": {
+        "count": 0,
+        "details": "Clean native SYCL. No DPCT artifacts."
+      },
+      "cuda_feature_parity": {
+        "parity_level": "full",
+        "missing_features": [],
+        "notes": "1:1 match with CUDA diagmask.cu. Same branchless masking pattern (col > n_past + row % rows_per_channel) * FLT_MAX. Same WG=32, same 2D grid layout."
+      },
+      "arithmetic_intensity": {
+        "flop_per_byte": 0.25,
+        "classification": "memory_bound",
+        "ridge_point_note": "Far below 27 FLOP/byte ridge point."
+      },
+      "optimizations": [
+        {
+          "id": "opt_043_001",
+          "category": "work_group_size",
+          "priority": "low",
+          "description": "Increase work-group size from 32 to 256 for better hardware occupancy on Xe2. Each WG of 32 is only 2 sub-groups of 16 — wasting occupancy slots.",
+          "expected_improvement": "5-15% — better latency hiding with more sub-groups per Xe-core.",
+          "implementation_notes": "Change local_range(1, 32) to local_range(1, 256). Each work-group would process 256 columns per row-tile instead of 32. Adjust num_blocks_x calculation.",
+          "risk": "low",
+          "risk_notes": "Straightforward change. Bounds check already present (col >= ncols)."
+        },
+        {
+          "id": "opt_043_002",
+          "category": "vectorization",
+          "priority": "low",
+          "description": "Use vec4 loads/stores for the common case where most elements are simply copied (src0_d[i] - 0 * FLT_MAX = src0_d[i]).",
+          "expected_improvement": "5-10% — most elements are below the diagonal and just get copied unchanged.",
+          "implementation_notes": "For rows where split_col >= ncols (no masking needed), do a bulk vec4 copy. For partially-masked rows, vec4 copy up to split point, then scalar for masked tail.",
+          "risk": "low",
+          "risk_notes": "Standard vectorization. Need to identify the split point per row."
+        },
+        {
+          "id": "opt_043_003",
+          "category": "sub_group_ops",
+          "priority": "low",
+          "description": "Add [[sycl::reqd_sub_group_size(WARP_SIZE)]] attribute to the kernel lambda.",
+          "expected_improvement": "0-2% — standard best practice.",
+          "implementation_notes": "Requires handler.parallel_for pattern.",
+          "risk": "low",
+          "risk_notes": "Standard practice."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "65-80%",
+      "efficiency_notes": "Clean implementation with 1:1 CUDA parity. Branchless masking is correct and efficient. Main inefficiency is the small WG size (32) which under-utilizes Xe-core occupancy. Called once per attention layer for causal masking — not a performance bottleneck. Low optimization ROI."
+    },
+    {
+      "kernel_id": "sk_044",
+      "kernel_name": "arange (inline in ggml-sycl.cpp)",
+      "file": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "line_range": "3213-3241",
+      "ops": ["GGML_OP_ARANGE"],
+      "source_cuda_ids": ["ck_003"],
+      "launch_config": {
+        "nd_range_dims": 1,
+        "work_group_size": 256,
+        "work_group_size_source": "hardcoded const int block_size = 256",
+        "grid_size": "ceil(ne0 / 256)",
+        "grid_size_notes": "Standard 1D grid. No grid-stride loop (assumes grid covers all elements)."
+      },
+      "memory_patterns": {
+        "global_reads": "0 (write-only kernel)",
+        "global_writes": "1 float per element (dst_d[nidx])",
+        "arithmetic_intensity_flop_per_byte": 0.25,
+        "arithmetic_intensity_notes": "1 FMA (start + step * nidx) per 4 bytes written. Write-only, memory-bound.",
+        "coalescing": "perfect — linear stride-1 writes",
+        "vectorization": "none — scalar 4-byte writes"
+      },
+      "slm_usage": {
+        "uses_slm": false
+      },
+      "sync_patterns": {
+        "barriers": 0,
+        "atomics": 0,
+        "sub_group_ops": 0,
+        "notes": "Embarrassingly parallel."
+      },
+      "dpct_artifacts": {
+        "count": 0,
+        "details": "Clean native SYCL."
+      },
+      "cuda_feature_parity": {
+        "parity_level": "full",
+        "missing_features": [],
+        "notes": "1:1 match with CUDA arange.cu. Same WG=256, same formula."
+      },
+      "arithmetic_intensity": {
+        "flop_per_byte": 0.25,
+        "classification": "memory_bound",
+        "ridge_point_note": "Far below ridge point. Write bandwidth limited."
+      },
+      "optimizations": [
+        {
+          "id": "opt_044_001",
+          "category": "vectorization",
+          "priority": "low",
+          "description": "Use vec4 writes to generate 4 consecutive values per work-item, reducing write transactions by 4x.",
+          "expected_improvement": "5-10% — minor bandwidth improvement on trivial kernel.",
+          "implementation_notes": "Compute 4 values (start + step*(4*i), start + step*(4*i+1), ...) and write as sycl::float4. Handle tail.",
+          "risk": "low",
+          "risk_notes": "Standard vectorization."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "80-90%",
+      "efficiency_notes": "Trivially simple write-only kernel. Near-optimal. Called very rarely (e.g., generating position indices for rotary embeddings). Absolute time contribution is negligible. No optimization ROI."
+    },
+    {
+      "kernel_id": "sk_045",
+      "kernel_name": "clamp (inline in ggml-sycl.cpp)",
+      "file": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "line_range": "3243-3289",
+      "ops": ["GGML_OP_CLAMP"],
+      "source_cuda_ids": ["ck_011"],
+      "launch_config": {
+        "nd_range_dims": 1,
+        "work_group_size": 256,
+        "work_group_size_source": "hardcoded const int block_size = 256",
+        "grid_size": "ceil(k / 256)",
+        "grid_size_notes": "Standard 1D grid. Separate kernel launches for F16 and F32 paths."
+      },
+      "memory_patterns": {
+        "global_reads": "1 element per work-item (src_f32[i] or src_f16[i])",
+        "global_writes": "1 element per work-item (dst_f32[i] or dst_f16[i])",
+        "arithmetic_intensity_flop_per_byte": 0.25,
+        "arithmetic_intensity_notes": "2 FLOPs (fmax + fmin) per 8 bytes (F32) or 4 bytes (F16). Memory-bound.",
+        "coalescing": "perfect — linear stride-1 access",
+        "vectorization": "none — scalar element-wise"
+      },
+      "slm_usage": {
+        "uses_slm": false
+      },
+      "sync_patterns": {
+        "barriers": 0,
+        "atomics": 0,
+        "sub_group_ops": 0,
+        "notes": "Embarrassingly parallel."
+      },
+      "dpct_artifacts": {
+        "count": 0,
+        "details": "Clean native SYCL. Uses sycl::fmin/fmax correctly."
+      },
+      "cuda_feature_parity": {
+        "parity_level": "full",
+        "missing_features": [],
+        "notes": "1:1 match with CUDA clamp.cu. SYCL has proper F16 support with float intermediate computation (cast up, clamp, cast down), matching CUDA's approach. Both use WG=256."
+      },
+      "arithmetic_intensity": {
+        "flop_per_byte": 0.25,
+        "classification": "memory_bound",
+        "ridge_point_note": "Far below 27 FLOP/byte ridge point."
+      },
+      "optimizations": [
+        {
+          "id": "opt_045_001",
+          "category": "vectorization",
+          "priority": "low",
+          "description": "Use vec4 loads/stores for F32 path and vec8 (sycl::half8) for F16 path to improve bandwidth utilization.",
+          "expected_improvement": "5-15% — bandwidth improvement on memory-bound kernel.",
+          "implementation_notes": "F32: sycl::float4 load, apply fmin/fmax to each component, store. F16: sycl::half8 load, process, store. Handle tails.",
+          "risk": "low",
+          "risk_notes": "Standard vectorization."
+        },
+        {
+          "id": "opt_045_002",
+          "category": "sub_group_ops",
+          "priority": "low",
+          "description": "Add [[sycl::reqd_sub_group_size(WARP_SIZE)]] attribute.",
+          "expected_improvement": "0-2%.",
+          "implementation_notes": "Requires handler.parallel_for pattern for both F16 and F32 paths.",
+          "risk": "low",
+          "risk_notes": "Standard practice."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "75-90%",
+      "efficiency_notes": "Clean implementation with full CUDA parity. Both F16 and F32 supported. Clamp is called very infrequently in LLM inference (rare activation clamping). Negligible optimization ROI."
+    },
+    {
+      "kernel_id": "sk_046",
+      "kernel_name": "acc (inline in ggml-sycl.cpp)",
+      "file": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "line_range": "3291-3344",
+      "ops": ["GGML_OP_ACC"],
+      "source_cuda_ids": ["ck_001"],
+      "launch_config": {
+        "nd_range_dims": 1,
+        "work_group_size": 256,
+        "work_group_size_source": "hardcoded const int block_size = 256",
+        "grid_size": "ceil(ne / 256)",
+        "grid_size_notes": "Standard 1D grid over all destination elements."
+      },
+      "memory_patterns": {
+        "global_reads": "1-2 floats per element (src0_d[i] always + src1_d[idx] conditionally)",
+        "global_writes": "1 float per element (dst_d[i])",
+        "arithmetic_intensity_flop_per_byte": 0.08,
+        "arithmetic_intensity_notes": "1 FP add per 12 bytes (2 reads + 1 write) in the accumulation region; 0 FLOPs (pure copy) outside. Deeply memory-bound.",
+        "coalescing": "src0 and dst are coalesced (linear). src1 access depends on stride parameters — may be non-coalesced for strided layouts.",
+        "vectorization": "none — scalar 4-byte loads/stores"
+      },
+      "slm_usage": {
+        "uses_slm": false
+      },
+      "sync_patterns": {
+        "barriers": 0,
+        "atomics": 0,
+        "sub_group_ops": 0,
+        "notes": "Embarrassingly parallel."
+      },
+      "dpct_artifacts": {
+        "count": 0,
+        "details": "Clean native SYCL."
+      },
+      "cuda_feature_parity": {
+        "parity_level": "full",
+        "missing_features": [],
+        "notes": "1:1 match with CUDA acc.cu. Same 4D index decomposition with stride parameters, same bounds checking, same WG=256."
+      },
+      "arithmetic_intensity": {
+        "flop_per_byte": 0.08,
+        "classification": "memory_bound",
+        "ridge_point_note": "Far below ridge point."
+      },
+      "optimizations": [
+        {
+          "id": "opt_046_001",
+          "category": "integer_arithmetic",
+          "priority": "low",
+          "description": "Replace 4 expensive int64 divisions (i13=tmp/s3, i12=tmp/s2, i11=tmp/s1) with fast multiply-shift trick using precomputed magic numbers.",
+          "expected_improvement": "5-10% — int64 division is expensive on GPU (20-40 cycles each vs 1 cycle for multiply).",
+          "implementation_notes": "Precompute magic multiplier and shift for s1, s2, s3 on host. Pass as kernel arguments. Use fast_div_modulo pattern from common.hpp.",
+          "risk": "low",
+          "risk_notes": "Standard fast-division optimization. Must handle s1/s2/s3 = 0 or 1 edge cases."
+        },
+        {
+          "id": "opt_046_002",
+          "category": "vectorization",
+          "priority": "low",
+          "description": "Use vec4 loads/stores for the copy-only region (outside accumulation bounds) which is typically the majority of elements.",
+          "expected_improvement": "3-8% — most elements are in the copy-only path.",
+          "implementation_notes": "Separate the kernel into two regions: (1) copy-only using vec4, (2) accumulation region using scalar with bounds checks.",
+          "risk": "low",
+          "risk_notes": "Adds code complexity for marginal gain."
+        },
+        {
+          "id": "opt_046_003",
+          "category": "sub_group_ops",
+          "priority": "low",
+          "description": "Add [[sycl::reqd_sub_group_size(WARP_SIZE)]] attribute.",
+          "expected_improvement": "0-2%.",
+          "implementation_notes": "Requires handler.parallel_for pattern.",
+          "risk": "low",
+          "risk_notes": "Standard practice."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "65-80%",
+      "efficiency_notes": "Clean implementation with full CUDA parity. The 4 int64 divisions per work-item are the main inefficiency. ACC is used for gradient accumulation in training and rarely during inference. Low optimization ROI."
+    },
+    {
+      "kernel_id": "sk_047",
+      "kernel_name": "diag (inline in ggml-sycl.cpp)",
+      "file": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "line_range": "3346-3418",
+      "ops": ["GGML_OP_DIAG"],
+      "source_cuda_ids": ["ck_050"],
+      "launch_config": {
+        "nd_range_dims": 1,
+        "work_group_size": 256,
+        "work_group_size_source": "hardcoded const int block_size = 256",
+        "grid_size": "ceil(total_elements / 256) where total_elements = ne0*ne1*ne2*ne3",
+        "grid_size_notes": "Standard 1D grid. Separate kernel launches for F32 and F16 paths (code duplication)."
+      },
+      "memory_patterns": {
+        "global_reads": "0-1 element per work-item (read only if i0 == i1, i.e., on diagonal)",
+        "global_writes": "1 element per work-item (dst[idx])",
+        "arithmetic_intensity_flop_per_byte": 0.0,
+        "arithmetic_intensity_notes": "0 FLOPs — pure data movement (copy or zero-fill). Completely memory-bound.",
+        "coalescing": "dst writes are coalesced. src reads are sparse (only diagonal elements) — stride-ne0 access pattern.",
+        "vectorization": "none — scalar element-wise"
+      },
+      "slm_usage": {
+        "uses_slm": false
+      },
+      "sync_patterns": {
+        "barriers": 0,
+        "atomics": 0,
+        "sub_group_ops": 0,
+        "notes": "Embarrassingly parallel."
+      },
+      "dpct_artifacts": {
+        "count": 0,
+        "details": "Clean native SYCL."
+      },
+      "cuda_feature_parity": {
+        "parity_level": "full",
+        "missing_features": [],
+        "notes": "1:1 match with CUDA diag.cu. Same templated approach for F32/F16, same 4D index decomposition, same conditional zero-fill. SYCL uses runtime type dispatch instead of CUDA's template dispatch, causing code duplication (F32 and F16 kernel bodies are copy-pasted). CUDA uses __restrict__ on pointers — SYCL does not."
+      },
+      "arithmetic_intensity": {
+        "flop_per_byte": 0.0,
+        "classification": "memory_bound",
+        "ridge_point_note": "Pure memory-bound. Zero compute."
+      },
+      "optimizations": [
+        {
+          "id": "opt_047_001",
+          "category": "integer_arithmetic",
+          "priority": "low",
+          "description": "Replace 4 int64 modulo/division operations (i0 = global_idx % ne0, i1 = (global_idx / ne0) % ne1, etc.) with fast multiply-shift trick.",
+          "expected_improvement": "5-10% — reduces ALU bottleneck from index decomposition.",
+          "implementation_notes": "Use fast_div_modulo for ne0, ne0*ne1, ne0*ne1*ne2.",
+          "risk": "low",
+          "risk_notes": "Standard optimization."
+        },
+        {
+          "id": "opt_047_002",
+          "category": "code_quality",
+          "priority": "low",
+          "description": "Eliminate F32/F16 code duplication by using a template or auto-typed lambda, matching CUDA's template approach.",
+          "expected_improvement": "0% runtime — code quality / maintainability improvement.",
+          "implementation_notes": "Use a templated lambda or generic auto-typed dispatch similar to the tri kernel's approach.",
+          "risk": "low",
+          "risk_notes": "Refactoring only."
+        },
+        {
+          "id": "opt_047_003",
+          "category": "sub_group_ops",
+          "priority": "low",
+          "description": "Add [[sycl::reqd_sub_group_size(WARP_SIZE)]] and __restrict__-equivalent annotations.",
+          "expected_improvement": "0-3%.",
+          "implementation_notes": "Requires handler.parallel_for pattern. Use sycl::ext::intel::experimental::kernel_arg_accessor_restrict if available.",
+          "risk": "low",
+          "risk_notes": "Standard practice."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "65-80%",
+      "efficiency_notes": "Clean implementation with full CUDA parity. Majority of output is zero-fill (off-diagonal), so most work-items just write 0. The 4 int64 divisions are the main overhead. Diag is used very rarely in LLM inference — negligible optimization ROI."
+    },
+    {
+      "kernel_id": "sk_048",
+      "kernel_name": "tri (inline in ggml-sycl.cpp)",
+      "file": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "line_range": "3420-3501",
+      "ops": ["GGML_OP_TRI"],
+      "source_cuda_ids": ["ck_108"],
+      "launch_config": {
+        "nd_range_dims": 3,
+        "work_group_size": 256,
+        "work_group_size_source": "constexpr int block_size = 256; block(1, 1, block_size)",
+        "grid_size": "dim0=ne03, dim1=ne02, dim2=ne01 * block_size (one WG per row, batched over ne02 and ne03)",
+        "grid_size_notes": "3D grid: one work-group handles one row. Threads stride across columns within a row. Matches CUDA tri.cu 3D grid (ne01, ne02, ne03)."
+      },
+      "memory_patterns": {
+        "global_reads": "0 or 1 element per position (read from src_row only for kept region; zero-fill for discarded region)",
+        "global_writes": "1 element per position (dst_row[i0])",
+        "arithmetic_intensity_flop_per_byte": 0.0,
+        "arithmetic_intensity_notes": "0 FLOPs — pure data movement (copy or zero-fill). Memory-bound.",
+        "coalescing": "perfect — threads stride across columns within a row, accessing contiguous memory",
+        "vectorization": "none — scalar element-wise"
+      },
+      "slm_usage": {
+        "uses_slm": false
+      },
+      "sync_patterns": {
+        "barriers": 0,
+        "atomics": 0,
+        "sub_group_ops": 0,
+        "notes": "Embarrassingly parallel per row."
+      },
+      "dpct_artifacts": {
+        "count": 0,
+        "details": "Clean native SYCL. Well-designed with auto-typed lambda dispatch."
+      },
+      "cuda_feature_parity": {
+        "parity_level": "full",
+        "missing_features": [],
+        "notes": "Excellent SYCL port. Matches CUDA tri.cu closely. CUDA uses triple-template (T, prefix_keep, add_to_split) with constexpr if for compile-time branch elimination. SYCL uses runtime branching (prefix_keep is a runtime bool captured by lambda) — slightly less optimal but functionally equivalent. Both support F32/F16/BF16."
+      },
+      "arithmetic_intensity": {
+        "flop_per_byte": 0.0,
+        "classification": "memory_bound",
+        "ridge_point_note": "Pure data movement."
+      },
+      "optimizations": [
+        {
+          "id": "opt_048_001",
+          "category": "vectorization",
+          "priority": "low",
+          "description": "Use vectorized stores (vec4 for F32, vec8 for F16) in the zero-fill and copy loops for the kept/discarded regions.",
+          "expected_improvement": "5-15% — reduces memory transactions for what is purely bandwidth-bound work.",
+          "implementation_notes": "In the copy loop, cast row pointers to vec4* and process 4 elements per iteration. In the zero-fill loop, use sycl::float4(0) writes. Handle tail elements scalar.",
+          "risk": "low",
+          "risk_notes": "Must handle ne00 not divisible by 4 and split_point not aligned to 4."
+        },
+        {
+          "id": "opt_048_002",
+          "category": "code_quality",
+          "priority": "low",
+          "description": "Convert prefix_keep from runtime bool to compile-time template parameter (matching CUDA's constexpr if approach) to eliminate branch in hot loop.",
+          "expected_improvement": "1-3% — eliminates branch prediction overhead in inner loop.",
+          "implementation_notes": "Dispatch to two separate kernel lambdas based on prefix_keep value, or use if constexpr with a template parameter.",
+          "risk": "low",
+          "risk_notes": "Minor refactoring."
+        },
+        {
+          "id": "opt_048_003",
+          "category": "sub_group_ops",
+          "priority": "low",
+          "description": "Add [[sycl::reqd_sub_group_size(WARP_SIZE)]] attribute.",
+          "expected_improvement": "0-2%.",
+          "implementation_notes": "Requires handler.parallel_for pattern.",
+          "risk": "low",
+          "risk_notes": "Standard practice."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "70-85%",
+      "efficiency_notes": "Well-designed SYCL port with good code quality (auto-typed lambda dispatch for F32/F16/BF16). 3D grid correctly maps one WG per row. The main inefficiency is scalar stores and runtime prefix_keep branching. Tri is used rarely in LLM inference. Low optimization ROI."
+    },
+    {
+      "kernel_id": "sk_049",
+      "kernel_name": "fill (inline in ggml-sycl.cpp)",
+      "file": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "line_range": "3503-3553",
+      "ops": ["GGML_OP_FILL"],
+      "source_cuda_ids": ["ck_059"],
+      "launch_config": {
+        "nd_range_dims": 1,
+        "work_group_size": 256,
+        "work_group_size_source": "hardcoded const int block_size = 256",
+        "grid_size": "min(0x7FFFFFFF, ceil(k / 256))",
+        "grid_size_notes": "Grid-stride loop with MAX_GRIDDIM_X cap, matching scale kernel pattern."
+      },
+      "memory_patterns": {
+        "global_reads": "0 (write-only kernel)",
+        "global_writes": "1 element per work-item per iteration (F32 or F16)",
+        "arithmetic_intensity_flop_per_byte": 0.0,
+        "arithmetic_intensity_notes": "0 FLOPs — pure memory fill. Write bandwidth limited.",
+        "coalescing": "perfect — linear stride-1 writes via grid-stride loop",
+        "vectorization": "none — scalar element-wise writes"
+      },
+      "slm_usage": {
+        "uses_slm": false
+      },
+      "sync_patterns": {
+        "barriers": 0,
+        "atomics": 0,
+        "sub_group_ops": 0,
+        "notes": "Embarrassingly parallel."
+      },
+      "dpct_artifacts": {
+        "count": 0,
+        "details": "Clean native SYCL."
+      },
+      "cuda_feature_parity": {
+        "parity_level": "full",
+        "missing_features": [],
+        "notes": "1:1 match with CUDA fill.cu. Both support F32 and F16. SYCL uses grid-stride loop (matching scale kernel), while CUDA fill.cu does not — SYCL is actually slightly better here for very large tensors."
+      },
+      "arithmetic_intensity": {
+        "flop_per_byte": 0.0,
+        "classification": "memory_bound",
+        "ridge_point_note": "Pure write-bandwidth bound."
+      },
+      "optimizations": [
+        {
+          "id": "opt_049_001",
+          "category": "vectorization",
+          "priority": "low",
+          "description": "Use vec4 (F32) or vec8 (F16) writes to fill 4-8 elements per work-item per iteration. Could also consider sycl::queue::fill() for the constant-value case.",
+          "expected_improvement": "5-15% — write coalescing improvement.",
+          "implementation_notes": "For F32: sycl::float4 fill_val(value, value, value, value); cast dst to float4* and write. Alternatively, use stream.fill(dst_f32, value, k) which may map to optimized memset on Intel.",
+          "risk": "low",
+          "risk_notes": "sycl::queue::fill() is the simplest and most portable approach."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "75-90%",
+      "efficiency_notes": "Near-optimal for a fill kernel. Grid-stride loop is a nice touch (not even in CUDA fill.cu). The kernel could be entirely replaced by sycl::queue::fill() for potentially better performance via driver-optimized memset. Called very rarely in inference. Negligible optimization ROI."
+    },
+    {
+      "kernel_id": "sk_050",
+      "kernel_name": "argmax (inline in ggml-sycl.cpp)",
+      "file": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "line_range": "3562-3661",
+      "ops": ["GGML_OP_ARGMAX"],
+      "source_cuda_ids": ["ck_004"],
+      "launch_config": {
+        "nd_range_dims": 1,
+        "work_group_size": "dynamic, warp-aligned, max 256",
+        "work_group_size_source": "min(ARGMAX_BLOCK_SIZE=256, ceil(ne00/WARP_SIZE)*WARP_SIZE), rounded to multiple of WARP_SIZE",
+        "grid_size": "nrows * block_size (one WG per row)",
+        "grid_size_notes": "One work-group per row. Dynamic block size adapts to row width."
+      },
+      "memory_patterns": {
+        "global_reads": "ncols floats per row (stride across columns, each thread reads ncols/block_size elements)",
+        "global_writes": "1 int32 per row (argmax index)",
+        "arithmetic_intensity_flop_per_byte": 0.25,
+        "arithmetic_intensity_notes": "1 comparison per 4 bytes read. Memory-bound for wide rows (typical vocabulary 32K-128K).",
+        "coalescing": "good — threads in a WG read columns with stride=block_size, giving coalesced 64-byte cache line hits",
+        "vectorization": "none — scalar float reads"
+      },
+      "slm_usage": {
+        "uses_slm": true,
+        "slm_bytes": 320,
+        "slm_bytes_notes": "max_warps=16 floats (64 bytes) + max_warps=16 ints (64 bytes) = 128 bytes per WG. Well within 64KB limit.",
+        "slm_access_pattern": "Write by lane 0 of each warp, barrier, read by warp 0 for final reduction."
+      },
+      "sync_patterns": {
+        "barriers": 1,
+        "atomics": 0,
+        "sub_group_ops": "multiple — sycl::permute_group_by_xor for intra-warp reduction, two-level reduction pattern",
+        "notes": "Proper two-level reduction: (1) intra-warp via sub-group shuffles with #pragma unroll, (2) inter-warp via SLM + barrier + second warp-shuffle reduction."
+      },
+      "dpct_artifacts": {
+        "count": 0,
+        "details": "Clean native SYCL. Uses sycl::permute_group_by_xor correctly (not dpct::permute). Has [[sycl::reqd_sub_group_size(WARP_SIZE)]] — exemplary."
+      },
+      "cuda_feature_parity": {
+        "parity_level": "full",
+        "missing_features": [],
+        "notes": "Excellent SYCL port with full CUDA parity. CUDA uses __shfl_xor_sync(0xFFFFFFFF, ...) for warp reduction — SYCL uses sycl::permute_group_by_xor. CUDA max block_size is 1024 vs SYCL 256 — SYCL is slightly smaller but 256 is optimal for Intel Xe2. CUDA has __shared__ float/int arrays sized to max_warps=32 (1024/32); SYCL has sycl::local_accessor sized to max_warps=16 (256/16). Both use #pragma unroll on shuffle loops."
+      },
+      "arithmetic_intensity": {
+        "flop_per_byte": 0.25,
+        "classification": "memory_bound",
+        "ridge_point_note": "Below ridge point. Reduction is memory-bandwidth limited."
+      },
+      "optimizations": [
+        {
+          "id": "opt_050_001",
+          "category": "vectorization",
+          "priority": "low",
+          "description": "Use vec4 loads in the per-thread max scan loop to read 4 floats per iteration, reducing memory transactions.",
+          "expected_improvement": "5-10% — reduces number of load instructions in the scan loop.",
+          "implementation_notes": "In the for(col = local_id; col < ncols; col += bs) loop, read sycl::float4 and compare all 4 values. Handle ncols not divisible by 4.",
+          "risk": "low",
+          "risk_notes": "Standard vectorization of reduction input."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "80-90%",
+      "efficiency_notes": "This is one of the best-implemented SYCL kernels in the codebase. Proper reqd_sub_group_size, proper two-level warp reduction with SLM, #pragma unroll on shuffle loops, dynamic WG sizing. The only minor improvement is vec4 loads in the scan phase. Called once per generation step (greedy decoding) — not a bottleneck. Negligible optimization ROI."
+    },
+    {
+      "kernel_id": "sk_051",
+      "kernel_name": "argsort (inline in ggml-sycl.cpp)",
+      "file": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "line_range": "3668-3752",
+      "ops": ["GGML_OP_ARGSORT"],
+      "source_cuda_ids": ["ck_005", "ck_006", "ck_007"],
+      "launch_config": {
+        "nd_range_dims": 1,
+        "work_group_size": "ncols_pad (next power of 2, up to 1024)",
+        "work_group_size_source": "ncols_pad = next_power_of_2(ncols). ASSERT ncols_pad <= 1024.",
+        "grid_size": "nrows * ncols_pad (one WG per row)",
+        "grid_size_notes": "One work-group per row. WG size equals the padded column count — can be 2, 4, 8, ..., 1024."
+      },
+      "memory_patterns": {
+        "global_reads": "ncols floats per row (read during comparison x_row[dst_row[col]])",
+        "global_writes": "ncols ints per row (final sorted indices to dst_d)",
+        "arithmetic_intensity_flop_per_byte": 0.5,
+        "arithmetic_intensity_notes": "O(n log^2 n) comparisons for bitonic sort. For n=1024: ~55K comparisons, ~8KB reads = ~6.9 FLOP/byte. Approaching compute-bound for large n.",
+        "coalescing": "SLM-based — global reads are indirect through sorted indices (random access). Global writes at end are coalesced.",
+        "vectorization": "none — scalar SLM reads/writes"
+      },
+      "slm_usage": {
+        "uses_slm": true,
+        "slm_bytes": "ncols_pad * 4 bytes (e.g., 1024 * 4 = 4096 bytes max)",
+        "slm_bytes_notes": "Stores the index array during sorting. 4KB max — well within 64KB limit.",
+        "slm_access_pattern": "Random access during bitonic compare-swap. Each thread accesses dst_row[col] and dst_row[col^j]."
+      },
+      "sync_patterns": {
+        "barriers": "O(log^2 n) — sycl::group_barrier after each compare-swap step. For n=1024: ~55 barriers.",
+        "atomics": 0,
+        "sub_group_ops": 0,
+        "notes": "Heavy barrier usage is fundamental to bitonic sort network. Each sort pass requires a barrier for correctness."
+      },
+      "dpct_artifacts": {
+        "count": 0,
+        "details": "Clean native SYCL. Uses sycl::group_barrier correctly."
+      },
+      "cuda_feature_parity": {
+        "parity_level": "partial",
+        "missing_features": [
+          "CUB DeviceRadixSort fallback for ncols > 1024",
+          "CUB DeviceSegmentedSort for multi-row sorting",
+          "Compile-time template on sort order (SYCL uses runtime bool)"
+        ],
+        "notes": "SYCL only has the bitonic sort path with hard ASSERT ncols_pad <= 1024. CUDA has a CUB radix sort fallback for ncols > 1024, making it work for arbitrarily large vocabularies. CUDA also templates on ggml_sort_order for compile-time branch elimination; SYCL uses a runtime bool. For the common case (ncols <= 1024), behavior is functionally equivalent."
+      },
+      "arithmetic_intensity": {
+        "flop_per_byte": 0.5,
+        "classification": "mixed",
+        "ridge_point_note": "Below ridge point but closer than pure element-wise kernels. Barrier-latency dominated."
+      },
+      "optimizations": [
+        {
+          "id": "opt_051_001",
+          "category": "feature_parity",
+          "priority": "medium",
+          "description": "Add oneDPL radix sort fallback for ncols > 1024, matching CUDA's CUB DeviceRadixSort path. Currently SYCL fails with ASSERT for large vocabularies.",
+          "expected_improvement": "Functional parity — enables argsort for ncols > 1024 (avoids assertion failure).",
+          "implementation_notes": "Use oneapi::dpl::sort or oneapi::dpl::sort_by_key with custom comparator. Fall back to bitonic only for ncols <= 1024. Alternatively use radix_sort from intel extension.",
+          "risk": "medium",
+          "risk_notes": "oneDPL dependency. Needs testing with various ncols values. Performance of DPL sort may vary."
+        },
+        {
+          "id": "opt_051_002",
+          "category": "code_quality",
+          "priority": "low",
+          "description": "Template on sort order (ascending bool) to eliminate runtime branch in the compare-swap inner loop, matching CUDA's template approach.",
+          "expected_improvement": "2-5% — eliminates branch in the hottest loop (called O(n log^2 n) times).",
+          "implementation_notes": "Create two kernel lambdas dispatched by ascending flag. Or use if constexpr with a template bool.",
+          "risk": "low",
+          "risk_notes": "Minor refactoring."
+        },
+        {
+          "id": "opt_051_003",
+          "category": "sub_group_ops",
+          "priority": "low",
+          "description": "Add [[sycl::reqd_sub_group_size(WARP_SIZE)]] attribute.",
+          "expected_improvement": "0-2%.",
+          "implementation_notes": "Add to the kernel lambda. Note: WG size varies (ncols_pad), so sub-group count varies.",
+          "risk": "low",
+          "risk_notes": "Standard practice."
+        }
+      ],
+      "overall_optimization_potential": "medium",
+      "estimated_current_efficiency": "55-70%",
+      "efficiency_notes": "Correct bitonic sort implementation with proper SLM usage and barriers. The missing CUB/oneDPL fallback for ncols > 1024 is a functional gap that could cause failures with large vocabulary sizes. The ~55 barriers for n=1024 are unavoidable for bitonic sort. Runtime sort-order branching adds overhead in the hot loop. Called during sampling (top-p, top-k, typical) — moderate frequency. Medium optimization potential primarily from the functional parity gap."
+    },
+    {
+      "kernel_id": "sk_052",
+      "kernel_name": "top_k (inline in ggml-sycl.cpp)",
+      "file": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "line_range": "3757-3864",
+      "ops": ["GGML_OP_TOP_K"],
+      "source_cuda_ids": ["ck_107"],
+      "launch_config": {
+        "nd_range_dims": 1,
+        "work_group_size": "ncols_pad for sort step (up to 1024), 256 for copy step",
+        "work_group_size_source": "Sort: ncols_pad = next_power_of_2(ncols). Copy: block_size=256.",
+        "grid_size": "Sort: nrows * ncols_pad. Copy: ceil(nrows*k / 256).",
+        "grid_size_notes": "Two-kernel approach: (1) bitonic argsort descending into temp buffer, (2) copy first k indices per row."
+      },
+      "memory_patterns": {
+        "global_reads": "ncols floats per row (sort), k ints per row (copy)",
+        "global_writes": "ncols ints per row (sort to tmp), k ints per row (copy to dst)",
+        "arithmetic_intensity_flop_per_byte": 0.5,
+        "arithmetic_intensity_notes": "Sort phase dominates. Same as argsort.",
+        "coalescing": "Sort: SLM-based indirect. Copy: coalesced linear reads and writes.",
+        "vectorization": "none — scalar"
+      },
+      "slm_usage": {
+        "uses_slm": true,
+        "slm_bytes": "ncols_pad * 4 bytes (up to 4096 bytes)",
+        "slm_bytes_notes": "Same bitonic sort SLM as argsort.",
+        "slm_access_pattern": "Random access during bitonic compare-swap."
+      },
+      "sync_patterns": {
+        "barriers": "O(log^2 n) in sort kernel, 0 in copy kernel",
+        "atomics": 0,
+        "sub_group_ops": 0,
+        "notes": "Same bitonic sort barriers as argsort."
+      },
+      "dpct_artifacts": {
+        "count": 0,
+        "details": "Clean native SYCL."
+      },
+      "cuda_feature_parity": {
+        "parity_level": "partial",
+        "missing_features": [
+          "CUB DeviceTopK::MaxPairs (native partial sort, CCCL >= 3.2)",
+          "CUB argsort fallback for large ncols",
+          "Support for ncols > 1024"
+        ],
+        "notes": "CUDA has a 3-tier strategy: (1) CUB DeviceTopK::MaxPairs for native partial sort (only sorts k elements, not full array), (2) CUB argsort+copy fallback, (3) bitonic sort+copy fallback. SYCL only has tier 3. For typical LLM vocabulary sizes (32K-128K), SYCL fails with ASSERT(ncols_pad <= 1024). This is a CRITICAL functional gap — top_k is called every generation step during sampling."
+      },
+      "arithmetic_intensity": {
+        "flop_per_byte": 0.5,
+        "classification": "mixed",
+        "ridge_point_note": "Barrier-dominated like argsort."
+      },
+      "optimizations": [
+        {
+          "id": "opt_052_001",
+          "category": "feature_parity",
+          "priority": "high",
+          "description": "CRITICAL: Add large-ncols support. Current implementation fails with ASSERT for ncols > 1024 (typical LLM vocab is 32K-128K). Implement partial sort using oneDPL nth_element or partial_sort, or use the argsort (sk_051) with oneDPL fallback + copy-first-k approach.",
+          "expected_improvement": "Functional parity — enables top_k for real LLM vocab sizes. Without this, top_k sampling may fall back to CPU.",
+          "implementation_notes": "Option 1: oneDPL partial_sort_copy for direct top-k. Option 2: Heap-based selection (build k-element min-heap per row). Option 3: Use argsort with oneDPL for full sort + copy-first-k. Option 1 is most efficient (O(n + k log k) vs O(n log n)).",
+          "risk": "medium",
+          "risk_notes": "oneDPL dependency. Need to verify performance for various k values (typically k=40-100 for LLM sampling)."
+        },
+        {
+          "id": "opt_052_002",
+          "category": "memory_traffic",
+          "priority": "low",
+          "description": "Eliminate the temporary buffer allocation and two-kernel approach. Fuse sort and copy into a single kernel that only writes the first k sorted indices directly to dst.",
+          "expected_improvement": "10-20% for the ncols <= 1024 path — eliminates ncols*nrows*4 bytes of temporary buffer allocation and extra copy kernel launch.",
+          "implementation_notes": "Modify the bitonic sort kernel to write only the first k indices to dst_d instead of all ncols to tmp. Replace the step 2 copy kernel with direct writes at the end of the sort kernel: if (col < k) dst_d[row*k + col] = dst_row[col].",
+          "risk": "low",
+          "risk_notes": "Simple modification to existing bitonic sort kernel."
+        },
+        {
+          "id": "opt_052_003",
+          "category": "sub_group_ops",
+          "priority": "low",
+          "description": "Add [[sycl::reqd_sub_group_size(WARP_SIZE)]] attribute to both kernels.",
+          "expected_improvement": "0-2%.",
+          "implementation_notes": "Standard practice.",
+          "risk": "low",
+          "risk_notes": "Standard practice."
+        }
+      ],
+      "overall_optimization_potential": "medium",
+      "estimated_current_efficiency": "50-65%",
+      "efficiency_notes": "CRITICAL functional gap: fails for ncols > 1024 which is the common case for LLM sampling (vocab sizes 32K-128K). For the ncols <= 1024 path, the two-kernel approach (full sort + copy first k) is suboptimal compared to CUDA's native CUB DeviceTopK (partial sort). The temporary buffer adds unnecessary memory traffic. Called every generation step during sampling — moderate frequency. Medium optimization potential primarily from the functional parity gap."
+    },
+    {
+      "kernel_id": "sk_053",
+      "kernel_name": "pool2d (inline in ggml-sycl.cpp)",
+      "file": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "line_range": "3866-3949",
+      "ops": ["GGML_OP_POOL_2D"],
+      "source_cuda_ids": ["ck_084"],
+      "launch_config": {
+        "nd_range_dims": 1,
+        "work_group_size": 256,
+        "work_group_size_source": "SYCL_POOL2D_BLOCK_SIZE = 256 (from presets.hpp)",
+        "grid_size": "ceil(N*OC*OH*OW / 256)",
+        "grid_size_notes": "Standard 1D grid over all output elements."
+      },
+      "memory_patterns": {
+        "global_reads": "kh*kw floats per output element (pooling window)",
+        "global_writes": "1 float per output element",
+        "arithmetic_intensity_flop_per_byte": 0.5,
+        "arithmetic_intensity_notes": "For typical 3x3 pool: 9 reads (36 bytes) + 1 write (4 bytes) with 9 comparisons (max) or 9 FMAs (avg) = ~0.22 FLOP/byte. Memory-bound.",
+        "coalescing": "output writes are coalesced. Input reads are strided by IW (pooling window rows) — partially coalesced within each window row.",
+        "vectorization": "none — scalar loads"
+      },
+      "slm_usage": {
+        "uses_slm": false
+      },
+      "sync_patterns": {
+        "barriers": 0,
+        "atomics": 0,
+        "sub_group_ops": 0,
+        "notes": "Embarrassingly parallel per output element."
+      },
+      "dpct_artifacts": {
+        "count": 0,
+        "details": "Clean native SYCL. Uses sycl::fmax/sycl::max/sycl::min correctly."
+      },
+      "cuda_feature_parity": {
+        "parity_level": "near_full",
+        "missing_features": [
+          "No __ldg() equivalent for read-only texture cache loads (not critical on Intel)"
+        ],
+        "notes": "1:1 match with CUDA pool2d.cu. Same WG=256, same NCHW layout, same avg/max dispatch. CUDA uses __ldg() for texture cache loads on arch >= 350 — not needed on Intel (L1 cache is unified). CUDA has dual type template <Ti, To> — SYCL is F32-only (matches current CUDA instantiation). Average pooling uses kernel-size-based scale (1/(kh*kw)) same as CUDA — no padding compensation."
+      },
+      "arithmetic_intensity": {
+        "flop_per_byte": 0.5,
+        "classification": "memory_bound",
+        "ridge_point_note": "Below ridge point."
+      },
+      "optimizations": [
+        {
+          "id": "opt_053_001",
+          "category": "slm_caching",
+          "priority": "low",
+          "description": "Cache input tiles in SLM for overlapping pooling windows. Adjacent output elements read overlapping input regions — SLM tiling can reduce redundant global reads by ~kh*kw/stride factor.",
+          "expected_improvement": "10-25% for large pooling kernels (7x7) with stride 1. Negligible for stride=kernel_size (no overlap).",
+          "implementation_notes": "Cooperative tile load: work-group loads a tile of input into SLM (size = (block_oh*sh + kh - 1) * (block_ow*sw + kw - 1) floats), barrier, then each thread reads from SLM. Need to restructure from flat 1D grid to 2D tiled grid.",
+          "risk": "medium",
+          "risk_notes": "Significant restructuring. Tile size depends on pooling parameters. Only beneficial for overlapping windows."
+        },
+        {
+          "id": "opt_053_002",
+          "category": "sub_group_ops",
+          "priority": "low",
+          "description": "Add [[sycl::reqd_sub_group_size(WARP_SIZE)]] attribute.",
+          "expected_improvement": "0-2%.",
+          "implementation_notes": "Requires handler.parallel_for pattern.",
+          "risk": "low",
+          "risk_notes": "Standard practice."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "65-80%",
+      "efficiency_notes": "Clean implementation with near-full CUDA parity. SLM tiling for overlapping windows is the main optimization opportunity but requires significant restructuring. Pool2d is used primarily in CNN-based vision models (image encoders, Whisper) — called a few times per forward pass but not a dominant cost. Low optimization ROI."
+    },
+    {
+      "kernel_id": "sk_054",
+      "kernel_name": "upscale (inline in ggml-sycl.cpp)",
+      "file": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "line_range": "3954-4201",
+      "ops": ["GGML_OP_UPSCALE"],
+      "source_cuda_ids": ["ck_116", "ck_117", "ck_118", "ck_119"],
+      "launch_config": {
+        "nd_range_dims": 1,
+        "work_group_size": 256,
+        "work_group_size_source": "SYCL_UPSCALE_BLOCK_SIZE = 256 (from presets.hpp)",
+        "grid_size": "ceil(ne10*ne11*ne12*ne13 / 256)",
+        "grid_size_notes": "Standard 1D grid over all destination elements. Same grid for all 4 modes."
+      },
+      "memory_patterns": {
+        "global_reads": "1 float (nearest), 4 floats (bilinear), variable (antialias), 16 floats (bicubic) per output element",
+        "global_writes": "1 float per output element",
+        "arithmetic_intensity_flop_per_byte": 1.0,
+        "arithmetic_intensity_notes": "Varies by mode. Nearest: 0 FLOP/byte. Bilinear: ~3 FLOP/byte. Bicubic: ~8 FLOP/byte. Antialias: variable, up to ~15 FLOP/byte for large support windows. All modes are memory-bound to mixed.",
+        "coalescing": "output writes are coalesced (linear). Input reads are scattered (mapped via scale factors) — non-coalesced for non-integer scale factors.",
+        "vectorization": "none — scalar loads/stores"
+      },
+      "slm_usage": {
+        "uses_slm": false
+      },
+      "sync_patterns": {
+        "barriers": 0,
+        "atomics": 0,
+        "sub_group_ops": 0,
+        "notes": "Embarrassingly parallel per output pixel."
+      },
+      "dpct_artifacts": {
+        "count": 0,
+        "details": "Clean native SYCL. Well-structured with mode dispatch and lambdas for bicubic."
+      },
+      "cuda_feature_parity": {
+        "parity_level": "full",
+        "missing_features": [],
+        "notes": "Excellent SYCL port with full parity across all 4 modes (nearest, bilinear, bilinear+antialias, bicubic). Byte-offset addressing for non-contiguous source tensors matches CUDA. Bicubic uses same alpha=-0.75 (PyTorch-compatible). Align-corners support present. SYCL code is well-organized with clear mode separation."
+      },
+      "arithmetic_intensity": {
+        "flop_per_byte": 1.0,
+        "classification": "memory_bound",
+        "ridge_point_note": "Below ridge point for all modes. Nearest is purely memory-bound; bicubic approaches mixed."
+      },
+      "optimizations": [
+        {
+          "id": "opt_054_001",
+          "category": "integer_arithmetic",
+          "priority": "low",
+          "description": "Replace 4 int64 divisions in the 4D index decomposition (present in all 4 modes) with fast multiply-shift trick.",
+          "expected_improvement": "3-8% — reduces ALU overhead in the index computation common to all modes.",
+          "implementation_notes": "Precompute magic numbers for ne10, ne10*ne11, ne10*ne11*ne12 on host. Pass as kernel args.",
+          "risk": "low",
+          "risk_notes": "Standard fast-division optimization."
+        },
+        {
+          "id": "opt_054_002",
+          "category": "vectorization",
+          "priority": "low",
+          "description": "For nearest-neighbor mode, use vec4 output writes when 4 consecutive output pixels map to the same source row (common for integer scale factors).",
+          "expected_improvement": "5-15% for nearest mode with integer scale factors.",
+          "implementation_notes": "Detect integer scale factors at host dispatch time. For sf0=2, every pair of output pixels maps to the same source pixel — batch writes.",
+          "risk": "low",
+          "risk_notes": "Only applies to integer scale factors. Need host-side detection."
+        },
+        {
+          "id": "opt_054_003",
+          "category": "sub_group_ops",
+          "priority": "low",
+          "description": "Add [[sycl::reqd_sub_group_size(WARP_SIZE)]] attribute to all 4 mode kernels.",
+          "expected_improvement": "0-2%.",
+          "implementation_notes": "Requires handler.parallel_for pattern for each mode's kernel.",
+          "risk": "low",
+          "risk_notes": "Standard practice."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "65-80%",
+      "efficiency_notes": "Well-implemented with full CUDA parity across all 4 interpolation modes. The scattered input reads are fundamental to the algorithm and cannot be easily improved. The 4D index decomposition overhead is the main optimization target. Used in vision models and diffusion models for image upscaling — called a few times per forward pass. Low optimization ROI for LLM inference."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 41,
+    "total_kernels_analyzed": 54,
     "high_potential": 4,
-    "medium_potential": 17,
-    "low_potential": 20,
+    "medium_potential": 19,
+    "low_potential": 31,
     "no_optimization_needed": 0,
     "top_opportunities": [
       {
@@ -5509,6 +6491,20 @@
         "optimization_id": "opt_017_004",
         "description": "Reduce GROUP_NORM from 3 passes to 2 passes using float2 accumulator \u2014 25-33% latency reduction for GROUP_NORM (critical for diffusion models)",
         "priority": "medium"
+      },
+      {
+        "kernel_id": "sk_051",
+        "kernel_name": "argsort (inline)",
+        "optimization_id": "opt_051_001",
+        "description": "Add oneDPL radix sort fallback for ncols > 1024 — functional parity gap, current ASSERT fails for large vocabularies",
+        "priority": "medium"
+      },
+      {
+        "kernel_id": "sk_052",
+        "kernel_name": "top_k (inline)",
+        "optimization_id": "opt_052_001",
+        "description": "CRITICAL: Add large-ncols support (fails for ncols > 1024 = typical LLM vocab 32K-128K). Implement oneDPL partial sort or argsort fallback — enables top_k sampling on real models",
+        "priority": "high"
       }
     ]
   }
