@@ -5,9 +5,9 @@
 
 ## Summary
 - Total SYCL kernels to analyze: 54
-- Kernels analyzed so far: 13
+- Kernels analyzed so far: 14
 - Analysis complete: No
-- Kernels with optimization potential: 11
+- Kernels with optimization potential: 12
 - Optimization tasks created: 0 (pending finalization)
 
 ## Kernels Analyzed
@@ -24,7 +24,7 @@
 - [x] sk_011: element_wise (GLU ops) — low potential
 - [x] sk_012: element_wise (special unary) — low potential
 - [x] sk_013: binbcast — medium potential
-- [ ] sk_014: repeat_back — pending
+- [x] sk_014: repeat_back — low potential
 - [ ] sk_015: softmax — pending
 - [ ] sk_016: rope — pending
 - [ ] sk_017: norm — pending
@@ -67,6 +67,7 @@
 - [ ] sk_054: upscale (inline) — pending
 
 ## Recent Activity
+[2026-03-06] Analyzed repeat_back (sk_014). Found 3 optimization opportunities (low potential). Key findings: Direct CUDA port of backward-pass repeat summation kernel (96 lines). WG=16 (just WARP_SIZE) — far below recommended 256, only 1 sub-group per work-group. 4-deep nested loop accumulates sum over repeat factors in private register. All scalar loads/stores, no vectorization. 64-bit integer division in hot path (tid23 % ne2, tid23 / ne2). FP32 only, no F16 support. Missing reqd_sub_group_size attribute. ~35-50% estimated efficiency. Low potential because repeat_back is a backward-pass kernel rarely called during inference, with negligible contribution to end-to-end latency.
 [2026-03-06] Analyzed binbcast binary broadcast (sk_013). Found 5 optimization opportunities (medium potential). Key findings: Clean native SYCL covering ADD, SUB, MUL, DIV, REPEAT with 4D broadcasting. WG=128 (below recommended 256). No vectorized loads on purely memory-bound ops (0.08 FLOP/byte). 6 expensive integer modulo operations per work-item where CUDA uses fastdiv. Missing fused multi-source ADD support (CUDA supports up to 8-way fusion). 3D nd_range with dimension collapsing for contiguous tensors. Supports F32/F16 mixed types. ~35-50% estimated efficiency. Medium potential because ADD is the most frequent op in transformer inference (residual connections).
 [2026-03-06] Analyzed element_wise special unary (sk_012). Found 4 optimization opportunities (low potential). Key findings: Clean manual port covering 5 kernels (leaky_relu, silu_back, xielu, expm1, swiglu_oai). All use nd_range<1> with WG=256, zero DPCT artifacts. Primary issue: scalar 1-element-per-work-item processing on purely memory-bound ops (0.4-2.0 FLOP/byte). Vectorized vec4 loads could improve bandwidth utilization 1.5-2x. Standard math where native would suffice. swiglu_oai is FP32-only. Low overall potential — special unary activations are a tiny fraction of inference compute.
 [2026-03-06] Analyzed element_wise GLU ops (sk_011). Found 4 optimization opportunities (low potential). Key findings: Clean manual port covering 6 GLU activation functions (SWIGLU, REGLU, GEGLU, GEGLU_ERF, GEGLU_QUICK, SWIGLU_OAI) plus XIELU. Math copied from ggml-cuda/unary.cu. All use nd_range<1> with WG=256. No vectorization — each work-item processes 1 element for memory-bound ops (0.17-1.25 FLOP/byte, all far below 27 FLOP/byte ridge point). 64-bit integer division/modulo in hot path (i/n, i%n). Standard math functions used where native would suffice. swiglu_oai is F32-only unlike generic GLU ops. ~40-55% estimated efficiency. Low overall potential because GLU activation is a small fraction of total inference compute.

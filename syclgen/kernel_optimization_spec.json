@@ -1912,13 +1912,129 @@
       "overall_optimization_potential": "medium",
       "estimated_current_efficiency": "35-50%",
       "efficiency_notes": "The binbcast kernel is a clean native SYCL implementation with zero DPCT artifacts. It correctly handles 4D broadcasting, dimension collapsing for contiguous tensors, type dispatch for F32/F16 mixed types, and has a 1D fallback for large grids. However, it has several performance gaps: (1) WG=128 is below the recommended 256 for memory-bound kernels, reducing occupancy, (2) no vectorized loads despite being purely memory-bound (0.08 FLOP/byte for ADD — deeply below the 27 FLOP/byte ridge point), (3) 6 expensive integer modulo operations per work-item where CUDA uses fast division, (4) missing fused-add support that CUDA provides for up to 8-way addition fusion. The overall potential is MEDIUM because: (a) ADD is the most frequently called operation in transformer inference (residual connections, every layer), so even modest per-call improvement accumulates across the model, (b) the vectorization + fast-div + WG size improvements are complementary and can compound to 1.5-3x improvement for contiguous ADD, (c) the fused-add feature provides an additional bandwidth reduction path for chained additions."
+    },
+    {
+      "kernel_id": "sk_014",
+      "name": "repeat_back",
+      "file": "ggml/src/ggml-sycl/repeat_back.cpp",
+      "source_cuda_ids": [
+        "ck_010"
+      ],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": [
+            1,
+            1,
+            16
+          ],
+          "work_group_size_total": 16,
+          "sub_group_size": null,
+          "sub_group_size_specified": false,
+          "global_size_expression": "3D: (ne2*ne3, ne1, ceil(ne0/WARP_SIZE)*WARP_SIZE). block_dims=(1,1,WARP_SIZE=16). Each work-item handles one output element in dim0, with nested loops summing over repeat factors in all 4 dimensions.",
+          "notes": "Work-group size of 16 (just WARP_SIZE) is extremely small — well below the recommended 256-512 for Intel GPUs. Only 1 sub-group per work-group, providing minimal memory-level parallelism. The 3D nd_range uses dimensions (ne2*ne3, ne1, gx*WARP_SIZE) but only dim2 (x) has multiple work-items per work-group — dims 0 and 1 have work-group extent of 1, making them single-thread dimensions within each work-group. Missing [[intel::reqd_sub_group_size(16)]] attribute."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "strided_accesses": [
+            "When s00 != 1 (non-contiguous src0), reads become strided with stride s00 elements between consecutive thread accesses in dim0",
+            "Higher-dimensional loop iterations (i1, i2, i3 loops) access non-adjacent memory locations separated by s01, s02, s03 strides"
+          ],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "Source reads: src[i3*s03 + i2*s02 + i1*s01 + i0*s00]. When s00==1 (contiguous, the common case), consecutive work-items in dim0 read consecutive elements — coalesced. The innermost loop (over i0) strides by ne0 elements, which may not be cache-friendly for large ne0. Output writes: dst[tid3*ne2*ne1*ne0 + tid2*ne1*ne0 + tid1*ne0 + tid0] — fully coalesced since consecutive work-items write to consecutive dst positions. All loads and stores are scalar (4-byte float), no vectorization."
+        },
+        "slm_usage": {
+          "uses_slm": false,
+          "slm_bytes": 0,
+          "notes": "No shared local memory used. Each work-item independently accumulates its own sum in a private register. No cross-thread communication or reduction is needed because each output element maps to exactly one work-item."
+        },
+        "reduction_pattern": {
+          "type": "private_accumulation",
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "notes": "Each work-item accumulates sum in a private T register across a 4-deep nested loop: for i3 (stride ne3), for i2 (stride ne2), for i1 (stride ne1), for i0 (stride ne0). The total iterations per work-item = (ne03/ne3) * (ne02/ne2) * (ne01/ne1) * (ne00/ne0) — which is the product of repeat factors across all dimensions. No cross-thread reduction is needed."
+        },
+        "data_types": {
+          "input_types": [
+            "float"
+          ],
+          "output_types": [
+            "float"
+          ],
+          "accumulation_type": "float",
+          "notes": "Template parameter T but only instantiated for float (GGML_TYPE_F32) in the switch statement (line 84-93). The default case asserts false. No FP16 support — this limits usage to F32-only backward pass operations."
+        },
+        "math_operations": {
+          "special_functions": [],
+          "uses_native_math": false,
+          "notes": "No special math functions used. The kernel performs only: (1) integer index arithmetic (multiplication and addition for linear index computation), (2) integer modulo/division (tid23 % ne2, tid23 / ne2), (3) floating-point addition (sum += ...). Purely arithmetic with no transcendental or special functions."
+        },
+        "synchronization": {
+          "barriers": 0,
+          "atomic_operations": 0,
+          "notes": "No barriers, no atomics, no synchronization of any kind. Each work-item is fully independent — reads from src, accumulates in private register, writes to unique dst location. Clean async submission via queue.parallel_for with no explicit wait."
+        },
+        "loop_structure": {
+          "loop_depth": 4,
+          "unroll_pragmas": false,
+          "notes": "4-deep nested loop (lines 32-40): for i3 (tid3 to ne03, step ne3), for i2 (tid2 to ne02, step ne2), for i1 (tid1 to ne01, step ne1), for i0 (tid0 to ne00, step ne0). Trip counts equal the repeat factors: typically 1 in most dimensions (no repeat), occasionally 2-4 for models that use repeat on specific dimensions. When all repeat factors are 1, each loop body executes exactly once (degenerate case — simple copy with reduction). No #pragma unroll annotations despite typically short trip counts."
+        },
+        "bottleneck": "memory",
+        "bottleneck_notes": "Arithmetic intensity is extremely low: for the common case of repeat factor 1 in all dimensions, the kernel performs 0 FLOPs per element (just a copy: sum = src[...], dst[...] = sum). For repeat factor R (total across all dims), it performs R-1 additions per output element with R reads × 4 bytes + 1 write × 4 bytes = (R+1)*4 bytes, giving (R-1)/((R+1)*4) FLOP/byte. Even with R=8, that's 7/36 = 0.19 FLOP/byte — far below the B60's 27 FLOP/byte ridge point. Performance is entirely determined by memory bandwidth utilization, which is poor due to the tiny work-group size (16) and lack of vectorization.",
+        "anti_patterns": [
+          "Work-group size of 16 (WARP_SIZE only) — far below recommended 256-512. Only 1 sub-group per work-group, severely limiting memory-level parallelism and occupancy per Xe-core. Should increase to at least 256.",
+          "3D nd_range with work-group dims (1,1,16) — dims 0 and 1 have extent 1, providing no parallelism within the work-group for those dimensions. The 3D structure adds overhead for what is essentially a 1D parallel-for over output elements.",
+          "No vectorized loads or stores — all memory accesses are scalar 4-byte float. For the contiguous case (s00==1), vec4 loads could reduce memory transactions by 4x.",
+          "Missing [[intel::reqd_sub_group_size(16)]] attribute — compiler may choose suboptimal sub-group size.",
+          "Integer division and modulo in hot path: tid23 % ne2 and tid23 / ne2 (lines 24-25) use expensive 64-bit integer division since tid23 is int64_t. Could use 32-bit or fast-division trick.",
+          "No #pragma unroll on the 4-deep nested loop — for the common case of repeat factor 1, the compiler may not optimize away the loop overhead without the hint.",
+          "FP32 only — no F16 support despite F16 being common in inference. The CUDA version (k_repeat_back in binbcast.cu) is also F32-only, so this is inherited.",
+          "Direct CUDA port structure — the kernel retains CUDA's thread/block mapping pattern (WARP_SIZE as work-group width) without adapting to Intel GPU's preferred larger work-groups."
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_014_001",
+          "category": "work_group_size",
+          "priority": "medium",
+          "description": "Increase work-group size from 16 to 256 for better occupancy and memory-level parallelism. The current WG=16 means only 1 sub-group per work-group, severely underutilizing the Xe-core's ability to interleave memory requests across multiple sub-groups. With WG=256, 16 sub-groups can be active per work-group, providing much better memory latency hiding.",
+          "expected_improvement": "10-30% throughput improvement from better memory bandwidth utilization, especially for larger output tensors. The improvement is most significant when there are few output elements (ne0*ne1*ne2*ne3 is small), where the GPU cannot fill enough work-groups to saturate the memory subsystem with the current tiny WG size.",
+          "implementation_notes": "Change block_dims from (1,1,WARP_SIZE) to (1,1,256). Update gx calculation: gx = (ne0 + 255) / 256. Alternatively, use a 1D nd_range since dims 0 and 1 have work-group extent of 1 anyway — flatten the 3D grid into 1D with total_work_items = ne0 * ne1 * ne2 * ne3, then recover (tid0, tid1, tid2, tid3) via division/modulo inside the kernel. This is cleaner and avoids the 3D overhead.",
+          "risk": "low",
+          "risk_notes": "256 is within hardware limits. The kernel has no inter-thread communication, so changing WG size has no correctness impact. The only risk is if ne0 is very small (< 256), in which case some work-items will exit early via the tid0 >= ne0 guard — but this already happens with WG=16 when ne0 < 16."
+        },
+        {
+          "id": "opt_014_002",
+          "category": "vectorization",
+          "priority": "low",
+          "description": "Add vectorized vec4 loads/stores for the contiguous case (s00==1, all repeat factors are 1). When repeat_back is a simple copy (all repeat factors = 1), vec4 float loads would reduce memory transactions by 4x. When s00==1 and repeat factors > 1 in dim0 only, the innermost loop reads can be vectorized.",
+          "expected_improvement": "1.5-2x throughput for the contiguous copy case. For the more common case with small repeat factors, the improvement is smaller since the inner loop has few iterations and vectorization of the accumulation loop is less straightforward.",
+          "implementation_notes": "Add a fast-path: if s00==1 and ne00/ne0 is the only non-trivial repeat factor, process 4 elements per work-item using sycl::vec<float,4>. For the general case, keep the scalar kernel. Check ne0 % 4 == 0 for the vectorized path. The output write is always contiguous (dst is asserted contiguous on line 69), so vec4 stores are always safe when ne0 % 4 == 0.",
+          "risk": "low",
+          "risk_notes": "Vectorized path is only used for the contiguous case with aligned dimensions, so no correctness risk. The scalar fallback handles all edge cases. Main complexity is determining when vectorization is safe across the nested loop structure."
+        },
+        {
+          "id": "opt_014_003",
+          "category": "launch_config",
+          "priority": "low",
+          "description": "Add [[intel::reqd_sub_group_size(16)]] attribute to ensure the compiler uses the native SIMD16 width. Without this, the compiler may choose SIMD8 or SIMD32, potentially causing incorrect behavior if any sub-group operations are added in the future, and suboptimal register allocation.",
+          "expected_improvement": "0-5% improvement — primarily ensures predictable behavior rather than direct speedup. The compiler likely already chooses SIMD16 for this simple kernel, but the attribute makes this explicit and prevents regressions.",
+          "implementation_notes": "Add the attribute to the lambda in the parallel_for call: [=](sycl::nd_item<3> item) [[intel::reqd_sub_group_size(16)]] { ... }. This is a one-line change.",
+          "risk": "low",
+          "risk_notes": "No risk — this is a best-practice annotation that the current code already implicitly relies on (WARP_SIZE=16 is the work-group x-dimension)."
+        }
+      ],
+      "overall_optimization_potential": "low",
+      "estimated_current_efficiency": "35-50%",
+      "efficiency_notes": "The repeat_back kernel is a direct CUDA port that correctly implements backward-pass summation over repeated dimensions. It has zero DPCT artifacts and clean SYCL code. However, it has several performance gaps: (1) WG=16 is far below recommended 256, providing only 1 sub-group per work-group and severely limiting memory-level parallelism, (2) no vectorized loads/stores for the memory-bound operation, (3) 64-bit integer division in the hot path (tid23 % ne2, tid23 / ne2), (4) no sub-group size attribute. The overall potential is LOW because: (a) repeat_back is a backward-pass kernel rarely called during inference (the primary use case), (b) it typically processes small tensors with small repeat factors (often all 1s), (c) the optimization opportunities (larger WG, vectorization) would provide meaningful improvement but the kernel's total contribution to end-to-end latency is negligible, (d) only F32 is supported, matching the CUDA reference. The 35-50% efficiency estimate reflects the poor WG utilization and scalar memory access pattern, but the absolute time spent in this kernel is tiny."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 13,
+    "total_kernels_analyzed": 14,
     "high_potential": 4,
     "medium_potential": 5,
-    "low_potential": 4,
+    "low_potential": 5,
     "no_optimization_needed": 0,
     "top_opportunities": [
       {
