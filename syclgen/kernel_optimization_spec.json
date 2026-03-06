@@ -3823,12 +3823,144 @@
       "overall_optimization_potential": "low",
       "estimated_current_efficiency": "50-65%",
       "efficiency_notes": "The count_equal kernel is a clean CUDA port with correct sub-group reduction and atomic global accumulation. The main inefficiencies are: (1) WG=WARP_SIZE=16 on Intel \u2014 far below optimal 256, meaning poor EU occupancy and high atomic contention (one atomic per 16-thread WG vs one per 256-thread WG). (2) Hardcoded nsm=64 instead of querying device. (3) No vectorized loads. However, the overall optimization potential is LOW because count_equal is called extremely rarely during inference \u2014 it's used only for model accuracy evaluation (comparing predicted vs actual token IDs), not in the critical inference path. The kernel processes a single 1D tensor comparison, typically ne ~ vocab_size * batch_size, completing in microseconds. Optimizing WG size would improve efficiency but the absolute time savings are negligible in the context of end-to-end inference."
+    },
+    {
+      "kernel_id": "sk_028",
+      "name": "wkv",
+      "file": "ggml/src/ggml-sycl/wkv.cpp",
+      "source_cuda_ids": [
+        "ck_120",
+        "ck_121"
+      ],
+      "current_analysis": {
+        "launch_config": {
+          "uses_nd_range": true,
+          "work_group_size": [
+            64,
+            1,
+            1
+          ],
+          "work_group_size_total": 64,
+          "sub_group_size": null,
+          "sub_group_size_specified": false,
+          "global_size_expression": "B * H * head_size, where head_size = C/H (64 or 128)",
+          "notes": "Uses nd_range<1> with local_range = head_size (SYCL_WKV_BLOCK_SIZE=64 or 128). Template parameter selects head_size at compile time. Each work-group processes one (batch, head) pair. WG size is 64 or 128 \u2014 below optimal 256 but architecturally constrained by head_size dimension. Each work-item maintains a private state vector of head_size floats and iterates over all sequence tokens. Missing [[intel::reqd_sub_group_size(16)]]. 2 kernel variants: WKV6 (RWKV v5/v6) and WKV7 (RWKV v7) with different input tensors and state update equations."
+        },
+        "memory_patterns": {
+          "coalesced_accesses": true,
+          "coalesced_notes": "Per-token SLM loads (_k[tid], _r[tid], etc.) are coalesced \u2014 adjacent threads load adjacent elements from contiguous tensor slices. Global v[t] load is also coalesced. State initialization reads state[i] with stride head_size across global memory (state[... + i * head_size + tid]) \u2014 this is strided by head_size elements, but since each thread reads head_size values sequentially, the access pattern is transposed. State writeback has the same pattern.",
+          "strided_accesses": [
+            "State initialization: s[batch_i * state_size + head_i * head_size * head_size + i * head_size + tid] \u2014 inner loop over i produces stride-head_size global reads",
+            "State writeback: dst[T * C + ... + i * head_size + tid] \u2014 same stride-head_size pattern",
+            "WKV7 state init: s[... + tid * head_size + i] \u2014 stride-1 per inner loop iteration (contiguous per thread, but threads stride by head_size)"
+          ],
+          "vectorized_loads": false,
+          "vector_width": null,
+          "notes": "SYCL kernel uses scalar loads for all SLM and global accesses. CUDA uses float4& reinterpret casts on shared memory arrays for the inner loop (e.g., (float4&)(_k[j])) \u2014 this enables 128-bit SLM reads (4 floats per load). SYCL accesses SLM as _k[j+0], _k[j+1], _k[j+2], _k[j+3] \u2014 4 separate 32-bit SLM reads vs 1 128-bit read. This is a significant difference for the hot inner loop."
+        },
+        "slm_usage": {
+          "uses_slm": true,
+          "slm_bytes": "WKV6: 4 * head_size * 4 = 1024B (head_size=64) or 2048B (head_size=128). WKV7: 5 * head_size * 4 = 1280B or 2560B",
+          "potential_bank_conflicts": true,
+          "notes": "WKV6 caches 4 vectors in SLM: _k, _r, _tf, _td (each head_size floats). WKV7 caches 5 vectors: _r, _w, _k, _a, _b. The SLM usage is very modest (1-2.5KB out of 64KB available). The inner loop reads all head_size elements from each SLM array \u2014 with scalar access pattern, bank conflicts are possible when multiple threads in the same sub-group access the same SLM bank. CUDA's float4 access pattern naturally avoids this by reading 4 consecutive bank entries atomically."
+        },
+        "reduction_pattern": {
+          "has_reduction": false,
+          "uses_sub_group_reduce": false,
+          "uses_work_group_reduce": false,
+          "uses_slm_manual_reduce": false,
+          "uses_atomic": false,
+          "notes": "No inter-thread reduction. Each thread computes a local y value by accumulating over its private state and SLM-cached vectors. The final y value is directly written to dst[t]. The dot-product (y accumulation) is entirely thread-local. WKV7's sa (state-a dot product) is also thread-local \u2014 no sub-group reduction."
+        },
+        "data_types": {
+          "compute_type": "float32",
+          "could_use_half": true,
+          "could_use_joint_matrix": false,
+          "notes": "All computation is FP32. RWKV models can potentially use FP16 for inference (state and activations), but the SYCL kernel only supports F32. CUDA is also F32-only. The inner loop performs head_size multiply-adds per token per thread \u2014 with head_size=64, that's 64*3 = 192 FLOPs per thread per token (for WKV6: kv=k*v, y+=r*(tf*kv+state), state=state*td+kv). Moderate compute intensity. Joint matrix is not applicable \u2014 the computation is element-wise state update, not matrix multiplication."
+        },
+        "math_functions": {
+          "uses_native_math": false,
+          "functions": [],
+          "notes": "No transcendental math. All arithmetic is multiply-add on FP32 values. No exp, log, sin, cos etc."
+        },
+        "loop_analysis": {
+          "hot_loops": [
+            {
+              "location": "wkv.cpp:42-70 (WKV6), wkv.cpp:116-154 (WKV7)",
+              "trip_count": "n_seq_tokens iterations over the time dimension",
+              "description": "Outer time loop: iterates over all tokens in the sequence. Per iteration: barrier, load k/r/td to SLM, barrier, inner loop over head_size"
+            },
+            {
+              "location": "wkv.cpp:53-68 (WKV6 inner), wkv.cpp:128-133 (WKV7 sa), wkv.cpp:137-152 (WKV7 state update)",
+              "trip_count": "head_size/4 = 16 or 32 iterations",
+              "description": "Inner unrolled-by-4 loop: computes kv products, accumulates y, updates state. This is the computational hot spot \u2014 head_size/4 iterations of 12+ FLOPs each (WKV6) or 16+ FLOPs each (WKV7)."
+            }
+          ],
+          "unrolled": false,
+          "notes": "CRITICAL: CUDA uses #pragma unroll on the state init/writeback loops (head_size iterations) and the inner compute loop. SYCL has NO unroll hints on any loop. The inner loop is already manually unrolled by 4 (j += 4), but #pragma unroll would eliminate loop overhead and enable register allocation optimization for the 16/32-iteration inner loop. The state init/writeback loops (head_size iterations of strided global memory access) also benefit significantly from unrolling."
+        },
+        "estimated_bottleneck": "register_pressure",
+        "bottleneck_notes": "Each work-item maintains a private state array of head_size floats: 64 floats = 256 bytes (head_size=64) or 128 floats = 512 bytes (head_size=128). With WG=64 and head_size=64: 64 * 256 = 16KB register file per WG. With WG=128 and head_size=128: 128 * 512 = 64KB register file per WG \u2014 this exceeds typical GPU register file capacity per execution unit, causing register spilling. The Xe2 architecture has ~128 registers per thread (512 bytes) \u2014 the head_size=128 variant exactly fits, but any additional temporaries will spill. The compute pattern within each time step is moderately compute-intensive (head_size multiply-adds), bounded by SLM bandwidth for the shared k/r/td vectors and register file bandwidth for the private state. The time loop has 2 barriers per iteration \u2014 serialization points. For long sequences, this kernel is compute-bound; for short sequences, launch overhead dominates.",
+        "anti_patterns": [
+          "Missing #pragma unroll on state init loop (head_size iterations of strided global reads) \u2014 CUDA has this, SYCL does not",
+          "Missing #pragma unroll on state writeback loop (head_size iterations of strided global writes) \u2014 CUDA has this, SYCL does not",
+          "Scalar SLM loads in inner loop \u2014 SYCL reads _k[j+0], _k[j+1], _k[j+2], _k[j+3] as 4 separate 32-bit loads; CUDA uses (float4&)(_k[j]) for a single 128-bit SLM load. This 4x increase in SLM transactions may cause bank conflicts and reduce throughput",
+          "Missing [[intel::reqd_sub_group_size(16)]] \u2014 compiler may select suboptimal SIMD width",
+          "WG size 64 is below optimal 256 but architecturally constrained by head_size; the head_size=128 variant at WG=128 is better but still below 256",
+          "FP32-only \u2014 no FP16 variant for inference where reduced precision is acceptable (could halve register pressure and memory bandwidth)"
+        ]
+      },
+      "optimization_opportunities": [
+        {
+          "id": "opt_028_001",
+          "category": "loop_optimization",
+          "priority": "medium",
+          "description": "Add #pragma unroll to all loops matching CUDA behavior: (1) state initialization loop (head_size iterations), (2) state writeback loop (head_size iterations), (3) inner compute loop (head_size/4 iterations). CUDA explicitly uses #pragma unroll on state init/writeback and implicitly unrolls the inner loop. The inner loop is the computational hotspot \u2014 with trip count 16 or 32 (compile-time known via template), full unrolling eliminates loop overhead and enables the compiler to optimize register allocation for the accumulation chain.",
+          "expected_improvement": "5-15% throughput improvement. The primary benefit is from unrolling the head_size/4 = 16/32 iteration inner compute loop, enabling the compiler to schedule multiply-add chains more efficiently. State init/writeback loops benefit from amortizing the loop control overhead over head_size iterations of strided memory access.",
+          "implementation_notes": "Add '#pragma unroll' before: (1) 'for (int i = 0; i < head_size; i++)' at wkv.cpp:34,72,112,156. (2) 'for (int j = 0; j < head_size; j += 4)' at wkv.cpp:53,128,137. The inner loops have compile-time known trip counts (head_size is a template parameter), so the compiler CAN fully unroll them \u2014 but may not without the explicit hint.",
+          "risk": "low",
+          "risk_notes": "No correctness risk. #pragma unroll is a compiler hint that cannot change semantics. The only risk is code size increase for the head_size=128 variant (128/4 = 32 iterations fully unrolled), which is acceptable."
+        },
+        {
+          "id": "opt_028_002",
+          "category": "slm_access",
+          "priority": "medium",
+          "description": "Use vectorized SLM reads in the inner loop to match CUDA's float4 access pattern. Replace scalar _k[j+0], _k[j+1], _k[j+2], _k[j+3] with a single sycl::vec<float,4> load from SLM. CUDA uses (float4&)(_k[j]) for 128-bit SLM reads \u2014 this reduces SLM transactions by 4x and eliminates potential bank conflicts from 4 consecutive scalar reads to adjacent banks.",
+          "expected_improvement": "5-20% throughput improvement for the inner loop. The benefit depends on whether the Intel compiler already vectorizes the scalar SLM loads. If the compiler does NOT coalesce them, the improvement could be significant (4x fewer SLM transactions). SLM bandwidth is often a bottleneck for kernels with high SLM read density like WKV.",
+          "implementation_notes": "In the inner loops, replace scalar reads with: sycl::vec<float,4> k4 = *reinterpret_cast<const sycl::vec<float,4>*>(&_k[j]); Then access k4[0], k4[1], k4[2], k4[3] or k4.s0(), k4.s1() etc. Alternatively, use sycl::vec<float,4> as SLM element type. Must verify alignment (j is always multiple of 4, so the SLM pointer is 16-byte aligned). Apply to all SLM arrays: _k, _r, _tf/_w, _td/_a/_b.",
+          "risk": "low",
+          "risk_notes": "Alignment is guaranteed since j increments by 4 and SLM arrays are float-aligned from index 0. reinterpret_cast on SLM accessor may need platform-specific validation. Alternative: use sycl::multi_ptr with alignment."
+        },
+        {
+          "id": "opt_028_003",
+          "category": "launch_config",
+          "priority": "low",
+          "description": "Add [[intel::reqd_sub_group_size(16)]] to both kernel lambdas. With WG=64 (head_size=64), this gives 4 sub-groups per WG. With WG=128, this gives 8 sub-groups per WG. While the kernel doesn't use sub-group operations, specifying the sub-group size ensures the compiler selects SIMD16 execution width, which is optimal for Xe2 and prevents fallback to SIMD8 or SIMD32.",
+          "expected_improvement": "0-5% throughput improvement. Minor for this kernel since there are no sub-group operations, but ensures correct SIMD width selection.",
+          "implementation_notes": "Add the attribute to the parallel_for lambda: [=](sycl::nd_item<1> item) [[intel::reqd_sub_group_size(16)]] { ... }",
+          "risk": "low",
+          "risk_notes": "No correctness risk. Standard Intel attribute."
+        },
+        {
+          "id": "opt_028_004",
+          "category": "data_type",
+          "priority": "low",
+          "description": "Add FP16 kernel variant for inference where reduced precision is acceptable. This would halve register pressure (state array: 64 floats \u2192 64 halfs = 128 bytes vs 256 bytes) and memory bandwidth requirements. RWKV models support FP16 inference. This is a larger optimization that also requires type dispatch in the host wrapper.",
+          "expected_improvement": "1.5-2x throughput improvement from halved memory bandwidth and register pressure. The head_size=128 variant especially benefits \u2014 register pressure drops from near-limit to comfortable range.",
+          "implementation_notes": "Create rwkv_wkv6_f16_sycl and rwkv_wkv7_f16_sycl variants using sycl::half for state, SLM arrays, and intermediate computations. Keep accumulator y as float for precision. Need to check if ggml WKV ops can have F16 input tensors. This is a significant code change \u2014 add only if RWKV FP16 inference is actively used.",
+          "risk": "medium",
+          "risk_notes": "FP16 state accumulation over long sequences may cause precision loss. RWKV's state update involves multiplication by decay factors (td/w) close to 1.0, which can amplify FP16 rounding errors. Need numerical validation against FP32 baseline."
+        }
+      ],
+      "overall_optimization_potential": "medium",
+      "estimated_current_efficiency": "50-65%",
+      "efficiency_notes": "The WKV kernels are clean CUDA ports with correct structure, proper SLM usage for shared vectors, and appropriate work-group sizing (constrained by head_size). The main inefficiencies vs CUDA are: (1) Missing #pragma unroll on all loops \u2014 CUDA explicitly unrolls state init/writeback and the compiler likely unrolls the inner loop. (2) Scalar SLM reads vs CUDA's float4 vectorized reads \u2014 4x more SLM transactions in the compute hotspot. (3) Missing reqd_sub_group_size. (4) FP32-only. The kernel is moderately compute-intensive (each work-item does head_size*3 FLOPs per token per timestep) with high register pressure (head_size private floats). WKV is the core attention mechanism for RWKV models (v5/v6/v7), called once per layer \u2014 for RWKV models, this kernel is on the critical path. For non-RWKV models (the majority of LLM usage), this kernel is never called. Medium potential because the optimizations are straightforward (unroll + vectorized SLM) but the user base is limited to RWKV models."
     }
   ],
   "summary": {
-    "total_kernels_analyzed": 27,
+    "total_kernels_analyzed": 28,
     "high_potential": 4,
-    "medium_potential": 11,
+    "medium_potential": 12,
     "low_potential": 12,
     "no_optimization_needed": 0,
     "top_opportunities": [
