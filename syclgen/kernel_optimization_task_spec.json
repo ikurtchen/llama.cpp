@@ -10,7 +10,7 @@
       "title": "Ensure all 54 kernels have micro-benchmark coverage",
       "description": "Develop micro-benchmark test cases for all 54 SYCL kernels using test-backend-ops perf framework. Verify each kernel can be individually benchmarked via remote_run.sh -k <KERNEL_NAME>.",
       "priority": 1,
-      "status": "pending",
+      "status": "completed",
       "depends_on": [],
       "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -e ZES_ENABLE_SYSMAN=1",
       "kernels": ["all"]
@@ -21,7 +21,7 @@
       "title": "Run micro-benchmark baseline for all 54 kernels",
       "description": "Execute micro-benchmarks for all kernels on Intel Arc Pro B60 to establish performance baselines before any optimization. Record throughput (GB/s or GFLOPS), latency (us), and occupancy for each kernel.",
       "priority": 1,
-      "status": "pending",
+      "status": "completed",
       "depends_on": ["opt_task_001"],
       "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -e ZES_ENABLE_SYSMAN=1",
       "kernels": ["all"]

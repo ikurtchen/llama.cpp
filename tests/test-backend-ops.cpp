@@ -8596,6 +8596,10 @@ static std::vector<std::unique_ptr<test_case>> make_test_cases_perf() {
     test_cases.emplace_back(new test_conv_transpose_2d({16, 16, 16, 1}, {3, 3, 8, 16}, 1));
     test_cases.emplace_back(new test_conv_transpose_2d({10, 10, 9, 1}, {3, 3, 1, 9}, 2));
 
+    // --- sk_024: CONV_TRANSPOSE_1D ---
+    test_cases.emplace_back(new test_conv_transpose_1d({197, 32, 1, 1}, {16, 32, 32, 1}, 1, 0, 1));
+    test_cases.emplace_back(new test_conv_transpose_1d({512, 64, 1, 1}, {8, 64, 64, 1}, 2, 0, 1));
+
     test_cases.emplace_back(new test_mean(GGML_TYPE_F32, {256, 256, 3, 1}));
 
 
@@ -8664,6 +8668,150 @@ static std::vector<std::unique_ptr<test_case>> make_test_cases_perf() {
     test_cases.emplace_back(new test_acc(GGML_TYPE_F32, {256, 17, 2, 3}, {256, 16, 2, 3}, 1));
     test_cases.emplace_back(new test_acc(GGML_TYPE_F32, {256, 17, 2, 3}, {128, 16, 2, 3}, 2));
     test_cases.emplace_back(new test_acc(GGML_TYPE_F32, {256, 17, 2, 3}, {64, 16, 2, 3}, 3));
+
+    // =====================================================================
+    // SYCL kernel benchmark coverage (opt_task_001)
+    // Adds perf test cases for all 54 SYCL kernels not yet covered above.
+    // Tensor sizes are chosen to be representative of LLM inference workloads.
+    // =====================================================================
+
+    // --- sk_010: Unary ops (element_wise) ---
+    for (ggml_unary_op op : {GGML_UNARY_OP_SILU, GGML_UNARY_OP_GELU, GGML_UNARY_OP_RELU, GGML_UNARY_OP_TANH,
+                             GGML_UNARY_OP_ABS, GGML_UNARY_OP_SGN, GGML_UNARY_OP_NEG, GGML_UNARY_OP_STEP,
+                             GGML_UNARY_OP_SIGMOID, GGML_UNARY_OP_GELU_ERF}) {
+        test_cases.emplace_back(new test_unary(op, GGML_TYPE_F32, {4096, 128, 1, 1}));
+        test_cases.emplace_back(new test_unary(op, GGML_TYPE_F32, {14336, 512, 1, 1}));
+    }
+
+    // --- sk_011: GLU ops (REGLU, GEGLU, SWIGLU) ---
+    for (ggml_glu_op op : {GGML_GLU_OP_REGLU, GGML_GLU_OP_GEGLU, GGML_GLU_OP_SWIGLU}) {
+        test_cases.emplace_back(new test_glu(op, GGML_TYPE_F32, {4096, 128, 1, 1}));
+        test_cases.emplace_back(new test_glu(op, GGML_TYPE_F32, {14336, 512, 1, 1}));
+    }
+
+    // --- sk_012: Special unary (LEAKY_RELU, SQR) ---
+    test_cases.emplace_back(new test_leaky_relu(GGML_TYPE_F32, {4096, 128, 1, 1}, 0.01f));
+    test_cases.emplace_back(new test_leaky_relu(GGML_TYPE_F32, {14336, 512, 1, 1}, 0.01f));
+    test_cases.emplace_back(new test_sqr(GGML_TYPE_F32, {4096, 128, 1, 1}));
+    test_cases.emplace_back(new test_sqr(GGML_TYPE_F32, {14336, 512, 1, 1}));
+
+    // --- sk_013: Binary broadcast (SUB, MUL, DIV) ---
+    // ADD is already covered above; add SUB, MUL, DIV with same shapes
+    test_cases.emplace_back(new test_bin_bcast(ggml_sub, GGML_TYPE_F32, {4096, 1, 1, 1}, {1,   1, 1, 1}));
+    test_cases.emplace_back(new test_bin_bcast(ggml_sub, GGML_TYPE_F32, {4096, 1, 1, 1}, {1, 512, 1, 1}));
+    test_cases.emplace_back(new test_bin_bcast(ggml_mul, GGML_TYPE_F32, {4096, 1, 1, 1}, {1,   1, 1, 1}));
+    test_cases.emplace_back(new test_bin_bcast(ggml_mul, GGML_TYPE_F32, {4096, 1, 1, 1}, {1, 512, 1, 1}));
+    test_cases.emplace_back(new test_bin_bcast(ggml_div, GGML_TYPE_F32, {4096, 1, 1, 1}, {1,   1, 1, 1}));
+    test_cases.emplace_back(new test_bin_bcast(ggml_div, GGML_TYPE_F32, {4096, 1, 1, 1}, {1, 512, 1, 1}));
+
+    // --- sk_014: REPEAT_BACK ---
+    test_cases.emplace_back(new test_repeat_back(GGML_TYPE_F32, {4096, 32, 1, 1}, {1, 4, 1, 1}));
+    test_cases.emplace_back(new test_repeat_back(GGML_TYPE_F32, {128, 128, 4, 1}, {2, 2, 1, 1}));
+
+    // --- sk_017: Normalization kernels (NORM, RMS_NORM, GROUP_NORM, L2_NORM) ---
+    for (ggml_type type : {GGML_TYPE_F32, GGML_TYPE_F16}) {
+        test_cases.emplace_back(new test_norm(type, {4096, 512, 1, 1}));
+        test_cases.emplace_back(new test_rms_norm(type, {4096, 512, 1, 1}));
+    }
+    test_cases.emplace_back(new test_group_norm(GGML_TYPE_F32, {64, 64, 320, 1}, 32));
+    test_cases.emplace_back(new test_group_norm(GGML_TYPE_F32, {128, 128, 640, 1}, 32));
+    test_cases.emplace_back(new test_l2_norm(GGML_TYPE_F32, {4096, 512, 1, 1}));
+    test_cases.emplace_back(new test_l2_norm(GGML_TYPE_F32, {128, 128, 320, 1}));
+
+    // --- sk_018: GET_ROWS ---
+    test_cases.emplace_back(new test_get_rows(GGML_TYPE_F32, 4096, 32000, 512));
+    test_cases.emplace_back(new test_get_rows(GGML_TYPE_Q4_0, 4096, 32000, 512));
+    test_cases.emplace_back(new test_get_rows(GGML_TYPE_Q8_0, 4096, 32000, 512));
+
+    // --- sk_020: CONCAT ---
+    test_cases.emplace_back(new test_concat(GGML_TYPE_F32, {4096, 256, 1, 1}, 256, 1));
+    test_cases.emplace_back(new test_concat(GGML_TYPE_F32, {4096, 512, 1, 1}, 512, 1));
+    test_cases.emplace_back(new test_concat(GGML_TYPE_F32, {256, 256, 32, 1}, 32, 2));
+
+    // --- sk_022: PAD ---
+    test_cases.emplace_back(new test_pad(GGML_TYPE_F32, {4096, 512, 1, 1}, 0, 0));
+    test_cases.emplace_back(new test_pad(GGML_TYPE_F32, {4095, 511, 1, 1}, 1, 1));
+    test_cases.emplace_back(new test_pad(GGML_TYPE_F32, {512, 512, 3, 1}, 32, 32));
+
+    // --- sk_025: SET ---
+    test_cases.emplace_back(new test_set(GGML_TYPE_F32, GGML_TYPE_F32, {4096, 512, 1, 1}, 1));
+    test_cases.emplace_back(new test_set(GGML_TYPE_F32, GGML_TYPE_F32, {4096, 512, 4, 1}, 1));
+
+    // --- sk_026: SET_ROWS ---
+    test_cases.emplace_back(new test_set_rows(GGML_TYPE_F32,  GGML_TYPE_I32, {4096, 512, 1, 1}, {1, 1}, 512));
+    test_cases.emplace_back(new test_set_rows(GGML_TYPE_Q4_0, GGML_TYPE_I32, {4096, 512, 1, 1}, {1, 1}, 512));
+
+    // --- sk_027: COUNT_EQUAL ---
+    test_cases.emplace_back(new test_count_equal(GGML_TYPE_F32, {4096, 512, 1, 1}));
+    test_cases.emplace_back(new test_count_equal(GGML_TYPE_F32, {32000, 64, 1, 1}));
+
+    // --- sk_028: RWKV_WKV6, RWKV_WKV7 ---
+    test_cases.emplace_back(new test_rwkv_wkv6(GGML_TYPE_F32, 32, 64, 512, 1));
+    test_cases.emplace_back(new test_rwkv_wkv6(GGML_TYPE_F32, 32, 64, 32, 4));
+    test_cases.emplace_back(new test_rwkv_wkv7(GGML_TYPE_F32, 32, 64, 512, 1));
+    test_cases.emplace_back(new test_rwkv_wkv7(GGML_TYPE_F32, 32, 64, 32, 4));
+
+    // --- sk_029: GLA (Gated Linear Attention) ---
+    test_cases.emplace_back(new test_gla(GGML_TYPE_F32, 32, 64, 512, 1));
+    test_cases.emplace_back(new test_gla(GGML_TYPE_F32, 32, 64, 32, 4));
+
+    // --- sk_030: TIMESTEP_EMBEDDING ---
+    test_cases.emplace_back(new test_timestep_embedding(GGML_TYPE_F32, {256, 1, 1, 1}, 320));
+    test_cases.emplace_back(new test_timestep_embedding(GGML_TYPE_F32, {1, 1, 1, 1}, 1280));
+
+    // --- sk_031: ROLL ---
+    test_cases.emplace_back(new test_roll(3, -2, 1, -1));
+    test_cases.emplace_back(new test_roll(0, 0, 0, 0));
+
+    // --- sk_034: CROSS_ENTROPY_LOSS ---
+    test_cases.emplace_back(new test_cross_entropy_loss(GGML_TYPE_F32, {32000, 64, 1, 1}));
+    test_cases.emplace_back(new test_cross_entropy_loss(GGML_TYPE_F32, {128256, 16, 1, 1}));
+
+    // --- sk_036: OPT_STEP_ADAMW ---
+    test_cases.emplace_back(new test_opt_step_adamw(GGML_TYPE_F32, {4096, 4096, 1, 1}));
+    test_cases.emplace_back(new test_opt_step_adamw(GGML_TYPE_F32, {14336, 4096, 1, 1}));
+
+    // --- sk_037: OPT_STEP_SGD ---
+    test_cases.emplace_back(new test_opt_step_sgd(GGML_TYPE_F32, {4096, 4096, 1, 1}));
+    test_cases.emplace_back(new test_opt_step_sgd(GGML_TYPE_F32, {14336, 4096, 1, 1}));
+
+    // --- sk_042: SCALE ---
+    test_cases.emplace_back(new test_scale(GGML_TYPE_F32, {4096, 512, 1, 1}, 0.08838f));
+    test_cases.emplace_back(new test_scale(GGML_TYPE_F32, {14336, 512, 1, 1}, 2.0f));
+
+    // --- sk_043: DIAG_MASK_INF ---
+    test_cases.emplace_back(new test_diag_mask_inf(GGML_TYPE_F32, {2048, 2048, 8, 1}, 0));
+    test_cases.emplace_back(new test_diag_mask_inf(GGML_TYPE_F32, {4096, 4096, 4, 1}, 512));
+
+    // --- sk_044: ARANGE ---
+    test_cases.emplace_back(new test_arange(GGML_TYPE_F32, 0.f, 8192.f, 1.f));
+    test_cases.emplace_back(new test_arange(GGML_TYPE_F32, 0.f, 131072.f, 1.f));
+
+    // --- sk_045: CLAMP ---
+    test_cases.emplace_back(new test_clamp(GGML_TYPE_F32, {4096, 512, 1, 1}, -1.0f, 1.0f));
+    test_cases.emplace_back(new test_clamp(GGML_TYPE_F32, {14336, 512, 1, 1}, -3.0f, 3.0f));
+
+    // --- sk_047: DIAG ---
+    test_cases.emplace_back(new test_diag(GGML_TYPE_F32, {2048, 1, 1, 1}));
+    test_cases.emplace_back(new test_diag(GGML_TYPE_F32, {8192, 1, 1, 1}));
+
+    // --- sk_049: FILL ---
+    test_cases.emplace_back(new test_fill(0.0f, GGML_TYPE_F32, {4096, 4096, 1, 1}));
+    test_cases.emplace_back(new test_fill(1.0f, GGML_TYPE_F32, {14336, 4096, 1, 1}));
+
+    // --- sk_053: POOL_2D ---
+    test_cases.emplace_back(new test_pool2d(GGML_OP_POOL_AVG, GGML_TYPE_F32, {512, 512, 64, 1}, 3, 3, 2, 2, 1, 1));
+    test_cases.emplace_back(new test_pool2d(GGML_OP_POOL_MAX, GGML_TYPE_F32, {512, 512, 64, 1}, 3, 3, 2, 2, 1, 1));
+    test_cases.emplace_back(new test_pool2d(GGML_OP_POOL_AVG, GGML_TYPE_F32, {256, 256, 128, 1}, 2, 2, 2, 2, 0, 0));
+
+    // --- sk_054: UPSCALE ---
+    test_cases.emplace_back(new test_upscale(GGML_TYPE_F32, {256, 256, 64, 1}, 2, GGML_SCALE_MODE_NEAREST));
+    test_cases.emplace_back(new test_upscale(GGML_TYPE_F32, {512, 512, 32, 1}, 2, GGML_SCALE_MODE_NEAREST));
+
+    // --- sk_005: OUT_PROD ---
+    test_cases.emplace_back(new test_out_prod(GGML_TYPE_F32, GGML_TYPE_F32, 4096, 4096, 1, {1, 1}, {1, 1}));
+    test_cases.emplace_back(new test_out_prod(GGML_TYPE_F32, GGML_TYPE_F32, 4096, 4096, 8, {1, 1}, {1, 1}));
+    test_cases.emplace_back(new test_out_prod(GGML_TYPE_F16, GGML_TYPE_F32, 4096, 4096, 1, {1, 1}, {1, 1}));
 
     return test_cases;
 }

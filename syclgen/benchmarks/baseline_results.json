@@ -1,0 +1,5425 @@
+{
+  "timestamp": "2026-03-07T20:07:23.772622+00:00",
+  "hardware": "Intel Arc Pro B60",
+  "device": "Intel Graphics [0xe211]",
+  "server": "b60",
+  "driver_version": "1.13.35563+7",
+  "compute_units": 160,
+  "memory_mb": 23256,
+  "log_files": [
+    "b60_benchmark_20260307_194801.log",
+    "b60_benchmark_20260307_195257.log",
+    "b60_benchmark_20260307_195258.log",
+    "b60_benchmark_20260307_195524.log",
+    "b60_benchmark_20260307_195527.log",
+    "b60_benchmark_20260307_200131.log",
+    "b60_benchmark_20260307_200133.log",
+    "b60_benchmark_20260307_200439.log",
+    "b60_benchmark_20260307_200441.log"
+  ],
+  "summary": {
+    "total_kernels_benchmarked": 59,
+    "total_test_cases": 603,
+    "total_not_supported": 49,
+    "kernels_with_unsupported": 10
+  },
+  "results": [
+    {
+      "kernel": "ABS",
+      "num_test_cases": 2,
+      "min_time_us": 6.56,
+      "max_time_us": 234.08,
+      "test_cases": [
+        {
+          "name": "ABS(type=f32,ne_a=[4096,128,1,1],v=0)",
+          "time_us": 6.56,
+          "runs": 155629,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 595.34,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ABS(type=f32,ne_a=[14336,512,1,1],v=0)",
+          "time_us": 234.08,
+          "runs": 4688,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 233.83,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "ACC",
+      "num_test_cases": 4,
+      "min_time_us": 6.23,
+      "max_time_us": 6.26,
+      "test_cases": [
+        {
+          "name": "ACC(type=f32,ne_a=[256,17,1,1],ne_b=[256,16,1,1],stride_dim=-1)",
+          "time_us": 6.23,
+          "runs": 163800,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 7.66,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ACC(type=f32,ne_a=[256,17,2,3],ne_b=[256,16,2,3],stride_dim=-1)",
+          "time_us": 6.26,
+          "runs": 163800,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 45.68,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ACC(type=f32,ne_a=[256,17,2,3],ne_b=[128,16,2,3],stride_dim=-1)",
+          "time_us": 6.25,
+          "runs": 163800,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 38.48,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ACC(type=f32,ne_a=[256,17,2,3],ne_b=[64,16,2,3],stride_dim=3)",
+          "time_us": 6.23,
+          "runs": 163780,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 34.88,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "ADD",
+      "num_test_cases": 2,
+      "min_time_us": 7.49,
+      "max_time_us": 144.04,
+      "test_cases": [
+        {
+          "name": "ADD(type=f32,ne=[4096,1,1,1],nr=[1,1,1,1],nf=1,perm1=0)",
+          "time_us": 7.49,
+          "runs": 139230,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 6.11,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ADD(type=f32,ne=[4096,1,1,1],nr=[1,512,1,1],nf=1,perm1=0)",
+          "time_us": 144.04,
+          "runs": 8196,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 162.72,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "ARANGE",
+      "num_test_cases": 2,
+      "min_time_us": 5.26,
+      "max_time_us": 5.27,
+      "test_cases": [
+        {
+          "name": "ARANGE(type=f32,start=0.000000,stop=8192.000000,step=1.000000)",
+          "time_us": 5.27,
+          "runs": 196608,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 5.79,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ARANGE(type=f32,start=0.000000,stop=131072.000000,step=1.000000)",
+          "time_us": 5.26,
+          "runs": 196608,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 92.84,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "ARGMAX",
+      "num_test_cases": 3,
+      "min_time_us": 5.61,
+      "max_time_us": 515.18,
+      "test_cases": [
+        {
+          "name": "ARGMAX(type=f32,ne=[32,10,1,1])",
+          "time_us": 5.87,
+          "runs": 172032,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 0.21,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ARGMAX(type=f32,ne=[1024,10,1,1])",
+          "time_us": 5.61,
+          "runs": 180224,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 6.8,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ARGMAX(type=f32,ne=[32000,512,1,1])",
+          "time_us": 515.18,
+          "runs": 2625,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 118.48,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "CLAMP",
+      "num_test_cases": 2,
+      "min_time_us": 36.73,
+      "max_time_us": 276.02,
+      "test_cases": [
+        {
+          "name": "CLAMP(type=f32,ne=[4096,512,1,1],min=-1.000000,max=1.000000)",
+          "time_us": 36.73,
+          "runs": 28686,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 425.44,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CLAMP(type=f32,ne=[14336,512,1,1],min=-3.000000,max=3.000000)",
+          "time_us": 276.02,
+          "runs": 4102,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 198.13,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "CONCAT",
+      "num_test_cases": 3,
+      "min_time_us": 22.56,
+      "max_time_us": 80.66,
+      "test_cases": [
+        {
+          "name": "CONCAT(type=f32,ne_a=[4096,256,1,1],ne_b_d=256,dim=1,v=0)",
+          "time_us": 22.56,
+          "runs": 45078,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 692.67,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CONCAT(type=f32,ne_a=[4096,512,1,1],ne_b_d=512,dim=1,v=0)",
+          "time_us": 80.66,
+          "runs": 13325,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 387.42,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CONCAT(type=f32,ne_a=[256,256,32,1],ne_b_d=32,dim=2,v=0)",
+          "time_us": 80.56,
+          "runs": 13325,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 387.89,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "CONV_TRANSPOSE_1D",
+      "num_test_cases": 2,
+      "min_time_us": 466.2,
+      "max_time_us": 4299.27,
+      "test_cases": [
+        {
+          "name": "CONV_TRANSPOSE_1D(ne_input=[197,32,1,1],ne_kernel=[16,32,32,1],s0=1,p0=0,d0=1)",
+          "time_us": 466.2,
+          "runs": 8192,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 0.24,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CONV_TRANSPOSE_1D(ne_input=[512,64,1,1],ne_kernel=[8,64,64,1],s0=2,p0=0,d0=1)",
+          "time_us": 4299.27,
+          "runs": 8192,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 0.11,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "COUNT_EQUAL",
+      "num_test_cases": 2,
+      "min_time_us": 10.83,
+      "max_time_us": 10.85,
+      "test_cases": [
+        {
+          "name": "COUNT_EQUAL(type=f32,ne=[4096,512,1,1])",
+          "time_us": 10.85,
+          "runs": 98280,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 0.53,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "COUNT_EQUAL(type=f32,ne=[32000,64,1,1])",
+          "time_us": 10.83,
+          "runs": 98280,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 0.22,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "CPY",
+      "num_test_cases": 12,
+      "min_time_us": 27.85,
+      "max_time_us": 47003.09,
+      "test_cases": [
+        {
+          "name": "CPY(type_src=f32,type_dst=f16,ne=[512,3072,1,1],permute_src=[0,0,0,0],permute_dst=[0,0,0,0],_src_transpose=0)",
+          "time_us": 27.85,
+          "runs": 36410,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 315.63,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CPY(type_src=f32,type_dst=f32,ne=[8192,512,2,1],permute_src=[0,2,1,3],permute_dst=[0,0,0,0],_src_transpose=0)",
+          "time_us": 1890.64,
+          "runs": 1026,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 33.09,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CPY(type_src=f32,type_dst=f32,ne=[3072,512,2,1],permute_src=[0,2,1,3],permute_dst=[0,0,0,0],_src_transpose=0)",
+          "time_us": 747.31,
+          "runs": 1366,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 31.37,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CPY(type_src=f32,type_dst=f32,ne=[786432,256,1,1],permute_src=[1,0,2,3],permute_dst=[0,0,0,0],_src_transpose=0)",
+          "time_us": 46558.55,
+          "runs": 22,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 32.95,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CPY(type_src=f16,type_dst=f16,ne=[786432,256,1,1],permute_src=[1,0,2,3],permute_dst=[0,0,0,0],_src_transpose=0)",
+          "time_us": 45971.63,
+          "runs": 43,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 16.5,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CPY(type_src=f16,type_dst=f16,ne=[768,1024,256,1],permute_src=[1,0,2,3],permute_dst=[0,0,0,0],_src_transpose=0)",
+          "time_us": 45478.84,
+          "runs": 43,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 16.68,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CPY(type_src=bf16,type_dst=bf16,ne=[768,1024,256,1],permute_src=[1,0,2,3],permute_dst=[0,0,0,0],_src_transpose=0)",
+          "time_us": 45538.47,
+          "runs": 43,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 16.66,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CPY(type_src=f32,type_dst=f32,ne=[786432,256,1,1],permute_src=[0,0,0,0],permute_dst=[0,0,0,0],_src_transpose=1)",
+          "time_us": 47003.09,
+          "runs": 22,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 32.64,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CPY(type_src=f32,type_dst=f32,ne=[768,1024,256,1],permute_src=[0,0,0,0],permute_dst=[0,0,0,0],_src_transpose=1)",
+          "time_us": 46503.09,
+          "runs": 22,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 32.99,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CPY(type_src=f16,type_dst=f16,ne=[786432,256,1,1],permute_src=[0,0,0,0],permute_dst=[0,0,0,0],_src_transpose=1)",
+          "time_us": 45871.95,
+          "runs": 43,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 16.54,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CPY(type_src=f16,type_dst=f16,ne=[768,1024,256,1],permute_src=[0,0,0,0],permute_dst=[0,0,0,0],_src_transpose=1)",
+          "time_us": 45743.3,
+          "runs": 43,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 16.59,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CPY(type_src=bf16,type_dst=bf16,ne=[768,1024,256,1],permute_src=[0,0,0,0],permute_dst=[0,0,0,0],_src_transpose=1)",
+          "time_us": 46170.81,
+          "runs": 43,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 16.43,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "CROSS_ENTROPY_LOSS",
+      "num_test_cases": 2,
+      "min_time_us": 891.02,
+      "max_time_us": 3491.56,
+      "test_cases": [
+        {
+          "name": "CROSS_ENTROPY_LOSS(type=f32,ne=[32000,64,1,1])",
+          "time_us": 891.02,
+          "runs": 2098,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 17.14,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CROSS_ENTROPY_LOSS(type=f32,ne=[128256,16,1,1])",
+          "time_us": 3491.56,
+          "runs": 2093,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 4.38,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "CUMSUM",
+      "num_test_cases": 43,
+      "min_time_us": 6.8,
+      "max_time_us": 2448.49,
+      "test_cases": [
+        {
+          "name": "CUMSUM(type=f32,ne=[128,128,4,4])",
+          "time_us": 42.89,
+          "runs": 24573,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 45.55,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[2048,16,5,4])",
+          "time_us": 34.09,
+          "runs": 32770,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 143.24,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[20000,10,4,1])",
+          "time_us": 57.35,
+          "runs": 21476,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 103.94,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[128,1,1,1])",
+          "time_us": 6.85,
+          "runs": 147438,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 0.14,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[1024,1,1,1])",
+          "time_us": 6.82,
+          "runs": 147438,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 1.12,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[4096,1,1,1])",
+          "time_us": 10.18,
+          "runs": 98292,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 3.0,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[8192,1,1,1])",
+          "time_us": 17.93,
+          "runs": 57337,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 3.4,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[16384,1,1,1])",
+          "time_us": 16.42,
+          "runs": 65528,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 7.44,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[32768,1,1,1])",
+          "time_us": 31.72,
+          "runs": 32764,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 7.7,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[65536,1,1,1])",
+          "time_us": 62.15,
+          "runs": 16382,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 7.86,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[131072,1,1,1])",
+          "time_us": 123.03,
+          "runs": 8191,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 7.94,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[200000,1,1,1])",
+          "time_us": 191.18,
+          "runs": 8191,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 7.79,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[2000000,1,1,1])",
+          "time_us": 1961.12,
+          "runs": 2148,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 7.6,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[128,4,1,1])",
+          "time_us": 6.8,
+          "runs": 147438,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 0.56,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[1024,4,1,1])",
+          "time_us": 7.09,
+          "runs": 147438,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 4.3,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[4096,4,1,1])",
+          "time_us": 7.01,
+          "runs": 147438,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 17.42,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[8192,4,1,1])",
+          "time_us": 8.86,
+          "runs": 114674,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 27.56,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[16384,4,1,1])",
+          "time_us": 16.5,
+          "runs": 65528,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 29.59,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[32768,4,1,1])",
+          "time_us": 31.87,
+          "runs": 32764,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 30.65,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[65536,4,1,1])",
+          "time_us": 62.35,
+          "runs": 16382,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 31.33,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[131072,4,1,1])",
+          "time_us": 123.25,
+          "runs": 8191,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 31.69,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[200000,4,1,1])",
+          "time_us": 192.4,
+          "runs": 5369,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 30.98,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[2000000,4,1,1])",
+          "time_us": 2425.12,
+          "runs": 537,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 24.6,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[128,8,1,1])",
+          "time_us": 6.95,
+          "runs": 147438,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 1.1,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[1024,8,1,1])",
+          "time_us": 7.02,
+          "runs": 147438,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 8.7,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[4096,8,1,1])",
+          "time_us": 7.06,
+          "runs": 147438,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 34.57,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[8192,8,1,1])",
+          "time_us": 8.86,
+          "runs": 114674,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 55.1,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[16384,8,1,1])",
+          "time_us": 16.51,
+          "runs": 65528,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 59.17,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[32768,8,1,1])",
+          "time_us": 31.88,
+          "runs": 32764,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 61.27,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[65536,8,1,1])",
+          "time_us": 62.5,
+          "runs": 16382,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 62.51,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[131072,8,1,1])",
+          "time_us": 123.43,
+          "runs": 8194,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 63.3,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[200000,8,1,1])",
+          "time_us": 209.15,
+          "runs": 5370,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 57.01,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[2000000,8,1,1])",
+          "time_us": 2427.28,
+          "runs": 538,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 49.2,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[128,16,1,1])",
+          "time_us": 6.95,
+          "runs": 147438,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 2.2,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[1024,16,1,1])",
+          "time_us": 6.94,
+          "runs": 147438,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 17.6,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[4096,16,1,1])",
+          "time_us": 6.83,
+          "runs": 147438,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 71.48,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[8192,16,1,1])",
+          "time_us": 8.89,
+          "runs": 114674,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 109.89,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[16384,16,1,1])",
+          "time_us": 16.55,
+          "runs": 65528,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 118.05,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[32768,16,1,1])",
+          "time_us": 31.9,
+          "runs": 32764,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 122.44,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[65536,16,1,1])",
+          "time_us": 62.48,
+          "runs": 16388,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 125.05,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[131072,16,1,1])",
+          "time_us": 124.01,
+          "runs": 8196,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 126.02,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[200000,16,1,1])",
+          "time_us": 242.36,
+          "runs": 5372,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 98.41,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "CUMSUM(type=f32,ne=[2000000,16,1,1])",
+          "time_us": 2448.49,
+          "runs": 540,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 97.73,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "DIAG_MASK_INF",
+      "num_test_cases": 2,
+      "min_time_us": 638.59,
+      "max_time_us": 1312.38,
+      "test_cases": [
+        {
+          "name": "DIAG_MASK_INF(type=f32,ne=[2048,2048,8,1],n_past=0)",
+          "time_us": 638.59,
+          "runs": 1677,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 393.01,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "DIAG_MASK_INF(type=f32,ne=[4096,4096,4,1],n_past=512)",
+          "time_us": 1312.38,
+          "runs": 780,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 383.92,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "DIV",
+      "num_test_cases": 2,
+      "min_time_us": 7.62,
+      "max_time_us": 164.25,
+      "test_cases": [
+        {
+          "name": "DIV(type=f32,ne=[4096,1,1,1],nr=[1,1,1,1],nf=1,perm1=0)",
+          "time_us": 7.62,
+          "runs": 139264,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 6.01,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "DIV(type=f32,ne=[4096,1,1,1],nr=[1,512,1,1],nf=1,perm1=0)",
+          "time_us": 164.25,
+          "runs": 6830,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 142.7,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "FILL",
+      "num_test_cases": 2,
+      "min_time_us": 122.07,
+      "max_time_us": 422.16,
+      "test_cases": [
+        {
+          "name": "FILL(type=f32,ne=[4096,4096,1,1],c=0.000000)",
+          "time_us": 122.07,
+          "runs": 8224,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 1025.99,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "FILL(type=f32,ne=[14336,4096,1,1],c=1.000000)",
+          "time_us": 422.16,
+          "runs": 2442,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 1043.33,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "GEGLU",
+      "num_test_cases": 2,
+      "min_time_us": 19.59,
+      "max_time_us": 285.74,
+      "test_cases": [
+        {
+          "name": "GEGLU(type=f32,ne_a=[4096,128,1,1],v=0,swapped=0)",
+          "time_us": 19.59,
+          "runs": 57344,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 149.55,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "GEGLU(type=f32,ne_a=[14336,512,1,1],v=0,swapped=0)",
+          "time_us": 285.74,
+          "runs": 3905,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 143.54,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "GELU",
+      "num_test_cases": 2,
+      "min_time_us": 17.55,
+      "max_time_us": 203.0,
+      "test_cases": [
+        {
+          "name": "GELU(type=f32,ne_a=[4096,128,1,1],v=0)",
+          "time_us": 17.55,
+          "runs": 57344,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 222.55,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "GELU(type=f32,ne_a=[14336,512,1,1],v=0)",
+          "time_us": 203.0,
+          "runs": 5274,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 269.39,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "GELU_ERF",
+      "num_test_cases": 2,
+      "min_time_us": 5.78,
+      "max_time_us": 158.82,
+      "test_cases": [
+        {
+          "name": "GELU_ERF(type=f32,ne_a=[4096,128,1,1],v=0)",
+          "time_us": 5.78,
+          "runs": 180224,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 675.83,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "GELU_ERF(type=f32,ne_a=[14336,512,1,1],v=0)",
+          "time_us": 158.82,
+          "runs": 6446,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 344.33,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "GET_ROWS",
+      "num_test_cases": 3,
+      "min_time_us": 45.94,
+      "max_time_us": 73.1,
+      "test_cases": [
+        {
+          "name": "GET_ROWS(type=f32,n=4096,m=32000,r=512,be1=1,be2=1,v=0)",
+          "time_us": 73.1,
+          "runs": 13715,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 6889.25,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "GET_ROWS(type=q4_0,n=4096,m=32000,r=512,be1=1,be2=1,v=0)",
+          "time_us": 45.94,
+          "runs": 21788,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 1668.15,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "GET_ROWS(type=q8_0,n=4096,m=32000,r=512,be1=1,be2=1,v=0)",
+          "time_us": 46.12,
+          "runs": 21902,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 2993.97,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "GROUP_NORM",
+      "num_test_cases": 2,
+      "min_time_us": 62.07,
+      "max_time_us": 1270.87,
+      "test_cases": [
+        {
+          "name": "GROUP_NORM(type=f32,ne=[64,64,320,1],num_groups=32,eps=0.000001)",
+          "time_us": 62.07,
+          "runs": 16385,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 157.32,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "GROUP_NORM(type=f32,ne=[128,128,640,1],num_groups=32,eps=0.000001)",
+          "time_us": 1270.87,
+          "runs": 820,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 61.47,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "IM2COL",
+      "num_test_cases": 10,
+      "min_time_us": 146.0,
+      "max_time_us": 24896.75,
+      "test_cases": [
+        {
+          "name": "IM2COL(type_input=f32,type_kernel=f16,dst_type=f32,ne_input=[32,32,256,1],ne_kernel=[3,3,256,1],s0=1,s1=1,p0=1,p1=1,d0=1,d1=1,is_2D=1)",
+          "time_us": 146.0,
+          "runs": 9828,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 66.92,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "IM2COL(type_input=f32,type_kernel=f16,dst_type=f32,ne_input=[64,64,256,1],ne_kernel=[3,3,256,1],s0=1,s1=1,p0=1,p1=1,d0=1,d1=1,is_2D=1)",
+          "time_us": 572.72,
+          "runs": 2460,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 68.22,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "IM2COL(type_input=f32,type_kernel=f16,dst_type=f32,ne_input=[256,256,256,1],ne_kernel=[3,3,256,1],s0=1,s1=1,p0=1,p1=1,d0=1,d1=1,is_2D=1)",
+          "time_us": 9230.08,
+          "runs": 156,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 67.84,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "IM2COL(type_input=f32,type_kernel=f16,dst_type=f32,ne_input=[32,32,2560,1],ne_kernel=[3,3,2560,1],s0=1,s1=1,p0=1,p1=1,d0=1,d1=1,is_2D=1)",
+          "time_us": 1428.31,
+          "runs": 984,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 68.42,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "IM2COL(type_input=f32,type_kernel=f16,dst_type=f32,ne_input=[64,64,2560,1],ne_kernel=[3,3,2560,1],s0=1,s1=1,p0=1,p1=1,d0=1,d1=1,is_2D=1)",
+          "time_us": 5719.13,
+          "runs": 246,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 68.39,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "IM2COL(type_input=f32,type_kernel=f16,dst_type=f32,ne_input=[32,32,256,1],ne_kernel=[5,5,256,1],s0=1,s1=1,p0=1,p1=1,d0=1,d1=1,is_2D=1)",
+          "time_us": 350.8,
+          "runs": 2852,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 63.99,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "IM2COL(type_input=f32,type_kernel=f16,dst_type=f32,ne_input=[64,64,256,1],ne_kernel=[5,5,256,1],s0=1,s1=1,p0=1,p1=1,d0=1,d1=1,is_2D=1)",
+          "time_us": 1478.15,
+          "runs": 1005,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 64.66,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "IM2COL(type_input=f32,type_kernel=f16,dst_type=f32,ne_input=[256,256,256,1],ne_kernel=[5,5,256,1],s0=1,s1=1,p0=1,p1=1,d0=1,d1=1,is_2D=1)",
+          "time_us": 24896.75,
+          "runs": 60,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 64.42,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "IM2COL(type_input=f32,type_kernel=f16,dst_type=f32,ne_input=[32,32,2560,1],ne_kernel=[5,5,2560,1],s0=1,s1=1,p0=1,p1=1,d0=1,d1=1,is_2D=1)",
+          "time_us": 3456.63,
+          "runs": 429,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 64.96,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "IM2COL(type_input=f32,type_kernel=f16,dst_type=f32,ne_input=[64,64,2560,1],ne_kernel=[5,5,2560,1],s0=1,s1=1,p0=1,p1=1,d0=1,d1=1,is_2D=1)",
+          "time_us": 14778.35,
+          "runs": 68,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 64.74,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "L2_NORM",
+      "num_test_cases": 2,
+      "min_time_us": 35.3,
+      "max_time_us": 662.89,
+      "test_cases": [
+        {
+          "name": "L2_NORM(type=f32,ne=[4096,512,1,1],eps=0.000000,v=0)",
+          "time_us": 35.3,
+          "runs": 28686,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 442.61,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "L2_NORM(type=f32,ne=[128,128,320,1],eps=0.000000,v=0)",
+          "time_us": 662.89,
+          "runs": 1640,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 58.93,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "LEAKY_RELU",
+      "num_test_cases": 2,
+      "min_time_us": 6.86,
+      "max_time_us": 247.73,
+      "test_cases": [
+        {
+          "name": "LEAKY_RELU(type=f32,ne_a=[4096,128,1,1],negative_slope=0.010000)",
+          "time_us": 6.86,
+          "runs": 155648,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 569.35,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "LEAKY_RELU(type=f32,ne_a=[14336,512,1,1],negative_slope=0.010000)",
+          "time_us": 247.73,
+          "runs": 4102,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 220.76,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "MEAN",
+      "num_test_cases": 4,
+      "min_time_us": 6.66,
+      "max_time_us": 1377.65,
+      "test_cases": [
+        {
+          "name": "MEAN(type=f32,ne=[256,256,3,1])",
+          "time_us": 20.24,
+          "runs": 57337,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 36.32,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "MEAN(type=f32,ne=[8192,1,1,1])",
+          "time_us": 6.66,
+          "runs": 155629,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 4.58,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "MEAN(type=f32,ne=[8192,8192,1,1])",
+          "time_us": 1377.65,
+          "runs": 768,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 182.91,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "MEAN(type=f32,ne=[128,8192,1,1])",
+          "time_us": 144.42,
+          "runs": 8129,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 27.26,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "MUL",
+      "num_test_cases": 2,
+      "min_time_us": 7.85,
+      "max_time_us": 147.88,
+      "test_cases": [
+        {
+          "name": "MUL(type=f32,ne=[4096,1,1,1],nr=[1,1,1,1],nf=1,perm1=0)",
+          "time_us": 7.85,
+          "runs": 131072,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 5.83,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "MUL(type=f32,ne=[4096,1,1,1],nr=[1,512,1,1],nf=1,perm1=0)",
+          "time_us": 147.88,
+          "runs": 6830,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 158.49,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "MUL_MAT",
+      "num_test_cases": 156,
+      "min_time_us": 83.88,
+      "max_time_us": 7968.84,
+      "test_cases": [
+        {
+          "name": "MUL_MAT(type_a=f16,type_b=f32,m=16416,n=1,k=128,bs=[8,1],nr=[4,1],per=[0,2,1,3],k_v=0,o=1)",
+          "time_us": 608.29,
+          "runs": 2232,
+          "throughput_gflops": 221.08,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=f16,type_b=f32,m=128,n=1,k=16416,bs=[8,1],nr=[4,1],per=[0,1,2,3],k_v=32832,o=1)",
+          "time_us": 752.34,
+          "runs": 1488,
+          "throughput_gflops": 178.75,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=f32,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 694.63,
+          "runs": 1704,
+          "throughput_gflops": 169.07,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=f16,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 304.13,
+          "runs": 3408,
+          "throughput_gflops": 386.15,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_0,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 84.82,
+          "runs": 11928,
+          "throughput_gflops": 1380.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_1,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 222.32,
+          "runs": 5112,
+          "throughput_gflops": 528.26,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_0,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 725.08,
+          "runs": 1704,
+          "throughput_gflops": 161.97,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_1,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 257.37,
+          "runs": 4260,
+          "throughput_gflops": 456.31,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q8_0,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 865.01,
+          "runs": 1704,
+          "throughput_gflops": 135.77,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=mxfp4,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 585.23,
+          "runs": 2556,
+          "throughput_gflops": 200.67,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q2_K,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 112.41,
+          "runs": 9372,
+          "throughput_gflops": 1040.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q3_K,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 664.48,
+          "runs": 1704,
+          "throughput_gflops": 176.74,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_K,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 95.07,
+          "runs": 11076,
+          "throughput_gflops": 1240.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_K,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 305.38,
+          "runs": 3408,
+          "throughput_gflops": 384.57,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q6_K,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 216.37,
+          "runs": 5112,
+          "throughput_gflops": 542.77,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_xxs,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 194.93,
+          "runs": 5964,
+          "throughput_gflops": 602.49,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_xs,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 271.39,
+          "runs": 4260,
+          "throughput_gflops": 432.74,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_s,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 191.12,
+          "runs": 5964,
+          "throughput_gflops": 614.49,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq3_xxs,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 380.96,
+          "runs": 3408,
+          "throughput_gflops": 308.28,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq1_s,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 141.25,
+          "runs": 7668,
+          "throughput_gflops": 831.42,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq1_m,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 83.88,
+          "runs": 11928,
+          "throughput_gflops": 1400.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq4_nl,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 718.63,
+          "runs": 1704,
+          "throughput_gflops": 163.42,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq3_s,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 337.68,
+          "runs": 3408,
+          "throughput_gflops": 347.78,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq4_xs,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 201.21,
+          "runs": 5112,
+          "throughput_gflops": 583.68,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=f32,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 687.71,
+          "runs": 1704,
+          "throughput_gflops": 341.54,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=f16,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 323.6,
+          "runs": 3408,
+          "throughput_gflops": 725.84,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_0,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1085.07,
+          "runs": 1278,
+          "throughput_gflops": 216.47,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_1,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 206.67,
+          "runs": 5112,
+          "throughput_gflops": 1140.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_0,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1198.39,
+          "runs": 852,
+          "throughput_gflops": 196.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_1,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 263.16,
+          "runs": 3834,
+          "throughput_gflops": 892.54,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q8_0,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1998.74,
+          "runs": 852,
+          "throughput_gflops": 117.51,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=mxfp4,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1175.69,
+          "runs": 852,
+          "throughput_gflops": 199.78,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q2_K,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 420.3,
+          "runs": 2556,
+          "throughput_gflops": 558.84,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q3_K,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1040.95,
+          "runs": 1278,
+          "throughput_gflops": 225.64,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_K,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 211.39,
+          "runs": 5112,
+          "throughput_gflops": 1110.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_K,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 252.61,
+          "runs": 4260,
+          "throughput_gflops": 929.83,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q6_K,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1757.93,
+          "runs": 852,
+          "throughput_gflops": 133.61,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_xxs,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 390.62,
+          "runs": 2982,
+          "throughput_gflops": 601.3,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_xs,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 539.6,
+          "runs": 2130,
+          "throughput_gflops": 435.29,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_s,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 370.6,
+          "runs": 2982,
+          "throughput_gflops": 633.79,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq3_xxs,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 754.35,
+          "runs": 1704,
+          "throughput_gflops": 311.37,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq1_s,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 277.91,
+          "runs": 3834,
+          "throughput_gflops": 845.16,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq1_m,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 170.15,
+          "runs": 5964,
+          "throughput_gflops": 1380.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq4_nl,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1434.53,
+          "runs": 852,
+          "throughput_gflops": 163.73,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq3_s,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 674.25,
+          "runs": 1704,
+          "throughput_gflops": 348.36,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq4_xs,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 400.71,
+          "runs": 2556,
+          "throughput_gflops": 586.16,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=f32,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 690.8,
+          "runs": 1704,
+          "throughput_gflops": 510.02,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=f16,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 306.73,
+          "runs": 3408,
+          "throughput_gflops": 1150.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_0,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1613.06,
+          "runs": 852,
+          "throughput_gflops": 218.42,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_1,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 312.26,
+          "runs": 3408,
+          "throughput_gflops": 1130.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_0,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1792.31,
+          "runs": 568,
+          "throughput_gflops": 196.57,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_1,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 395.12,
+          "runs": 2556,
+          "throughput_gflops": 891.69,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q8_0,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2985.82,
+          "runs": 568,
+          "throughput_gflops": 118.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=mxfp4,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1749.19,
+          "runs": 852,
+          "throughput_gflops": 201.42,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q2_K,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 626.73,
+          "runs": 1704,
+          "throughput_gflops": 562.16,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q3_K,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1544.99,
+          "runs": 852,
+          "throughput_gflops": 228.04,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_K,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 320.32,
+          "runs": 3124,
+          "throughput_gflops": 1100.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_K,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 377.86,
+          "runs": 2840,
+          "throughput_gflops": 932.41,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q6_K,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2634.84,
+          "runs": 568,
+          "throughput_gflops": 133.72,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_xxs,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 580.01,
+          "runs": 1988,
+          "throughput_gflops": 607.44,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_xs,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 936.39,
+          "runs": 1136,
+          "throughput_gflops": 376.26,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_s,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 562.03,
+          "runs": 1988,
+          "throughput_gflops": 626.88,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq3_xxs,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1146.29,
+          "runs": 1136,
+          "throughput_gflops": 307.36,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq1_s,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 421.67,
+          "runs": 2556,
+          "throughput_gflops": 835.54,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq1_m,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 251.56,
+          "runs": 3976,
+          "throughput_gflops": 1400.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq4_nl,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2153.03,
+          "runs": 568,
+          "throughput_gflops": 163.64,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq3_s,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 994.46,
+          "runs": 1136,
+          "throughput_gflops": 354.28,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq4_xs,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 596.25,
+          "runs": 1704,
+          "throughput_gflops": 590.89,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=f32,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 692.81,
+          "runs": 1491,
+          "throughput_gflops": 678.05,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=f16,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 291.77,
+          "runs": 3621,
+          "throughput_gflops": 1610.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_0,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2152.8,
+          "runs": 639,
+          "throughput_gflops": 218.21,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_1,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 414.97,
+          "runs": 2556,
+          "throughput_gflops": 1130.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_0,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2393.99,
+          "runs": 426,
+          "throughput_gflops": 196.23,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_1,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 526.81,
+          "runs": 1917,
+          "throughput_gflops": 891.7,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q8_0,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 3974.31,
+          "runs": 426,
+          "throughput_gflops": 118.2,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=mxfp4,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2330.4,
+          "runs": 639,
+          "throughput_gflops": 201.58,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q2_K,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 839.2,
+          "runs": 1278,
+          "throughput_gflops": 559.77,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q3_K,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2054.54,
+          "runs": 639,
+          "throughput_gflops": 228.65,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_K,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 434.09,
+          "runs": 2343,
+          "throughput_gflops": 1080.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_K,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 507.81,
+          "runs": 2130,
+          "throughput_gflops": 925.08,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q6_K,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 3507.65,
+          "runs": 426,
+          "throughput_gflops": 133.92,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_xxs,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 761.15,
+          "runs": 1491,
+          "throughput_gflops": 617.17,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_xs,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1252.32,
+          "runs": 852,
+          "throughput_gflops": 375.11,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_s,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 748.37,
+          "runs": 1491,
+          "throughput_gflops": 627.71,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq3_xxs,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1530.26,
+          "runs": 852,
+          "throughput_gflops": 306.98,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq1_s,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 553.93,
+          "runs": 1917,
+          "throughput_gflops": 848.06,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq1_m,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 331.92,
+          "runs": 3195,
+          "throughput_gflops": 1420.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq4_nl,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2857.47,
+          "runs": 426,
+          "throughput_gflops": 164.4,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq3_s,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1326.23,
+          "runs": 852,
+          "throughput_gflops": 354.21,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq4_xs,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 793.51,
+          "runs": 1278,
+          "throughput_gflops": 592.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=f32,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 674.78,
+          "runs": 1539,
+          "throughput_gflops": 870.21,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=f16,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 282.42,
+          "runs": 3591,
+          "throughput_gflops": 2080.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_0,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2708.8,
+          "runs": 513,
+          "throughput_gflops": 216.78,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_1,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 524.21,
+          "runs": 2052,
+          "throughput_gflops": 1120.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_0,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2989.19,
+          "runs": 342,
+          "throughput_gflops": 196.44,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_1,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 656.06,
+          "runs": 1539,
+          "throughput_gflops": 895.04,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q8_0,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 4998.22,
+          "runs": 342,
+          "throughput_gflops": 117.48,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=mxfp4,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2927.87,
+          "runs": 342,
+          "throughput_gflops": 200.56,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q2_K,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1054.34,
+          "runs": 1026,
+          "throughput_gflops": 556.94,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q3_K,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2587.09,
+          "runs": 513,
+          "throughput_gflops": 226.97,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_K,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 544.27,
+          "runs": 1881,
+          "throughput_gflops": 1080.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_K,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 635.11,
+          "runs": 1710,
+          "throughput_gflops": 924.57,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q6_K,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 4388.74,
+          "runs": 342,
+          "throughput_gflops": 133.8,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_xxs,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 988.37,
+          "runs": 1026,
+          "throughput_gflops": 594.11,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_xs,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1353.98,
+          "runs": 855,
+          "throughput_gflops": 433.69,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_s,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 943.04,
+          "runs": 1197,
+          "throughput_gflops": 622.67,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq3_xxs,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1879.32,
+          "runs": 684,
+          "throughput_gflops": 312.46,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq1_s,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 697.76,
+          "runs": 1539,
+          "throughput_gflops": 841.55,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq1_m,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 421.37,
+          "runs": 2394,
+          "throughput_gflops": 1390.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq4_nl,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 3563.63,
+          "runs": 342,
+          "throughput_gflops": 164.78,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq3_s,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1665.85,
+          "runs": 684,
+          "throughput_gflops": 352.5,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq4_xs,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1004.16,
+          "runs": 1026,
+          "throughput_gflops": 584.77,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=f32,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 676.41,
+          "runs": 1498,
+          "throughput_gflops": 1390.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=f16,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 275.7,
+          "runs": 3638,
+          "throughput_gflops": 3410.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_0,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 4326.78,
+          "runs": 321,
+          "throughput_gflops": 217.14,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_1,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 834.2,
+          "runs": 1284,
+          "throughput_gflops": 1130.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_0,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 4768.66,
+          "runs": 214,
+          "throughput_gflops": 197.02,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_1,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1057.3,
+          "runs": 963,
+          "throughput_gflops": 888.6,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q8_0,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 7968.84,
+          "runs": 214,
+          "throughput_gflops": 117.9,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=mxfp4,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 4683.21,
+          "runs": 214,
+          "throughput_gflops": 200.62,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q2_K,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1684.26,
+          "runs": 642,
+          "throughput_gflops": 557.83,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q3_K,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 4131.23,
+          "runs": 321,
+          "throughput_gflops": 227.42,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_K,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 876.81,
+          "runs": 1177,
+          "throughput_gflops": 1070.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_K,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1017.44,
+          "runs": 1070,
+          "throughput_gflops": 923.42,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q6_K,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 7002.57,
+          "runs": 214,
+          "throughput_gflops": 134.17,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_xxs,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1584.96,
+          "runs": 642,
+          "throughput_gflops": 592.78,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_xs,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2166.49,
+          "runs": 535,
+          "throughput_gflops": 433.66,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_s,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1506.34,
+          "runs": 749,
+          "throughput_gflops": 623.72,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq3_xxs,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 3014.21,
+          "runs": 428,
+          "throughput_gflops": 311.7,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq1_s,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1113.52,
+          "runs": 963,
+          "throughput_gflops": 843.75,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq1_m,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 678.74,
+          "runs": 1498,
+          "throughput_gflops": 1380.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq4_nl,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 5716.34,
+          "runs": 214,
+          "throughput_gflops": 164.36,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq3_s,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2667.94,
+          "runs": 428,
+          "throughput_gflops": 352.15,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq4_xs,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1601.81,
+          "runs": 642,
+          "throughput_gflops": 586.54,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=f32,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 5024.38,
+          "runs": 200,
+          "throughput_gflops": 11970.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=f16,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1176.05,
+          "runs": 852,
+          "throughput_gflops": 51130.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_0,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1872.77,
+          "runs": 534,
+          "throughput_gflops": 32110.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_1,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1878.71,
+          "runs": 534,
+          "throughput_gflops": 32010.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_0,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2685.98,
+          "runs": 374,
+          "throughput_gflops": 22390.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_1,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1897.41,
+          "runs": 528,
+          "throughput_gflops": 31690.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q8_0,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1721.07,
+          "runs": 582,
+          "throughput_gflops": 34940.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=mxfp4,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2912.0,
+          "runs": 344,
+          "throughput_gflops": 20650.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q2_K,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1856.31,
+          "runs": 540,
+          "throughput_gflops": 32390.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q3_K,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2836.3,
+          "runs": 354,
+          "throughput_gflops": 21200.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q4_K,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1844.28,
+          "runs": 544,
+          "throughput_gflops": 32600.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q5_K,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1592.5,
+          "runs": 628,
+          "throughput_gflops": 37760.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=q6_K,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 1714.92,
+          "runs": 584,
+          "throughput_gflops": 35060.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_xxs,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2688.27,
+          "runs": 372,
+          "throughput_gflops": 22370.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_xs,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2315.74,
+          "runs": 432,
+          "throughput_gflops": 25970.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq2_s,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2319.63,
+          "runs": 432,
+          "throughput_gflops": 25920.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq3_xxs,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2733.64,
+          "runs": 366,
+          "throughput_gflops": 22000.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq1_s,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2308.63,
+          "runs": 434,
+          "throughput_gflops": 26050.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq1_m,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2320.6,
+          "runs": 432,
+          "throughput_gflops": 25910.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq4_nl,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2855.83,
+          "runs": 352,
+          "throughput_gflops": 21060.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq3_s,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2327.21,
+          "runs": 430,
+          "throughput_gflops": 25840.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT(type_a=iq4_xs,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+          "time_us": 2084.39,
+          "runs": 480,
+          "throughput_gflops": 28850.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        }
+      ]
+    },
+    {
+      "kernel": "MUL_MAT_ID",
+      "num_test_cases": 116,
+      "min_time_us": 198.41,
+      "max_time_us": 13172.83,
+      "test_cases": [
+        {
+          "name": "MUL_MAT_ID(type_a=f32,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=1,k=2048)",
+          "time_us": 336.19,
+          "runs": 3974,
+          "throughput_gflops": 74.86,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=f16,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=1,k=2048)",
+          "time_us": 542.04,
+          "runs": 3974,
+          "throughput_gflops": 46.43,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q4_0,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=1,k=2048)",
+          "time_us": 476.51,
+          "runs": 3974,
+          "throughput_gflops": 52.81,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q8_0,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=1,k=2048)",
+          "time_us": 632.09,
+          "runs": 3974,
+          "throughput_gflops": 39.81,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q4_K,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=1,k=2048)",
+          "time_us": 385.0,
+          "runs": 3974,
+          "throughput_gflops": 65.37,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q6_K,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=1,k=2048)",
+          "time_us": 396.6,
+          "runs": 3974,
+          "throughput_gflops": 63.45,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=iq2_xs,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=1,k=2048)",
+          "time_us": 431.24,
+          "runs": 3974,
+          "throughput_gflops": 58.36,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=f32,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=4,k=2048)",
+          "time_us": 1355.94,
+          "runs": 994,
+          "throughput_gflops": 74.24,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=f16,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=4,k=2048)",
+          "time_us": 1121.08,
+          "runs": 994,
+          "throughput_gflops": 89.79,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q4_0,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=4,k=2048)",
+          "time_us": 1125.38,
+          "runs": 994,
+          "throughput_gflops": 89.45,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q8_0,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=4,k=2048)",
+          "time_us": 1156.54,
+          "runs": 994,
+          "throughput_gflops": 87.04,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q4_K,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=4,k=2048)",
+          "time_us": 885.61,
+          "runs": 1988,
+          "throughput_gflops": 113.67,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q6_K,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=4,k=2048)",
+          "time_us": 913.63,
+          "runs": 1988,
+          "throughput_gflops": 110.18,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=iq2_xs,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=4,k=2048)",
+          "time_us": 1033.11,
+          "runs": 994,
+          "throughput_gflops": 97.44,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=f32,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=8,k=2048)",
+          "time_us": 2234.36,
+          "runs": 497,
+          "throughput_gflops": 90.1,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=f16,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=8,k=2048)",
+          "time_us": 2166.81,
+          "runs": 497,
+          "throughput_gflops": 92.91,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q4_0,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=8,k=2048)",
+          "time_us": 1880.85,
+          "runs": 994,
+          "throughput_gflops": 107.04,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q8_0,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=8,k=2048)",
+          "time_us": 1989.1,
+          "runs": 994,
+          "throughput_gflops": 101.21,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q4_K,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=8,k=2048)",
+          "time_us": 1579.91,
+          "runs": 994,
+          "throughput_gflops": 127.43,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q6_K,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=8,k=2048)",
+          "time_us": 1596.59,
+          "runs": 994,
+          "throughput_gflops": 126.1,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=iq2_xs,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=8,k=2048)",
+          "time_us": 2013.0,
+          "runs": 994,
+          "throughput_gflops": 100.01,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=f32,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=32,k=2048)",
+          "time_us": 5134.19,
+          "runs": 250,
+          "throughput_gflops": 156.85,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=f16,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=32,k=2048)",
+          "time_us": 4772.96,
+          "runs": 250,
+          "throughput_gflops": 168.72,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q4_0,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=32,k=2048)",
+          "time_us": 4428.79,
+          "runs": 250,
+          "throughput_gflops": 181.83,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q8_0,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=32,k=2048)",
+          "time_us": 6744.16,
+          "runs": 250,
+          "throughput_gflops": 119.41,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q4_K,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=32,k=2048)",
+          "time_us": 4284.14,
+          "runs": 250,
+          "throughput_gflops": 187.97,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q6_K,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=32,k=2048)",
+          "time_us": 6208.45,
+          "runs": 250,
+          "throughput_gflops": 129.71,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=iq2_xs,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=32,k=2048)",
+          "time_us": 4388.05,
+          "runs": 250,
+          "throughput_gflops": 183.52,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=f32,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=64,k=2048)",
+          "time_us": 6270.71,
+          "runs": 189,
+          "throughput_gflops": 256.85,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=f16,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=64,k=2048)",
+          "time_us": 5866.03,
+          "runs": 189,
+          "throughput_gflops": 274.57,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q4_0,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=64,k=2048)",
+          "time_us": 7449.07,
+          "runs": 189,
+          "throughput_gflops": 216.22,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q8_0,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=64,k=2048)",
+          "time_us": 11663.94,
+          "runs": 126,
+          "throughput_gflops": 138.08,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q4_K,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=64,k=2048)",
+          "time_us": 6299.64,
+          "runs": 189,
+          "throughput_gflops": 255.67,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q6_K,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=64,k=2048)",
+          "time_us": 11851.13,
+          "runs": 126,
+          "throughput_gflops": 135.9,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=iq2_xs,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=64,k=2048)",
+          "time_us": 6382.37,
+          "runs": 189,
+          "throughput_gflops": 252.35,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=f32,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=128,k=2048)",
+          "time_us": 6552.52,
+          "runs": 160,
+          "throughput_gflops": 491.6,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=f16,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=128,k=2048)",
+          "time_us": 6162.58,
+          "runs": 192,
+          "throughput_gflops": 522.71,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q4_0,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=128,k=2048)",
+          "time_us": 8622.02,
+          "runs": 128,
+          "throughput_gflops": 373.6,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q8_0,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=128,k=2048)",
+          "time_us": 12105.19,
+          "runs": 96,
+          "throughput_gflops": 266.1,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q4_K,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=128,k=2048)",
+          "time_us": 7875.02,
+          "runs": 128,
+          "throughput_gflops": 409.04,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q6_K,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=128,k=2048)",
+          "time_us": 13172.83,
+          "runs": 96,
+          "throughput_gflops": 244.54,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=iq2_xs,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=128,k=2048)",
+          "time_us": 7722.27,
+          "runs": 160,
+          "throughput_gflops": 417.13,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=f32,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=256,k=2048)",
+          "time_us": 6716.99,
+          "runs": 160,
+          "throughput_gflops": 959.13,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=f16,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=256,k=2048)",
+          "time_us": 6315.7,
+          "runs": 160,
+          "throughput_gflops": 1020.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q4_0,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=256,k=2048)",
+          "time_us": 7101.2,
+          "runs": 144,
+          "throughput_gflops": 907.23,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q8_0,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=256,k=2048)",
+          "time_us": 7139.2,
+          "runs": 144,
+          "throughput_gflops": 902.4,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q4_K,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=256,k=2048)",
+          "time_us": 7214.3,
+          "runs": 144,
+          "throughput_gflops": 893.01,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q6_K,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=256,k=2048)",
+          "time_us": 7195.29,
+          "runs": 144,
+          "throughput_gflops": 895.37,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=iq2_xs,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=256,k=2048)",
+          "time_us": 7150.5,
+          "runs": 144,
+          "throughput_gflops": 900.98,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=f32,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=512,k=2048)",
+          "time_us": 9219.79,
+          "runs": 112,
+          "throughput_gflops": 1400.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=f16,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=512,k=2048)",
+          "time_us": 7437.8,
+          "runs": 136,
+          "throughput_gflops": 1730.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q4_0,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=512,k=2048)",
+          "time_us": 8712.92,
+          "runs": 120,
+          "throughput_gflops": 1480.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q8_0,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=512,k=2048)",
+          "time_us": 8755.92,
+          "runs": 120,
+          "throughput_gflops": 1470.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q4_K,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=512,k=2048)",
+          "time_us": 7953.63,
+          "runs": 128,
+          "throughput_gflops": 1620.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q6_K,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=512,k=2048)",
+          "time_us": 8786.82,
+          "runs": 120,
+          "throughput_gflops": 1470.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=iq2_xs,type_b=f32,n_mats=128,n_used=8,b=0,m=768,n=512,k=2048)",
+          "time_us": 9521.39,
+          "runs": 112,
+          "throughput_gflops": 1350.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=f32,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=1,k=2048)",
+          "time_us": 317.81,
+          "runs": 3406,
+          "throughput_gflops": 92.38,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=f16,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=1,k=2048)",
+          "time_us": 236.53,
+          "runs": 6812,
+          "throughput_gflops": 124.13,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q4_0,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=1,k=2048)",
+          "time_us": 209.83,
+          "runs": 6812,
+          "throughput_gflops": 139.92,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q8_0,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=1,k=2048)",
+          "time_us": 377.35,
+          "runs": 3406,
+          "throughput_gflops": 77.81,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q4_K,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=1,k=2048)",
+          "time_us": 231.86,
+          "runs": 6812,
+          "throughput_gflops": 126.63,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q6_K,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=1,k=2048)",
+          "time_us": 198.41,
+          "runs": 6812,
+          "throughput_gflops": 147.97,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=iq2_xs,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=1,k=2048)",
+          "time_us": 210.79,
+          "runs": 6812,
+          "throughput_gflops": 139.29,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=f32,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=4,k=2048)",
+          "time_us": 779.22,
+          "runs": 1704,
+          "throughput_gflops": 150.72,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=f16,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=4,k=2048)",
+          "time_us": 634.88,
+          "runs": 1704,
+          "throughput_gflops": 184.98,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q4_0,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=4,k=2048)",
+          "time_us": 599.08,
+          "runs": 1704,
+          "throughput_gflops": 196.04,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q8_0,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=4,k=2048)",
+          "time_us": 1294.67,
+          "runs": 852,
+          "throughput_gflops": 90.71,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q4_K,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=4,k=2048)",
+          "time_us": 519.48,
+          "runs": 2556,
+          "throughput_gflops": 226.07,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q6_K,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=4,k=2048)",
+          "time_us": 838.29,
+          "runs": 1704,
+          "throughput_gflops": 140.1,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=iq2_xs,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=4,k=2048)",
+          "time_us": 640.49,
+          "runs": 1704,
+          "throughput_gflops": 183.36,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=f32,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=8,k=2048)",
+          "time_us": 1154.86,
+          "runs": 1278,
+          "throughput_gflops": 203.39,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=f16,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=8,k=2048)",
+          "time_us": 985.61,
+          "runs": 1278,
+          "throughput_gflops": 238.31,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q4_0,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=8,k=2048)",
+          "time_us": 1231.55,
+          "runs": 852,
+          "throughput_gflops": 190.72,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q8_0,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=8,k=2048)",
+          "time_us": 2284.86,
+          "runs": 852,
+          "throughput_gflops": 102.8,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q4_K,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=8,k=2048)",
+          "time_us": 828.34,
+          "runs": 1278,
+          "throughput_gflops": 283.56,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q6_K,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=8,k=2048)",
+          "time_us": 1737.23,
+          "runs": 852,
+          "throughput_gflops": 135.2,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=iq2_xs,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=8,k=2048)",
+          "time_us": 1104.6,
+          "runs": 1278,
+          "throughput_gflops": 212.64,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=f32,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=32,k=2048)",
+          "time_us": 1916.79,
+          "runs": 535,
+          "throughput_gflops": 490.15,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=f16,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=32,k=2048)",
+          "time_us": 1612.22,
+          "runs": 642,
+          "throughput_gflops": 582.75,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q4_0,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=32,k=2048)",
+          "time_us": 4065.21,
+          "runs": 321,
+          "throughput_gflops": 231.11,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q8_0,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=32,k=2048)",
+          "time_us": 7153.98,
+          "runs": 214,
+          "throughput_gflops": 131.33,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q4_K,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=32,k=2048)",
+          "time_us": 1753.69,
+          "runs": 642,
+          "throughput_gflops": 535.74,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q6_K,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=32,k=2048)",
+          "time_us": 6972.17,
+          "runs": 214,
+          "throughput_gflops": 134.75,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=iq2_xs,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=32,k=2048)",
+          "time_us": 3161.75,
+          "runs": 321,
+          "throughput_gflops": 297.15,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=f32,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=64,k=2048)",
+          "time_us": 2036.29,
+          "runs": 540,
+          "throughput_gflops": 922.78,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=f16,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=64,k=2048)",
+          "time_us": 1669.11,
+          "runs": 648,
+          "throughput_gflops": 1130.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q4_0,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=64,k=2048)",
+          "time_us": 4646.22,
+          "runs": 216,
+          "throughput_gflops": 404.43,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q8_0,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=64,k=2048)",
+          "time_us": 7859.54,
+          "runs": 162,
+          "throughput_gflops": 239.08,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q4_K,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=64,k=2048)",
+          "time_us": 2039.39,
+          "runs": 540,
+          "throughput_gflops": 921.38,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q6_K,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=64,k=2048)",
+          "time_us": 6896.89,
+          "runs": 162,
+          "throughput_gflops": 272.45,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=iq2_xs,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=64,k=2048)",
+          "time_us": 3846.61,
+          "runs": 270,
+          "throughput_gflops": 488.49,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=f32,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=128,k=2048)",
+          "time_us": 2245.76,
+          "runs": 459,
+          "throughput_gflops": 1670.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=f16,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=128,k=2048)",
+          "time_us": 1656.91,
+          "runs": 621,
+          "throughput_gflops": 2270.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q4_0,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=128,k=2048)",
+          "time_us": 1971.12,
+          "runs": 513,
+          "throughput_gflops": 1910.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q8_0,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=128,k=2048)",
+          "time_us": 2467.08,
+          "runs": 432,
+          "throughput_gflops": 1520.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q4_K,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=128,k=2048)",
+          "time_us": 1842.04,
+          "runs": 567,
+          "throughput_gflops": 2040.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q6_K,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=128,k=2048)",
+          "time_us": 2376.04,
+          "runs": 432,
+          "throughput_gflops": 1580.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=iq2_xs,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=128,k=2048)",
+          "time_us": 2583.98,
+          "runs": 405,
+          "throughput_gflops": 1450.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=f32,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=256,k=2048)",
+          "time_us": 2449.71,
+          "runs": 420,
+          "throughput_gflops": 3070.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=f16,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=256,k=2048)",
+          "time_us": 1695.71,
+          "runs": 602,
+          "throughput_gflops": 4430.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q4_0,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=256,k=2048)",
+          "time_us": 2250.69,
+          "runs": 448,
+          "throughput_gflops": 3340.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q8_0,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=256,k=2048)",
+          "time_us": 2264.6,
+          "runs": 448,
+          "throughput_gflops": 3320.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q4_K,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=256,k=2048)",
+          "time_us": 1893.63,
+          "runs": 532,
+          "throughput_gflops": 3970.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q6_K,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=256,k=2048)",
+          "time_us": 2238.89,
+          "runs": 448,
+          "throughput_gflops": 3360.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=iq2_xs,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=256,k=2048)",
+          "time_us": 2756.53,
+          "runs": 364,
+          "throughput_gflops": 2730.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=f32,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=512,k=2048)",
+          "time_us": 3433.41,
+          "runs": 294,
+          "throughput_gflops": 4380.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=f16,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=512,k=2048)",
+          "time_us": 1930.72,
+          "runs": 518,
+          "throughput_gflops": 7790.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q4_0,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=512,k=2048)",
+          "time_us": 2858.21,
+          "runs": 350,
+          "throughput_gflops": 5260.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q8_0,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=512,k=2048)",
+          "time_us": 2811.73,
+          "runs": 357,
+          "throughput_gflops": 5350.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q4_K,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=512,k=2048)",
+          "time_us": 2387.47,
+          "runs": 420,
+          "throughput_gflops": 6300.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=q6_K,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=512,k=2048)",
+          "time_us": 2811.37,
+          "runs": 357,
+          "throughput_gflops": 5350.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=iq2_xs,type_b=f32,n_mats=32,n_used=4,b=0,m=1792,n=512,k=2048)",
+          "time_us": 3295.42,
+          "runs": 308,
+          "throughput_gflops": 4560.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=mxfp4,type_b=f32,n_mats=32,n_used=4,b=0,m=2880,n=1,k=2880)",
+          "time_us": 479.57,
+          "runs": 3016,
+          "throughput_gflops": 138.36,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=mxfp4,type_b=f32,n_mats=32,n_used=4,b=0,m=2880,n=4,k=2880)",
+          "time_us": 1749.74,
+          "runs": 754,
+          "throughput_gflops": 151.69,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=mxfp4,type_b=f32,n_mats=32,n_used=4,b=0,m=2880,n=8,k=2880)",
+          "time_us": 3096.29,
+          "runs": 378,
+          "throughput_gflops": 171.44,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        },
+        {
+          "name": "MUL_MAT_ID(type_a=mxfp4,type_b=f32,n_mats=32,n_used=4,b=0,m=2880,n=512,k=2880)",
+          "time_us": 8983.7,
+          "runs": 114,
+          "throughput_gflops": 3780.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "flops"
+        }
+      ]
+    },
+    {
+      "kernel": "NEG",
+      "num_test_cases": 2,
+      "min_time_us": 9.63,
+      "max_time_us": 156.82,
+      "test_cases": [
+        {
+          "name": "NEG(type=f32,ne_a=[4096,128,1,1],v=0)",
+          "time_us": 9.63,
+          "runs": 106483,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 405.74,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "NEG(type=f32,ne_a=[14336,512,1,1],v=0)",
+          "time_us": 156.82,
+          "runs": 6446,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 349.03,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "NORM",
+      "num_test_cases": 1,
+      "min_time_us": 37.16,
+      "max_time_us": 37.16,
+      "test_cases": [
+        {
+          "name": "NORM(type=f32,ne=[4096,512,1,1],v=0,eps=0.000001)",
+          "time_us": 37.16,
+          "runs": 28686,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 420.49,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "OUT_PROD",
+      "num_test_cases": 2,
+      "min_time_us": 185.77,
+      "max_time_us": 188.29,
+      "test_cases": [
+        {
+          "name": "OUT_PROD(type_a=f32,type_b=f32,m=4096,n=4096,k=1,bs=[1,1],nr=[1,1],trans_b=0)",
+          "time_us": 185.77,
+          "runs": 5632,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 336.61,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "OUT_PROD(type_a=f32,type_b=f32,m=4096,n=4096,k=8,bs=[1,1],nr=[1,1],trans_b=0)",
+          "time_us": 188.29,
+          "runs": 5621,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 333.23,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "PAD",
+      "num_test_cases": 3,
+      "min_time_us": 24.48,
+      "max_time_us": 55.19,
+      "test_cases": [
+        {
+          "name": "PAD(type=f32,ne_a=[4096,512,1,1],pad_0=0,pad_1=0,circular=0)",
+          "time_us": 54.64,
+          "runs": 18441,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 285.95,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "PAD(type=f32,ne_a=[4095,511,1,1],pad_0=1,pad_1=1,circular=0)",
+          "time_us": 55.19,
+          "runs": 18459,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 282.79,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "PAD(type=f32,ne_a=[512,512,3,1],pad_0=32,pad_1=32,circular=0)",
+          "time_us": 24.48,
+          "runs": 41048,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 254.83,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "POOL_2D",
+      "num_test_cases": 3,
+      "min_time_us": 108.47,
+      "max_time_us": 234.12,
+      "test_cases": [
+        {
+          "name": "POOL_2D(pool_type=avg,type_input=f32,ne_input=[512,512,64,1],k0=3,k1=3,s0=2,s1=2,p0=1,p1=1)",
+          "time_us": 234.12,
+          "runs": 4510,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 334.34,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "POOL_2D(pool_type=max,type_input=f32,ne_input=[512,512,64,1],k0=3,k1=3,s0=2,s1=2,p0=1,p1=1)",
+          "time_us": 232.68,
+          "runs": 4510,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 336.42,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "POOL_2D(pool_type=avg,type_input=f32,ne_input=[256,256,128,1],k0=2,k1=2,s0=2,s1=2,p0=0,p1=0)",
+          "time_us": 108.47,
+          "runs": 9840,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 360.48,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "REGLU",
+      "num_test_cases": 2,
+      "min_time_us": 15.17,
+      "max_time_us": 237.03,
+      "test_cases": [
+        {
+          "name": "REGLU(type=f32,ne_a=[4096,128,1,1],v=0,swapped=0)",
+          "time_us": 15.17,
+          "runs": 73728,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 193.11,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "REGLU(type=f32,ne_a=[14336,512,1,1],v=0,swapped=0)",
+          "time_us": 237.03,
+          "runs": 4686,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 173.04,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "RELU",
+      "num_test_cases": 2,
+      "min_time_us": 9.62,
+      "max_time_us": 227.61,
+      "test_cases": [
+        {
+          "name": "RELU(type=f32,ne_a=[4096,128,1,1],v=0)",
+          "time_us": 9.62,
+          "runs": 106483,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 406.08,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "RELU(type=f32,ne_a=[14336,512,1,1],v=0)",
+          "time_us": 227.61,
+          "runs": 4688,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 240.47,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "RMS_NORM",
+      "num_test_cases": 1,
+      "min_time_us": 35.43,
+      "max_time_us": 35.43,
+      "test_cases": [
+        {
+          "name": "RMS_NORM(type=f32,ne=[4096,512,1,1],v=0,eps=0.000001,inplace=0)",
+          "time_us": 35.43,
+          "runs": 28686,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 441.09,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "ROLL",
+      "num_test_cases": 2,
+      "min_time_us": 6.22,
+      "max_time_us": 6.24,
+      "test_cases": [
+        {
+          "name": "ROLL(shift0=3,shift1=-2,shift3=1,shift4=-1)",
+          "time_us": 6.24,
+          "runs": 163840,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 0.72,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROLL(shift0=0,shift1=0,shift3=0,shift4=0)",
+          "time_us": 6.22,
+          "runs": 163840,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 0.72,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "ROPE",
+      "num_test_cases": 56,
+      "min_time_us": 7.28,
+      "max_time_us": 412.07,
+      "test_cases": [
+        {
+          "name": "ROPE(type=f32,ne_a=[128,32,512,1],n_dims=128,mode=0,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=0,inplace=0)",
+          "time_us": 155.31,
+          "runs": 8192,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 100.64,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f32,ne_a=[128,64,512,1],n_dims=128,mode=0,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=0,inplace=0)",
+          "time_us": 412.07,
+          "runs": 3072,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 75.88,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f32,ne_a=[80,32,512,1],n_dims=20,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=0,inplace=0)",
+          "time_us": 132.48,
+          "runs": 9831,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 73.74,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f32,ne_a=[64,8,512,1],n_dims=64,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=0,inplace=0)",
+          "time_us": 26.27,
+          "runs": 40955,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 74.42,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f32,ne_a=[128,12,512,1],n_dims=128,mode=8,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=0,inplace=0)",
+          "time_us": 41.05,
+          "runs": 27275,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 142.95,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f32,ne_a=[128,12,512,1],n_dims=128,mode=40,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=0,inplace=0)",
+          "time_us": 51.63,
+          "runs": 21820,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 113.64,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f32,ne_a=[80,16,2,1],n_dims=80,mode=24,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=0,inplace=0)",
+          "time_us": 7.43,
+          "runs": 139247,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 2.57,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f32,ne_a=[128,32,512,1],n_dims=128,mode=0,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=1,inplace=0)",
+          "time_us": 100.07,
+          "runs": 10032,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 705.86,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f32,ne_a=[128,64,512,1],n_dims=128,mode=0,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=1,inplace=0)",
+          "time_us": 193.39,
+          "runs": 5244,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 734.74,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f32,ne_a=[80,32,512,1],n_dims=20,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=1,inplace=0)",
+          "time_us": 62.55,
+          "runs": 16060,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 704.29,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f32,ne_a=[64,8,512,1],n_dims=64,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=1,inplace=0)",
+          "time_us": 16.66,
+          "runs": 61965,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 527.43,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f32,ne_a=[128,12,512,1],n_dims=128,mode=8,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=1,inplace=0)",
+          "time_us": 41.07,
+          "runs": 25515,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 642.69,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f32,ne_a=[128,12,512,1],n_dims=128,mode=40,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=1,inplace=0)",
+          "time_us": 51.73,
+          "runs": 19440,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 510.28,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f32,ne_a=[80,16,2,1],n_dims=80,mode=24,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=1,inplace=0)",
+          "time_us": 7.28,
+          "runs": 139230,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 7.82,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f32,ne_a=[128,32,512,1],n_dims=128,mode=0,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=0,inplace=0)",
+          "time_us": 89.04,
+          "runs": 12288,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 175.55,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f32,ne_a=[128,64,512,1],n_dims=128,mode=0,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=0,inplace=0)",
+          "time_us": 193.89,
+          "runs": 6144,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 161.26,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f32,ne_a=[80,32,512,1],n_dims=20,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=0,inplace=0)",
+          "time_us": 62.37,
+          "runs": 16385,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 156.63,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f32,ne_a=[64,8,512,1],n_dims=64,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=0,inplace=0)",
+          "time_us": 16.73,
+          "runs": 65528,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 116.84,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f32,ne_a=[128,12,512,1],n_dims=128,mode=8,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=0,inplace=0)",
+          "time_us": 42.15,
+          "runs": 27275,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 139.22,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f32,ne_a=[128,12,512,1],n_dims=128,mode=40,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=0,inplace=0)",
+          "time_us": 53.75,
+          "runs": 21820,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 109.16,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f32,ne_a=[80,16,2,1],n_dims=80,mode=24,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=0,inplace=0)",
+          "time_us": 7.49,
+          "runs": 139247,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 2.57,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f32,ne_a=[128,32,512,1],n_dims=128,mode=0,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=1,inplace=0)",
+          "time_us": 103.29,
+          "runs": 10032,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 683.83,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f32,ne_a=[128,64,512,1],n_dims=128,mode=0,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=1,inplace=0)",
+          "time_us": 199.7,
+          "runs": 5016,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 711.51,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f32,ne_a=[80,32,512,1],n_dims=20,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=1,inplace=0)",
+          "time_us": 63.07,
+          "runs": 16060,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 698.45,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f32,ne_a=[64,8,512,1],n_dims=64,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=1,inplace=0)",
+          "time_us": 16.77,
+          "runs": 61965,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 523.82,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f32,ne_a=[128,12,512,1],n_dims=128,mode=8,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=1,inplace=0)",
+          "time_us": 42.2,
+          "runs": 24300,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 625.48,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f32,ne_a=[128,12,512,1],n_dims=128,mode=40,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=1,inplace=0)",
+          "time_us": 53.78,
+          "runs": 19440,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 490.84,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f32,ne_a=[80,16,2,1],n_dims=80,mode=24,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=1,inplace=0)",
+          "time_us": 7.4,
+          "runs": 139230,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 7.72,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f16,ne_a=[128,32,512,1],n_dims=128,mode=0,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=0,inplace=0)",
+          "time_us": 80.97,
+          "runs": 16384,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 96.52,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f16,ne_a=[128,64,512,1],n_dims=128,mode=0,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=0,inplace=0)",
+          "time_us": 169.81,
+          "runs": 6144,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 92.05,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f16,ne_a=[80,32,512,1],n_dims=20,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=0,inplace=0)",
+          "time_us": 62.3,
+          "runs": 19656,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 78.41,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f16,ne_a=[64,8,512,1],n_dims=64,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=0,inplace=0)",
+          "time_us": 16.93,
+          "runs": 65528,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 57.79,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f16,ne_a=[128,12,512,1],n_dims=128,mode=8,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=0,inplace=0)",
+          "time_us": 42.04,
+          "runs": 24573,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 69.88,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f16,ne_a=[128,12,512,1],n_dims=128,mode=40,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=0,inplace=0)",
+          "time_us": 53.02,
+          "runs": 24573,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 55.4,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f16,ne_a=[80,16,2,1],n_dims=80,mode=24,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=0,inplace=0)",
+          "time_us": 7.64,
+          "runs": 131056,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 1.25,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f16,ne_a=[128,32,512,1],n_dims=128,mode=0,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=1,inplace=0)",
+          "time_us": 87.7,
+          "runs": 11856,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 401.52,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f16,ne_a=[128,64,512,1],n_dims=128,mode=0,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=1,inplace=0)",
+          "time_us": 193.02,
+          "runs": 5472,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 365.94,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f16,ne_a=[80,32,512,1],n_dims=20,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=1,inplace=0)",
+          "time_us": 62.26,
+          "runs": 17508,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 353.15,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f16,ne_a=[64,8,512,1],n_dims=64,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=1,inplace=0)",
+          "time_us": 16.93,
+          "runs": 65601,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 259.41,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f16,ne_a=[128,12,512,1],n_dims=128,mode=8,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=1,inplace=0)",
+          "time_us": 42.12,
+          "runs": 24300,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 313.11,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f16,ne_a=[128,12,512,1],n_dims=128,mode=40,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=1,inplace=0)",
+          "time_us": 53.23,
+          "runs": 19440,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 247.74,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f16,ne_a=[80,16,2,1],n_dims=80,mode=24,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=1,inplace=0)",
+          "time_us": 7.57,
+          "runs": 139230,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 3.77,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f16,ne_a=[128,32,512,1],n_dims=128,mode=0,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=0,inplace=0)",
+          "time_us": 85.51,
+          "runs": 12285,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 91.4,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f16,ne_a=[128,64,512,1],n_dims=128,mode=0,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=0,inplace=0)",
+          "time_us": 178.44,
+          "runs": 6144,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 87.6,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f16,ne_a=[80,32,512,1],n_dims=20,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=0,inplace=0)",
+          "time_us": 62.77,
+          "runs": 19653,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 77.83,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f16,ne_a=[64,8,512,1],n_dims=64,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=0,inplace=0)",
+          "time_us": 17.18,
+          "runs": 65528,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 56.97,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f16,ne_a=[128,12,512,1],n_dims=128,mode=8,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=0,inplace=0)",
+          "time_us": 43.32,
+          "runs": 24573,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 67.82,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f16,ne_a=[128,12,512,1],n_dims=128,mode=40,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=0,inplace=0)",
+          "time_us": 55.12,
+          "runs": 24573,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 53.3,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f16,ne_a=[80,16,2,1],n_dims=80,mode=24,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=0,inplace=0)",
+          "time_us": 7.42,
+          "runs": 139247,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 1.31,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f16,ne_a=[128,32,512,1],n_dims=128,mode=0,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=1,inplace=0)",
+          "time_us": 92.06,
+          "runs": 10944,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 382.5,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f16,ne_a=[128,64,512,1],n_dims=128,mode=0,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=1,inplace=0)",
+          "time_us": 201.89,
+          "runs": 5016,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 349.86,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f16,ne_a=[80,32,512,1],n_dims=20,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=1,inplace=0)",
+          "time_us": 62.56,
+          "runs": 16049,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 351.41,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f16,ne_a=[64,8,512,1],n_dims=64,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=1,inplace=0)",
+          "time_us": 17.18,
+          "runs": 58312,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 255.62,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f16,ne_a=[128,12,512,1],n_dims=128,mode=8,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=1,inplace=0)",
+          "time_us": 43.46,
+          "runs": 24300,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 303.46,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f16,ne_a=[128,12,512,1],n_dims=128,mode=40,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=1,inplace=0)",
+          "time_us": 55.24,
+          "runs": 19440,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 238.75,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE(type=f16,ne_a=[80,16,2,1],n_dims=80,mode=24,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=1,inplace=0)",
+          "time_us": 7.47,
+          "runs": 139230,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 3.83,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "ROPE_BACK",
+      "num_test_cases": 56,
+      "min_time_us": 7.37,
+      "max_time_us": 201.87,
+      "test_cases": [
+        {
+          "name": "ROPE_BACK(type=f32,ne_a=[128,32,512,1],n_dims=128,mode=0,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=0,inplace=0)",
+          "time_us": 82.0,
+          "runs": 12288,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 190.57,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f32,ne_a=[128,64,512,1],n_dims=128,mode=0,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=0,inplace=0)",
+          "time_us": 187.21,
+          "runs": 6144,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 166.94,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f32,ne_a=[80,32,512,1],n_dims=20,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=0,inplace=0)",
+          "time_us": 62.01,
+          "runs": 16385,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 157.53,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f32,ne_a=[64,8,512,1],n_dims=64,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=0,inplace=0)",
+          "time_us": 16.62,
+          "runs": 65536,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 117.65,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f32,ne_a=[128,12,512,1],n_dims=128,mode=8,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=0,inplace=0)",
+          "time_us": 41.12,
+          "runs": 27275,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 142.7,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f32,ne_a=[128,12,512,1],n_dims=128,mode=40,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=0,inplace=0)",
+          "time_us": 51.71,
+          "runs": 21820,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 113.46,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f32,ne_a=[80,16,2,1],n_dims=80,mode=24,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=0,inplace=0)",
+          "time_us": 7.44,
+          "runs": 139264,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 2.57,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f32,ne_a=[128,32,512,1],n_dims=128,mode=0,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=1,inplace=0)",
+          "time_us": 99.61,
+          "runs": 10488,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 704.95,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f32,ne_a=[128,64,512,1],n_dims=128,mode=0,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=1,inplace=0)",
+          "time_us": 193.07,
+          "runs": 5244,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 727.43,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f32,ne_a=[80,32,512,1],n_dims=20,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=1,inplace=0)",
+          "time_us": 62.68,
+          "runs": 16060,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 700.22,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f32,ne_a=[64,8,512,1],n_dims=64,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=1,inplace=0)",
+          "time_us": 16.66,
+          "runs": 61965,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 527.06,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f32,ne_a=[128,12,512,1],n_dims=128,mode=8,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=1,inplace=0)",
+          "time_us": 41.16,
+          "runs": 24300,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 639.87,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f32,ne_a=[128,12,512,1],n_dims=128,mode=40,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=1,inplace=0)",
+          "time_us": 51.76,
+          "runs": 19440,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 508.85,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f32,ne_a=[80,16,2,1],n_dims=80,mode=24,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=1,inplace=0)",
+          "time_us": 7.48,
+          "runs": 139247,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 7.62,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f32,ne_a=[128,32,512,1],n_dims=128,mode=0,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=0,inplace=0)",
+          "time_us": 84.48,
+          "runs": 12288,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 184.98,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f32,ne_a=[128,64,512,1],n_dims=128,mode=0,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=0,inplace=0)",
+          "time_us": 193.82,
+          "runs": 6144,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 161.25,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f32,ne_a=[80,32,512,1],n_dims=20,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=0,inplace=0)",
+          "time_us": 62.32,
+          "runs": 16385,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 156.73,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f32,ne_a=[64,8,512,1],n_dims=64,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=0,inplace=0)",
+          "time_us": 16.73,
+          "runs": 65536,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 116.89,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f32,ne_a=[128,12,512,1],n_dims=128,mode=8,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=0,inplace=0)",
+          "time_us": 42.13,
+          "runs": 27275,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 139.26,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f32,ne_a=[128,12,512,1],n_dims=128,mode=40,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=0,inplace=0)",
+          "time_us": 53.74,
+          "runs": 21820,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 109.18,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f32,ne_a=[80,16,2,1],n_dims=80,mode=24,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=0,inplace=0)",
+          "time_us": 7.41,
+          "runs": 139264,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 2.6,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f32,ne_a=[128,32,512,1],n_dims=128,mode=0,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=1,inplace=0)",
+          "time_us": 102.45,
+          "runs": 10032,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 685.4,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f32,ne_a=[128,64,512,1],n_dims=128,mode=0,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=1,inplace=0)",
+          "time_us": 199.04,
+          "runs": 5244,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 705.62,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f32,ne_a=[80,32,512,1],n_dims=20,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=1,inplace=0)",
+          "time_us": 63.31,
+          "runs": 16060,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 693.28,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f32,ne_a=[64,8,512,1],n_dims=64,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=1,inplace=0)",
+          "time_us": 16.76,
+          "runs": 61965,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 523.72,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f32,ne_a=[128,12,512,1],n_dims=128,mode=8,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=1,inplace=0)",
+          "time_us": 42.2,
+          "runs": 24300,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 624.23,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f32,ne_a=[128,12,512,1],n_dims=128,mode=40,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=1,inplace=0)",
+          "time_us": 53.78,
+          "runs": 19440,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 489.77,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f32,ne_a=[80,16,2,1],n_dims=80,mode=24,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=1,inplace=0)",
+          "time_us": 7.47,
+          "runs": 139247,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 7.64,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f16,ne_a=[128,32,512,1],n_dims=128,mode=0,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=0,inplace=0)",
+          "time_us": 81.09,
+          "runs": 16384,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 96.37,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f16,ne_a=[128,64,512,1],n_dims=128,mode=0,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=0,inplace=0)",
+          "time_us": 169.9,
+          "runs": 6144,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 91.98,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f16,ne_a=[80,32,512,1],n_dims=20,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=0,inplace=0)",
+          "time_us": 62.2,
+          "runs": 19656,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 78.53,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f16,ne_a=[64,8,512,1],n_dims=64,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=0,inplace=0)",
+          "time_us": 16.9,
+          "runs": 65536,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 57.88,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f16,ne_a=[128,12,512,1],n_dims=128,mode=8,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=0,inplace=0)",
+          "time_us": 41.97,
+          "runs": 24576,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 69.98,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f16,ne_a=[128,12,512,1],n_dims=128,mode=40,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=0,inplace=0)",
+          "time_us": 52.91,
+          "runs": 24576,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 55.52,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f16,ne_a=[80,16,2,1],n_dims=80,mode=24,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=0,inplace=0)",
+          "time_us": 7.37,
+          "runs": 139264,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 1.3,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f16,ne_a=[128,32,512,1],n_dims=128,mode=0,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=1,inplace=0)",
+          "time_us": 89.8,
+          "runs": 11856,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 390.99,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f16,ne_a=[128,64,512,1],n_dims=128,mode=0,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=1,inplace=0)",
+          "time_us": 193.35,
+          "runs": 5472,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 363.19,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f16,ne_a=[80,32,512,1],n_dims=20,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=1,inplace=0)",
+          "time_us": 62.09,
+          "runs": 17508,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 353.44,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f16,ne_a=[64,8,512,1],n_dims=64,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=1,inplace=0)",
+          "time_us": 16.91,
+          "runs": 65601,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 259.57,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f16,ne_a=[128,12,512,1],n_dims=128,mode=8,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=1,inplace=0)",
+          "time_us": 42.04,
+          "runs": 24300,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 313.38,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f16,ne_a=[128,12,512,1],n_dims=128,mode=40,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=1,inplace=0)",
+          "time_us": 52.99,
+          "runs": 19440,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 248.6,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f16,ne_a=[80,16,2,1],n_dims=80,mode=24,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=1,inplace=0)",
+          "time_us": 7.48,
+          "runs": 139247,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 3.81,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f16,ne_a=[128,32,512,1],n_dims=128,mode=0,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=0,inplace=0)",
+          "time_us": 85.36,
+          "runs": 12285,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 91.55,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f16,ne_a=[128,64,512,1],n_dims=128,mode=0,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=0,inplace=0)",
+          "time_us": 178.07,
+          "runs": 6144,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 87.76,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f16,ne_a=[80,32,512,1],n_dims=20,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=0,inplace=0)",
+          "time_us": 62.77,
+          "runs": 19653,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 77.82,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f16,ne_a=[64,8,512,1],n_dims=64,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=0,inplace=0)",
+          "time_us": 17.17,
+          "runs": 65536,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 57.0,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f16,ne_a=[128,12,512,1],n_dims=128,mode=8,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=0,inplace=0)",
+          "time_us": 43.32,
+          "runs": 24576,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 67.81,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f16,ne_a=[128,12,512,1],n_dims=128,mode=40,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=0,inplace=0)",
+          "time_us": 55.11,
+          "runs": 24576,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 53.3,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f16,ne_a=[80,16,2,1],n_dims=80,mode=24,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=0,inplace=0)",
+          "time_us": 7.48,
+          "runs": 139264,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 1.3,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f16,ne_a=[128,32,512,1],n_dims=128,mode=0,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=1,inplace=0)",
+          "time_us": 91.97,
+          "runs": 10944,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 381.79,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f16,ne_a=[128,64,512,1],n_dims=128,mode=0,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=1,inplace=0)",
+          "time_us": 201.87,
+          "runs": 5016,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 347.86,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f16,ne_a=[80,32,512,1],n_dims=20,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=1,inplace=0)",
+          "time_us": 62.55,
+          "runs": 16049,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 350.84,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f16,ne_a=[64,8,512,1],n_dims=64,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=1,inplace=0)",
+          "time_us": 17.18,
+          "runs": 58312,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 255.64,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f16,ne_a=[128,12,512,1],n_dims=128,mode=8,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=1,inplace=0)",
+          "time_us": 43.44,
+          "runs": 24300,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 303.26,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f16,ne_a=[128,12,512,1],n_dims=128,mode=40,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=1,inplace=0)",
+          "time_us": 55.27,
+          "runs": 19440,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 238.38,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "ROPE_BACK(type=f16,ne_a=[80,16,2,1],n_dims=80,mode=24,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=1,inplace=0)",
+          "time_us": 7.47,
+          "runs": 139247,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 3.83,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "RWKV_WKV6",
+      "num_test_cases": 2,
+      "min_time_us": 62.8,
+      "max_time_us": 1197.58,
+      "test_cases": [
+        {
+          "name": "RWKV_WKV6(type=f32,head_count=32,head_size=64,n_seq_tokens=512,n_seqs=1)",
+          "time_us": 1197.58,
+          "runs": 1560,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 17.13,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "RWKV_WKV6(type=f32,head_count=32,head_size=64,n_seq_tokens=32,n_seqs=4)",
+          "time_us": 62.8,
+          "runs": 18190,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 140.07,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "RWKV_WKV7",
+      "num_test_cases": 2,
+      "min_time_us": 78.23,
+      "max_time_us": 1358.8,
+      "test_cases": [
+        {
+          "name": "RWKV_WKV7(type=f32,head_count=32,head_size=64,n_seq_tokens=512,n_seqs=1)",
+          "time_us": 1358.8,
+          "runs": 1130,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 20.85,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "RWKV_WKV7(type=f32,head_count=32,head_size=64,n_seq_tokens=32,n_seqs=4)",
+          "time_us": 78.23,
+          "runs": 14895,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 137.33,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "SCALE",
+      "num_test_cases": 2,
+      "min_time_us": 49.73,
+      "max_time_us": 347.27,
+      "test_cases": [
+        {
+          "name": "SCALE(type=f32,ne=[4096,512,1,1],scale=0.088380,bias=0.000000,inplace=0)",
+          "time_us": 49.73,
+          "runs": 20490,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 314.28,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SCALE(type=f32,ne=[14336,512,1,1],scale=2.000000,bias=0.000000,inplace=0)",
+          "time_us": 347.27,
+          "runs": 2930,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 157.61,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "SET",
+      "num_test_cases": 2,
+      "min_time_us": 114.6,
+      "max_time_us": 512.76,
+      "test_cases": [
+        {
+          "name": "SET(type_src=f32,type_dst=f32,ne=[4096,512,1,1],dim=1,inplace=0)",
+          "time_us": 114.6,
+          "runs": 9225,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 272.89,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SET(type_src=f32,type_dst=f32,ne=[4096,512,4,1],dim=1,inplace=0)",
+          "time_us": 512.76,
+          "runs": 2056,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 244.49,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "SET_ROWS",
+      "num_test_cases": 1,
+      "min_time_us": 404.47,
+      "max_time_us": 404.47,
+      "test_cases": [
+        {
+          "name": "SET_ROWS(type=f32,type_idx=i32,ne=[4096,512,1,1],nr23=[1,1],r=512,v=0)",
+          "time_us": 404.47,
+          "runs": 2732,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 57.95,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "SGN",
+      "num_test_cases": 2,
+      "min_time_us": 8.32,
+      "max_time_us": 180.65,
+      "test_cases": [
+        {
+          "name": "SGN(type=f32,ne_a=[4096,128,1,1],v=0)",
+          "time_us": 8.32,
+          "runs": 122865,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 469.38,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SGN(type=f32,ne_a=[14336,512,1,1],v=0)",
+          "time_us": 180.65,
+          "runs": 6446,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 302.99,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "SIGMOID",
+      "num_test_cases": 2,
+      "min_time_us": 4.95,
+      "max_time_us": 156.72,
+      "test_cases": [
+        {
+          "name": "SIGMOID(type=f32,ne_a=[4096,128,1,1],v=0)",
+          "time_us": 4.95,
+          "runs": 204800,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 788.77,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SIGMOID(type=f32,ne_a=[14336,512,1,1],v=0)",
+          "time_us": 156.72,
+          "runs": 6446,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 348.94,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "SILU",
+      "num_test_cases": 2,
+      "min_time_us": 5.1,
+      "max_time_us": 274.99,
+      "test_cases": [
+        {
+          "name": "SILU(type=f32,ne_a=[4096,128,1,1],v=0)",
+          "time_us": 5.1,
+          "runs": 196584,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 765.96,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SILU(type=f32,ne_a=[14336,512,1,1],v=0)",
+          "time_us": 274.99,
+          "runs": 4102,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 199.04,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "SOFT_MAX",
+      "num_test_cases": 29,
+      "min_time_us": 13.01,
+      "max_time_us": 5008.38,
+      "test_cases": [
+        {
+          "name": "SOFT_MAX(type=f32,ne=[4096,4096,5,1],mask=0,sinks=0,m_prec=f32,nr23=[1,1],scale=1.000000,max_bias=0.000000,inplace=0)",
+          "time_us": 5008.38,
+          "runs": 260,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 125.99,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[12888,256,5,1],mask=0,sinks=0,m_prec=f32,nr23=[1,1],scale=1.000000,max_bias=0.000000,inplace=0)",
+          "time_us": 1467.22,
+          "runs": 783,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 83.93,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[77,4096,5,1],mask=0,sinks=0,m_prec=f32,nr23=[1,1],scale=1.000000,max_bias=0.000000,inplace=0)",
+          "time_us": 722.64,
+          "runs": 2724,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 16.26,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[1024,1024,10,1],mask=0,sinks=0,m_prec=f32,nr23=[1,1],scale=1.000000,max_bias=0.000000,inplace=0)",
+          "time_us": 1062.47,
+          "runs": 1230,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 73.62,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[77,1024,10,1],mask=0,sinks=0,m_prec=f32,nr23=[1,1],scale=1.000000,max_bias=0.000000,inplace=0)",
+          "time_us": 345.81,
+          "runs": 5448,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 16.99,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[256,256,20,1],mask=0,sinks=0,m_prec=f32,nr23=[1,1],scale=1.000000,max_bias=0.000000,inplace=0)",
+          "time_us": 118.65,
+          "runs": 9831,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 82.32,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[64,64,20,1],mask=0,sinks=0,m_prec=f32,nr23=[1,1],scale=1.000000,max_bias=0.000000,inplace=0)",
+          "time_us": 29.97,
+          "runs": 40955,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 20.36,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[77,64,20,1],mask=0,sinks=0,m_prec=f32,nr23=[1,1],scale=1.000000,max_bias=0.000000,inplace=0)",
+          "time_us": 33.1,
+          "runs": 32764,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 22.19,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[8192,1,1,1],mask=0,sinks=0,m_prec=f32,nr23=[1,1],scale=1.000000,max_bias=0.000000,inplace=0)",
+          "time_us": 22.19,
+          "runs": 49146,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 2.75,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[8192,4,1,1],mask=0,sinks=0,m_prec=f32,nr23=[1,1],scale=1.000000,max_bias=0.000000,inplace=0)",
+          "time_us": 13.01,
+          "runs": 81910,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 18.76,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[8192,16,1,1],mask=0,sinks=0,m_prec=f32,nr23=[1,1],scale=1.000000,max_bias=0.000000,inplace=0)",
+          "time_us": 13.07,
+          "runs": 81910,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 74.72,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[16384,1,1,1],mask=0,sinks=0,m_prec=f32,nr23=[1,1],scale=1.000000,max_bias=0.000000,inplace=0)",
+          "time_us": 34.91,
+          "runs": 32764,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 3.5,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[16384,4,1,1],mask=0,sinks=0,m_prec=f32,nr23=[1,1],scale=1.000000,max_bias=0.000000,inplace=0)",
+          "time_us": 70.34,
+          "runs": 16382,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 6.94,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[16384,16,1,1],mask=0,sinks=0,m_prec=f32,nr23=[1,1],scale=1.000000,max_bias=0.000000,inplace=0)",
+          "time_us": 65.18,
+          "runs": 16382,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 29.97,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[32768,1,1,1],mask=0,sinks=0,m_prec=f32,nr23=[1,1],scale=1.000000,max_bias=0.000000,inplace=0)",
+          "time_us": 66.55,
+          "runs": 16382,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 3.67,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[32768,4,1,1],mask=0,sinks=0,m_prec=f32,nr23=[1,1],scale=1.000000,max_bias=0.000000,inplace=0)",
+          "time_us": 67.18,
+          "runs": 16382,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 14.54,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[32768,16,1,1],mask=0,sinks=0,m_prec=f32,nr23=[1,1],scale=1.000000,max_bias=0.000000,inplace=0)",
+          "time_us": 69.67,
+          "runs": 16382,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 56.07,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[65536,1,1,1],mask=0,sinks=0,m_prec=f32,nr23=[1,1],scale=1.000000,max_bias=0.000000,inplace=0)",
+          "time_us": 270.89,
+          "runs": 8191,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 1.8,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[65536,4,1,1],mask=0,sinks=0,m_prec=f32,nr23=[1,1],scale=1.000000,max_bias=0.000000,inplace=0)",
+          "time_us": 132.38,
+          "runs": 8191,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 14.75,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[65536,16,1,1],mask=0,sinks=0,m_prec=f32,nr23=[1,1],scale=1.000000,max_bias=0.000000,inplace=0)",
+          "time_us": 134.13,
+          "runs": 8194,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 58.25,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[131072,1,1,1],mask=0,sinks=0,m_prec=f32,nr23=[1,1],scale=1.000000,max_bias=0.000000,inplace=0)",
+          "time_us": 418.67,
+          "runs": 8191,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 2.33,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[131072,4,1,1],mask=0,sinks=0,m_prec=f32,nr23=[1,1],scale=1.000000,max_bias=0.000000,inplace=0)",
+          "time_us": 267.8,
+          "runs": 8191,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 14.59,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[131072,16,1,1],mask=0,sinks=0,m_prec=f32,nr23=[1,1],scale=1.000000,max_bias=0.000000,inplace=0)",
+          "time_us": 473.08,
+          "runs": 4098,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 33.04,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[262144,1,1,1],mask=0,sinks=0,m_prec=f32,nr23=[1,1],scale=1.000000,max_bias=0.000000,inplace=0)",
+          "time_us": 674.62,
+          "runs": 8191,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 2.9,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[262144,4,1,1],mask=0,sinks=0,m_prec=f32,nr23=[1,1],scale=1.000000,max_bias=0.000000,inplace=0)",
+          "time_us": 525.49,
+          "runs": 4097,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 14.87,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[262144,16,1,1],mask=0,sinks=0,m_prec=f32,nr23=[1,1],scale=1.000000,max_bias=0.000000,inplace=0)",
+          "time_us": 1012.14,
+          "runs": 1025,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 30.89,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[524288,1,1,1],mask=0,sinks=0,m_prec=f32,nr23=[1,1],scale=1.000000,max_bias=0.000000,inplace=0)",
+          "time_us": 1479.84,
+          "runs": 8191,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 2.64,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[524288,4,1,1],mask=0,sinks=0,m_prec=f32,nr23=[1,1],scale=1.000000,max_bias=0.000000,inplace=0)",
+          "time_us": 3725.66,
+          "runs": 2049,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 4.19,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SOFT_MAX(type=f32,ne=[524288,16,1,1],mask=0,sinks=0,m_prec=f32,nr23=[1,1],scale=1.000000,max_bias=0.000000,inplace=0)",
+          "time_us": 4705.38,
+          "runs": 513,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 13.3,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "SQR",
+      "num_test_cases": 2,
+      "min_time_us": 9.89,
+      "max_time_us": 321.82,
+      "test_cases": [
+        {
+          "name": "SQR(type=f32,ne=[4096,128,1,1])",
+          "time_us": 9.89,
+          "runs": 106483,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 395.01,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SQR(type=f32,ne=[14336,512,1,1])",
+          "time_us": 321.82,
+          "runs": 3516,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 170.08,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "SSM_CONV",
+      "num_test_cases": 2,
+      "min_time_us": 6.05,
+      "max_time_us": 263.99,
+      "test_cases": [
+        {
+          "name": "SSM_CONV(type=f32,ne_a=[515,3328,1,1],ne_b=[4,3328,1,1])",
+          "time_us": 263.99,
+          "runs": 5008,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 48.42,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SSM_CONV(type=f32,ne_a=[4,3328,1,1],ne_b=[4,3328,1,1])",
+          "time_us": 6.05,
+          "runs": 172032,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 18.46,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "SSM_SCAN",
+      "num_test_cases": 2,
+      "min_time_us": 12.72,
+      "max_time_us": 3072.52,
+      "test_cases": [
+        {
+          "name": "SSM_SCAN(type=f32,d_state=128,head_dim=64,n_head=48,n_group=1,n_seq_tokens=512,n_seqs=1)",
+          "time_us": 3072.52,
+          "runs": 2102,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 4.96,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SSM_SCAN(type=f32,d_state=128,head_dim=64,n_head=48,n_group=1,n_seq_tokens=1,n_seqs=1)",
+          "time_us": 12.72,
+          "runs": 81920,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 232.25,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "STEP",
+      "num_test_cases": 2,
+      "min_time_us": 4.97,
+      "max_time_us": 136.16,
+      "test_cases": [
+        {
+          "name": "STEP(type=f32,ne_a=[4096,128,1,1],v=0)",
+          "time_us": 4.97,
+          "runs": 204775,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 785.3,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "STEP(type=f32,ne_a=[14336,512,1,1],v=0)",
+          "time_us": 136.16,
+          "runs": 7618,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 401.99,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "SUB",
+      "num_test_cases": 2,
+      "min_time_us": 7.72,
+      "max_time_us": 158.12,
+      "test_cases": [
+        {
+          "name": "SUB(type=f32,ne=[4096,1,1,1],nr=[1,1,1,1],nf=1,perm1=0)",
+          "time_us": 7.72,
+          "runs": 131072,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 5.93,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SUB(type=f32,ne=[4096,1,1,1],nr=[1,512,1,1],nf=1,perm1=0)",
+          "time_us": 158.12,
+          "runs": 6830,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 148.22,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "SUM",
+      "num_test_cases": 3,
+      "min_time_us": 6.66,
+      "max_time_us": 49085.64,
+      "test_cases": [
+        {
+          "name": "SUM(type=f32,ne=[8192,1,1,1])",
+          "time_us": 6.66,
+          "runs": 155629,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 4.58,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SUM(type=f32,ne=[8192,8192,1,1])",
+          "time_us": 49085.64,
+          "runs": 128,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 5.13,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SUM(type=f32,ne=[128,8192,1,1])",
+          "time_us": 609.71,
+          "runs": 8191,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 6.41,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "SUM_ROWS",
+      "num_test_cases": 3,
+      "min_time_us": 5.97,
+      "max_time_us": 594.36,
+      "test_cases": [
+        {
+          "name": "SUM_ROWS(type=f32,ne=[8192,1,1,1],permute=0,slice=0)",
+          "time_us": 5.97,
+          "runs": 172011,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 5.11,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SUM_ROWS(type=f32,ne=[8192,8192,1,1],permute=0,slice=0)",
+          "time_us": 594.36,
+          "runs": 1792,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 423.96,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SUM_ROWS(type=f32,ne=[128,8192,1,1],permute=0,slice=0)",
+          "time_us": 76.47,
+          "runs": 16258,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 51.49,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "SWIGLU",
+      "num_test_cases": 2,
+      "min_time_us": 16.02,
+      "max_time_us": 244.05,
+      "test_cases": [
+        {
+          "name": "SWIGLU(type=f32,ne_a=[4096,128,1,1],v=0,swapped=0)",
+          "time_us": 16.02,
+          "runs": 65536,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 182.84,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "SWIGLU(type=f32,ne_a=[14336,512,1,1],v=0,swapped=0)",
+          "time_us": 244.05,
+          "runs": 4686,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 168.06,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "TANH",
+      "num_test_cases": 2,
+      "min_time_us": 14.08,
+      "max_time_us": 333.33,
+      "test_cases": [
+        {
+          "name": "TANH(type=f32,ne_a=[4096,128,1,1],v=0)",
+          "time_us": 14.08,
+          "runs": 73728,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 277.48,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "TANH(type=f32,ne_a=[14336,512,1,1],v=0)",
+          "time_us": 333.33,
+          "runs": 3516,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 164.07,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "TIMESTEP_EMBEDDING",
+      "num_test_cases": 2,
+      "min_time_us": 5.56,
+      "max_time_us": 5.62,
+      "test_cases": [
+        {
+          "name": "TIMESTEP_EMBEDDING(type=f32,ne_a=[256,1,1,1],dim=320,max_period=10000)",
+          "time_us": 5.56,
+          "runs": 180224,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 55.05,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "TIMESTEP_EMBEDDING(type=f32,ne_a=[1,1,1,1],dim=1280,max_period=10000)",
+          "time_us": 5.62,
+          "runs": 180224,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 0.85,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "TOP_K",
+      "num_test_cases": 17,
+      "min_time_us": 11.04,
+      "max_time_us": 19.87,
+      "test_cases": [
+        {
+          "name": "TOP_K(type=f32,ne=[2,1,1,1],k=1,ties=0)",
+          "time_us": 11.04,
+          "runs": 98304,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "TOP_K(type=f32,ne=[1,1,1,1],k=1,ties=0)",
+          "time_us": 11.17,
+          "runs": 90112,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 0.0,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "TOP_K(type=f32,ne=[1000,1,1,1],k=1,ties=0)",
+          "time_us": 19.24,
+          "runs": 57344,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 0.19,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "TOP_K(type=f32,ne=[1,16,1,1],k=1,ties=0)",
+          "time_us": 11.17,
+          "runs": 90112,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 0.01,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "TOP_K(type=f32,ne=[1000,16,1,1],k=1,ties=0)",
+          "time_us": 19.87,
+          "runs": 57344,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 3.0,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "TOP_K(type=f32,ne=[10,1,1,1],k=10,ties=0)",
+          "time_us": 11.17,
+          "runs": 90112,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 0.01,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "TOP_K(type=f32,ne=[1000,1,1,1],k=10,ties=0)",
+          "time_us": 19.29,
+          "runs": 57344,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 0.2,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "TOP_K(type=f32,ne=[10,16,1,1],k=10,ties=0)",
+          "time_us": 11.15,
+          "runs": 90112,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 0.11,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "TOP_K(type=f32,ne=[1000,16,1,1],k=10,ties=0)",
+          "time_us": 19.83,
+          "runs": 57344,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 3.04,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "TOP_K(type=f32,ne=[40,1,1,1],k=40,ties=0)",
+          "time_us": 11.21,
+          "runs": 90112,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 0.03,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "TOP_K(type=f32,ne=[1000,1,1,1],k=40,ties=0)",
+          "time_us": 19.24,
+          "runs": 57344,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 0.2,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "TOP_K(type=f32,ne=[40,16,1,1],k=40,ties=0)",
+          "time_us": 11.27,
+          "runs": 90112,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 0.42,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "TOP_K(type=f32,ne=[1000,16,1,1],k=40,ties=0)",
+          "time_us": 19.84,
+          "runs": 57344,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 3.12,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "TOP_K(type=f32,ne=[400,1,1,1],k=400,ties=0)",
+          "time_us": 13.38,
+          "runs": 81920,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 0.22,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "TOP_K(type=f32,ne=[1000,1,1,1],k=400,ties=0)",
+          "time_us": 19.21,
+          "runs": 57344,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 0.27,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "TOP_K(type=f32,ne=[400,16,1,1],k=400,ties=0)",
+          "time_us": 13.53,
+          "runs": 81920,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 3.52,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "TOP_K(type=f32,ne=[1000,16,1,1],k=400,ties=0)",
+          "time_us": 19.85,
+          "runs": 57344,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 4.2,
+          "metric_type": "bandwidth"
+        }
+      ]
+    },
+    {
+      "kernel": "UPSCALE",
+      "num_test_cases": 2,
+      "min_time_us": 664.47,
+      "max_time_us": 1325.77,
+      "test_cases": [
+        {
+          "name": "UPSCALE(type=f32,ne=[256,256,64,1],scale_factor=2,mode=nearest,transpose=0)",
+          "time_us": 664.47,
+          "runs": 1640,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 117.58,
+          "metric_type": "bandwidth"
+        },
+        {
+          "name": "UPSCALE(type=f32,ne=[512,512,32,1],scale_factor=2,mode=nearest,transpose=0)",
+          "time_us": 1325.77,
+          "runs": 820,
+          "throughput_gflops": 0.0,
+          "bandwidth_gbs": 117.86,
+          "metric_type": "bandwidth"
+        }
+      ]
+    }
+  ],
+  "not_supported": [
+    {
+      "kernel": "ACC",
+      "unsupported_cases": [
+        "ACC(type=f32,ne_a=[256,17,2,3],ne_b=[256,16,2,3],stride_dim=1)",
+        "ACC(type=f32,ne_a=[256,17,2,3],ne_b=[128,16,2,3],stride_dim=2)"
+      ]
+    },
+    {
+      "kernel": "ARGSORT",
+      "unsupported_cases": [
+        "ARGSORT(type=f32,ne=[65000,16,1,1],order=0)",
+        "ARGSORT(type=f32,ne=[200000,1,1,1],order=0)",
+        "ARGSORT(type=f32,ne=[200000,16,1,1],order=0)"
+      ]
+    },
+    {
+      "kernel": "CPY",
+      "unsupported_cases": [
+        "CPY(type_src=f32,type_dst=q4_0,ne=[8192,512,2,1],permute_src=[0,0,0,0],permute_dst=[0,0,0,0],_src_transpose=0)",
+        "CPY(type_src=q4_0,type_dst=f32,ne=[8192,512,2,1],permute_src=[0,0,0,0],permute_dst=[0,0,0,0],_src_transpose=0)"
+      ]
+    },
+    {
+      "kernel": "FLASH_ATTN_EXT",
+      "unsupported_cases": [
+        "FLASH_ATTN_EXT(hsk=72,hsv=72,nh=16,nr23=[1,1],kv=5776,nb=5776,mask=0,sinks=0,max_bias=0.000000,logit_softcap=0.000000,prec=f32,type_KV=f16,permute=[0,1,2,3])",
+        "FLASH_ATTN_EXT(hsk=64,hsv=64,nh=8,nr23=[8,1],kv=7680,nb=1,mask=1,sinks=0,max_bias=0.000000,logit_softcap=0.000000,prec=f32,type_KV=f16,permute=[0,1,2,3])",
+        "FLASH_ATTN_EXT(hsk=64,hsv=64,nh=8,nr23=[8,1],kv=7680,nb=4,mask=1,sinks=0,max_bias=0.000000,logit_softcap=0.000000,prec=f32,type_KV=f16,permute=[0,1,2,3])",
+        "FLASH_ATTN_EXT(hsk=64,hsv=64,nh=8,nr23=[1,1],kv=4096,nb=1,mask=1,sinks=0,max_bias=0.000000,logit_softcap=0.000000,prec=f32,type_KV=f16,permute=[0,1,2,3])",
+        "FLASH_ATTN_EXT(hsk=64,hsv=64,nh=8,nr23=[4,1],kv=4096,nb=1,mask=1,sinks=0,max_bias=0.000000,logit_softcap=0.000000,prec=f32,type_KV=f16,permute=[0,1,2,3])",
+        "FLASH_ATTN_EXT(hsk=128,hsv=128,nh=8,nr23=[1,1],kv=4096,nb=1,mask=1,sinks=0,max_bias=0.000000,logit_softcap=0.000000,prec=f32,type_KV=f16,permute=[0,1,2,3])",
+        "FLASH_ATTN_EXT(hsk=128,hsv=128,nh=8,nr23=[4,1],kv=4096,nb=1,mask=1,sinks=0,max_bias=0.000000,logit_softcap=0.000000,prec=f32,type_KV=f16,permute=[0,1,2,3])",
+        "FLASH_ATTN_EXT(hsk=64,hsv=64,nh=8,nr23=[1,1],kv=8192,nb=1,mask=1,sinks=0,max_bias=0.000000,logit_softcap=0.000000,prec=f32,type_KV=f16,permute=[0,1,2,3])",
+        "FLASH_ATTN_EXT(hsk=64,hsv=64,nh=8,nr23=[4,1],kv=8192,nb=1,mask=1,sinks=0,max_bias=0.000000,logit_softcap=0.000000,prec=f32,type_KV=f16,permute=[0,1,2,3])",
+        "FLASH_ATTN_EXT(hsk=128,hsv=128,nh=8,nr23=[1,1],kv=8192,nb=1,mask=1,sinks=0,max_bias=0.000000,logit_softcap=0.000000,prec=f32,type_KV=f16,permute=[0,1,2,3])",
+        "FLASH_ATTN_EXT(hsk=128,hsv=128,nh=8,nr23=[4,1],kv=8192,nb=1,mask=1,sinks=0,max_bias=0.000000,logit_softcap=0.000000,prec=f32,type_KV=f16,permute=[0,1,2,3])",
+        "FLASH_ATTN_EXT(hsk=64,hsv=64,nh=8,nr23=[1,1],kv=16384,nb=1,mask=1,sinks=0,max_bias=0.000000,logit_softcap=0.000000,prec=f32,type_KV=f16,permute=[0,1,2,3])",
+        "FLASH_ATTN_EXT(hsk=64,hsv=64,nh=8,nr23=[4,1],kv=16384,nb=1,mask=1,sinks=0,max_bias=0.000000,logit_softcap=0.000000,prec=f32,type_KV=f16,permute=[0,1,2,3])",
+        "FLASH_ATTN_EXT(hsk=128,hsv=128,nh=8,nr23=[1,1],kv=16384,nb=1,mask=1,sinks=0,max_bias=0.000000,logit_softcap=0.000000,prec=f32,type_KV=f16,permute=[0,1,2,3])",
+        "FLASH_ATTN_EXT(hsk=128,hsv=128,nh=8,nr23=[4,1],kv=16384,nb=1,mask=1,sinks=0,max_bias=0.000000,logit_softcap=0.000000,prec=f32,type_KV=f16,permute=[0,1,2,3])"
+      ]
+    },
+    {
+      "kernel": "MUL_MAT",
+      "unsupported_cases": [
+        "MUL_MAT(type_a=bf16,type_b=f32,m=4096,n=1,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+        "MUL_MAT(type_a=bf16,type_b=f32,m=4096,n=2,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+        "MUL_MAT(type_a=bf16,type_b=f32,m=4096,n=3,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+        "MUL_MAT(type_a=bf16,type_b=f32,m=4096,n=4,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+        "MUL_MAT(type_a=bf16,type_b=f32,m=4096,n=5,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+        "MUL_MAT(type_a=bf16,type_b=f32,m=4096,n=8,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)",
+        "MUL_MAT(type_a=bf16,type_b=f32,m=4096,n=512,k=14336,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1)"
+      ]
+    },
+    {
+      "kernel": "NORM",
+      "unsupported_cases": [
+        "NORM(type=f16,ne=[4096,512,1,1],v=0,eps=0.000001)"
+      ]
+    },
+    {
+      "kernel": "OUT_PROD",
+      "unsupported_cases": [
+        "OUT_PROD(type_a=f16,type_b=f32,m=4096,n=4096,k=1,bs=[1,1],nr=[1,1],trans_b=0)"
+      ]
+    },
+    {
+      "kernel": "RMS_NORM",
+      "unsupported_cases": [
+        "RMS_NORM(type=f16,ne=[4096,512,1,1],v=0,eps=0.000001,inplace=0)"
+      ]
+    },
+    {
+      "kernel": "SET_ROWS",
+      "unsupported_cases": [
+        "SET_ROWS(type=q4_0,type_idx=i32,ne=[4096,512,1,1],nr23=[1,1],r=512,v=0)"
+      ]
+    },
+    {
+      "kernel": "TOP_K",
+      "unsupported_cases": [
+        "TOP_K(type=f32,ne=[65000,1,1,1],k=1,ties=0)",
+        "TOP_K(type=f32,ne=[200000,1,1,1],k=1,ties=0)",
+        "TOP_K(type=f32,ne=[65000,16,1,1],k=1,ties=0)",
+        "TOP_K(type=f32,ne=[200000,16,1,1],k=1,ties=0)",
+        "TOP_K(type=f32,ne=[65000,1,1,1],k=10,ties=0)",
+        "TOP_K(type=f32,ne=[200000,1,1,1],k=10,ties=0)",
+        "TOP_K(type=f32,ne=[65000,16,1,1],k=10,ties=0)",
+        "TOP_K(type=f32,ne=[200000,16,1,1],k=10,ties=0)",
+        "TOP_K(type=f32,ne=[65000,1,1,1],k=40,ties=0)",
+        "TOP_K(type=f32,ne=[200000,1,1,1],k=40,ties=0)",
+        "TOP_K(type=f32,ne=[65000,16,1,1],k=40,ties=0)",
+        "TOP_K(type=f32,ne=[200000,16,1,1],k=40,ties=0)",
+        "TOP_K(type=f32,ne=[65000,1,1,1],k=400,ties=0)",
+        "TOP_K(type=f32,ne=[200000,1,1,1],k=400,ties=0)",
+        "TOP_K(type=f32,ne=[65000,16,1,1],k=400,ties=0)",
+        "TOP_K(type=f32,ne=[200000,16,1,1],k=400,ties=0)"
+      ]
+    }
+  ]
+}
