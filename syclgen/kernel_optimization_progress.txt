@@ -8,7 +8,9 @@
 - Kernels analyzed so far: 54
 - Analysis complete: Yes
 - Kernels with optimization potential: 48
-- Optimization tasks created: 0 (pending finalization)
+- Optimization tasks created: 58 (3 benchmark + 54 kernel + 1 final benchmark)
+- Total optimization steps: 208
+- Task spec: syclgen/kernel_optimization_task_spec.json
 
 ## Kernels Analyzed
 - [x] sk_001: mul_mat_q (MMQ) — high potential
@@ -67,6 +69,7 @@
 - [x] sk_054: upscale (inline) — low potential
 
 ## Recent Activity
+[2026-03-07] FINALIZATION COMPLETE — Generated kernel_optimization_task_spec.json with 58 tasks (3 benchmark + 54 kernel optimization + 1 final benchmark) containing 208 total optimization steps. Priority breakdown: 3 P1 (benchmark infrastructure), 12 P2 (top opportunity kernels), 42 P3 (remaining kernels), 1 P4 (final benchmark). Created .optimize_init_done marker.
 [2026-03-06] ANALYSIS COMPLETE — All 54/54 SYCL kernels analyzed. Final counts: 4 high, 19 medium, 31 low, 0 no-optimization. 48 kernels with optimization potential.
 [2026-03-06] Analyzed sk_042 through sk_054 (13 inline kernels in ggml-sycl.cpp). Batch findings: Most are trivial element-wise kernels (scale, arange, clamp, fill, diag, tri, acc) with low optimization potential. Notable exceptions: sk_050 (argmax) is one of the best-implemented SYCL kernels with proper reqd_sub_group_size and two-level warp reduction. sk_051 (argsort) and sk_052 (top_k) have CRITICAL functional gaps — both ASSERT ncols_pad <= 1024 but typical LLM vocabularies are 32K-128K, meaning these kernels fail for real models. CUDA handles this via CUB DeviceRadixSort/DeviceTopK fallbacks. sk_052 (top_k) needs highest priority fix as it's called every generation step during sampling.
 [2026-03-06] Analyzed add-id (sk_041). Found 3 optimization opportunities (low potential). Key findings: Clean native SYCL port of scatter-add by index for MoE expert output aggregation. nd_range<2> with WG=min(ne00,768), dim1 local=1 (CUDA grid artifact). Perfectly coalesced element-wise addition. WG=768 exceeds Intel preferred 256-512 max. No vectorized loads. Missing reqd_sub_group_size. Used in MoE models, not on dominant latency path. ~65-80% estimated efficiency.
