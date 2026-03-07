@@ -32,7 +32,7 @@
       "title": "Run workload-level baseline benchmark (end-to-end inference)",
       "description": "Run end-to-end inference benchmark on Intel Arc Pro B60 with models to establish workload-level performance baseline. Record tokens/sec for both prompt processing (pp) and text generation (tg).",
       "priority": 1,
-      "status": "pending",
+      "status": "completed",
       "depends_on": ["opt_task_002"],
       "benchmark_command": "./syclgen/remote_run.sh -s b60 -t workload -e ZES_ENABLE_SYSMAN=1",
       "kernels": ["all"]
