@@ -22,6 +22,8 @@ $3 is the other arguments to pass to the script
 
 Examples:
 
+Nvidia GPU:
+
 * Upload code to Nvidia GPU server `h20` and build:
 ```bash
 bash syclgen/remote_run.sh -s h20 -t upload,build --local "/localdisk/kurt/workspace/code/xpu/llama.cpp" --remote "/ssh/kurt/"
@@ -46,6 +48,8 @@ bash syclgen/remote_run.sh -s h20 -t workload -e CUDA_VISIBLE_DEVICES="0"
 ```bash
 bash syclgen/remote_run.sh -s h20 -t run -e CUDA_VISIBLE_DEVICES="0"
 ```
+
+Intel GPU:
 
 * Upload code to Intel GPU server `b60` and build:
 ```bash

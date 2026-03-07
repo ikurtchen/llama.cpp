@@ -29,7 +29,9 @@ declare -A SERVER_MODEL_PATHS
 # Each entry is a newline-separated list of model GGUF paths on the server.
 SERVER_MODEL_PATHS=(
     ["h20"]="/ssd/hf_models/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf"
-    ["b60"]="/intel/hf_models/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf"
+    ["b60"]="/intel/hf_models/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf
+/intel/hf_models/Qwen3-8B-GGUF/Qwen3-8B-Q8_0.gguf
+/intel/hf_models/Qwen3-14B-GGUF/Qwen3-14B-Q8_0.gguf"
 )
 
 ################################################################################
@@ -62,9 +64,9 @@ SERVER_ENV_PREFIX=(
 # Test-Case Parameter Lists
 # Adjust these lists to cover the workload scenarios you care about.
 ################################################################################
-INPUT_LENS=(128 256 512 1024)
-OUTPUT_LENS=(128 256 512)
-BATCH_SIZES=(1 2 4 8)
+INPUT_LENS=(128 256 512 1024 2048)
+OUTPUT_LENS=(32)
+BATCH_SIZES=(1 8 16 32 64 128 256 512)
 
 ################################################################################
 # Parse Arguments
@@ -154,7 +156,7 @@ for MODEL_PATH in "${MODEL_LIST[@]}"; do
             for B in "${BATCH_SIZES[@]}"; do
                 TOTAL=$((TOTAL + 1))
 
-                CMD="./build/bin/llama-bench -m ${MODEL_PATH} -p ${P} -n ${N} -b ${B} -mg ${DEVICE_ID} -fa ${FLASH_ATTENTION}"
+                CMD="./build/bin/llama-bench -m ${MODEL_PATH} -p ${P} -n ${N} -ub ${B} -mg ${DEVICE_ID} -fa ${FLASH_ATTENTION}"
 
                 # Prepend environment exports from -e flags
                 env_prefix_extra=""
@@ -168,15 +170,15 @@ for MODEL_PATH in "${MODEL_LIST[@]}"; do
                     CMD="${env_prefix_extra}${CMD}"
                 fi
 
-                print_info "[${TOTAL}] p=${P} n=${N} b=${B}"
+                print_info "[${TOTAL}] p=${P} n=${N} ub=${B}"
                 print_info "CMD: $CMD"
 
                 if eval "$CMD"; then
                     PASSED=$((PASSED + 1))
-                    print_success "[${TOTAL}] PASSED  (p=${P} n=${N} b=${B})"
+                    print_success "[${TOTAL}] PASSED  (p=${P} n=${N} ub=${B})"
                 else
                     FAILED=$((FAILED + 1))
-                    print_error "[${TOTAL}] FAILED  (p=${P} n=${N} b=${B})"
+                    print_error "[${TOTAL}] FAILED  (p=${P} n=${N} ub=${B})"
                 fi
 
                 echo ""

@@ -30,11 +30,11 @@
       "task_id": "opt_task_003",
       "type": "benchmark_workload_baseline",
       "title": "Run workload-level baseline benchmark (end-to-end inference)",
-      "description": "Run end-to-end inference benchmark on Intel Arc Pro B60 with representative models (e.g., Llama-2-7B Q4_0, Phi-2 Q4_K_M) to establish workload-level performance baseline. Record tokens/sec for both prompt processing (pp) and text generation (tg).",
+      "description": "Run end-to-end inference benchmark on Intel Arc Pro B60 with models to establish workload-level performance baseline. Record tokens/sec for both prompt processing (pp) and text generation (tg).",
       "priority": 1,
       "status": "pending",
       "depends_on": ["opt_task_002"],
-      "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -e ZES_ENABLE_SYSMAN=1",
+      "benchmark_command": "./syclgen/remote_run.sh -s b60 -t workload -e ZES_ENABLE_SYSMAN=1",
       "kernels": ["all"]
     },
     {
@@ -43,7 +43,7 @@
       "kernel_id": "sk_001",
       "kernel_name": "mul_mat_q (MMQ)",
       "source_file": "ggml/src/ggml-sycl/mmq.cpp",
-      "title": "Optimize mul_mat_q (MMQ) kernel (high potential)",
+      "title": "Optimize mul_mat_q (MMQ) kernel (high potential). NOTE: mmq for SYCL is not enabled by default, need to change ggml_sycl_supports_mmq to enable it.",
       "overall_optimization_potential": "high",
       "priority": 2,
       "status": "pending",
@@ -318,15 +318,6 @@
         },
         {
           "step_id": "opt_006_005",
-          "category": "sub_group_size",
-          "priority": "low",
-          "description": "Add reqd_sub_group_size to copy kernels",
-          "expected_improvement": "0-5%",
-          "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k MUL_MAT_ID -e ZES_ENABLE_SYSMAN=1"
-        },
-        {
-          "step_id": "opt_006_006",
           "category": "memory_management",
           "priority": "medium",
           "description": "Pre-allocate contiguous expert buffers to avoid per-call allocation",
@@ -353,7 +344,7 @@
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k MUL_MAT_ID -e ZES_ENABLE_SYSMAN=1"
         },
         {
-          "step_id": "opt_006_007",
+          "step_id": "opt_006_006",
           "category": "multi_expert",
           "priority": "low",
           "description": "Support concurrent multi-expert execution with streams",
@@ -404,15 +395,6 @@
         },
         {
           "step_id": "opt_004_004",
-          "category": "sub_group_size",
-          "priority": "medium",
-          "description": "Add reqd_sub_group_size(16) to all kernel launch sites",
-          "expected_improvement": "0-5% throughput",
-          "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k CONVERT -e ZES_ENABLE_SYSMAN=1"
-        },
-        {
-          "step_id": "opt_004_005",
           "category": "loop_unroll",
           "priority": "low",
           "description": "Add consistent #pragma unroll across all format inner loops",
@@ -421,7 +403,7 @@
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k CONVERT -e ZES_ENABLE_SYSMAN=1"
         },
         {
-          "step_id": "opt_004_008",
+          "step_id": "opt_004_007",
           "category": "slm_caching",
           "priority": "low",
           "description": "Cache IQ format lookup tables in SLM instead of global memory",
@@ -430,7 +412,7 @@
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k CONVERT -e ZES_ENABLE_SYSMAN=1"
         },
         {
-          "step_id": "opt_004_006",
+          "step_id": "opt_004_005",
           "category": "memory_layout",
           "priority": "medium",
           "description": "Extend SoA reorder variants to remaining 14+ formats (only Q4_K/Q5_K/Q6_K have them)",
@@ -439,7 +421,7 @@
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k CONVERT -e ZES_ENABLE_SYSMAN=1"
         },
         {
-          "step_id": "opt_004_007",
+          "step_id": "opt_004_006",
           "category": "output_coalescing",
           "priority": "low",
           "description": "Fix strided output writes (stride 32) in K-quant formats to coalesced pattern",
@@ -485,15 +467,6 @@
           "priority": "medium",
           "description": "Replace 6 expensive integer modulo with fast-division multiply-shift trick",
           "expected_improvement": "5-10% throughput",
-          "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k ADD -e ZES_ENABLE_SYSMAN=1"
-        },
-        {
-          "step_id": "opt_013_005",
-          "category": "sub_group_size",
-          "priority": "low",
-          "description": "Add reqd_sub_group_size(16) to all kernel variants",
-          "expected_improvement": "0-5%",
           "risk": "low",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k ADD -e ZES_ENABLE_SYSMAN=1"
         },
@@ -634,15 +607,6 @@
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k ROPE -e ZES_ENABLE_SYSMAN=1"
         },
         {
-          "step_id": "opt_016_005",
-          "category": "sub_group_size",
-          "priority": "low",
-          "description": "Verify reqd_sub_group_size(16) is effective across all 4 variants",
-          "expected_improvement": "0-3%",
-          "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k ROPE -e ZES_ENABLE_SYSMAN=1"
-        },
-        {
           "step_id": "opt_016_001",
           "category": "kernel_fusion",
           "priority": "high",
@@ -734,15 +698,6 @@
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k ARGSORT -e ZES_ENABLE_SYSMAN=1"
         },
         {
-          "step_id": "opt_051_003",
-          "category": "sub_group_ops",
-          "priority": "low",
-          "description": "Add reqd_sub_group_size(WARP_SIZE)",
-          "expected_improvement": "0-2%",
-          "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k ARGSORT -e ZES_ENABLE_SYSMAN=1"
-        },
-        {
           "step_id": "opt_051_001",
           "category": "feature_parity",
           "priority": "medium",
@@ -771,15 +726,6 @@
           "priority": "low",
           "description": "Fuse sort + copy into single kernel; eliminate temp buffer",
           "expected_improvement": "10-20% for ncols<=1024 path",
-          "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k TOP_K -e ZES_ENABLE_SYSMAN=1"
-        },
-        {
-          "step_id": "opt_052_003",
-          "category": "sub_group_ops",
-          "priority": "low",
-          "description": "Add reqd_sub_group_size(WARP_SIZE) to both kernels",
-          "expected_improvement": "0-2%",
           "risk": "low",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k TOP_K -e ZES_ENABLE_SYSMAN=1"
         },
@@ -976,15 +922,6 @@
         },
         {
           "step_id": "opt_010_002",
-          "category": "sub_group_size",
-          "priority": "medium",
-          "description": "Add reqd_sub_group_size(16) to all 6 kernel launch sites",
-          "expected_improvement": "0-5% throughput",
-          "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k UNARY -e ZES_ENABLE_SYSMAN=1"
-        },
-        {
-          "step_id": "opt_010_003",
           "category": "native_math",
           "priority": "medium",
           "description": "Replace standard math functions with sycl::native:: variants for inference",
@@ -993,7 +930,7 @@
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k UNARY -e ZES_ENABLE_SYSMAN=1"
         },
         {
-          "step_id": "opt_010_004",
+          "step_id": "opt_010_003",
           "category": "kernel_fusion",
           "priority": "low",
           "description": "Fuse consecutive element-wise ops (e.g., SILU+MUL for SwiGLU)",
@@ -1002,7 +939,7 @@
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k UNARY -e ZES_ENABLE_SYSMAN=1"
         },
         {
-          "step_id": "opt_010_005",
+          "step_id": "opt_010_004",
           "category": "data_type",
           "priority": "low",
           "description": "Add BF16 support for Xe2 native BF16 path",
@@ -1039,15 +976,6 @@
           "priority": "low",
           "description": "Reduce 64-bit integer arithmetic in k_cpy_scalar",
           "expected_improvement": "5-15% for non-contiguous copy of small tensors",
-          "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k CPY -e ZES_ENABLE_SYSMAN=1"
-        },
-        {
-          "step_id": "opt_019_004",
-          "category": "sub_group_size",
-          "priority": "low",
-          "description": "Add reqd_sub_group_size(WARP_SIZE) to both kernel lambdas",
-          "expected_improvement": "0-3%",
           "risk": "low",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k CPY -e ZES_ENABLE_SYSMAN=1"
         },
@@ -1152,15 +1080,6 @@
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k SET_ROWS -e ZES_ENABLE_SYSMAN=1"
         },
         {
-          "step_id": "opt_026_005",
-          "category": "launch_config",
-          "priority": "low",
-          "description": "Add reqd_sub_group_size(16)",
-          "expected_improvement": "0-5%",
-          "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k SET_ROWS -e ZES_ENABLE_SYSMAN=1"
-        },
-        {
           "step_id": "opt_026_002",
           "category": "functional_parity",
           "priority": "medium",
@@ -1212,15 +1131,6 @@
         },
         {
           "step_id": "opt_028_003",
-          "category": "launch_config",
-          "priority": "low",
-          "description": "Add reqd_sub_group_size(16)",
-          "expected_improvement": "0-5%",
-          "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k RWKV_WKV6 -e ZES_ENABLE_SYSMAN=1"
-        },
-        {
-          "step_id": "opt_028_004",
           "category": "data_type",
           "priority": "low",
           "description": "Add FP16 kernel variant for inference",
@@ -1259,15 +1169,6 @@
           "expected_improvement": "5-20% throughput",
           "risk": "low",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k GLA -e ZES_ENABLE_SYSMAN=1"
-        },
-        {
-          "step_id": "opt_029_003",
-          "category": "launch_config",
-          "priority": "low",
-          "description": "Add reqd_sub_group_size(16)",
-          "expected_improvement": "0-5%",
-          "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k GLA -e ZES_ENABLE_SYSMAN=1"
         }
       ]
     },
@@ -1303,15 +1204,6 @@
         },
         {
           "step_id": "opt_032_003",
-          "category": "sub_group_ops",
-          "priority": "low",
-          "description": "Add reqd_sub_group_size(16)",
-          "expected_improvement": "0-5%",
-          "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k SSM_CONV -e ZES_ENABLE_SYSMAN=1"
-        },
-        {
-          "step_id": "opt_032_004",
           "category": "memory_coalescing",
           "priority": "low",
           "description": "Cache convolution weights in SLM",
@@ -1355,7 +1247,7 @@
           "step_id": "opt_033_003",
           "category": "sub_group_ops",
           "priority": "medium",
-          "description": "Replace DPCT warp_reduce_sum with sycl::reduce_over_group; add reqd_sub_group_size to Mamba-1",
+          "description": "Replace DPCT warp_reduce_sum with sycl::reduce_over_group",
           "expected_improvement": "3-8% for Mamba-2; 0-3% for Mamba-1",
           "risk": "low",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k SSM_SCAN -e ZES_ENABLE_SYSMAN=1"
@@ -1466,15 +1358,6 @@
           "priority": "medium",
           "description": "Fix MAX_N_SHARED from 128 to 64 (exceeds 64KB SLM limit)",
           "expected_improvement": "Correctness fix for n=128",
-          "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k SOLVE_TRI -e ZES_ENABLE_SYSMAN=1"
-        },
-        {
-          "step_id": "opt_038_004",
-          "category": "sub_group_ops",
-          "priority": "low",
-          "description": "Add reqd_sub_group_size(WARP_SIZE)",
-          "expected_improvement": "0-5%",
           "risk": "low",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k SOLVE_TRI -e ZES_ENABLE_SYSMAN=1"
         },
@@ -1627,15 +1510,6 @@
           "expected_improvement": "Minor code quality",
           "risk": "low",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k UNARY -e ZES_ENABLE_SYSMAN=1"
-        },
-        {
-          "step_id": "opt_012_004",
-          "category": "sub_group_size",
-          "priority": "low",
-          "description": "Add reqd_sub_group_size(16) to all kernels",
-          "expected_improvement": "0-5%",
-          "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k UNARY -e ZES_ENABLE_SYSMAN=1"
         }
       ]
     },
@@ -1668,15 +1542,6 @@
           "expected_improvement": "5-10% throughput",
           "risk": "low",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k REPEAT_BACK -e ZES_ENABLE_SYSMAN=1"
-        },
-        {
-          "step_id": "opt_014_003",
-          "category": "sub_group_size",
-          "priority": "low",
-          "description": "Add reqd_sub_group_size(16)",
-          "expected_improvement": "0-5%",
-          "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k REPEAT_BACK -e ZES_ENABLE_SYSMAN=1"
         }
       ]
     },
@@ -1703,15 +1568,6 @@
         },
         {
           "step_id": "opt_018_002",
-          "category": "sub_group_size",
-          "priority": "low",
-          "description": "Add reqd_sub_group_size(16) to all 3 kernel functions",
-          "expected_improvement": "0-5%",
-          "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k GET_ROWS -e ZES_ENABLE_SYSMAN=1"
-        },
-        {
-          "step_id": "opt_018_003",
           "category": "vectorization",
           "priority": "low",
           "description": "Use vec4 loads/stores for float-type get_rows (memory-copy path)",
@@ -1720,7 +1576,7 @@
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k GET_ROWS -e ZES_ENABLE_SYSMAN=1"
         },
         {
-          "step_id": "opt_018_004",
+          "step_id": "opt_018_003",
           "category": "backward_opt",
           "priority": "low",
           "description": "Optimize backward scatter-add kernel for training workloads",
@@ -1803,15 +1659,6 @@
         },
         {
           "step_id": "opt_021_003",
-          "category": "sub_group_ops",
-          "priority": "low",
-          "description": "Add reqd_sub_group_size(16) to both kernels",
-          "expected_improvement": "0-5%",
-          "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k IM2COL -e ZES_ENABLE_SYSMAN=1"
-        },
-        {
-          "step_id": "opt_021_004",
           "category": "work_group_size",
           "priority": "low",
           "description": "Convert nd_range<3> to nd_range<1> — cosmetic",
@@ -2032,15 +1879,6 @@
           "expected_improvement": "2-3x kernel speed (negligible absolute)",
           "risk": "low",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k TIMESTEP_EMBEDDING -e ZES_ENABLE_SYSMAN=1"
-        },
-        {
-          "step_id": "opt_030_002",
-          "category": "launch_config",
-          "priority": "low",
-          "description": "Add reqd_sub_group_size(16)",
-          "expected_improvement": "0-5%",
-          "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k TIMESTEP_EMBEDDING -e ZES_ENABLE_SYSMAN=1"
         }
       ]
     },
@@ -2155,15 +1993,6 @@
           "expected_improvement": "5-15% throughput",
           "risk": "low",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k OPT_STEP_ADAMW -e ZES_ENABLE_SYSMAN=1"
-        },
-        {
-          "step_id": "opt_036_002",
-          "category": "sub_group_ops",
-          "priority": "low",
-          "description": "Add reqd_sub_group_size(WARP_SIZE) and kernel_args_restrict attributes",
-          "expected_improvement": "2-5%",
-          "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k OPT_STEP_ADAMW -e ZES_ENABLE_SYSMAN=1"
         }
       ]
     },
@@ -2181,15 +2010,6 @@
       "steps": [
         {
           "step_id": "opt_037_001",
-          "category": "sub_group_ops",
-          "priority": "low",
-          "description": "Add reqd_sub_group_size(WARP_SIZE) and kernel_args_restrict attributes",
-          "expected_improvement": "2-5%",
-          "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k OPT_STEP_SGD -e ZES_ENABLE_SYSMAN=1"
-        },
-        {
-          "step_id": "opt_037_002",
           "category": "vectorized_memory",
           "priority": "low",
           "description": "Use vec4 loads/stores for 4 elements per work-item",
@@ -2283,15 +2103,6 @@
           "expected_improvement": "5-15% throughput",
           "risk": "low",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k ADD_ID -e ZES_ENABLE_SYSMAN=1"
-        },
-        {
-          "step_id": "opt_041_003",
-          "category": "sub_group_ops",
-          "priority": "low",
-          "description": "Add reqd_sub_group_size(WARP_SIZE)",
-          "expected_improvement": "0-2%",
-          "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k ADD_ID -e ZES_ENABLE_SYSMAN=1"
         }
       ]
     },
@@ -2313,15 +2124,6 @@
           "priority": "low",
           "description": "Use vec4 loads/stores for 4 elements per work-item",
           "expected_improvement": "5-15%",
-          "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k SCALE -e ZES_ENABLE_SYSMAN=1"
-        },
-        {
-          "step_id": "opt_042_002",
-          "category": "sub_group_ops",
-          "priority": "low",
-          "description": "Add reqd_sub_group_size(WARP_SIZE)",
-          "expected_improvement": "0-2%",
           "risk": "low",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k SCALE -e ZES_ENABLE_SYSMAN=1"
         }
@@ -2354,15 +2156,6 @@
           "priority": "low",
           "description": "Use vec4 loads/stores for bulk copy below diagonal",
           "expected_improvement": "5-10%",
-          "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k DIAG_MASK_INF -e ZES_ENABLE_SYSMAN=1"
-        },
-        {
-          "step_id": "opt_043_003",
-          "category": "sub_group_ops",
-          "priority": "low",
-          "description": "Add reqd_sub_group_size(WARP_SIZE)",
-          "expected_improvement": "0-2%",
           "risk": "low",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k DIAG_MASK_INF -e ZES_ENABLE_SYSMAN=1"
         }
@@ -2411,15 +2204,6 @@
           "expected_improvement": "5-15%",
           "risk": "low",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k CLAMP -e ZES_ENABLE_SYSMAN=1"
-        },
-        {
-          "step_id": "opt_045_002",
-          "category": "sub_group_ops",
-          "priority": "low",
-          "description": "Add reqd_sub_group_size(WARP_SIZE)",
-          "expected_improvement": "0-2%",
-          "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k CLAMP -e ZES_ENABLE_SYSMAN=1"
         }
       ]
     },
@@ -2450,15 +2234,6 @@
           "priority": "low",
           "description": "Use vec4 loads/stores for copy-only region",
           "expected_improvement": "3-8%",
-          "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k ACC -e ZES_ENABLE_SYSMAN=1"
-        },
-        {
-          "step_id": "opt_046_003",
-          "category": "sub_group_ops",
-          "priority": "low",
-          "description": "Add reqd_sub_group_size(WARP_SIZE)",
-          "expected_improvement": "0-2%",
           "risk": "low",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k ACC -e ZES_ENABLE_SYSMAN=1"
         }
@@ -2493,15 +2268,6 @@
           "expected_improvement": "0% runtime (maintainability)",
           "risk": "low",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k DIAG -e ZES_ENABLE_SYSMAN=1"
-        },
-        {
-          "step_id": "opt_047_003",
-          "category": "sub_group_ops",
-          "priority": "low",
-          "description": "Add reqd_sub_group_size(WARP_SIZE) and restrict annotations",
-          "expected_improvement": "0-3%",
-          "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k DIAG -e ZES_ENABLE_SYSMAN=1"
         }
       ]
     },
@@ -2532,15 +2298,6 @@
           "priority": "low",
           "description": "Convert prefix_keep from runtime bool to compile-time template param",
           "expected_improvement": "1-3%",
-          "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k TRI -e ZES_ENABLE_SYSMAN=1"
-        },
-        {
-          "step_id": "opt_048_003",
-          "category": "sub_group_ops",
-          "priority": "low",
-          "description": "Add reqd_sub_group_size(WARP_SIZE)",
-          "expected_improvement": "0-2%",
           "risk": "low",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k TRI -e ZES_ENABLE_SYSMAN=1"
         }
@@ -2605,15 +2362,6 @@
       "depends_on": ["opt_task_002"],
       "steps": [
         {
-          "step_id": "opt_053_002",
-          "category": "sub_group_ops",
-          "priority": "low",
-          "description": "Add reqd_sub_group_size(WARP_SIZE)",
-          "expected_improvement": "0-2%",
-          "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k POOL_2D -e ZES_ENABLE_SYSMAN=1"
-        },
-        {
           "step_id": "opt_053_001",
           "category": "slm_caching",
           "priority": "low",
@@ -2651,15 +2399,6 @@
           "priority": "low",
           "description": "Use vec4 output writes for nearest-neighbor with integer scale factors",
           "expected_improvement": "5-15% for nearest mode",
-          "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k UPSCALE -e ZES_ENABLE_SYSMAN=1"
-        },
-        {
-          "step_id": "opt_054_003",
-          "category": "sub_group_ops",
-          "priority": "low",
-          "description": "Add reqd_sub_group_size(WARP_SIZE) to all 4 mode kernels",
-          "expected_improvement": "0-2%",
           "risk": "low",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k UPSCALE -e ZES_ENABLE_SYSMAN=1"
         }
