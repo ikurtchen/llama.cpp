@@ -154,7 +154,7 @@
       "title": "Optimize mul_mat_vec_q (MMVQ) kernel (high potential)",
       "overall_optimization_potential": "high",
       "priority": 2,
-      "status": "in_progress",
+      "status": "abandoned",
       "started_at": "2026-03-08T14:00:00Z",
       "depends_on": [
         "opt_task_002"
@@ -253,7 +253,7 @@
       "title": "Optimize dequantize_mul_mat_vec (DMMV) kernel (high potential)",
       "overall_optimization_potential": "high",
       "priority": 2,
-      "status": "pending",
+      "status": "abandoned",
       "depends_on": [
         "opt_task_002"
       ],
@@ -341,7 +341,7 @@
       "title": "Optimize MUL_MAT_ID kernels kernel (high potential)",
       "overall_optimization_potential": "high",
       "priority": 2,
-      "status": "pending",
+      "status": "abandoned",
       "depends_on": [
         "opt_task_002"
       ],
