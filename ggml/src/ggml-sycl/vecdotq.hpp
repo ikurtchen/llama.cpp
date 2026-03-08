@@ -486,6 +486,70 @@ template <> struct reorder_vec_dot_q_sycl<GGML_TYPE_Q6_K> {
         return vec_dot_q6_K_q8_1_impl_mmvq(vl, vh, u, scs, *d, d8);
     }
 };
+
+template <> struct reorder_vec_dot_q_sycl<GGML_TYPE_Q5_K> {
+    static constexpr ggml_type gtype = GGML_TYPE_Q5_K;
+
+    using q5_k_block  = ggml_sycl_reordered::block_q_t<GGML_TYPE_Q5_K>;
+    using q5_k_traits = typename q5_k_block::traits;
+
+    __dpct_inline__ float operator()(const void * __restrict__ vbq, const std::pair<int, int> ibx_offset,
+                                     const std::pair<int, int> d_offset, const int8_t * q8_1_quant_ptr,
+                                     const sycl::half2 * q8_1_ds, const int & iqs) {
+        const uint8_t *    base       = static_cast<const uint8_t *>(vbq);
+        // ibx_offset.first = qs offset, ibx_offset.second = qh offset
+        const uint8_t *    qs         = base + ibx_offset.first;
+        const uint8_t *    qh_base    = base + ibx_offset.second;
+        // d_offset.first = scales offset, d_offset.second = dm offset
+        const uint8_t *    scs        = base + d_offset.first;
+        const ggml_half2 * dms        = reinterpret_cast<const ggml_half2 *>(base + d_offset.second);
+
+        const int bq8_offset = QR5_K * ((iqs / 2) / (QI8_1 / 2));
+
+        // Read low 4-bit quants (qs), same layout as Q4_K
+        const int * ql = (const int *) (qs + 16 * bq8_offset + 4 * ((iqs / 2) % 4));
+        // Read high bits (qh)
+        const int * qh = (const int *) (qh_base + 4 * ((iqs / 2) % 4));
+
+        int vl[2];
+        int vh[2];
+        vl[0] = ql[0];
+        vl[1] = ql[4];
+        vh[0] = qh[0] >> bq8_offset;
+        vh[1] = qh[4] >> bq8_offset;
+
+        // Unpack scales and mins using the same logic as vec_dot_q5_K_q8_1
+        const uint16_t * scales = (const uint16_t *) scs;
+        uint16_t aux[2];
+        const int j = bq8_offset / 2;
+        if (j < 2) {
+            aux[0] = scales[j + 0] & 0x3f3f;
+            aux[1] = scales[j + 2] & 0x3f3f;
+        } else {
+            aux[0] = ((scales[j + 2] >> 0) & 0x0f0f) | ((scales[j - 2] & 0xc0c0) >> 2);
+            aux[1] = ((scales[j + 2] >> 4) & 0x0f0f) | ((scales[j - 0] & 0xc0c0) >> 2);
+        }
+
+        const uint8_t * sc = (const uint8_t *) aux;
+        const uint8_t * m  = sc + 2;
+
+        int   u[2 * QR5_K];
+        float d8[QR5_K];
+
+        for (int i = 0; i < QR5_K; ++i) {
+            const int8_t * quant_base_ptr = q8_1_quant_ptr + (bq8_offset + i) * QK8_1;
+            sycl::half2 ds_values = *(q8_1_ds + bq8_offset + i);
+
+            d8[i] = ds_values[0];
+
+            const int * q8 = (const int *) quant_base_ptr + ((iqs / 2) % 4);
+            u[2 * i + 0] = q8[0];
+            u[2 * i + 1] = q8[4];
+        }
+
+        return vec_dot_q5_K_q8_1_impl_vmmq(vl, vh, u, sc, m, *dms, d8);
+    }
+};
 #define VDR_Q4_0_Q8_1_MMVQ 2
 #define VDR_Q4_0_Q8_1_MMQ  4
 
