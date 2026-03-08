@@ -411,7 +411,11 @@
       "title": "Optimize dequantize_block_sycl (convert) kernel (medium potential)",
       "overall_optimization_potential": "medium",
       "priority": 2,
-      "status": "pending",
+      "status": "abandoned",
+      "started_at": "2026-03-08T18:00:00Z",
+      "completed_at": "2026-03-08T20:00:00Z",
+      "outcome": "no_speedup",
+      "outcome_notes": "opt_004_001 (WG=256 multi-block-per-WG) showed no measurable speedup. Dequantize kernels are a tiny fraction of MUL_MAT time (dominated by oneMKL GEMM). Cannot be benchmarked in isolation. Remaining steps face same fundamental bottleneck issue. All code reverted.",
       "depends_on": [
         "opt_task_002"
       ],
@@ -423,7 +427,10 @@
           "description": "Standardize WG sizes to 256 for better occupancy across all dequant formats",
           "expected_improvement": "10-30% throughput for formats currently at WG=16/32",
           "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k CONVERT -e ZES_ENABLE_SYSMAN=1"
+          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k CONVERT -e ZES_ENABLE_SYSMAN=1",
+          "completed": true,
+          "speedup": 0.98,
+          "notes": "Multi-block-per-WG transformation for 15 kernels. No measurable speedup via MUL_MAT proxy benchmark. Dequantize not the bottleneck. Reverted."
         },
         {
           "step_id": "opt_004_002",
