@@ -1,0 +1,81 @@
+{
+  "version": "1.0",
+  "target_hardware": "Intel Arc Pro B60 (Xe2, Battlemage)",
+  "results": [
+    {
+      "task_id": "opt_task_004",
+      "kernel": "mul_mat_q (MMQ)",
+      "step_id": "opt_001_002",
+      "description": "Increase work-group size from 64 to 256 (nwarps=16 _INTEL macros)",
+      "outcome": "no_speedup",
+      "build_config": "GGML_SYCL_FORCE_MMQ (compile-time define to force MMQ dispatch)",
+      "notes": "MMQ disabled by default (accuracy issues noted by original devs). Enabled for 7 types (QI<=16). Results show MMQ is slower than all alternative dispatch paths. Reverted ggml_sycl_supports_mmq to return false. mmq.cpp improvements kept dormant.",
+      "accuracy_issue": "q4_0 m=576,n=512,k=576: ERR=0.999572 > 0.000500 (nearly 100% relative error)",
+      "benchmark_comparison": {
+        "test_case": "MUL_MAT(type_a=q4_0,type_b=f32,m=4096,n=*,k=14336)",
+        "baseline_log": "logs/b60_benchmark_20260307_194801.log",
+        "force_mmq_log": "logs/b60_mmq_benchmark_results.log",
+        "standard_with_changes_log": "logs/b60_benchmark_20260308_030017.log",
+        "data": [
+          {
+            "n": 1,
+            "baseline_us": 84.82, "baseline_kernel": "DMMV",
+            "force_mmq_us": 188.69, "force_mmq_kernel": "MMQ",
+            "standard_changes_us": 84.91, "standard_changes_kernel": "DMMV",
+            "mmq_vs_baseline_ratio": 2.22,
+            "standard_changes_vs_baseline_ratio": 1.00
+          },
+          {
+            "n": 2,
+            "baseline_us": 1078.83, "baseline_kernel": "MMVQ",
+            "force_mmq_us": 2402.01, "force_mmq_kernel": "MMQ",
+            "standard_changes_us": 1082.26, "standard_changes_kernel": "MMVQ",
+            "mmq_vs_baseline_ratio": 2.23,
+            "standard_changes_vs_baseline_ratio": 1.00
+          },
+          {
+            "n": 3,
+            "baseline_us": 1614.23, "baseline_kernel": "MMVQ",
+            "force_mmq_us": 3610.78, "force_mmq_kernel": "MMQ",
+            "standard_changes_us": 1617.76, "standard_changes_kernel": "MMVQ",
+            "mmq_vs_baseline_ratio": 2.24,
+            "standard_changes_vs_baseline_ratio": 1.00
+          },
+          {
+            "n": 4,
+            "baseline_us": 2154.64, "baseline_kernel": "MMVQ",
+            "force_mmq_us": 4798.69, "force_mmq_kernel": "MMQ",
+            "standard_changes_us": 2160.01, "standard_changes_kernel": "MMVQ",
+            "mmq_vs_baseline_ratio": 2.23,
+            "standard_changes_vs_baseline_ratio": 1.00
+          },
+          {
+            "n": 5,
+            "baseline_us": 2690.16, "baseline_kernel": "MMVQ",
+            "force_mmq_us": 6007.25, "force_mmq_kernel": "MMQ",
+            "standard_changes_us": 2696.67, "standard_changes_kernel": "MMVQ",
+            "mmq_vs_baseline_ratio": 2.23,
+            "standard_changes_vs_baseline_ratio": 1.00
+          },
+          {
+            "n": 8,
+            "baseline_us": 4316.87, "baseline_kernel": "MMVQ",
+            "force_mmq_us": 9552.27, "force_mmq_kernel": "MMQ",
+            "standard_changes_us": 4317.11, "standard_changes_kernel": "MMVQ",
+            "mmq_vs_baseline_ratio": 2.21,
+            "standard_changes_vs_baseline_ratio": 1.00
+          },
+          {
+            "n": 512,
+            "baseline_us": 1872.77, "baseline_kernel": "oneMKL",
+            "force_mmq_us": 2977.55, "force_mmq_kernel": "MMQ",
+            "standard_changes_us": 1866.75, "standard_changes_kernel": "oneMKL",
+            "mmq_vs_baseline_ratio": 1.59,
+            "standard_changes_vs_baseline_ratio": 1.00
+          }
+        ],
+        "summary": "MMQ is 2.2x slower than MMVQ/DMMV for n<=8 and 1.6x slower than oneMKL for n=512. Standard build with dormant mmq.cpp changes shows no regression (ratio 1.00)."
+      }
+    }
+  ]
+}

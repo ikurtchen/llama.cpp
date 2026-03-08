@@ -46,7 +46,11 @@
       "title": "Optimize mul_mat_q (MMQ) kernel (high potential). NOTE: mmq for SYCL is not enabled by default, need to change ggml_sycl_supports_mmq to enable it.",
       "overall_optimization_potential": "high",
       "priority": 2,
-      "status": "pending",
+      "status": "completed",
+      "started_at": "2026-03-08T00:00:00Z",
+      "completed_at": "2026-03-08T12:00:00Z",
+      "outcome": "no_speedup",
+      "outcome_notes": "MMQ is disabled by default (accuracy issues). Enabled it for 7 types with QI<=WARP_SIZE=16, implemented _INTEL macros (WG=256), added reqd_sub_group_size. Benchmarks show MMQ is 2.2x slower than MMVQ/DMMV (n<=8) and 1.6x slower than oneMKL (n=512). Accuracy failure: q4_0 n=512 ERR=0.999572. Reverted ggml_sycl_supports_mmq to return false. mmq.cpp improvements kept dormant. Only joint_matrix/XMX (opt_001_008) could make MMQ competitive. Steps opt_001_003-007 skipped.",
       "depends_on": ["opt_task_002"],
       "steps": [
         {
@@ -56,7 +60,10 @@
           "description": "Add [[intel::reqd_sub_group_size(16)]] — correctness fix and performance baseline",
           "expected_improvement": "Correct execution + 5-20% improvement",
           "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k MUL_MAT -e ZES_ENABLE_SYSMAN=1"
+          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k MUL_MAT -e ZES_ENABLE_SYSMAN=1",
+          "completed": true,
+          "speedup": 1.0,
+          "notes": "Already implemented — all 20 kernel launch sites already have [[sycl::reqd_sub_group_size(WARP_SIZE)]] where WARP_SIZE=16 on Intel. No code changes needed."
         },
         {
           "step_id": "opt_001_002",
@@ -65,7 +72,10 @@
           "description": "Increase work-group size from 64 to 256+ for better EU occupancy",
           "expected_improvement": "15-30% throughput improvement",
           "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k MUL_MAT -e ZES_ENABLE_SYSMAN=1"
+          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k MUL_MAT -e ZES_ENABLE_SYSMAN=1",
+          "completed": true,
+          "speedup": 0.45,
+          "notes": "Implemented _INTEL macros with nwarps=16 (WG=256) for all 10 quant formats. Added reqd_sub_group_size(WARP_SIZE) to all 20 launch sites. However, benchmarking with FORCE_MMQ showed MMQ is ~2.2x slower than MMVQ/DMMV for n=1..8, and ~1.6x slower than oneMKL for n=512. Also has accuracy issues (q4_0 n=512 ERR=0.999572). The original devs disabled MMQ entirely (returns false for all types) with TODO about accuracy issues. ggml_sycl_supports_mmq change reverted. mmq.cpp kernel improvements kept as dormant code. MMQ is fundamentally not competitive on Xe2/SIMD16 — it needs dp4a/joint_matrix to be useful. Remaining MMQ optimization steps (opt_001_003 through opt_001_007) are BLOCKED until the accuracy issue is resolved and MMQ becomes competitive. Only opt_001_008 (joint_matrix/XMX) could make MMQ worthwhile."
         },
         {
           "step_id": "opt_001_003",
