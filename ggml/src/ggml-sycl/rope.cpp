@@ -31,10 +31,10 @@ static inline void rope_yarn(
     if (ext_factor != 0.0f) {
         float ramp_mix = rope_yarn_ramp(corr_dims.v[0], corr_dims.v[1], i0) * ext_factor;
         theta = theta_interp * (1 - ramp_mix) + theta_extrap * ramp_mix;
-        mscale *= 1.0f + 0.1f * sycl::log(1.0f / freq_scale);
+        mscale *= 1.0f + 0.1f * sycl::native::log(1.0f / freq_scale);
     }
-    cos_theta = sycl::cos(theta) * mscale;
-    sin_theta = sycl::sin(theta) * mscale;
+    cos_theta = sycl::native::cos(theta) * mscale;
+    sin_theta = sycl::native::sin(theta) * mscale;
     if constexpr (!forward) {
         sin_theta *= -1.0f;
     }
@@ -62,6 +62,7 @@ static void rope_norm_sycl(
     const int n_blocks_x = (ne00 + 2 * block_size - 1) / (2 * block_size);
     // grid: (nr, n_blocks_x)   block: (1, block_size)
     const float theta_scale = sycl::pow(freq_base, -2.0f / n_dims);
+    const float theta_scale_log2 = sycl::log2(theta_scale);
 
     q.parallel_for(
         sycl::nd_range<2>(
@@ -85,7 +86,7 @@ static void rope_norm_sycl(
                 return;
             }
 
-            const float theta_base = pos[i2] * sycl::pow(theta_scale, i0 / 2.0f);
+            const float theta_base = pos[i2] * sycl::native::exp2(theta_scale_log2 * (i0 / 2.0f));
             const float freq_factor = has_ff ? freq_factors[i0 / 2] : 1.0f;
 
             float cos_theta, sin_theta;
@@ -121,6 +122,7 @@ static void rope_neox_sycl(
     const int block_size = SYCL_ROPE_BLOCK_SIZE;
     const int n_blocks_x = (ne00 + 2 * block_size - 1) / (2 * block_size);
     const float theta_scale = sycl::pow(freq_base, -2.0f / n_dims);
+    const float theta_scale_log2 = sycl::log2(theta_scale);
 
     q.parallel_for(
         sycl::nd_range<2>(
@@ -144,7 +146,7 @@ static void rope_neox_sycl(
                 return;
             }
 
-            const float theta_base = pos[i2] * sycl::pow(theta_scale, i0 / 2.0f);
+            const float theta_base = pos[i2] * sycl::native::exp2(theta_scale_log2 * (i0 / 2.0f));
             const float freq_factor = has_ff ? freq_factors[i0 / 2] : 1.0f;
 
             float cos_theta, sin_theta;
@@ -182,6 +184,7 @@ static void rope_multi_sycl(
     const int block_size = SYCL_ROPE_BLOCK_SIZE;
     const int n_blocks_x = (ne00 + 2 * block_size - 1) / (2 * block_size);
     const float theta_scale = sycl::pow(freq_base, -2.0f / n_dims);
+    const float theta_scale_log2 = sycl::log2(theta_scale);
 
     q.parallel_for(
         sycl::nd_range<2>(
@@ -209,26 +212,27 @@ static void rope_multi_sycl(
             const int sec_w = sections.v[1] + sections.v[0];
             const int sector = (i0 / 2) % sect_dims;
 
+            const float theta_pow = sycl::native::exp2(theta_scale_log2 * (i0 / 2.0f));
             float theta_base = 0.0f;
             if (is_imrope) {
                 if (sector % 3 == 1 && sector < 3 * sections.v[1]) {           // h
-                    theta_base = pos[i2 + ne02 * 1] * sycl::pow(theta_scale, i0 / 2.0f);
+                    theta_base = pos[i2 + ne02 * 1] * theta_pow;
                 } else if (sector % 3 == 2 && sector < 3 * sections.v[2]) {    // w
-                    theta_base = pos[i2 + ne02 * 2] * sycl::pow(theta_scale, i0 / 2.0f);
+                    theta_base = pos[i2 + ne02 * 2] * theta_pow;
                 } else if (sector % 3 == 0 && sector < 3 * sections.v[0]) {    // t
-                    theta_base = pos[i2] * sycl::pow(theta_scale, i0 / 2.0f);
+                    theta_base = pos[i2] * theta_pow;
                 } else {
-                    theta_base = pos[i2 + ne02 * 3] * sycl::pow(theta_scale, i0 / 2.0f);
+                    theta_base = pos[i2 + ne02 * 3] * theta_pow;
                 }
             } else {
                 if (sector < sections.v[0]) {
-                    theta_base = pos[i2] * sycl::pow(theta_scale, i0 / 2.0f);
+                    theta_base = pos[i2] * theta_pow;
                 } else if (sector >= sections.v[0] && sector < sec_w) {
-                    theta_base = pos[i2 + ne02 * 1] * sycl::pow(theta_scale, i0 / 2.0f);
+                    theta_base = pos[i2 + ne02 * 1] * theta_pow;
                 } else if (sector >= sec_w && sector < sec_w + sections.v[2]) {
-                    theta_base = pos[i2 + ne02 * 2] * sycl::pow(theta_scale, i0 / 2.0f);
+                    theta_base = pos[i2 + ne02 * 2] * theta_pow;
                 } else if (sector >= sec_w + sections.v[2]) {
-                    theta_base = pos[i2 + ne02 * 3] * sycl::pow(theta_scale, i0 / 2.0f);
+                    theta_base = pos[i2 + ne02 * 3] * theta_pow;
                 }
             }
 
@@ -268,6 +272,7 @@ static void rope_vision_sycl(
     const int block_size = SYCL_ROPE_BLOCK_SIZE;
     const int n_blocks_x = (ne00 + 2 * block_size - 1) / (2 * block_size);
     const float theta_scale = sycl::pow(freq_base, -2.0f / n_dims);
+    const float theta_scale_log2 = sycl::log2(theta_scale);
 
     q.parallel_for(
         sycl::nd_range<2>(
@@ -292,10 +297,10 @@ static void rope_vision_sycl(
             float theta_base = 0.0f;
             if (sector < sections.v[0]) {
                 const int p = sector;
-                theta_base  = pos[i2] * sycl::pow(theta_scale, (float)p);
+                theta_base  = pos[i2] * sycl::native::exp2(theta_scale_log2 * (float)p);
             } else if (sector >= sections.v[0] && sector < sec_w) {
                 const int p = sector - sections.v[0];
-                theta_base  = pos[i2 + ne02] * sycl::pow(theta_scale, (float)p);
+                theta_base  = pos[i2 + ne02] * sycl::native::exp2(theta_scale_log2 * (float)p);
             }
 
             const float freq_factor = has_ff ? freq_factors[i0 / 2] : 1.0f;

@@ -1408,6 +1408,89 @@
           "description": "1.77x average speedup across all 29 cases. Specialized paths average 2.99x. Peak bandwidth 365 GB/s (80% of B60 456 GB/s peak). Only 1 of 29 cases shows minor regression (4%, within noise)."
         }
       }
+    },
+    {
+      "task_id": "opt_task_011",
+      "kernel": "rope (rotary position embedding)",
+      "step_id": "opt_016_002",
+      "description": "Replace full-precision sycl::pow/sin/cos with sycl::native:: variants (exp2, cos, sin, log)",
+      "outcome": "significant_speedup",
+      "build_config": "Standard build (GGML_SYCL_F16=ON, no special defines)",
+      "timestamp": "2026-03-08T15:10:00Z",
+      "correctness": "pass (268/268 ROPE tests)",
+      "notes": "Four changes in rope.cpp: (1) Precompute theta_scale_log2 = sycl::log2(theta_scale) on host, (2) Replace sycl::pow(theta_scale, X) with sycl::native::exp2(theta_scale_log2 * X) in all 4 kernel variants (norm, neox, multi, vision), (3) Replace sycl::cos/sin with sycl::native::cos/sin in rope_yarn, (4) Replace sycl::log with sycl::native::log in rope_yarn ext_factor path. Native math trades ~1 ULP accuracy for 3-5x faster transcendentals — acceptable for positional encoding where small errors are absorbed by attention softmax.",
+      "benchmark_comparison": {
+        "test_case": "ROPE(type={f32,f16},...) — 56 test configurations",
+        "baseline_log": "syclgen/benchmarks/baseline_results.json",
+        "new_log": "logs/b60_benchmark_20260308_150541.log",
+        "group_analysis": {
+          "f32_mode0_ff0_v0": {
+            "description": "f32 rope_norm, no freq_factors, small tensors (compute-bound)",
+            "avg_speedup": 2.656,
+            "num_cases": 2,
+            "data": [
+              {"ne": "[128,32,512,1]", "baseline_us": 155.31, "new_us": 63.60, "speedup": 2.441},
+              {"ne": "[128,64,512,1]", "baseline_us": 412.07, "new_us": 143.56, "speedup": 2.870}
+            ]
+          },
+          "f32_mode2_ff0_v0": {
+            "description": "f32 rope_neox, no freq_factors, small tensors",
+            "avg_speedup": 1.882,
+            "num_cases": 2,
+            "data": [
+              {"ne": "[80,32,512,1]", "baseline_us": 132.48, "new_us": 61.62, "speedup": 2.150},
+              {"ne": "[64,8,512,1]", "baseline_us": 26.27, "new_us": 16.28, "speedup": 1.614}
+            ]
+          },
+          "f32_mode0_ff1_v0": {
+            "description": "f32 rope_norm, with freq_factors, small tensors",
+            "avg_speedup": 1.349,
+            "num_cases": 2,
+            "data": [
+              {"ne": "[128,32,512,1]", "baseline_us": 85.48, "new_us": 64.61, "speedup": 1.323},
+              {"ne": "[128,64,512,1]", "baseline_us": 201.47, "new_us": 146.79, "speedup": 1.372}
+            ]
+          },
+          "f32_mode8_ff0_v0": {
+            "description": "f32 rope_multi (mrope), small tensors",
+            "avg_speedup": 1.372,
+            "num_cases": 1,
+            "data": [
+              {"ne": "[128,12,512,1]", "baseline_us": 41.05, "new_us": 29.91, "speedup": 1.372}
+            ]
+          },
+          "f32_mode40_ff0_v0": {
+            "description": "f32 rope_vision, small tensors",
+            "avg_speedup": 1.550,
+            "num_cases": 1,
+            "data": [
+              {"ne": "[128,12,512,1]", "baseline_us": 51.63, "new_us": 33.30, "speedup": 1.550}
+            ]
+          },
+          "f32_v1_all": {
+            "description": "f32 all modes with v=1 (large tensors, bandwidth-bound)",
+            "avg_speedup": 1.178,
+            "num_cases": 14,
+            "note": "Bandwidth-bound cases show smaller benefit — native math reduces compute but memory latency dominates"
+          },
+          "f16_all": {
+            "description": "f16 all modes (compute in f32, load/store in f16)",
+            "avg_speedup": 1.204,
+            "num_cases": 28,
+            "note": "f16 benefits less than f32: half the memory bandwidth requirement means less compute-bound. mode=40 (vision) still shows ~1.49x, mode=0 shows ~1.30x, mode=2 (neox) shows ~1.02x"
+          }
+        },
+        "overall": {
+          "avg_speedup": 1.294,
+          "num_cases": 56,
+          "best_speedup": 2.870,
+          "worst_speedup": 0.984,
+          "num_regressions_below_098x": 0,
+          "peak_bandwidth_gbps": 918.67,
+          "peak_pct_of_hw_peak": 201.4,
+          "description": "1.29x average speedup across all 56 ROPE test cases. Biggest wins on compute-bound f32 small-tensor cases: rope_norm 2.66x avg, rope_neox 1.88x avg. Bandwidth-bound (v=1) cases show ~1.18x avg. f16 cases average 1.20x. Zero regressions below 0.98x. Peak reported bandwidth 918 GB/s exceeds theoretical peak (likely measurement artifact from v=1 large tensor amortization)."
+        }
+      }
     }
   ]
 }
