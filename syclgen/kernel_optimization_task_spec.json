@@ -142,7 +142,8 @@
       "title": "Optimize mul_mat_vec_q (MMVQ) kernel (high potential)",
       "overall_optimization_potential": "high",
       "priority": 2,
-      "status": "pending",
+      "status": "in_progress",
+      "started_at": "2026-03-08T14:00:00Z",
       "depends_on": ["opt_task_002"],
       "steps": [
         {
@@ -152,7 +153,10 @@
           "description": "Increase legacy kernel WG from 16 to 256 (adopt reordered kernel pattern for all formats)",
           "expected_improvement": "4-16x occupancy improvement, 2-4x throughput",
           "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k MUL_MAT -e ZES_ENABLE_SYSMAN=1"
+          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k MUL_MAT -e ZES_ENABLE_SYSMAN=1",
+          "completed": true,
+          "speedup": 1.94,
+          "notes": "1.94x overall avg speedup across 120 MMVQ test cases. Two changes: (1) WG 32->256 for all legacy launchers, (2) new mul_mat_vec_q_multicol kernel for non-IQ types at n=2..8. Non-IQ multicol avg 3.07x, IQ fallback avg 0.99x (neutral), n=1 avg 0.99x (neutral). Top: q6_K n=8 7.55x, q8_0 n=8 7.14x, q4_0 n=8 6.40x. Correctness: all MUL_MAT unit tests passed."
         },
         {
           "step_id": "opt_002_002",
