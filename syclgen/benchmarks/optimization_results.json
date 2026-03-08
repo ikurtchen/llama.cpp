@@ -1684,6 +1684,53 @@
           "description": "Enables ARGSORT and TOP_K for arbitrarily large ncols via oneDPL radix sort. Previously limited to ncols <= 1024. No performance regression on existing small-ncols cases. Matches CUDA parity with CUB DeviceRadixSort."
         }
       }
+    },
+    {
+      "task_id": "opt_task_015",
+      "kernel": "outprod (oneMKL GEMM)",
+      "source_file": "ggml/src/ggml-sycl/outprod.cpp",
+      "date": "2026-03-08",
+      "steps": {
+        "opt_005_001_and_003": {
+          "description": "Add batch/GQA support (ne2>1, ne3>1 loop with dps2/dps3 broadcasting) + stride-based leading dimensions + src1 contiguity assert. Remove ne2==1&&ne3==1 restriction from supports_op.",
+          "changes": [
+            "outprod.cpp: Replaced single GEMM call with ne2*ne3 loop, GQA broadcasting via dps2/dps3, stride-based lda/ldc, src1 contiguity assert",
+            "ggml-sycl.cpp: Removed ne[2]==1 && ne[3]==1 from supports_op for OUT_PROD"
+          ],
+          "unit_test_result": "64/64 F32 tests PASS (all batched/GQA configs). 960 non-F32 'not supported' (expected — CUDA also F32-only)",
+          "benchmark_result": {
+            "comparison": [
+              {
+                "name": "OUT_PROD(type_a=f32,type_b=f32,m=4096,n=4096,k=1,bs=[1,1],nr=[1,1],trans_b=0)",
+                "baseline_us": 185.77,
+                "optimized_us": 185.26,
+                "speedup": 1.003,
+                "baseline_gbs": 336.61,
+                "optimized_gbs": 337.52
+              },
+              {
+                "name": "OUT_PROD(type_a=f32,type_b=f32,m=4096,n=4096,k=8,bs=[1,1],nr=[1,1],trans_b=0)",
+                "baseline_us": 188.29,
+                "optimized_us": 188.33,
+                "speedup": 1.000,
+                "baseline_gbs": 333.23,
+                "optimized_gbs": 333.15
+              }
+            ],
+            "overall": {
+              "avg_speedup": "1.00x (no regression on existing cases)",
+              "num_cases": 2,
+              "description": "No performance change for existing bs=[1,1] cases. Primary value is functional parity: batched/GQA outprod now runs on GPU instead of CPU fallback. Matches CUDA out-prod.cu approach (loop over ne2*ne3 with GQA broadcasting)."
+            }
+          },
+          "outcome": "kept_functional_improvement"
+        },
+        "opt_005_002": {
+          "description": "Add F16 GEMM support via oneMKL half-precision routines",
+          "outcome": "skipped",
+          "skip_reason": "CUDA doesn't support F16 outprod either — beyond parity scope. Mixed-precision GEMM adds complexity and precision risk."
+        }
+      }
     }
   ]
 }
