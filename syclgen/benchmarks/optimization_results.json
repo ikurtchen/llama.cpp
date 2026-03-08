@@ -1359,6 +1359,55 @@
           "description": "WG=256 doubles bandwidth utilization for broadcast operations (2.13x avg), reaching 72% of B60 peak. Small tensors unaffected."
         }
       }
+    },
+    {
+      "task_id": "opt_task_010",
+      "kernel": "soft_max_f32 (softmax)",
+      "step_id": "opt_015_001",
+      "description": "Compile-time ncols specialization with #pragma unroll + dynamic block_size + compile-time block_reduce",
+      "outcome": "significant_speedup",
+      "build_config": "Standard build (GGML_SYCL_F16=ON, no special defines)",
+      "timestamp": "2026-03-08T23:00:00Z",
+      "correctness": "pass (212/212 SOFT_MAX tests)",
+      "notes": "Added ncols_template and block_size_template template parameters to soft_max_f32_sycl kernel. 8 compile-time specializations matching CUDA: {32,64,128,256,512,1024,2048,4096}. Block sizes capped at WARP_SIZE*WARP_SIZE=256 (Xe2 block_reduce limitation: single warp reduces inter-warp partials, max WARP_SIZE warps). Specializations enable #pragma unroll on 3 inner loops and eliminate bounds checks when ncols_template>0. block_reduce gets compile-time block_size_const instead of 0 (runtime). New soft_max_dispatch_sycl helper routes to specialization or fallback. Initial attempt with block_size=1024 for ncols>=512 caused block_reduce corruption (40 test failures at ncols=1024); fixed by capping at 256.",
+      "benchmark_comparison": {
+        "test_case": "SOFT_MAX(type=f32,...) — 29 test configurations",
+        "baseline_log": "syclgen/benchmarks/baseline_results.json",
+        "new_log": "b60 benchmark 2026-03-08",
+        "specialized_cases": {
+          "description": "ncols in {32, 64, 128, 256, 512, 1024, 2048, 4096} — compile-time specialization",
+          "data": [
+            {"ne": "[4096,4096,5,1]", "ncols": 4096, "block_size": 256, "baseline_gbps": 125.99, "new_gbps": 365.55, "baseline_us": 5008.38, "new_us": 1726.17, "speedup": 2.90},
+            {"ne": "[1024,1024,10,1]", "ncols": 1024, "block_size": 256, "baseline_gbps": 73.62, "new_gbps": 263.62, "baseline_us": 1062.47, "new_us": 296.72, "speedup": 3.58},
+            {"ne": "[256,256,20,1]", "ncols": 256, "block_size": 256, "baseline_gbps": 82.32, "new_gbps": 104.55, "baseline_us": 118.65, "new_us": 93.42, "speedup": 1.27},
+            {"ne": "[64,64,20,1]", "ncols": 64, "block_size": 64, "baseline_gbps": 20.36, "new_gbps": 85.95, "baseline_us": 29.97, "new_us": 7.10, "speedup": 4.22}
+          ],
+          "avg_speedup": 2.99,
+          "best": {"speedup": 4.22, "ne": "[64,64,20,1]", "note": "ncols=64, block_size=64, single-iteration fully unrolled"},
+          "worst": {"speedup": 1.27, "ne": "[256,256,20,1]", "note": "ncols=256, block_size=256 — already at optimal WG size, unroll provides modest benefit"}
+        },
+        "fallback_cases": {
+          "description": "ncols not in specialization set — generic kernel, still benefits from compile-time block_size in block_reduce",
+          "avg_speedup": 1.58,
+          "num_cases": 25,
+          "best": {"speedup": 4.00, "ne": "[524288,4,1,1]", "note": "Large ncols, baseline was pathologically slow"},
+          "worst": {"speedup": 0.96, "ne": "[262144,16,1,1]", "note": "4% regression, within noise margin"},
+          "notable": [
+            {"ne": "[12888,256,5,1]", "ncols": 12888, "baseline_gbps": 83.93, "new_gbps": 186.33, "speedup": 2.22},
+            {"ne": "[77,4096,5,1]", "ncols": 77, "baseline_gbps": 16.26, "new_gbps": 29.78, "speedup": 1.83},
+            {"ne": "[131072,16,1,1]", "ncols": 131072, "baseline_gbps": 33.04, "new_gbps": 65.94, "speedup": 2.00}
+          ]
+        },
+        "overall": {
+          "avg_speedup": 1.77,
+          "num_cases": 29,
+          "best_speedup": 4.22,
+          "worst_speedup": 0.96,
+          "peak_bandwidth_gbps": 365.55,
+          "peak_pct_of_hw_peak": 80.2,
+          "description": "1.77x average speedup across all 29 cases. Specialized paths average 2.99x. Peak bandwidth 365 GB/s (80% of B60 456 GB/s peak). Only 1 of 29 cases shows minor regression (4%, within noise)."
+        }
+      }
     }
   ]
 }

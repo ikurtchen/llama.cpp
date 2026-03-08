@@ -497,8 +497,11 @@
       "title": "Optimize binbcast (binary broadcast) kernel (medium potential)",
       "overall_optimization_potential": "medium",
       "priority": 2,
-      "status": "in_progress",
+      "status": "completed",
       "started_at": "2026-03-08T21:00:00Z",
+      "completed_at": "2026-03-08T22:00:00Z",
+      "outcome": "speedup",
+      "outcome_notes": "opt_013_001 (WG 128→256) gave 2.13x avg speedup for broadcast ops. KEPT. Remaining steps (vectorization, integer opt, kernel fusion) deprioritized based on Xe2 findings — vectorization regresses, integer opt low impact.",
       "depends_on": [
         "opt_task_002"
       ],
@@ -553,7 +556,11 @@
       "title": "Optimize softmax kernel (medium potential)",
       "overall_optimization_potential": "medium",
       "priority": 2,
-      "status": "pending",
+      "status": "completed",
+      "started_at": "2026-03-08T23:00:00Z",
+      "completed_at": "2026-03-09T04:00:00Z",
+      "outcome": "speedup",
+      "outcome_notes": "opt_015_001 (compile-time ncols specialization) gave 1.77x avg overall speedup (2.99x for specialized paths, 1.58x for fallback). KEPT. Remaining steps deprioritized: opt_015_002 vectorization likely regression on Xe2, opt_015_004 shuffle replacement proven regression, opt_015_003/005/006 low impact.",
       "depends_on": [
         "opt_task_002"
       ],
@@ -562,10 +569,13 @@
           "step_id": "opt_015_001",
           "category": "compile_time_specialization",
           "priority": "high",
-          "description": "Add compile-time ncols specialization ({32,64,...,4096}) with #pragma unroll \u2014 10-25% throughput",
+          "description": "Add compile-time ncols specialization ({32,64,...,4096}) with #pragma unroll — 10-25% throughput",
           "expected_improvement": "10-25% throughput",
           "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k SOFT_MAX -e ZES_ENABLE_SYSMAN=1"
+          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k SOFT_MAX -e ZES_ENABLE_SYSMAN=1",
+          "completed": true,
+          "speedup": 1.77,
+          "notes": "8 compile-time specializations {32,64,128,256,512,1024,2048,4096} with ncols_template and block_size_template params. #pragma unroll on 3 inner loops. Bounds check elimination when specialized. Compile-time block_size_const passed to block_reduce. block_size capped at WARP_SIZE*WARP_SIZE=256 (block_reduce limitation on Xe2). 212/212 tests passed. Specialized avg 2.99x, fallback avg 1.58x, overall avg 1.77x. Peak 365 GB/s (80% peak BW). KEPT."
         },
         {
           "step_id": "opt_015_002",
