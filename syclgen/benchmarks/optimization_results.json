@@ -2370,6 +2370,40 @@
       },
       "average_speedup": 7.39,
       "notes": "Massive speedup on long-token path. Compile-time NC=4 allows full unroll of 4-iteration loops and modulo->bitmask optimization. BW>peak because effective BW metric double-counts sliding window reads. Stable across 2 runs (19.27 and 19.47 us). Second run confirmed: 656.34 GB/s."
+    },
+    {
+      "task_id": "opt_task_025",
+      "kernel": "SSM_SCAN",
+      "step_id": "opt_033_001+opt_033_004",
+      "description": "#pragma unroll on all 7 inner loops (both Mamba-1 and Mamba-2) + native math (exp/log for softplus and state decay) + reqd_sub_group_size on Mamba-1",
+      "outcome": "speedup",
+      "changes": [
+        "ggml/src/ggml-sycl/ssm_scan.cpp: Mamba-1 #pragma unroll on A/s0 load (N=16), inner dot-product (N=16), state store (N=16)",
+        "ggml/src/ggml-sycl/ssm_scan.cpp: Mamba-2 #pragma unroll on state init (c_factor), inner update (c_factor), state store (c_factor)",
+        "sycl::native::exp for state decay in both kernels (hottest inner loop)",
+        "sycl::native::log(1+native::exp(x)) for softplus in both kernels",
+        "[[intel::reqd_sub_group_size(WARP_SIZE)]] added to Mamba-1 kernel"
+      ],
+      "benchmark_results": {
+        "mamba2_n_tok_512": {
+          "baseline_us": 3072.52,
+          "baseline_bw_gbs": 4.96,
+          "optimized_us": 1045.07,
+          "optimized_bw_gbs": 14.57,
+          "speedup": 2.94,
+          "note": "Compute-bound case (512 time steps of exp calls). Native math provides majority of speedup."
+        },
+        "mamba2_n_tok_1": {
+          "baseline_us": 12.72,
+          "baseline_bw_gbs": 232.25,
+          "optimized_us": 7.72,
+          "optimized_bw_gbs": 382.59,
+          "speedup": 1.65,
+          "note": "Single-token inference, more memory-bound. 382 GB/s is 84% of peak 456 GB/s."
+        }
+      },
+      "average_speedup": 2.3,
+      "notes": "Both Mamba-2 benchmark cases improved significantly. Native math (sycl::native::exp/log) is the dominant contributor for the compute-bound n_tok=512 case. Stable across 2 runs. 3/3 unit tests pass (Mamba-1 d_state=16, Mamba-2 d_state=128, Mamba-2 d_state=256)."
     }
   ]
 }

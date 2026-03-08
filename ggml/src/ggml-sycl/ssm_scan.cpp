@@ -25,7 +25,7 @@ static void ssm_scan_f32_sycl(
 
         cgh.parallel_for(
             sycl::nd_range<2>(global, local),
-            [=](sycl::nd_item<2> item) {
+            [=](sycl::nd_item<2> item) [[intel::reqd_sub_group_size(WARP_SIZE)]] {
                 const int seq_idx    = item.get_group(0);  // blockIdx.x
                 const int head_chunk = item.get_group(1);  // blockIdx.y
                 const int tid        = item.get_local_id(1); // threadIdx.x
@@ -53,6 +53,7 @@ static void ssm_scan_f32_sycl(
                 float regs0[N];
 
                 // Load A and s0 (non-CUB path)
+                #pragma unroll
                 for (int n = 0; n < N; ++n) {
                     regA[n]  = A_block[tid * stride_A + n];
                     regs0[n] = s0_block[tid * stride_s0 + n];
@@ -68,13 +69,14 @@ static void ssm_scan_f32_sycl(
 
                     float dt_soft_plus = dt_block[i * stride_dt + tid];
                     if (dt_soft_plus <= 20.0f) {
-                        dt_soft_plus = sycl::log1p(sycl::exp(dt_soft_plus));
+                        dt_soft_plus = sycl::native::log(1.0f + sycl::native::exp(dt_soft_plus));
                     }
                     float x_dt = x_block[i * stride_x + tid] * dt_soft_plus;
 
                     float sumf = 0.0f;
+                    #pragma unroll
                     for (int n = 0; n < N; n++) {
-                        float state = regs0[n] * sycl::exp(dt_soft_plus * regA[n]) + smemB[n] * x_dt;
+                        float state = regs0[n] * sycl::native::exp(dt_soft_plus * regA[n]) + smemB[n] * x_dt;
                         sumf += state * smemC[n];
                         regs0[n] = state;
                     }
@@ -83,6 +85,7 @@ static void ssm_scan_f32_sycl(
 
                 // Store final states
                 const int stride_s = stride_s0;
+                #pragma unroll
                 for (int n = 0; n < N; ++n) {
                     s_block[tid * stride_s + n] = regs0[n];
                 }
@@ -146,18 +149,20 @@ static void ssm_scan_f32_group_sycl(
             float state_sum = 0.0f;
 
             // Load initial states
+            #pragma unroll
             for (int j = 0; j < c_factor; j++) {
                 state[j] = s0_warp[WARP_SIZE * j + lane];
             }
 
             for (int64_t i = 0; i < n_tok; i++) {
                 const float dt_val = dt_warp[i * stride_dt];
-                const float dt_soft_plus = (dt_val <= 20.0f ? sycl::log1p(sycl::exp(dt_val)) : dt_val);
+                const float dt_soft_plus = (dt_val <= 20.0f ? sycl::native::log(1.0f + sycl::native::exp(dt_val)) : dt_val);
 
                 state_sum = 0.0f;
-                const float dA   = sycl::exp(dt_soft_plus * A_warp[0]);
+                const float dA   = sycl::native::exp(dt_soft_plus * A_warp[0]);
                 const float x_dt = x_warp[i * stride_x] * dt_soft_plus;
 
+                #pragma unroll
                 for (int j = 0; j < c_factor; j++) {
                     const float B_val = B_warp[i * stride_B + WARP_SIZE * j + lane];
                     const float C_val = C_warp[i * stride_C + WARP_SIZE * j + lane];
@@ -174,6 +179,7 @@ static void ssm_scan_f32_group_sycl(
             }
 
             // Write back the state
+            #pragma unroll
             for (int j = 0; j < c_factor; j++) {
                 s_warp[WARP_SIZE * j + lane] = state[j];
             }
