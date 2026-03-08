@@ -1731,6 +1731,85 @@
           "skip_reason": "CUDA doesn't support F16 outprod either — beyond parity scope. Mixed-precision GEMM adds complexity and precision risk."
         }
       }
+    },
+    {
+      "task_id": "opt_task_017",
+      "kernel": "dequantize device functions",
+      "step_id": "all",
+      "description": "All steps skipped — no standalone CONVERT benchmark exists, dequantize_block called indirectly from CPY/DUP",
+      "outcome": "skipped",
+      "notes": "opt_009_003 (loop unroll) proven ineffective on Xe2. opt_009_002 (SoA reorder) too complex. opt_009_001 (output coalescing) and opt_009_005 (vectorization) potentially valuable but unmeasurable without benchmark."
+    },
+    {
+      "task_id": "opt_task_018",
+      "kernel": "element_wise (unary ops)",
+      "step_id": "opt_010_002",
+      "description": "Replace standard math with sycl::native:: variants (exp, log, sqrt, sin, cos, tanh via native exp)",
+      "outcome": "speedup",
+      "notes": "Applied to 14 op functions + 3 special kernels. expf->native::exp in SILU/SIGMOID/EXP/GELU_QUICK/SOFTPLUS/ELU/SWIGLU_OAI/SILU_BACK. tanhf->native exp-based tanh in GELU/TANH. logf->native::log, sqrtf->native::sqrt, sinf/cosf->native::sin/cos. erff left unchanged (no native equivalent).",
+      "benchmark_results": {
+        "test_ne": "[14336,512,1,1]",
+        "results_by_op": {
+          "TANH": {
+            "baseline_us": 333.33,
+            "optimized_us": 139.05,
+            "speedup": 2.40,
+            "baseline_bw_gbs": 164.07,
+            "optimized_bw_gbs": 393.30
+          },
+          "GEGLU": {
+            "baseline_us": 285.74,
+            "optimized_us": 114.47,
+            "speedup": 2.50,
+            "baseline_bw_gbs": 143.54,
+            "optimized_bw_gbs": 358.31
+          },
+          "SWIGLU": {
+            "baseline_us": 244.05,
+            "optimized_us": 113.86,
+            "speedup": 2.14,
+            "baseline_bw_gbs": 168.06,
+            "optimized_bw_gbs": 360.22
+          },
+          "SILU": {
+            "baseline_us": 274.99,
+            "optimized_us": 154.72,
+            "speedup": 1.78,
+            "baseline_bw_gbs": 199.04,
+            "optimized_bw_gbs": 353.75
+          },
+          "GELU": {
+            "baseline_us": 203.00,
+            "optimized_us": 154.56,
+            "speedup": 1.31,
+            "baseline_bw_gbs": 269.39,
+            "optimized_bw_gbs": 353.84
+          },
+          "SIGMOID": {
+            "baseline_us": 156.72,
+            "optimized_us": 151.81,
+            "speedup": 1.03,
+            "baseline_bw_gbs": 348.94,
+            "optimized_bw_gbs": 360.24,
+            "notes": "Already near peak BW, minimal improvement expected"
+          },
+          "GELU_ERF": {
+            "baseline_us": 158.82,
+            "optimized_us": 157.40,
+            "speedup": 1.01,
+            "notes": "erff not changed, control comparison"
+          },
+          "NEG": {
+            "baseline_us": 156.82,
+            "optimized_us": 153.29,
+            "speedup": 1.02,
+            "notes": "Unchanged op, control comparison"
+          }
+        },
+        "avg_speedup_native_math_ops": 1.86,
+        "max_speedup": 2.50,
+        "unit_tests_passed": "GELU 4/4, SILU 4/4, SIGMOID 4/4, TANH 4/4, SWIGLU 24/24, GEGLU 24/24, SOFT_MAX 212/212"
+      }
     }
   ]
 }

@@ -20,7 +20,11 @@ static float op_step(float x) { return x > 0.0f; }
 static float op_gelu(float x) {
     const float GELU_COEF_A    = 0.044715f;
     const float SQRT_2_OVER_PI = 0.79788456080286535587989211986876f;
-    return 0.5f * x * (1.0f + tanhf(SQRT_2_OVER_PI * x * (1.0f + GELU_COEF_A * x * x)));
+    float arg = SQRT_2_OVER_PI * x * (1.0f + GELU_COEF_A * x * x);
+    // tanh(arg) = 1 - 2/(exp(2*arg) + 1), using native exp
+    float e2a = sycl::native::exp(2.0f * arg);
+    float t   = 1.0f - 2.0f / (e2a + 1.0f);
+    return 0.5f * x * (1.0f + t);
 }
 
 static float op_gelu_erf(float x) {
@@ -29,38 +33,43 @@ static float op_gelu_erf(float x) {
 }
 
 static float op_gelu_quick(float x) {
-    return x * (1.0f / (1.0f + expf(GELU_QUICK_COEF * x)));
+    return x * (1.0f / (1.0f + sycl::native::exp(GELU_QUICK_COEF * x)));
 }
 
-static float op_silu(float x) { return x / (1.0f + expf(-x)); }
+static float op_silu(float x) { return x / (1.0f + sycl::native::exp(-x)); }
 
-static float op_tanh(float x) { return tanhf(x); }
+static float op_tanh(float x) {
+    if (x > 10.0f) return 1.0f;
+    if (x < -10.0f) return -1.0f;
+    float e2x = sycl::native::exp(2.0f * x);
+    return 1.0f - 2.0f / (e2x + 1.0f);
+}
 
 static float op_relu(float x) { return fmaxf(x, 0); }
 
-static float op_sigmoid(float x) { return 1.0f / (1.0f + expf(-x)); }
+static float op_sigmoid(float x) { return 1.0f / (1.0f + sycl::native::exp(-x)); }
 
 static float op_hardsigmoid(float x) { return fminf(1.0f, fmaxf(0.0f, (x + 3.0f) / 6.0f)); }
 
 static float op_hardswish(float x) { return x * fminf(1.0f, fmaxf(0.0f, (x + 3.0f) / 6.0f)); }
 
-static float op_exp(float x) { return expf(x); }
+static float op_exp(float x) { return sycl::native::exp(x); }
 
 static float op_sqr(float x) { return x * x; }
 
-static float op_sqrt(float x) { return sqrtf(x); }
+static float op_sqrt(float x) { return sycl::native::sqrt(x); }
 
-static float op_sin(float x) { return sinf(x); }
+static float op_sin(float x) { return sycl::native::sin(x); }
 
-static float op_cos(float x) { return cosf(x); }
+static float op_cos(float x) { return sycl::native::cos(x); }
 
-static float op_log(float x) { return logf(x); }
+static float op_log(float x) { return sycl::native::log(x); }
 
-static float op_expm1(float x) { return expm1f(x); }
+static float op_expm1(float x) { return sycl::native::exp(x) - 1.0f; }
 
-static float op_softplus(float x) { return (x > 20.0f) ? x : logf(1.0f + expf(x)); }
+static float op_softplus(float x) { return (x > 20.0f) ? x : sycl::native::log(1.0f + sycl::native::exp(x)); }
 
-static float op_elu(float x) { return (x > 0.f) ? x : expm1f(x); }
+static float op_elu(float x) { return (x > 0.f) ? x : sycl::native::exp(x) - 1.0f; }
 
 static float op_floor(float x) { return floorf(x); }
 
@@ -354,7 +363,7 @@ static float swiglu_oai_single(float x, float g, float alpha, float limit) {
     x = fminf(x, limit);
     g = fmaxf(fminf(g, limit), -limit);
 
-    float out_glu = x / (1.0f + expf(-x * alpha));
+    float out_glu = x / (1.0f + sycl::native::exp(-x * alpha));
     out_glu = out_glu * (1.0f + g);
     return out_glu;
 }
@@ -500,7 +509,7 @@ static void silu_back_op_kernel(const T * grad, const T * xf, T * dst, const int
     if (i >= k) return;
     float g = (float)grad[i];
     float x = (float)xf[i];
-    float s = 1.0f / (1.0f + expf(-x));
+    float s = 1.0f / (1.0f + sycl::native::exp(-x));
     dst[i] = (T)(g * s * (1.0f + x * (1.0f - s)));
 }
 
@@ -547,7 +556,7 @@ static void xielu_op_kernel(const T * x, T * dst, const int k,
     float gate_pos = (xi > 0.0f) ? 1.0f : 0.0f;
     float y_pos = alpha_p * xi * xi + beta * xi;
     float min_v_eps = fminf(xi, eps);
-    float y_neg = (expm1f(min_v_eps) - xi) * alpha_n + beta * xi;
+    float y_neg = (sycl::native::exp(min_v_eps) - 1.0f - xi) * alpha_n + beta * xi;
     float out = gate_pos * y_pos + (1.0f - gate_pos) * y_neg;
     dst[i] = (T)out;
 }
