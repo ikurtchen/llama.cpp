@@ -1275,6 +1275,90 @@
         },
         "conclusion": "No measurable speedup. Dequantize kernels are a tiny fraction of MUL_MAT execution time (dominated by oneMKL GEMM at n=512). WG=256 multi-block approach adds bounds-checking overhead without visible benefit. The K-quant/IQ dequantize kernels are already fast enough relative to downstream consumers. Remaining opt_task_008 steps (vectorization, nd_range cleanup, loop unroll, SLM caching) unlikely to show measurable improvement for the same reason — dequantize is not the bottleneck. Task abandoned."
       }
+    },
+    {
+      "task_id": "opt_task_009",
+      "kernel": "binbcast (binary broadcast)",
+      "step_id": "opt_013_001",
+      "description": "Increase work-group size from 128 to 256 for better EU occupancy on Xe2",
+      "outcome": "significant_speedup",
+      "build_config": "Standard build (GGML_SYCL_F16=ON, no special defines)",
+      "timestamp": "2026-03-08T21:30:00Z",
+      "correctness": "pass (ADD 99/99, MUL 91/91)",
+      "notes": "Single-line change: block_size 128→256 in launch_bin_bcast(). Affects all binary broadcast operations (ADD, SUB, MUL, DIV, REPEAT) since they share the same launch function. The 3D grid partitioning (bx*by*bz) automatically adapts to the new block_size. For the broadcast test case (ne0=4096, nr=[1,512,1,1]), dimension collapsing merges ne0*ne1 into a single dimension, making this effectively a 1D launch with WG=256 processing 2M elements. Bandwidth improved from ~155 GB/s to ~328 GB/s (72% of B60 peak 456 GB/s).",
+      "benchmark_comparison": {
+        "test_cases": "ADD/MUL/DIV with ne=[4096,1,1,1], nr=[1,1,1,1] (small 1D) and nr=[1,512,1,1] (broadcast)",
+        "baseline_log": "syclgen/benchmarks/baseline_results.json",
+        "data": [
+          {
+            "op": "ADD",
+            "shape": "ne=[4096,1,1,1],nr=[1,1,1,1]",
+            "baseline_us": 7.49,
+            "baseline_gbps": 6.11,
+            "new_us": 7.65,
+            "new_gbps": 5.99,
+            "speedup": 0.98,
+            "note": "Small tensor, launch-overhead dominated — neutral"
+          },
+          {
+            "op": "ADD",
+            "shape": "ne=[4096,1,1,1],nr=[1,512,1,1]",
+            "baseline_us": 144.04,
+            "baseline_gbps": 162.72,
+            "new_us": 70.73,
+            "new_gbps": 331.34,
+            "speedup": 2.04,
+            "note": "2.04x speedup, bandwidth doubled"
+          },
+          {
+            "op": "MUL",
+            "shape": "ne=[4096,1,1,1],nr=[1,1,1,1]",
+            "baseline_us": 7.85,
+            "baseline_gbps": 5.83,
+            "new_us": 7.55,
+            "new_gbps": 6.07,
+            "speedup": 1.04,
+            "note": "Small tensor — neutral"
+          },
+          {
+            "op": "MUL",
+            "shape": "ne=[4096,1,1,1],nr=[1,512,1,1]",
+            "baseline_us": 147.88,
+            "baseline_gbps": 158.49,
+            "new_us": 70.80,
+            "new_gbps": 331.04,
+            "speedup": 2.09,
+            "note": "2.09x speedup"
+          },
+          {
+            "op": "DIV",
+            "shape": "ne=[4096,1,1,1],nr=[1,1,1,1]",
+            "baseline_us": 7.62,
+            "baseline_gbps": 6.01,
+            "new_us": 7.62,
+            "new_gbps": 6.01,
+            "speedup": 1.00,
+            "note": "Small tensor — neutral"
+          },
+          {
+            "op": "DIV",
+            "shape": "ne=[4096,1,1,1],nr=[1,512,1,1]",
+            "baseline_us": 164.25,
+            "baseline_gbps": 142.70,
+            "new_us": 72.61,
+            "new_gbps": 322.78,
+            "speedup": 2.26,
+            "note": "2.26x speedup"
+          }
+        ],
+        "summary": {
+          "broadcast_avg_speedup": 2.13,
+          "broadcast_avg_bandwidth_gbps": 328.39,
+          "broadcast_pct_peak_bw": 72.0,
+          "small_1d_avg_speedup": 1.01,
+          "description": "WG=256 doubles bandwidth utilization for broadcast operations (2.13x avg), reaching 72% of B60 peak. Small tensors unaffected."
+        }
+      }
     }
   ]
 }

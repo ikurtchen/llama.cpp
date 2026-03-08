@@ -249,7 +249,7 @@ static void launch_bin_bcast(const ggml_tensor * src0, const ggml_tensor * src1,
         GGML_ASSERT(nb12 % sizeof(src1_t) == 0);
         GGML_ASSERT(nb13 % sizeof(src1_t) == 0);
 
-        const int block_size = 128;
+        const int block_size = 256;
 
         int64_t hne0 = std::max(ne0 / 2LL, 1LL);
 

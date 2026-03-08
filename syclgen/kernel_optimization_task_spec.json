@@ -497,7 +497,8 @@
       "title": "Optimize binbcast (binary broadcast) kernel (medium potential)",
       "overall_optimization_potential": "medium",
       "priority": 2,
-      "status": "pending",
+      "status": "in_progress",
+      "started_at": "2026-03-08T21:00:00Z",
       "depends_on": [
         "opt_task_002"
       ],
@@ -509,7 +510,10 @@
           "description": "Increase WG from 128 to 256 for better occupancy",
           "expected_improvement": "5-15% throughput",
           "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k ADD -e ZES_ENABLE_SYSMAN=1"
+          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k ADD -e ZES_ENABLE_SYSMAN=1",
+          "completed": true,
+          "speedup": 2.13,
+          "notes": "block_size 128→256. Broadcast avg 2.13x speedup (ADD 2.04x, MUL 2.09x, DIV 2.26x). Bandwidth ~328 GB/s (72% peak). Small 1D neutral. KEPT."
         },
         {
           "step_id": "opt_013_002",
