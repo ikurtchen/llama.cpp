@@ -5134,7 +5134,12 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         }
         case GGML_OP_SET_ROWS:
         {
-            return (op->type == GGML_TYPE_F32 || op->type == GGML_TYPE_F16 || op->type == GGML_TYPE_BF16) &&
+            const ggml_type dst_type = op->type;
+            const bool float_dst = (dst_type == GGML_TYPE_F32 || dst_type == GGML_TYPE_F16 || dst_type == GGML_TYPE_BF16);
+            const bool quant_dst = (dst_type == GGML_TYPE_Q4_0 || dst_type == GGML_TYPE_Q4_1 ||
+                                    dst_type == GGML_TYPE_Q5_0 || dst_type == GGML_TYPE_Q5_1 ||
+                                    dst_type == GGML_TYPE_Q8_0 || dst_type == GGML_TYPE_IQ4_NL);
+            return (float_dst || quant_dst) &&
                    op->src[0]->type == GGML_TYPE_F32 &&
                    (op->src[1]->type == GGML_TYPE_I64 || op->src[1]->type == GGML_TYPE_I32);
         }

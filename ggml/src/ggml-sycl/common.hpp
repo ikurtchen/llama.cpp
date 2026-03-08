@@ -763,6 +763,10 @@ static __dpct_inline__ sycl::uint2 fast_div_modulo(uint32_t n, const sycl::uint3
     return sycl::uint2(div_val, mod_val);
 }
 
+static __dpct_inline__ uint32_t fastmodulo(uint32_t n, const sycl::uint3 fastdiv_values) {
+    return n - fastdiv(n, fastdiv_values) * fastdiv_values.z();
+}
+
 static __dpct_inline__ int ggml_sycl_dp4a(const int a, const int b, int c) {
     return dpct::dp4a(a, b, c);
 }

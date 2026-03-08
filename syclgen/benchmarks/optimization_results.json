@@ -2246,6 +2246,43 @@
         "peak_bw_pct": 61.9,
         "unit_tests_passed": "CPY 108/108, DUP 8/8"
       }
+    },
+    {
+      "task_id": "opt_task_021",
+      "kernel": "set_rows",
+      "step_id": "opt_026_001",
+      "description": "Replace 7 int64 div/mod with fast_div_modulo (precomputed magic-number division)",
+      "outcome": "speedup",
+      "speedup_avg": 5.44,
+      "benchmark_data": [
+        {
+          "test_case": "SET_ROWS(type=f32,type_idx=i32,ne=[4096,512,1,1],nr23=[1,1],r=512,v=0)",
+          "baseline_us": 404.47,
+          "baseline_gbs": 57.95,
+          "optimized_us": 74.28,
+          "optimized_gbs": 315.56,
+          "speedup": 5.44
+        }
+      ],
+      "notes": "Replaced raw int64 % and / operations with precomputed uint32 fast_div_modulo for ne00, ne01, ne02 decomposition and fastmodulo for ne11, ne12 wrapping. Matches CUDA set-rows.cu pattern exactly. Int64 division is extremely expensive on Intel GPUs (~50+ cycles per op). Added fastmodulo helper to common.hpp. Second run confirmed: 74.60 us / 314.18 GB/s."
+    },
+    {
+      "task_id": "opt_task_021",
+      "kernel": "set_rows",
+      "step_id": "opt_026_002",
+      "description": "Add quantized dst types (Q4_0, Q4_1, Q5_0, Q5_1, Q8_0, IQ4_NL) to match CUDA",
+      "outcome": "new_capability",
+      "notes": "Functional parity with CUDA: 6 device-side quantization functions ported from cpy-utils.cuh. k_set_rows_quant kernel template + set_rows_sycl_quant launcher. supports_op updated. 135/135 unit tests passed (all quantized types verified correct). Enables GPU path for quantized KV caches.",
+      "types_added": [
+        "q4_0",
+        "q4_1",
+        "q5_0",
+        "q5_1",
+        "q8_0",
+        "iq4_nl"
+      ],
+      "unit_tests": "135/135 passed",
+      "date": "2026-03-08"
     }
   ]
 }
