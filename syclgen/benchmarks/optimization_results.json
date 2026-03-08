@@ -1058,7 +1058,7 @@
             "description": "IQ types (iq2_xxs, iq2_xs, iq2_s, iq3_xxs, iq1_s, iq1_m, iq4_nl, iq3_s, iq4_xs) across n=1..8"
           },
           "multicol_n1": {
-            "avg_speedup": 0.970,
+            "avg_speedup": 0.97,
             "num_cases": 11,
             "description": "Non-IQ types at n=1 (legacy kernel path)"
           },
@@ -1070,28 +1070,88 @@
           "overall": {
             "avg_speedup": 0.971,
             "num_cases": 120,
-            "description": "All quantized types across all n values — net 2.9% regression"
+            "description": "All quantized types across all n values \u2014 net 2.9% regression"
           }
         },
         "worst_regressions": [
-          {"type": "q4_0", "n": 3, "speedup": 0.697, "note": "30.3% regression in multicol at n=3"},
-          {"type": "q6_K", "n": 3, "speedup": 0.709, "note": "29.1% regression in multicol at n=3"},
-          {"type": "mxfp4", "n": 3, "speedup": 0.717, "note": "28.3% regression in multicol at n=3"},
-          {"type": "q5_0", "n": 3, "speedup": 0.730, "note": "27.0% regression in multicol at n=3"},
-          {"type": "q3_K", "n": 3, "speedup": 0.754, "note": "24.6% regression in multicol at n=3"},
-          {"type": "q2_K", "n": 3, "speedup": 0.786, "note": "21.4% regression in multicol at n=3"}
+          {
+            "type": "q4_0",
+            "n": 3,
+            "speedup": 0.697,
+            "note": "30.3% regression in multicol at n=3"
+          },
+          {
+            "type": "q6_K",
+            "n": 3,
+            "speedup": 0.709,
+            "note": "29.1% regression in multicol at n=3"
+          },
+          {
+            "type": "mxfp4",
+            "n": 3,
+            "speedup": 0.717,
+            "note": "28.3% regression in multicol at n=3"
+          },
+          {
+            "type": "q5_0",
+            "n": 3,
+            "speedup": 0.73,
+            "note": "27.0% regression in multicol at n=3"
+          },
+          {
+            "type": "q3_K",
+            "n": 3,
+            "speedup": 0.754,
+            "note": "24.6% regression in multicol at n=3"
+          },
+          {
+            "type": "q2_K",
+            "n": 3,
+            "speedup": 0.786,
+            "note": "21.4% regression in multicol at n=3"
+          }
         ],
         "best_improvements": [
-          {"type": "q4_K", "n": 2, "speedup": 1.150, "note": "15.0% improvement"},
-          {"type": "q5_K", "n": 2, "speedup": 1.144, "note": "14.4% improvement"},
-          {"type": "iq2_xxs", "n": 2, "speedup": 1.143, "note": "14.3% improvement"},
-          {"type": "iq2_xxs", "n": 4, "speedup": 1.127, "note": "12.7% improvement"},
-          {"type": "iq2_xxs", "n": 8, "speedup": 1.113, "note": "11.3% improvement"},
-          {"type": "q4_K", "n": 3, "speedup": 1.091, "note": "9.1% improvement"}
+          {
+            "type": "q4_K",
+            "n": 2,
+            "speedup": 1.15,
+            "note": "15.0% improvement"
+          },
+          {
+            "type": "q5_K",
+            "n": 2,
+            "speedup": 1.144,
+            "note": "14.4% improvement"
+          },
+          {
+            "type": "iq2_xxs",
+            "n": 2,
+            "speedup": 1.143,
+            "note": "14.3% improvement"
+          },
+          {
+            "type": "iq2_xxs",
+            "n": 4,
+            "speedup": 1.127,
+            "note": "12.7% improvement"
+          },
+          {
+            "type": "iq2_xxs",
+            "n": 8,
+            "speedup": 1.113,
+            "note": "11.3% improvement"
+          },
+          {
+            "type": "q4_K",
+            "n": 3,
+            "speedup": 1.091,
+            "note": "9.1% improvement"
+          }
         ],
         "observations": [
           "sycl::reduce_over_group has higher latency than manual butterfly shuffle for most sub-group configurations on Xe2",
-          "Severe regressions concentrated at n=2 and n=3 for multicol types — possibly related to sub-group reduction implementation overhead",
+          "Severe regressions concentrated at n=2 and n=3 for multicol types \u2014 possibly related to sub-group reduction implementation overhead",
           "A few types (iq2_xxs, iq4_xs, q4_K, q5_K) showed improvements but not enough to offset widespread regressions",
           "The Xe2 compiler/runtime appears to generate worse code for reduce_over_group than hand-rolled butterfly xor shuffles",
           "Changes reverted; dpct::permute_sub_group_by_xor remains the preferred reduction pattern on this hardware"
@@ -1102,7 +1162,7 @@
       "task_id": "opt_task_005",
       "kernel": "mul_mat_vec_q (MMVQ)",
       "step_id": "opt_002_003",
-      "description": "Vectorized 64-bit loads (get_int2_from_*) for q4_0, q4_1, q5_0, q5_1, q8_0 — replace per-element int32 loads with coalesced int64 loads",
+      "description": "Vectorized 64-bit loads (get_int2_from_*) for q4_0, q4_1, q5_0, q5_1, q8_0 \u2014 replace per-element int32 loads with coalesced int64 loads",
       "outcome": "regression",
       "build_config": "Standard build (GGML_SYCL_F16=ON, no special defines)",
       "notes": "Replaced loop-based 32-bit loads with widened 64-bit load helpers (get_int2_from_int8_aligned, get_int2_from_uint8_aligned, get_int2_from_int8, get_int2_from_uint8) in 5 non-K formats (q4_0, q4_1, q5_0, q5_1, q8_0), both legacy and reorder paths. Also simplified get_int_from_int8/uint8 to use __builtin_memcpy. For q5_0/q5_1, optimized qh loads to single load + two shifts. Build succeeded, correctness passed (730/730), but benchmarks showed net regression. REVERTED.",
@@ -1114,43 +1174,98 @@
           "modified_5_formats_n2_8": {
             "avg_speedup": 0.914,
             "num_cases": 25,
-            "description": "q4_0, q4_1, q5_0, q5_1, q8_0 at n=2..8 — average 8.6% regression"
+            "description": "q4_0, q4_1, q5_0, q5_1, q8_0 at n=2..8 \u2014 average 8.6% regression"
           },
           "modified_5_formats_n1": {
-            "avg_speedup": 1.00,
+            "avg_speedup": 1.0,
             "num_cases": 5,
-            "description": "Modified formats at n=1 — neutral (DMMV path, not MMVQ multicol)"
+            "description": "Modified formats at n=1 \u2014 neutral (DMMV path, not MMVQ multicol)"
           },
           "unmodified_kquants_all_n": {
-            "avg_speedup": 1.00,
+            "avg_speedup": 1.0,
             "num_cases": 30,
-            "description": "q2_K, q3_K, q4_K, q5_K, q6_K across all n — neutral, confirming changes isolated"
+            "description": "q2_K, q3_K, q4_K, q5_K, q6_K across all n \u2014 neutral, confirming changes isolated"
           },
           "overall_10_formats": {
             "avg_speedup": 0.96,
             "num_cases": 60,
-            "description": "All 10 non-IQ quantized types across all n values — net 4.0% regression"
+            "description": "All 10 non-IQ quantized types across all n values \u2014 net 4.0% regression"
           }
         },
         "worst_regressions": [
-          {"type": "q4_0", "n": 8, "speedup": 0.75, "note": "~25% regression, worst case for q4_0"},
-          {"type": "q4_0", "n": 5, "speedup": 0.79, "note": "~21% regression"},
-          {"type": "q5_0", "n": 8, "speedup": 0.80, "note": "~20% regression"},
-          {"type": "q5_0", "n": 5, "speedup": 0.83, "note": "~17% regression"},
-          {"type": "q8_0", "n": 8, "speedup": 0.784, "note": "~21.6% regression despite some improvements at smaller n"},
-          {"type": "q6_K", "n": 8, "speedup": 0.847, "note": "~15.3% regression in unmodified format — possible cache pressure effect"}
+          {
+            "type": "q4_0",
+            "n": 8,
+            "speedup": 0.75,
+            "note": "~25% regression, worst case for q4_0"
+          },
+          {
+            "type": "q4_0",
+            "n": 5,
+            "speedup": 0.79,
+            "note": "~21% regression"
+          },
+          {
+            "type": "q5_0",
+            "n": 8,
+            "speedup": 0.8,
+            "note": "~20% regression"
+          },
+          {
+            "type": "q5_0",
+            "n": 5,
+            "speedup": 0.83,
+            "note": "~17% regression"
+          },
+          {
+            "type": "q8_0",
+            "n": 8,
+            "speedup": 0.784,
+            "note": "~21.6% regression despite some improvements at smaller n"
+          },
+          {
+            "type": "q6_K",
+            "n": 8,
+            "speedup": 0.847,
+            "note": "~15.3% regression in unmodified format \u2014 possible cache pressure effect"
+          }
         ],
         "best_improvements": [
-          {"type": "q8_0", "n": 2, "speedup": 1.122, "note": "12.2% improvement — only clear win"},
-          {"type": "q8_0", "n": 5, "speedup": 1.076, "note": "7.6% improvement"},
-          {"type": "q8_0", "n": 4, "speedup": 1.062, "note": "6.2% improvement"},
-          {"type": "q4_1", "n": 2, "speedup": 1.04, "note": "4% improvement at n=2 only"},
-          {"type": "q5_1", "n": 2, "speedup": 1.03, "note": "3% improvement at n=2 only"}
+          {
+            "type": "q8_0",
+            "n": 2,
+            "speedup": 1.122,
+            "note": "12.2% improvement \u2014 only clear win"
+          },
+          {
+            "type": "q8_0",
+            "n": 5,
+            "speedup": 1.076,
+            "note": "7.6% improvement"
+          },
+          {
+            "type": "q8_0",
+            "n": 4,
+            "speedup": 1.062,
+            "note": "6.2% improvement"
+          },
+          {
+            "type": "q4_1",
+            "n": 2,
+            "speedup": 1.04,
+            "note": "4% improvement at n=2 only"
+          },
+          {
+            "type": "q5_1",
+            "n": 2,
+            "speedup": 1.03,
+            "note": "3% improvement at n=2 only"
+          }
         ],
         "observations": [
           "64-bit loads do not reduce total instruction count enough to offset increased register pressure on Xe2",
           "q4_0 and q5_0 are worst affected (15-25% regressions at n>=4), likely because their original 32-bit load loop was well-optimized by the compiler",
-          "q8_0 shows mixed results — improves at n=2,4,5 but regresses badly at n=8, suggesting it benefits from coalescing at smaller batch sizes but hits register spill at n=8",
+          "q8_0 shows mixed results \u2014 improves at n=2,4,5 but regresses badly at n=8, suggesting it benefits from coalescing at smaller batch sizes but hits register spill at n=8",
           "n=1 is neutral across all formats because it uses the DMMV path, not the MMVQ multicol kernel",
           "Unmodified K-quants confirm changes are isolated; q6_K n=8 anomaly (-15.3%) may be noise or shared cache pressure",
           "The Xe2 compiler appears to handle small unrolled loops (2 iterations) efficiently enough that manual vectorization adds overhead",
@@ -1186,10 +1301,10 @@
       "task_id": "opt_task_005",
       "kernel": "mul_mat_vec_q (MMVQ)",
       "step_id": "opt_002_006",
-      "description": "Add #pragma unroll to dequantization inner loops — Q4_K data-loading loops in vecdotq.hpp",
+      "description": "Add #pragma unroll to dequantization inner loops \u2014 Q4_K data-loading loops in vecdotq.hpp",
       "outcome": "abandoned",
       "build_config": "Standard build (GGML_SYCL_F16=ON, no special defines)",
-      "notes": "Added #pragma unroll to the only 2 loops missing it in the MMVQ path: vec_dot_q4_K_q8_1_common() and reorder_vec_dot_q_sycl<Q4_K>::operator() data-loading loops (QR4_K=2 iterations). All other loops in mmvq.cpp and vecdotq.hpp (IQ format loops, K-quant loops, reduction loops, reorder loops) already had #pragma unroll. Build succeeded, correctness passed (730/730), but benchmark showed 0% measurable improvement — Q4_K times within noise of opt_002_001 results. The compiler already unrolled these trivial 2-iteration loops. Code reverted.",
+      "notes": "Added #pragma unroll to the only 2 loops missing it in the MMVQ path: vec_dot_q4_K_q8_1_common() and reorder_vec_dot_q_sycl<Q4_K>::operator() data-loading loops (QR4_K=2 iterations). All other loops in mmvq.cpp and vecdotq.hpp (IQ format loops, K-quant loops, reduction loops, reorder loops) already had #pragma unroll. Build succeeded, correctness passed (730/730), but benchmark showed 0% measurable improvement \u2014 Q4_K times within noise of opt_002_001 results. The compiler already unrolled these trivial 2-iteration loops. Code reverted.",
       "timestamp": "2026-03-08T17:30:00Z",
       "correctness": "pass",
       "baseline_time_us": 95.07,
@@ -1200,30 +1315,65 @@
         "baseline_log": "logs/b60_benchmark_20260308_050530.log (opt_002_001 results)",
         "new_log": "logs/b60_benchmark_20260308_110651.log",
         "q4_K_data": [
-          {"n": 1, "baseline_us": 95.27, "optimized_us": 95.39, "speedup": 0.999},
-          {"n": 2, "baseline_us": 162.77, "optimized_us": 163.74, "speedup": 0.994},
-          {"n": 3, "baseline_us": 227.52, "optimized_us": 226.92, "speedup": 1.003},
-          {"n": 4, "baseline_us": 300.28, "optimized_us": 301.20, "speedup": 0.997},
-          {"n": 5, "baseline_us": 365.27, "optimized_us": 364.09, "speedup": 1.003},
-          {"n": 8, "baseline_us": 554.87, "optimized_us": 553.09, "speedup": 1.003},
-          {"n": 512, "baseline_us": 1842.69, "optimized_us": 1824.29, "speedup": 1.010}
+          {
+            "n": 1,
+            "baseline_us": 95.27,
+            "optimized_us": 95.39,
+            "speedup": 0.999
+          },
+          {
+            "n": 2,
+            "baseline_us": 162.77,
+            "optimized_us": 163.74,
+            "speedup": 0.994
+          },
+          {
+            "n": 3,
+            "baseline_us": 227.52,
+            "optimized_us": 226.92,
+            "speedup": 1.003
+          },
+          {
+            "n": 4,
+            "baseline_us": 300.28,
+            "optimized_us": 301.2,
+            "speedup": 0.997
+          },
+          {
+            "n": 5,
+            "baseline_us": 365.27,
+            "optimized_us": 364.09,
+            "speedup": 1.003
+          },
+          {
+            "n": 8,
+            "baseline_us": 554.87,
+            "optimized_us": 553.09,
+            "speedup": 1.003
+          },
+          {
+            "n": 512,
+            "baseline_us": 1842.69,
+            "optimized_us": 1824.29,
+            "speedup": 1.01
+          }
         ],
-        "conclusion": "All values within <1% of opt_002_001 results. No measurable impact from #pragma unroll on 2-iteration data-loading loops — compiler already unrolls them."
+        "conclusion": "All values within <1% of opt_002_001 results. No measurable impact from #pragma unroll on 2-iteration data-loading loops \u2014 compiler already unrolls them."
       }
     },
     {
       "task_id": "opt_task_008",
       "kernel": "dequantize_block_sycl (convert)",
       "step_id": "opt_004_001",
-      "description": "Standardize WG sizes to 256 for all dequant formats — multi-block-per-WG transformation for K-quant (q2_K, q3_K, q4_K, q5_K, q6_K), IQ (iq1_s, iq1_m, iq2_xxs, iq2_xs, iq2_s, iq3_xxs, iq3_s, iq4_xs, iq4_nl), and mxfp4 kernels",
+      "description": "Standardize WG sizes to 256 for all dequant formats \u2014 multi-block-per-WG transformation for K-quant (q2_K, q3_K, q4_K, q5_K, q6_K), IQ (iq1_s, iq1_m, iq2_xxs, iq2_xs, iq2_s, iq3_xxs, iq3_s, iq4_xs, iq4_nl), and mxfp4 kernels",
       "outcome": "no_speedup",
       "build_config": "Standard build (GGML_SYCL_F16=ON, no special defines)",
       "timestamp": "2026-03-08T20:00:00Z",
       "correctness": "pass (CPY 108/108, GET_ROWS 43/43)",
-      "notes": "Implemented multi-block-per-WG transformation: WG=64→256 kernels (q2_K, q3_K, q5_K, q6_K) process 4 quant blocks per WG; WG=32→256 kernels (q4_K, IQ formats, mxfp4) process 8 quant blocks per WG. Each kernel uses virtual sub-group indexing (sub_block = tid/orig_wg_size, tid = tid%orig_wg_size) with nb bounds checking. q4_K SLM expanded from 12 to 96 bytes (8 sub-blocks × 12). All 15 kernel bodies modified in dequantize.hpp, all launch configs updated in convert.cpp. Dequantize kernels cannot be benchmarked in isolation — no dedicated CONVERT test in test-backend-ops. Tested via MUL_MAT n=512 (GEMM fallback: dequantize + oneMKL) and MUL_MAT n=1 for IQ types. Dequantize is a tiny fraction of total MUL_MAT time, so improvements are invisible. REVERTED.",
+      "notes": "Implemented multi-block-per-WG transformation: WG=64\u2192256 kernels (q2_K, q3_K, q5_K, q6_K) process 4 quant blocks per WG; WG=32\u2192256 kernels (q4_K, IQ formats, mxfp4) process 8 quant blocks per WG. Each kernel uses virtual sub-group indexing (sub_block = tid/orig_wg_size, tid = tid%orig_wg_size) with nb bounds checking. q4_K SLM expanded from 12 to 96 bytes (8 sub-blocks \u00d7 12). All 15 kernel bodies modified in dequantize.hpp, all launch configs updated in convert.cpp. Dequantize kernels cannot be benchmarked in isolation \u2014 no dedicated CONVERT test in test-backend-ops. Tested via MUL_MAT n=512 (GEMM fallback: dequantize + oneMKL) and MUL_MAT n=1 for IQ types. Dequantize is a tiny fraction of total MUL_MAT time, so improvements are invisible. REVERTED.",
       "benchmark_comparison": {
-        "test_case_1": "MUL_MAT(type_a=*,type_b=f32,m=4096,n=512,k=14336) — K-quant and IQ types via GEMM fallback",
-        "test_case_2": "MUL_MAT(type_a=iq*,type_b=f32,m=4096,n=1,k=14336) — IQ types via GEMM fallback at n=1",
+        "test_case_1": "MUL_MAT(type_a=*,type_b=f32,m=4096,n=512,k=14336) \u2014 K-quant and IQ types via GEMM fallback",
+        "test_case_2": "MUL_MAT(type_a=iq*,type_b=f32,m=4096,n=1,k=14336) \u2014 IQ types via GEMM fallback at n=1",
         "baseline_log": "logs/b60_benchmark_20260307_194801.log",
         "new_log": "logs/b60_benchmark_20260308_141729.log",
         "summary": {
@@ -1232,11 +1382,36 @@
             "num_cases": 5,
             "description": "K-quant types (q2_K, q3_K, q4_K, q5_K, q6_K) at n=512",
             "data": [
-              {"type": "q2_K", "baseline_us": 563.89, "new_us": 600.11, "speedup": 0.94},
-              {"type": "q3_K", "baseline_us": 1004.27, "new_us": 1027.56, "speedup": 0.98},
-              {"type": "q4_K", "baseline_us": 858.30, "new_us": 853.87, "speedup": 1.01},
-              {"type": "q5_K", "baseline_us": 1025.82, "new_us": 1060.78, "speedup": 0.97},
-              {"type": "q6_K", "baseline_us": 1301.61, "new_us": 1338.92, "speedup": 0.97}
+              {
+                "type": "q2_K",
+                "baseline_us": 563.89,
+                "new_us": 600.11,
+                "speedup": 0.94
+              },
+              {
+                "type": "q3_K",
+                "baseline_us": 1004.27,
+                "new_us": 1027.56,
+                "speedup": 0.98
+              },
+              {
+                "type": "q4_K",
+                "baseline_us": 858.3,
+                "new_us": 853.87,
+                "speedup": 1.01
+              },
+              {
+                "type": "q5_K",
+                "baseline_us": 1025.82,
+                "new_us": 1060.78,
+                "speedup": 0.97
+              },
+              {
+                "type": "q6_K",
+                "baseline_us": 1301.61,
+                "new_us": 1338.92,
+                "speedup": 0.97
+              }
             ]
           },
           "mul_mat_n512_iq": {
@@ -1244,15 +1419,42 @@
             "num_cases": 9,
             "description": "IQ types at n=512",
             "data": [
-              {"type": "iq1_s", "speedup": 1.00},
-              {"type": "iq1_m", "speedup": 0.98},
-              {"type": "iq2_xxs", "speedup": 0.99},
-              {"type": "iq2_xs", "speedup": 0.99},
-              {"type": "iq2_s", "speedup": 0.99},
-              {"type": "iq3_xxs", "speedup": 1.00},
-              {"type": "iq3_s", "speedup": 0.98},
-              {"type": "iq4_xs", "speedup": 0.99},
-              {"type": "iq4_nl", "speedup": 0.99}
+              {
+                "type": "iq1_s",
+                "speedup": 1.0
+              },
+              {
+                "type": "iq1_m",
+                "speedup": 0.98
+              },
+              {
+                "type": "iq2_xxs",
+                "speedup": 0.99
+              },
+              {
+                "type": "iq2_xs",
+                "speedup": 0.99
+              },
+              {
+                "type": "iq2_s",
+                "speedup": 0.99
+              },
+              {
+                "type": "iq3_xxs",
+                "speedup": 1.0
+              },
+              {
+                "type": "iq3_s",
+                "speedup": 0.98
+              },
+              {
+                "type": "iq4_xs",
+                "speedup": 0.99
+              },
+              {
+                "type": "iq4_nl",
+                "speedup": 0.99
+              }
             ]
           },
           "mul_mat_n1_iq": {
@@ -1260,20 +1462,49 @@
             "num_cases": 9,
             "description": "IQ types at n=1 (GEMM fallback, dequantize + oneMKL)",
             "data": [
-              {"type": "iq1_s", "speedup": 1.00},
-              {"type": "iq1_m", "speedup": 0.95},
-              {"type": "iq2_xxs", "speedup": 0.95},
-              {"type": "iq2_xs", "speedup": 1.00},
-              {"type": "iq2_s", "speedup": 0.97},
-              {"type": "iq3_xxs", "speedup": 1.00},
-              {"type": "iq3_s", "speedup": 1.00},
-              {"type": "iq4_xs", "speedup": 1.00},
-              {"type": "iq4_nl", "speedup": 1.00}
+              {
+                "type": "iq1_s",
+                "speedup": 1.0
+              },
+              {
+                "type": "iq1_m",
+                "speedup": 0.95
+              },
+              {
+                "type": "iq2_xxs",
+                "speedup": 0.95
+              },
+              {
+                "type": "iq2_xs",
+                "speedup": 1.0
+              },
+              {
+                "type": "iq2_s",
+                "speedup": 0.97
+              },
+              {
+                "type": "iq3_xxs",
+                "speedup": 1.0
+              },
+              {
+                "type": "iq3_s",
+                "speedup": 1.0
+              },
+              {
+                "type": "iq4_xs",
+                "speedup": 1.0
+              },
+              {
+                "type": "iq4_nl",
+                "speedup": 1.0
+              }
             ]
           },
-          "mxfp4_n512": {"speedup": 0.98}
+          "mxfp4_n512": {
+            "speedup": 0.98
+          }
         },
-        "conclusion": "No measurable speedup. Dequantize kernels are a tiny fraction of MUL_MAT execution time (dominated by oneMKL GEMM at n=512). WG=256 multi-block approach adds bounds-checking overhead without visible benefit. The K-quant/IQ dequantize kernels are already fast enough relative to downstream consumers. Remaining opt_task_008 steps (vectorization, nd_range cleanup, loop unroll, SLM caching) unlikely to show measurable improvement for the same reason — dequantize is not the bottleneck. Task abandoned."
+        "conclusion": "No measurable speedup. Dequantize kernels are a tiny fraction of MUL_MAT execution time (dominated by oneMKL GEMM at n=512). WG=256 multi-block approach adds bounds-checking overhead without visible benefit. The K-quant/IQ dequantize kernels are already fast enough relative to downstream consumers. Remaining opt_task_008 steps (vectorization, nd_range cleanup, loop unroll, SLM caching) unlikely to show measurable improvement for the same reason \u2014 dequantize is not the bottleneck. Task abandoned."
       }
     },
     {
@@ -1285,7 +1516,7 @@
       "build_config": "Standard build (GGML_SYCL_F16=ON, no special defines)",
       "timestamp": "2026-03-08T21:30:00Z",
       "correctness": "pass (ADD 99/99, MUL 91/91)",
-      "notes": "Single-line change: block_size 128→256 in launch_bin_bcast(). Affects all binary broadcast operations (ADD, SUB, MUL, DIV, REPEAT) since they share the same launch function. The 3D grid partitioning (bx*by*bz) automatically adapts to the new block_size. For the broadcast test case (ne0=4096, nr=[1,512,1,1]), dimension collapsing merges ne0*ne1 into a single dimension, making this effectively a 1D launch with WG=256 processing 2M elements. Bandwidth improved from ~155 GB/s to ~328 GB/s (72% of B60 peak 456 GB/s).",
+      "notes": "Single-line change: block_size 128\u2192256 in launch_bin_bcast(). Affects all binary broadcast operations (ADD, SUB, MUL, DIV, REPEAT) since they share the same launch function. The 3D grid partitioning (bx*by*bz) automatically adapts to the new block_size. For the broadcast test case (ne0=4096, nr=[1,512,1,1]), dimension collapsing merges ne0*ne1 into a single dimension, making this effectively a 1D launch with WG=256 processing 2M elements. Bandwidth improved from ~155 GB/s to ~328 GB/s (72% of B60 peak 456 GB/s).",
       "benchmark_comparison": {
         "test_cases": "ADD/MUL/DIV with ne=[4096,1,1,1], nr=[1,1,1,1] (small 1D) and nr=[1,512,1,1] (broadcast)",
         "baseline_log": "syclgen/benchmarks/baseline_results.json",
@@ -1298,7 +1529,7 @@
             "new_us": 7.65,
             "new_gbps": 5.99,
             "speedup": 0.98,
-            "note": "Small tensor, launch-overhead dominated — neutral"
+            "note": "Small tensor, launch-overhead dominated \u2014 neutral"
           },
           {
             "op": "ADD",
@@ -1318,14 +1549,14 @@
             "new_us": 7.55,
             "new_gbps": 6.07,
             "speedup": 1.04,
-            "note": "Small tensor — neutral"
+            "note": "Small tensor \u2014 neutral"
           },
           {
             "op": "MUL",
             "shape": "ne=[4096,1,1,1],nr=[1,512,1,1]",
             "baseline_us": 147.88,
             "baseline_gbps": 158.49,
-            "new_us": 70.80,
+            "new_us": 70.8,
             "new_gbps": 331.04,
             "speedup": 2.09,
             "note": "2.09x speedup"
@@ -1337,14 +1568,14 @@
             "baseline_gbps": 6.01,
             "new_us": 7.62,
             "new_gbps": 6.01,
-            "speedup": 1.00,
-            "note": "Small tensor — neutral"
+            "speedup": 1.0,
+            "note": "Small tensor \u2014 neutral"
           },
           {
             "op": "DIV",
             "shape": "ne=[4096,1,1,1],nr=[1,512,1,1]",
             "baseline_us": 164.25,
-            "baseline_gbps": 142.70,
+            "baseline_gbps": 142.7,
             "new_us": 72.61,
             "new_gbps": 322.78,
             "speedup": 2.26,
@@ -1371,31 +1602,101 @@
       "correctness": "pass (212/212 SOFT_MAX tests)",
       "notes": "Added ncols_template and block_size_template template parameters to soft_max_f32_sycl kernel. 8 compile-time specializations matching CUDA: {32,64,128,256,512,1024,2048,4096}. Block sizes capped at WARP_SIZE*WARP_SIZE=256 (Xe2 block_reduce limitation: single warp reduces inter-warp partials, max WARP_SIZE warps). Specializations enable #pragma unroll on 3 inner loops and eliminate bounds checks when ncols_template>0. block_reduce gets compile-time block_size_const instead of 0 (runtime). New soft_max_dispatch_sycl helper routes to specialization or fallback. Initial attempt with block_size=1024 for ncols>=512 caused block_reduce corruption (40 test failures at ncols=1024); fixed by capping at 256.",
       "benchmark_comparison": {
-        "test_case": "SOFT_MAX(type=f32,...) — 29 test configurations",
+        "test_case": "SOFT_MAX(type=f32,...) \u2014 29 test configurations",
         "baseline_log": "syclgen/benchmarks/baseline_results.json",
         "new_log": "b60 benchmark 2026-03-08",
         "specialized_cases": {
-          "description": "ncols in {32, 64, 128, 256, 512, 1024, 2048, 4096} — compile-time specialization",
+          "description": "ncols in {32, 64, 128, 256, 512, 1024, 2048, 4096} \u2014 compile-time specialization",
           "data": [
-            {"ne": "[4096,4096,5,1]", "ncols": 4096, "block_size": 256, "baseline_gbps": 125.99, "new_gbps": 365.55, "baseline_us": 5008.38, "new_us": 1726.17, "speedup": 2.90},
-            {"ne": "[1024,1024,10,1]", "ncols": 1024, "block_size": 256, "baseline_gbps": 73.62, "new_gbps": 263.62, "baseline_us": 1062.47, "new_us": 296.72, "speedup": 3.58},
-            {"ne": "[256,256,20,1]", "ncols": 256, "block_size": 256, "baseline_gbps": 82.32, "new_gbps": 104.55, "baseline_us": 118.65, "new_us": 93.42, "speedup": 1.27},
-            {"ne": "[64,64,20,1]", "ncols": 64, "block_size": 64, "baseline_gbps": 20.36, "new_gbps": 85.95, "baseline_us": 29.97, "new_us": 7.10, "speedup": 4.22}
+            {
+              "ne": "[4096,4096,5,1]",
+              "ncols": 4096,
+              "block_size": 256,
+              "baseline_gbps": 125.99,
+              "new_gbps": 365.55,
+              "baseline_us": 5008.38,
+              "new_us": 1726.17,
+              "speedup": 2.9
+            },
+            {
+              "ne": "[1024,1024,10,1]",
+              "ncols": 1024,
+              "block_size": 256,
+              "baseline_gbps": 73.62,
+              "new_gbps": 263.62,
+              "baseline_us": 1062.47,
+              "new_us": 296.72,
+              "speedup": 3.58
+            },
+            {
+              "ne": "[256,256,20,1]",
+              "ncols": 256,
+              "block_size": 256,
+              "baseline_gbps": 82.32,
+              "new_gbps": 104.55,
+              "baseline_us": 118.65,
+              "new_us": 93.42,
+              "speedup": 1.27
+            },
+            {
+              "ne": "[64,64,20,1]",
+              "ncols": 64,
+              "block_size": 64,
+              "baseline_gbps": 20.36,
+              "new_gbps": 85.95,
+              "baseline_us": 29.97,
+              "new_us": 7.1,
+              "speedup": 4.22
+            }
           ],
           "avg_speedup": 2.99,
-          "best": {"speedup": 4.22, "ne": "[64,64,20,1]", "note": "ncols=64, block_size=64, single-iteration fully unrolled"},
-          "worst": {"speedup": 1.27, "ne": "[256,256,20,1]", "note": "ncols=256, block_size=256 — already at optimal WG size, unroll provides modest benefit"}
+          "best": {
+            "speedup": 4.22,
+            "ne": "[64,64,20,1]",
+            "note": "ncols=64, block_size=64, single-iteration fully unrolled"
+          },
+          "worst": {
+            "speedup": 1.27,
+            "ne": "[256,256,20,1]",
+            "note": "ncols=256, block_size=256 \u2014 already at optimal WG size, unroll provides modest benefit"
+          }
         },
         "fallback_cases": {
-          "description": "ncols not in specialization set — generic kernel, still benefits from compile-time block_size in block_reduce",
+          "description": "ncols not in specialization set \u2014 generic kernel, still benefits from compile-time block_size in block_reduce",
           "avg_speedup": 1.58,
           "num_cases": 25,
-          "best": {"speedup": 4.00, "ne": "[524288,4,1,1]", "note": "Large ncols, baseline was pathologically slow"},
-          "worst": {"speedup": 0.96, "ne": "[262144,16,1,1]", "note": "4% regression, within noise margin"},
+          "best": {
+            "speedup": 4.0,
+            "ne": "[524288,4,1,1]",
+            "note": "Large ncols, baseline was pathologically slow"
+          },
+          "worst": {
+            "speedup": 0.96,
+            "ne": "[262144,16,1,1]",
+            "note": "4% regression, within noise margin"
+          },
           "notable": [
-            {"ne": "[12888,256,5,1]", "ncols": 12888, "baseline_gbps": 83.93, "new_gbps": 186.33, "speedup": 2.22},
-            {"ne": "[77,4096,5,1]", "ncols": 77, "baseline_gbps": 16.26, "new_gbps": 29.78, "speedup": 1.83},
-            {"ne": "[131072,16,1,1]", "ncols": 131072, "baseline_gbps": 33.04, "new_gbps": 65.94, "speedup": 2.00}
+            {
+              "ne": "[12888,256,5,1]",
+              "ncols": 12888,
+              "baseline_gbps": 83.93,
+              "new_gbps": 186.33,
+              "speedup": 2.22
+            },
+            {
+              "ne": "[77,4096,5,1]",
+              "ncols": 77,
+              "baseline_gbps": 16.26,
+              "new_gbps": 29.78,
+              "speedup": 1.83
+            },
+            {
+              "ne": "[131072,16,1,1]",
+              "ncols": 131072,
+              "baseline_gbps": 33.04,
+              "new_gbps": 65.94,
+              "speedup": 2.0
+            }
           ]
         },
         "overall": {
@@ -1418,9 +1719,9 @@
       "build_config": "Standard build (GGML_SYCL_F16=ON, no special defines)",
       "timestamp": "2026-03-08T15:10:00Z",
       "correctness": "pass (268/268 ROPE tests)",
-      "notes": "Four changes in rope.cpp: (1) Precompute theta_scale_log2 = sycl::log2(theta_scale) on host, (2) Replace sycl::pow(theta_scale, X) with sycl::native::exp2(theta_scale_log2 * X) in all 4 kernel variants (norm, neox, multi, vision), (3) Replace sycl::cos/sin with sycl::native::cos/sin in rope_yarn, (4) Replace sycl::log with sycl::native::log in rope_yarn ext_factor path. Native math trades ~1 ULP accuracy for 3-5x faster transcendentals — acceptable for positional encoding where small errors are absorbed by attention softmax.",
+      "notes": "Four changes in rope.cpp: (1) Precompute theta_scale_log2 = sycl::log2(theta_scale) on host, (2) Replace sycl::pow(theta_scale, X) with sycl::native::exp2(theta_scale_log2 * X) in all 4 kernel variants (norm, neox, multi, vision), (3) Replace sycl::cos/sin with sycl::native::cos/sin in rope_yarn, (4) Replace sycl::log with sycl::native::log in rope_yarn ext_factor path. Native math trades ~1 ULP accuracy for 3-5x faster transcendentals \u2014 acceptable for positional encoding where small errors are absorbed by attention softmax.",
       "benchmark_comparison": {
-        "test_case": "ROPE(type={f32,f16},...) — 56 test configurations",
+        "test_case": "ROPE(type={f32,f16},...) \u2014 56 test configurations",
         "baseline_log": "syclgen/benchmarks/baseline_results.json",
         "new_log": "logs/b60_benchmark_20260308_150541.log",
         "group_analysis": {
@@ -1429,8 +1730,18 @@
             "avg_speedup": 2.656,
             "num_cases": 2,
             "data": [
-              {"ne": "[128,32,512,1]", "baseline_us": 155.31, "new_us": 63.60, "speedup": 2.441},
-              {"ne": "[128,64,512,1]", "baseline_us": 412.07, "new_us": 143.56, "speedup": 2.870}
+              {
+                "ne": "[128,32,512,1]",
+                "baseline_us": 155.31,
+                "new_us": 63.6,
+                "speedup": 2.441
+              },
+              {
+                "ne": "[128,64,512,1]",
+                "baseline_us": 412.07,
+                "new_us": 143.56,
+                "speedup": 2.87
+              }
             ]
           },
           "f32_mode2_ff0_v0": {
@@ -1438,8 +1749,18 @@
             "avg_speedup": 1.882,
             "num_cases": 2,
             "data": [
-              {"ne": "[80,32,512,1]", "baseline_us": 132.48, "new_us": 61.62, "speedup": 2.150},
-              {"ne": "[64,8,512,1]", "baseline_us": 26.27, "new_us": 16.28, "speedup": 1.614}
+              {
+                "ne": "[80,32,512,1]",
+                "baseline_us": 132.48,
+                "new_us": 61.62,
+                "speedup": 2.15
+              },
+              {
+                "ne": "[64,8,512,1]",
+                "baseline_us": 26.27,
+                "new_us": 16.28,
+                "speedup": 1.614
+              }
             ]
           },
           "f32_mode0_ff1_v0": {
@@ -1447,8 +1768,18 @@
             "avg_speedup": 1.349,
             "num_cases": 2,
             "data": [
-              {"ne": "[128,32,512,1]", "baseline_us": 85.48, "new_us": 64.61, "speedup": 1.323},
-              {"ne": "[128,64,512,1]", "baseline_us": 201.47, "new_us": 146.79, "speedup": 1.372}
+              {
+                "ne": "[128,32,512,1]",
+                "baseline_us": 85.48,
+                "new_us": 64.61,
+                "speedup": 1.323
+              },
+              {
+                "ne": "[128,64,512,1]",
+                "baseline_us": 201.47,
+                "new_us": 146.79,
+                "speedup": 1.372
+              }
             ]
           },
           "f32_mode8_ff0_v0": {
@@ -1456,22 +1787,32 @@
             "avg_speedup": 1.372,
             "num_cases": 1,
             "data": [
-              {"ne": "[128,12,512,1]", "baseline_us": 41.05, "new_us": 29.91, "speedup": 1.372}
+              {
+                "ne": "[128,12,512,1]",
+                "baseline_us": 41.05,
+                "new_us": 29.91,
+                "speedup": 1.372
+              }
             ]
           },
           "f32_mode40_ff0_v0": {
             "description": "f32 rope_vision, small tensors",
-            "avg_speedup": 1.550,
+            "avg_speedup": 1.55,
             "num_cases": 1,
             "data": [
-              {"ne": "[128,12,512,1]", "baseline_us": 51.63, "new_us": 33.30, "speedup": 1.550}
+              {
+                "ne": "[128,12,512,1]",
+                "baseline_us": 51.63,
+                "new_us": 33.3,
+                "speedup": 1.55
+              }
             ]
           },
           "f32_v1_all": {
             "description": "f32 all modes with v=1 (large tensors, bandwidth-bound)",
             "avg_speedup": 1.178,
             "num_cases": 14,
-            "note": "Bandwidth-bound cases show smaller benefit — native math reduces compute but memory latency dominates"
+            "note": "Bandwidth-bound cases show smaller benefit \u2014 native math reduces compute but memory latency dominates"
           },
           "f16_all": {
             "description": "f16 all modes (compute in f32, load/store in f16)",
@@ -1483,7 +1824,7 @@
         "overall": {
           "avg_speedup": 1.294,
           "num_cases": 56,
-          "best_speedup": 2.870,
+          "best_speedup": 2.87,
           "worst_speedup": 0.984,
           "num_regressions_below_098x": 0,
           "peak_bandwidth_gbps": 918.67,
@@ -1501,9 +1842,9 @@
       "build_config": "Standard build (GGML_SYCL_F16=ON, no special defines)",
       "timestamp": "2026-03-09T10:30:00Z",
       "correctness": "pass (51/51 norm tests: GROUP_NORM 2/2, RMS_NORM 17/17, NORM 16/16, L2_NORM 16/16)",
-      "notes": "Replaced 3-pass GROUP_NORM (pass1: sum+reduce for mean, pass2: subtract_mean+write+sum_sq+reduce for variance, pass3: scale*read+write) with 2-pass approach using sycl::float2 accumulation: pass1 accumulates sum and sum-of-squares simultaneously (Var = E[x²]-E[x]²), pass2 writes (x-mean)*scale. Eliminates one full read+write pass over the data. Same approach already used by NORM kernel in this file. Also an improvement over CUDA GROUP_NORM which still uses 3 passes. SLM type changed from sycl::local_accessor<float> to sycl::local_accessor<sycl::float2> to support the float2 block_reduce.",
+      "notes": "Replaced 3-pass GROUP_NORM (pass1: sum+reduce for mean, pass2: subtract_mean+write+sum_sq+reduce for variance, pass3: scale*read+write) with 2-pass approach using sycl::float2 accumulation: pass1 accumulates sum and sum-of-squares simultaneously (Var = E[x\u00b2]-E[x]\u00b2), pass2 writes (x-mean)*scale. Eliminates one full read+write pass over the data. Same approach already used by NORM kernel in this file. Also an improvement over CUDA GROUP_NORM which still uses 3 passes. SLM type changed from sycl::local_accessor<float> to sycl::local_accessor<sycl::float2> to support the float2 block_reduce.",
       "benchmark_comparison": {
-        "test_case": "GROUP_NORM(type=f32,...) — 2 test configurations",
+        "test_case": "GROUP_NORM(type=f32,...) \u2014 2 test configurations",
         "baseline_log": "syclgen/benchmarks/baseline_results.json",
         "new_log": "b60 benchmark 2026-03-09",
         "data": [
@@ -1511,23 +1852,23 @@
             "ne": "[64,64,320,1]",
             "num_groups": 32,
             "group_size": 40960,
-            "baseline_us": 62.10,
+            "baseline_us": 62.1,
             "new_us": 42.17,
-            "baseline_gbps": 157.30,
-            "new_gbps": 231.60,
+            "baseline_gbps": 157.3,
+            "new_gbps": 231.6,
             "speedup": 1.473,
-            "note": "Small case: 40960 elements/group, 160 iterations/thread — reduction overhead is non-trivial relative to data passes"
+            "note": "Small case: 40960 elements/group, 160 iterations/thread \u2014 reduction overhead is non-trivial relative to data passes"
           },
           {
             "ne": "[128,128,640,1]",
             "num_groups": 32,
             "group_size": 327680,
-            "baseline_us": 1270.90,
+            "baseline_us": 1270.9,
             "new_us": 846.07,
-            "baseline_gbps": 61.50,
+            "baseline_gbps": 61.5,
             "new_gbps": 92.34,
             "speedup": 1.502,
-            "note": "Large case: 327680 elements/group, 1280 iterations/thread — eliminating the third pass saves ~425us of memory traffic"
+            "note": "Large case: 327680 elements/group, 1280 iterations/thread \u2014 eliminating the third pass saves ~425us of memory traffic"
           }
         ],
         "overall": {
@@ -1535,7 +1876,7 @@
           "num_cases": 2,
           "best_speedup": 1.502,
           "worst_speedup": 1.473,
-          "peak_bandwidth_gbps": 231.60,
+          "peak_bandwidth_gbps": 231.6,
           "peak_pct_of_hw_peak": 50.8,
           "description": "1.49x average speedup across both GROUP_NORM test cases by reducing 3 passes to 2. Large case improved from 62 to 92 GB/s. Bandwidth still well below peak (50.8%) due to GROUP_NORM's non-contiguous access pattern (groups span multiple channels) and high iteration count per thread."
         }
@@ -1552,7 +1893,7 @@
       "correctness": "pass (94/94 ARGSORT tests, 445/445 TOP_K tests)",
       "notes": "Extracted bitonic sort into standalone template function argsort_f32_i32_sycl_bitonic<ggml_sort_order order>(). Dispatcher calls templated function instead of inline lambda with runtime bool. TOP_K now calls same function (descending order) instead of duplicating the sort code. No baseline comparison possible for ARGSORT (all baseline cases were ncols>1024 = 'not supported'). TOP_K small-ncols cases show no regression (ne=[1000,1,1,1],k=1: 19.34us vs baseline 19.24us).",
       "benchmark_comparison": {
-        "test_case": "ARGSORT + TOP_K — no baseline comparison for new large-ncols cases",
+        "test_case": "ARGSORT + TOP_K \u2014 no baseline comparison for new large-ncols cases",
         "baseline_log": "syclgen/benchmarks/baseline_results.json",
         "new_log": "b60 benchmark 2026-03-08",
         "data": [
@@ -1613,7 +1954,7 @@
       "correctness": "pass (94/94 ARGSORT tests including ncols up to 1048576; 445/445 TOP_K tests including ncols up to 524288)",
       "notes": "Added oneDPL sort_by_key-based argsort for large ncols, matching CUDA's CUB path. CMakeLists.txt auto-detects oneDPL with find_package(oneDPL QUIET). When found, GGML_SYCL_USE_ONEDPL is defined and supports_op removes the ncols<=1024 limit. When not found, falls back to bitonic sort with ncols<=1024 limit (same as before). No baseline comparison possible since all large-ncols cases were 'not supported' in baseline. Performance for large ncols via oneDPL radix sort: ARGSORT ncols=65000 nrows=16 takes 12.7ms, ncols=200000 nrows=1 takes 0.9ms, ncols=200000 nrows=16 takes 14.6ms. TOP_K ncols=65000 k=1 takes 474us/row, ncols=200000 k=1 takes 474us/row.",
       "benchmark_comparison": {
-        "test_case": "ARGSORT + TOP_K large ncols — new capability, no baseline exists",
+        "test_case": "ARGSORT + TOP_K large ncols \u2014 new capability, no baseline exists",
         "baseline_log": "syclgen/benchmarks/baseline_results.json (all large cases were 'not supported')",
         "new_log": "b60 benchmark 2026-03-08",
         "data": [
@@ -1697,7 +2038,7 @@
             "outprod.cpp: Replaced single GEMM call with ne2*ne3 loop, GQA broadcasting via dps2/dps3, stride-based lda/ldc, src1 contiguity assert",
             "ggml-sycl.cpp: Removed ne[2]==1 && ne[3]==1 from supports_op for OUT_PROD"
           ],
-          "unit_test_result": "64/64 F32 tests PASS (all batched/GQA configs). 960 non-F32 'not supported' (expected — CUDA also F32-only)",
+          "unit_test_result": "64/64 F32 tests PASS (all batched/GQA configs). 960 non-F32 'not supported' (expected \u2014 CUDA also F32-only)",
           "benchmark_result": {
             "comparison": [
               {
@@ -1712,7 +2053,7 @@
                 "name": "OUT_PROD(type_a=f32,type_b=f32,m=4096,n=4096,k=8,bs=[1,1],nr=[1,1],trans_b=0)",
                 "baseline_us": 188.29,
                 "optimized_us": 188.33,
-                "speedup": 1.000,
+                "speedup": 1.0,
                 "baseline_gbs": 333.23,
                 "optimized_gbs": 333.15
               }
@@ -1728,7 +2069,7 @@
         "opt_005_002": {
           "description": "Add F16 GEMM support via oneMKL half-precision routines",
           "outcome": "skipped",
-          "skip_reason": "CUDA doesn't support F16 outprod either — beyond parity scope. Mixed-precision GEMM adds complexity and precision risk."
+          "skip_reason": "CUDA doesn't support F16 outprod either \u2014 beyond parity scope. Mixed-precision GEMM adds complexity and precision risk."
         }
       }
     },
@@ -1736,7 +2077,7 @@
       "task_id": "opt_task_017",
       "kernel": "dequantize device functions",
       "step_id": "all",
-      "description": "All steps skipped — no standalone CONVERT benchmark exists, dequantize_block called indirectly from CPY/DUP",
+      "description": "All steps skipped \u2014 no standalone CONVERT benchmark exists, dequantize_block called indirectly from CPY/DUP",
       "outcome": "skipped",
       "notes": "opt_009_003 (loop unroll) proven ineffective on Xe2. opt_009_002 (SoA reorder) too complex. opt_009_001 (output coalescing) and opt_009_005 (vectorization) potentially valuable but unmeasurable without benchmark."
     },
@@ -1753,14 +2094,14 @@
           "TANH": {
             "baseline_us": 333.33,
             "optimized_us": 139.05,
-            "speedup": 2.40,
+            "speedup": 2.4,
             "baseline_bw_gbs": 164.07,
-            "optimized_bw_gbs": 393.30
+            "optimized_bw_gbs": 393.3
           },
           "GEGLU": {
             "baseline_us": 285.74,
             "optimized_us": 114.47,
-            "speedup": 2.50,
+            "speedup": 2.5,
             "baseline_bw_gbs": 143.54,
             "optimized_bw_gbs": 358.31
           },
@@ -1779,7 +2120,7 @@
             "optimized_bw_gbs": 353.75
           },
           "GELU": {
-            "baseline_us": 203.00,
+            "baseline_us": 203.0,
             "optimized_us": 154.56,
             "speedup": 1.31,
             "baseline_bw_gbs": 269.39,
@@ -1795,7 +2136,7 @@
           },
           "GELU_ERF": {
             "baseline_us": 158.82,
-            "optimized_us": 157.40,
+            "optimized_us": 157.4,
             "speedup": 1.01,
             "notes": "erff not changed, control comparison"
           },
@@ -1807,8 +2148,103 @@
           }
         },
         "avg_speedup_native_math_ops": 1.86,
-        "max_speedup": 2.50,
+        "max_speedup": 2.5,
         "unit_tests_passed": "GELU 4/4, SILU 4/4, SIGMOID 4/4, TANH 4/4, SWIGLU 24/24, GEGLU 24/24, SOFT_MAX 212/212"
+      }
+    },
+    {
+      "task_id": "opt_task_019",
+      "kernel": "cpy (tensor copy with type conversion)",
+      "step_id": "opt_019_001",
+      "description": "SLM-tiled 2D transpose kernel matching CUDA cpy_scalar_transpose",
+      "outcome": "significant_speedup",
+      "notes": "Added k_cpy_scalar_transpose kernel with SLM tile[32][33] and nd_range<3> (32x8 WG). Detects 2D transpose via can_be_transposed check (nb01==element_size, ne[3]==1, nb02==ne00*ne01*element_size, dst contiguous). Dispatched for same-type copies: F32->F32, F16->F16, BF16->BF16, I32->I32. CUDA reference: __shared__ float tile[32][33] with dim3(32,8,1).",
+      "benchmark_results": {
+        "comparison_note": "Baseline values are from fresh pre-optimization runs (same session, GPU not throttled). Original batch-run baseline had thermal throttling.",
+        "test_cases": [
+          {
+            "name": "CPY F32->F16 contiguous [512,3072] (control)",
+            "before_bw_gbs": 691.34,
+            "after_bw_gbs": 694.09,
+            "speedup": 1.0,
+            "notes": "Unchanged path, control"
+          },
+          {
+            "name": "CPY F32->F32 permute[0,2,1,3] [8192,512,2] (control)",
+            "before_bw_gbs": 71.43,
+            "after_bw_gbs": 71.51,
+            "speedup": 1.0,
+            "notes": "Not a dim0/dim1 transpose, generic path still used"
+          },
+          {
+            "name": "CPY F32->F32 permute[1,0,2,3] [786432,256,1,1]",
+            "before_bw_gbs": 72.57,
+            "after_bw_gbs": 164.82,
+            "speedup": 2.27,
+            "notes": "SLM transpose kernel"
+          },
+          {
+            "name": "CPY F16->F16 permute[1,0,2,3] [786432,256,1,1]",
+            "before_bw_gbs": 36.25,
+            "after_bw_gbs": 73.76,
+            "speedup": 2.03,
+            "notes": "SLM transpose kernel, F16 packing"
+          },
+          {
+            "name": "CPY F16->F16 permute[1,0,2,3] [768,1024,256]",
+            "before_bw_gbs": 36.25,
+            "after_bw_gbs": 155.94,
+            "speedup": 4.3,
+            "notes": "SLM transpose kernel, batched z-blocking"
+          },
+          {
+            "name": "CPY BF16->BF16 permute[1,0,2,3] [768,1024,256]",
+            "before_bw_gbs": 36.25,
+            "after_bw_gbs": 155.94,
+            "speedup": 4.3,
+            "notes": "SLM transpose kernel, batched z-blocking"
+          },
+          {
+            "name": "CPY F32->F32 transpose [786432,256,1,1]",
+            "before_bw_gbs": 72.51,
+            "after_bw_gbs": 164.84,
+            "speedup": 2.27,
+            "notes": "SLM transpose kernel"
+          },
+          {
+            "name": "CPY F32->F32 transpose [768,1024,256]",
+            "before_bw_gbs": 71.98,
+            "after_bw_gbs": 282.16,
+            "speedup": 3.92,
+            "notes": "SLM transpose kernel, batched z-blocking"
+          },
+          {
+            "name": "CPY F16->F16 transpose [786432,256,1,1]",
+            "before_bw_gbs": 36.29,
+            "after_bw_gbs": 73.81,
+            "speedup": 2.03,
+            "notes": "SLM transpose kernel, F16 packing"
+          },
+          {
+            "name": "CPY F16->F16 transpose [768,1024,256]",
+            "before_bw_gbs": 36.28,
+            "after_bw_gbs": 155.91,
+            "speedup": 4.3,
+            "notes": "SLM transpose kernel, batched z-blocking"
+          },
+          {
+            "name": "CPY BF16->BF16 transpose [768,1024,256]",
+            "before_bw_gbs": 36.28,
+            "after_bw_gbs": 156.53,
+            "speedup": 4.31,
+            "notes": "SLM transpose kernel, batched z-blocking"
+          }
+        ],
+        "avg_speedup_transpose_ops": 3.17,
+        "max_speedup": 4.31,
+        "peak_bw_achieved_gbs": 282.16,
+        "peak_bw_pct": 61.9,
+        "unit_tests_passed": "CPY 108/108, DUP 8/8"
       }
     }
   ]

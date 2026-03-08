@@ -183,7 +183,7 @@
           "completed": true,
           "speedup": 1.0,
           "outcome": "abandoned",
-          "notes": "Implemented SLM caching (cooperative Y-vector load into local_accessor<block_q8_1>) with use_slm template parameter and MMVQ_SLM_Y_LIMIT=48KB budget check in all 11 multicol launchers. A/B benchmark (SLM ON vs OFF): n=1 no diff (expected, single-col path), n=4,5,8 no measurable diff (<1.4%), n=2,3 mixed results (some types 10-43% faster, others 10-14% slower — not consistently beneficial). Xe2 L1 cache already handles Y-vector access efficiently, making explicit SLM management neutral. Code reverted to simplify kernel. Logs: b60_benchmark_20260308_095124.log (SLM ON), b60_benchmark_20260308_095950.log (SLM OFF)."
+          "notes": "Implemented SLM caching (cooperative Y-vector load into local_accessor<block_q8_1>) with use_slm template parameter and MMVQ_SLM_Y_LIMIT=48KB budget check in all 11 multicol launchers. A/B benchmark (SLM ON vs OFF): n=1 no diff (expected, single-col path), n=4,5,8 no measurable diff (<1.4%), n=2,3 mixed results (some types 10-43% faster, others 10-14% slower \u2014 not consistently beneficial). Xe2 L1 cache already handles Y-vector access efficiently, making explicit SLM management neutral. Code reverted to simplify kernel. Logs: b60_benchmark_20260308_095124.log (SLM ON), b60_benchmark_20260308_095950.log (SLM OFF)."
         },
         {
           "step_id": "opt_002_003",
@@ -222,7 +222,7 @@
           "completed": true,
           "speedup": 1.0,
           "abandoned": true,
-          "abandoned_reason": "Almost all loops in mmvq.cpp and vecdotq.hpp already have #pragma unroll. Only 2 Q4_K data-loading loops (trip count 2) were missing it. Adding #pragma unroll showed 0% measurable improvement — compiler already unrolled them. Code reverted."
+          "abandoned_reason": "Almost all loops in mmvq.cpp and vecdotq.hpp already have #pragma unroll. Only 2 Q4_K data-loading loops (trip count 2) were missing it. Adding #pragma unroll showed 0% measurable improvement \u2014 compiler already unrolled them. Code reverted."
         },
         {
           "step_id": "opt_002_005",
@@ -501,7 +501,7 @@
       "started_at": "2026-03-08T21:00:00Z",
       "completed_at": "2026-03-08T22:00:00Z",
       "outcome": "speedup",
-      "outcome_notes": "opt_013_001 (WG 128→256) gave 2.13x avg speedup for broadcast ops. KEPT. Remaining steps (vectorization, integer opt, kernel fusion) deprioritized based on Xe2 findings — vectorization regresses, integer opt low impact.",
+      "outcome_notes": "opt_013_001 (WG 128\u2192256) gave 2.13x avg speedup for broadcast ops. KEPT. Remaining steps (vectorization, integer opt, kernel fusion) deprioritized based on Xe2 findings \u2014 vectorization regresses, integer opt low impact.",
       "depends_on": [
         "opt_task_002"
       ],
@@ -516,7 +516,7 @@
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k ADD -e ZES_ENABLE_SYSMAN=1",
           "completed": true,
           "speedup": 2.13,
-          "notes": "block_size 128→256. Broadcast avg 2.13x speedup (ADD 2.04x, MUL 2.09x, DIV 2.26x). Bandwidth ~328 GB/s (72% peak). Small 1D neutral. KEPT."
+          "notes": "block_size 128\u2192256. Broadcast avg 2.13x speedup (ADD 2.04x, MUL 2.09x, DIV 2.26x). Bandwidth ~328 GB/s (72% peak). Small 1D neutral. KEPT."
         },
         {
           "step_id": "opt_013_002",
@@ -569,7 +569,7 @@
           "step_id": "opt_015_001",
           "category": "compile_time_specialization",
           "priority": "high",
-          "description": "Add compile-time ncols specialization ({32,64,...,4096}) with #pragma unroll — 10-25% throughput",
+          "description": "Add compile-time ncols specialization ({32,64,...,4096}) with #pragma unroll \u2014 10-25% throughput",
           "expected_improvement": "10-25% throughput",
           "risk": "low",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k SOFT_MAX -e ZES_ENABLE_SYSMAN=1",
@@ -654,7 +654,7 @@
       "status": "completed",
       "completed": "2026-03-08T15:10:00Z",
       "outcome": "significant_speedup",
-      "outcome_summary": "opt_016_002 native math gave 1.294x avg speedup (56 cases, max 2.87x, 0 regressions). Remaining steps (vectorization, fusion) skipped — native math captured the main compute-bound win; remaining ops are bandwidth-bound.",
+      "outcome_summary": "opt_016_002 native math gave 1.294x avg speedup (56 cases, max 2.87x, 0 regressions). Remaining steps (vectorization, fusion) skipped \u2014 native math captured the main compute-bound win; remaining ops are bandwidth-bound.",
       "depends_on": [
         "opt_task_002"
       ],
@@ -689,7 +689,7 @@
           "expected_improvement": "Enables fusion path",
           "risk": "low",
           "status": "skipped",
-          "skip_reason": "Fusion prerequisite — skipped since fusion (opt_016_001) is high-risk and out of scope for this pass",
+          "skip_reason": "Fusion prerequisite \u2014 skipped since fusion (opt_016_001) is high-risk and out of scope for this pass",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k ROPE -e ZES_ENABLE_SYSMAN=1"
         },
         {
@@ -700,7 +700,7 @@
           "expected_improvement": "15-30% latency reduction",
           "risk": "medium",
           "status": "skipped",
-          "skip_reason": "High-risk kernel fusion requiring changes to graph scheduling — deferred to future pass",
+          "skip_reason": "High-risk kernel fusion requiring changes to graph scheduling \u2014 deferred to future pass",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k ROPE -e ZES_ENABLE_SYSMAN=1"
         }
       ]
@@ -717,7 +717,7 @@
       "status": "completed",
       "completed": "2026-03-09T10:30:00Z",
       "outcome": "partial_speedup",
-      "outcome_summary": "opt_017_004 GROUP_NORM 3→2 passes gave 1.49x avg speedup (KEPT). RMS_NORM/NORM/L2_NORM already at 97% peak BW (441-562 GB/s) — no room for improvement. Vectorization/adaptive WG skipped (already near-optimal). Fused RMS_NORM+MUL (opt_017_001) skipped — requires graph-level fusion infrastructure not yet present in SYCL backend.",
+      "outcome_summary": "opt_017_004 GROUP_NORM 3\u21922 passes gave 1.49x avg speedup (KEPT). RMS_NORM/NORM/L2_NORM already at 97% peak BW (441-562 GB/s) \u2014 no room for improvement. Vectorization/adaptive WG skipped (already near-optimal). Fused RMS_NORM+MUL (opt_017_001) skipped \u2014 requires graph-level fusion infrastructure not yet present in SYCL backend.",
       "depends_on": [
         "opt_task_002"
       ],
@@ -741,7 +741,7 @@
           "expected_improvement": "5-15% throughput for edge cases",
           "risk": "low",
           "status": "skipped",
-          "skip_reason": "block_reduce on Xe2 caps at 256 WIs (WARP_SIZE²), so can't go higher. Smaller WG only helps ncols < 256, but all benchmark cases have ncols >= 4096. No measurable benefit expected.",
+          "skip_reason": "block_reduce on Xe2 caps at 256 WIs (WARP_SIZE\u00b2), so can't go higher. Smaller WG only helps ncols < 256, but all benchmark cases have ncols >= 4096. No measurable benefit expected.",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k NORM -e ZES_ENABLE_SYSMAN=1"
         },
         {
@@ -759,11 +759,11 @@
           "step_id": "opt_017_001",
           "category": "kernel_fusion",
           "priority": "high",
-          "description": "Implement fused RMS_NORM+MUL kernel to match CUDA parity — 20-40% latency reduction per transformer layer (called 2x per layer)",
+          "description": "Implement fused RMS_NORM+MUL kernel to match CUDA parity \u2014 20-40% latency reduction per transformer layer (called 2x per layer)",
           "expected_improvement": "20-40% latency reduction",
           "risk": "medium",
           "status": "skipped",
-          "skip_reason": "Requires graph-level fusion infrastructure (can_fuse, node lookahead) not present in SYCL backend. CUDA implements this in ggml-cuda.cu compute_graph with ggml_cuda_can_fuse() pattern scanning. High-value but high-risk — deferred to future dedicated fusion pass.",
+          "skip_reason": "Requires graph-level fusion infrastructure (can_fuse, node lookahead) not present in SYCL backend. CUDA implements this in ggml-cuda.cu compute_graph with ggml_cuda_can_fuse() pattern scanning. High-value but high-risk \u2014 deferred to future dedicated fusion pass.",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k NORM -e ZES_ENABLE_SYSMAN=1"
         },
         {
@@ -828,7 +828,7 @@
       "overall_optimization_potential": "medium",
       "priority": 2,
       "status": "completed",
-      "progress_notes": "Large-ncols support (opt_052_001) done as part of opt_task_013 — TOP_K now reuses shared argsort_f32_i32_sycl_bitonic<DESC>() + oneDPL radix sort path. 445/445 TOP_K tests passed including ncols up to 524288. opt_052_002 (fuse sort+copy) skipped — low priority, copy kernel overhead is negligible (~2-4us) since k is tiny (1-100) and sort dominates runtime.",
+      "progress_notes": "Large-ncols support (opt_052_001) done as part of opt_task_013 \u2014 TOP_K now reuses shared argsort_f32_i32_sycl_bitonic<DESC>() + oneDPL radix sort path. 445/445 TOP_K tests passed including ncols up to 524288. opt_052_002 (fuse sort+copy) skipped \u2014 low priority, copy kernel overhead is negligible (~2-4us) since k is tiny (1-100) and sort dominates runtime.",
       "depends_on": [
         "opt_task_002"
       ],
@@ -867,7 +867,7 @@
       "overall_optimization_potential": "low",
       "priority": 2,
       "status": "completed",
-      "progress_notes": "opt_005_001+opt_005_003 done together: added batch/GQA support (ne2>1, ne3>1 loop with dps2/dps3 broadcasting) + stride-based LD + src1 contiguity assert. Removed ne2==1&&ne3==1 restriction from supports_op. 64/64 F32 tests pass including all batched/GQA configs. No regression on existing bs=[1,1] cases (185.26us vs 185.77us baseline). opt_005_002 (F16 GEMM) skipped — CUDA doesn't have it either, beyond parity scope.",
+      "progress_notes": "opt_005_001+opt_005_003 done together: added batch/GQA support (ne2>1, ne3>1 loop with dps2/dps3 broadcasting) + stride-based LD + src1 contiguity assert. Removed ne2==1&&ne3==1 restriction from supports_op. 64/64 F32 tests pass including all batched/GQA configs. No regression on existing bs=[1,1] cases (185.26us vs 185.77us baseline). opt_005_002 (F16 GEMM) skipped \u2014 CUDA doesn't have it either, beyond parity scope.",
       "depends_on": [
         "opt_task_002"
       ],
@@ -880,7 +880,7 @@
           "expected_improvement": "2x throughput for F16 models",
           "risk": "low",
           "status": "skipped",
-          "skip_reason": "CUDA doesn't support F16 outprod either — beyond parity scope. Mixed-precision GEMM adds complexity and precision risk for training gradients.",
+          "skip_reason": "CUDA doesn't support F16 outprod either \u2014 beyond parity scope. Mixed-precision GEMM adds complexity and precision risk for training gradients.",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k OUT_PROD -e ZES_ENABLE_SYSMAN=1"
         },
         {
@@ -902,7 +902,7 @@
           "expected_improvement": "Enables GPU path for batched outprod",
           "risk": "medium",
           "status": "completed",
-          "actual_speedup": "N/A (new capability — batched/GQA outprod now runs on GPU instead of CPU fallback). 64/64 tests pass. No regression: 185.26us vs 185.77us baseline for bs=[1,1].",
+          "actual_speedup": "N/A (new capability \u2014 batched/GQA outprod now runs on GPU instead of CPU fallback). 64/64 tests pass. No regression: 185.26us vs 185.77us baseline for bs=[1,1].",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k OUT_PROD -e ZES_ENABLE_SYSMAN=1"
         }
       ]
@@ -917,7 +917,7 @@
       "overall_optimization_potential": "medium",
       "priority": 3,
       "status": "completed",
-      "progress_notes": "All steps evaluated and skipped. Analysis: (1) opt_008_001 DPCT cleanup — massive refactoring (53 dp4a + 21 vectorized_binary + 5 byte_level_permute) for 0-5% gain, high risk of breaking critical quantized inference. (2) opt_008_002 aligned loads — non-aligned helpers exist for genuinely unaligned data, unclear benefit. (3) opt_008_004 IQ #pragma unroll — proven no effect on Xe2 (compiler auto-unrolls small loops, confirmed in softmax/binbcast experiments). (4) opt_008_003 SoA reorder variants — 20-40% per format but requires deep per-format memory layout understanding, high complexity, out of scope for this optimization pass. (5) opt_008_005 DPCT_COMPAT guard — DPCT_COMPATIBILITY_TEMP=900 and MIN_CC_DP4A is undefined (defaults to 0), so guard evaluates to '900 >= 0' = always true — dead code, IQ functions are always compiled, no correctness issue. These are device functions whose performance was already improved 1.94x via the MMVQ WG=256 kernel optimization (opt_002_001).",
+      "progress_notes": "All steps evaluated and skipped. Analysis: (1) opt_008_001 DPCT cleanup \u2014 massive refactoring (53 dp4a + 21 vectorized_binary + 5 byte_level_permute) for 0-5% gain, high risk of breaking critical quantized inference. (2) opt_008_002 aligned loads \u2014 non-aligned helpers exist for genuinely unaligned data, unclear benefit. (3) opt_008_004 IQ #pragma unroll \u2014 proven no effect on Xe2 (compiler auto-unrolls small loops, confirmed in softmax/binbcast experiments). (4) opt_008_003 SoA reorder variants \u2014 20-40% per format but requires deep per-format memory layout understanding, high complexity, out of scope for this optimization pass. (5) opt_008_005 DPCT_COMPAT guard \u2014 DPCT_COMPATIBILITY_TEMP=900 and MIN_CC_DP4A is undefined (defaults to 0), so guard evaluates to '900 >= 0' = always true \u2014 dead code, IQ functions are always compiled, no correctness issue. These are device functions whose performance was already improved 1.94x via the MMVQ WG=256 kernel optimization (opt_002_001).",
       "depends_on": [
         "opt_task_002"
       ],
@@ -952,7 +952,7 @@
           "expected_improvement": "5-10% for IQ formats",
           "risk": "low",
           "status": "skipped",
-          "skip_reason": "Proven no effect on Xe2 — Intel compiler auto-unrolls small constant-bound loops (2-4 iterations). Confirmed in softmax and binbcast experiments.",
+          "skip_reason": "Proven no effect on Xe2 \u2014 Intel compiler auto-unrolls small constant-bound loops (2-4 iterations). Confirmed in softmax and binbcast experiments.",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k MUL_MAT -e ZES_ENABLE_SYSMAN=1"
         },
         {
@@ -963,7 +963,7 @@
           "expected_improvement": "20-40% per format",
           "risk": "medium",
           "status": "skipped",
-          "skip_reason": "High complexity — requires deep per-format memory layout understanding and matching changes in dequantize.hpp/convert.cpp. Only 4 of 20+ formats have reorder variants (Q4_0, Q4_K, Q5_K, Q6_K). Out of scope for this optimization pass.",
+          "skip_reason": "High complexity \u2014 requires deep per-format memory layout understanding and matching changes in dequantize.hpp/convert.cpp. Only 4 of 20+ formats have reorder variants (Q4_0, Q4_K, Q5_K, Q6_K). Out of scope for this optimization pass.",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k MUL_MAT -e ZES_ENABLE_SYSMAN=1"
         },
         {
@@ -974,7 +974,7 @@
           "expected_improvement": "Functional parity for IQ formats",
           "risk": "medium",
           "status": "skipped",
-          "skip_reason": "Not a correctness issue — DPCT_COMPATIBILITY_TEMP=900 and MIN_CC_DP4A is undefined (defaults to 0 in #if), so guard always evaluates true. IQ functions are always compiled. Cosmetic dead code removal only.",
+          "skip_reason": "Not a correctness issue \u2014 DPCT_COMPATIBILITY_TEMP=900 and MIN_CC_DP4A is undefined (defaults to 0 in #if), so guard always evaluates true. IQ functions are always compiled. Cosmetic dead code removal only.",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k MUL_MAT -e ZES_ENABLE_SYSMAN=1"
         }
       ]
@@ -1051,7 +1051,7 @@
       "overall_optimization_potential": "medium",
       "priority": 3,
       "status": "completed",
-      "completion_notes": "opt_010_002 (native math): 1.86x avg speedup across 6 affected ops. TANH 2.40x, GEGLU 2.50x, SWIGLU 2.14x, SILU 1.78x, GELU 1.31x, SIGMOID 1.03x. All near peak BW (~350-393 GB/s) post-optimization. opt_010_001 (vectorization) skipped — Xe2 vectorized loads showed regression in MMVQ, and all ops are now near peak BW anyway. opt_010_003 (fusion) requires graph-level changes. opt_010_004 (BF16) out of scope.",
+      "completion_notes": "opt_010_002 (native math): 1.86x avg speedup across 6 affected ops. TANH 2.40x, GEGLU 2.50x, SWIGLU 2.14x, SILU 1.78x, GELU 1.31x, SIGMOID 1.03x. All near peak BW (~350-393 GB/s) post-optimization. opt_010_001 (vectorization) skipped \u2014 Xe2 vectorized loads showed regression in MMVQ, and all ops are now near peak BW anyway. opt_010_003 (fusion) requires graph-level changes. opt_010_004 (BF16) out of scope.",
       "depends_on": [
         "opt_task_002"
       ],
@@ -1103,7 +1103,7 @@
       "title": "Optimize cpy (tensor copy) kernel (medium potential)",
       "overall_optimization_potential": "medium",
       "priority": 3,
-      "status": "pending",
+      "status": "completed",
       "depends_on": [
         "opt_task_002"
       ],
@@ -1135,7 +1135,8 @@
           "risk": "medium",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k CPY -e ZES_ENABLE_SYSMAN=1"
         }
-      ]
+      ],
+      "notes": "opt_019_001 (SLM transpose): 3.17x avg speedup, peak 282 GB/s. opt_019_002 (vec4 contiguous) SKIPPED: contiguous F32->F16 already at 694 GB/s near peak; vec loads showed regression on Xe2 in prior tests. opt_019_003 (int32 arithmetic) SKIPPED: low priority, transpose bottleneck addressed by SLM kernel."
     },
     {
       "task_id": "opt_task_020",
