@@ -13,7 +13,9 @@
       "status": "completed",
       "depends_on": [],
       "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -e ZES_ENABLE_SYSMAN=1",
-      "kernels": ["all"]
+      "kernels": [
+        "all"
+      ]
     },
     {
       "task_id": "opt_task_002",
@@ -22,9 +24,13 @@
       "description": "Execute micro-benchmarks for all kernels on Intel Arc Pro B60 to establish performance baselines before any optimization. Record throughput (GB/s or GFLOPS), latency (us), and occupancy for each kernel.",
       "priority": 1,
       "status": "completed",
-      "depends_on": ["opt_task_001"],
+      "depends_on": [
+        "opt_task_001"
+      ],
       "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -e ZES_ENABLE_SYSMAN=1",
-      "kernels": ["all"]
+      "kernels": [
+        "all"
+      ]
     },
     {
       "task_id": "opt_task_003",
@@ -33,9 +39,13 @@
       "description": "Run end-to-end inference benchmark on Intel Arc Pro B60 with models to establish workload-level performance baseline. Record tokens/sec for both prompt processing (pp) and text generation (tg).",
       "priority": 1,
       "status": "completed",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "benchmark_command": "./syclgen/remote_run.sh -s b60 -t workload -e ZES_ENABLE_SYSMAN=1",
-      "kernels": ["all"]
+      "kernels": [
+        "all"
+      ]
     },
     {
       "task_id": "opt_task_004",
@@ -51,19 +61,21 @@
       "completed_at": "2026-03-08T12:00:00Z",
       "outcome": "no_speedup",
       "outcome_notes": "MMQ is disabled by default (accuracy issues). Enabled it for 7 types with QI<=WARP_SIZE=16, implemented _INTEL macros (WG=256), added reqd_sub_group_size. Benchmarks show MMQ is 2.2x slower than MMVQ/DMMV (n<=8) and 1.6x slower than oneMKL (n=512). Accuracy failure: q4_0 n=512 ERR=0.999572. Reverted ggml_sycl_supports_mmq to return false. mmq.cpp improvements kept dormant. Only joint_matrix/XMX (opt_001_008) could make MMQ competitive. Steps opt_001_003-007 skipped.",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_001_001",
           "category": "sub_group_size",
           "priority": "high",
-          "description": "Add [[intel::reqd_sub_group_size(16)]] — correctness fix and performance baseline",
+          "description": "Add [[intel::reqd_sub_group_size(16)]] \u2014 correctness fix and performance baseline",
           "expected_improvement": "Correct execution + 5-20% improvement",
           "risk": "low",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k MUL_MAT -e ZES_ENABLE_SYSMAN=1",
           "completed": true,
           "speedup": 1.0,
-          "notes": "Already implemented — all 20 kernel launch sites already have [[sycl::reqd_sub_group_size(WARP_SIZE)]] where WARP_SIZE=16 on Intel. No code changes needed."
+          "notes": "Already implemented \u2014 all 20 kernel launch sites already have [[sycl::reqd_sub_group_size(WARP_SIZE)]] where WARP_SIZE=16 on Intel. No code changes needed."
         },
         {
           "step_id": "opt_001_002",
@@ -75,7 +87,7 @@
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k MUL_MAT -e ZES_ENABLE_SYSMAN=1",
           "completed": true,
           "speedup": 0.45,
-          "notes": "Implemented _INTEL macros with nwarps=16 (WG=256) for all 10 quant formats. Added reqd_sub_group_size(WARP_SIZE) to all 20 launch sites. However, benchmarking with FORCE_MMQ showed MMQ is ~2.2x slower than MMVQ/DMMV for n=1..8, and ~1.6x slower than oneMKL for n=512. Also has accuracy issues (q4_0 n=512 ERR=0.999572). The original devs disabled MMQ entirely (returns false for all types) with TODO about accuracy issues. ggml_sycl_supports_mmq change reverted. mmq.cpp kernel improvements kept as dormant code. MMQ is fundamentally not competitive on Xe2/SIMD16 — it needs dp4a/joint_matrix to be useful. Remaining MMQ optimization steps (opt_001_003 through opt_001_007) are BLOCKED until the accuracy issue is resolved and MMQ becomes competitive. Only opt_001_008 (joint_matrix/XMX) could make MMQ worthwhile."
+          "notes": "Implemented _INTEL macros with nwarps=16 (WG=256) for all 10 quant formats. Added reqd_sub_group_size(WARP_SIZE) to all 20 launch sites. However, benchmarking with FORCE_MMQ showed MMQ is ~2.2x slower than MMVQ/DMMV for n=1..8, and ~1.6x slower than oneMKL for n=512. Also has accuracy issues (q4_0 n=512 ERR=0.999572). The original devs disabled MMQ entirely (returns false for all types) with TODO about accuracy issues. ggml_sycl_supports_mmq change reverted. mmq.cpp kernel improvements kept as dormant code. MMQ is fundamentally not competitive on Xe2/SIMD16 \u2014 it needs dp4a/joint_matrix to be useful. Remaining MMQ optimization steps (opt_001_003 through opt_001_007) are BLOCKED until the accuracy issue is resolved and MMQ becomes competitive. Only opt_001_008 (joint_matrix/XMX) could make MMQ worthwhile."
         },
         {
           "step_id": "opt_001_003",
@@ -144,7 +156,9 @@
       "priority": 2,
       "status": "in_progress",
       "started_at": "2026-03-08T14:00:00Z",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_002_001",
@@ -165,16 +179,24 @@
           "description": "Cache Y vector in SLM to eliminate 16x redundant global memory loads across sub-groups",
           "expected_improvement": "15-30% throughput for memory-bound formats",
           "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k MUL_MAT -e ZES_ENABLE_SYSMAN=1"
+          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k MUL_MAT -e ZES_ENABLE_SYSMAN=1",
+          "completed": true,
+          "speedup": 1.0,
+          "outcome": "abandoned",
+          "notes": "Implemented SLM caching (cooperative Y-vector load into local_accessor<block_q8_1>) with use_slm template parameter and MMVQ_SLM_Y_LIMIT=48KB budget check in all 11 multicol launchers. A/B benchmark (SLM ON vs OFF): n=1 no diff (expected, single-col path), n=4,5,8 no measurable diff (<1.4%), n=2,3 mixed results (some types 10-43% faster, others 10-14% slower — not consistently beneficial). Xe2 L1 cache already handles Y-vector access efficiently, making explicit SLM management neutral. Code reverted to simplify kernel. Logs: b60_benchmark_20260308_095124.log (SLM ON), b60_benchmark_20260308_095950.log (SLM OFF)."
         },
         {
           "step_id": "opt_002_003",
           "category": "vectorization",
           "priority": "medium",
-          "description": "Vectorized loads for quantized block reads",
+          "description": "Vectorized 64-bit loads (get_int2_from_*) for q4_0, q4_1, q5_0, q5_1, q8_0",
           "expected_improvement": "10-20% throughput improvement",
           "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k MUL_MAT -e ZES_ENABLE_SYSMAN=1"
+          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k MUL_MAT -e ZES_ENABLE_SYSMAN=1",
+          "completed": true,
+          "speedup": 0.914,
+          "outcome": "abandoned",
+          "notes": "Replaced loop-based 32-bit loads with widened 64-bit load helpers in 5 non-K formats (both legacy and reorder paths). Also simplified get_int_from_int8/uint8 to __builtin_memcpy. Build succeeded, correctness passed (730/730). Net 8.6% regression for modified formats at n=2..8. Worst: q4_0 n=8 -25%, q5_0 n=8 -20%. Only q8_0 showed mixed improvement (n=2 +12.2%). Xe2 compiler optimizes small unrolled loops efficiently; manual vectorization adds register pressure. Code reverted. Log: b60_benchmark_20260308_104102.log."
         },
         {
           "step_id": "opt_002_004",
@@ -183,7 +205,11 @@
           "description": "Replace DPCT dpct::permute_sub_group_by_xor with native sycl::reduce_over_group",
           "expected_improvement": "2-8% throughput improvement",
           "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k MUL_MAT -e ZES_ENABLE_SYSMAN=1"
+          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k MUL_MAT -e ZES_ENABLE_SYSMAN=1",
+          "completed": true,
+          "speedup": 0.971,
+          "outcome": "abandoned",
+          "notes": "Tested combined with opt_002_002 (SLM caching). Net 2.9% regression overall. Severe regressions at n=2,3 for multicol types (up to 30%). Manual butterfly shuffle (dpct::permute_sub_group_by_xor) remains faster than sycl::reduce_over_group on Xe2 for the legacy kernels. Code reverted. Note: the combined test conflates SLM+shuffle changes; the regression may be partly from SLM overhead in the IQ path."
         },
         {
           "step_id": "opt_002_006",
@@ -192,7 +218,11 @@
           "description": "Add #pragma unroll to dequantization inner loops in all formats",
           "expected_improvement": "5-10% throughput improvement",
           "risk": "low",
-          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k MUL_MAT -e ZES_ENABLE_SYSMAN=1"
+          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k MUL_MAT -e ZES_ENABLE_SYSMAN=1",
+          "completed": true,
+          "speedup": 1.0,
+          "abandoned": true,
+          "abandoned_reason": "Almost all loops in mmvq.cpp and vecdotq.hpp already have #pragma unroll. Only 2 Q4_K data-loading loops (trip count 2) were missing it. Adding #pragma unroll showed 0% measurable improvement — compiler already unrolled them. Code reverted."
         },
         {
           "step_id": "opt_002_005",
@@ -224,13 +254,15 @@
       "overall_optimization_potential": "high",
       "priority": 2,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_003_001",
           "category": "sub_group_size",
           "priority": "high",
-          "description": "Fix K-quant sub-group size mismatch: QK_WARP_SIZE=32 vs Intel native SIMD16 — correctness fix",
+          "description": "Fix K-quant sub-group size mismatch: QK_WARP_SIZE=32 vs Intel native SIMD16 \u2014 correctness fix",
           "expected_improvement": "Correct execution on Intel GPUs",
           "risk": "low",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k MUL_MAT -e ZES_ENABLE_SYSMAN=1"
@@ -310,13 +342,15 @@
       "overall_optimization_potential": "high",
       "priority": 2,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_006_001",
           "category": "host_device_sync",
           "priority": "high",
-          "description": "Implement GPU-side mm_ids_helper to eliminate blocking D2H copy and host-side counting — 30-60% latency reduction",
+          "description": "Implement GPU-side mm_ids_helper to eliminate blocking D2H copy and host-side counting \u2014 30-60% latency reduction",
           "expected_improvement": "30-60% latency reduction",
           "risk": "low",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k MUL_MAT_ID -e ZES_ENABLE_SYSMAN=1"
@@ -343,7 +377,7 @@
           "step_id": "opt_006_002",
           "category": "batching",
           "priority": "high",
-          "description": "Replace ne12==1 serial path with batched compaction — 5-20x speedup for common MoE inference case",
+          "description": "Replace ne12==1 serial path with batched compaction \u2014 5-20x speedup for common MoE inference case",
           "expected_improvement": "5-20x speedup for ne12==1",
           "risk": "medium",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k MUL_MAT_ID -e ZES_ENABLE_SYSMAN=1"
@@ -378,7 +412,9 @@
       "overall_optimization_potential": "medium",
       "priority": 2,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_004_001",
@@ -455,7 +491,9 @@
       "overall_optimization_potential": "medium",
       "priority": 2,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_013_001",
@@ -470,7 +508,7 @@
           "step_id": "opt_013_002",
           "category": "vectorization",
           "priority": "medium",
-          "description": "Use vec4 loads/stores for contiguous tensors — 1.5-3x throughput for memory-bound ADD/MUL",
+          "description": "Use vec4 loads/stores for contiguous tensors \u2014 1.5-3x throughput for memory-bound ADD/MUL",
           "expected_improvement": "1.5-3x throughput",
           "risk": "low",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k ADD -e ZES_ENABLE_SYSMAN=1"
@@ -505,13 +543,15 @@
       "overall_optimization_potential": "medium",
       "priority": 2,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_015_001",
           "category": "compile_time_specialization",
           "priority": "high",
-          "description": "Add compile-time ncols specialization ({32,64,...,4096}) with #pragma unroll — 10-25% throughput",
+          "description": "Add compile-time ncols specialization ({32,64,...,4096}) with #pragma unroll \u2014 10-25% throughput",
           "expected_improvement": "10-25% throughput",
           "risk": "low",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k SOFT_MAX -e ZES_ENABLE_SYSMAN=1"
@@ -591,7 +631,9 @@
       "overall_optimization_potential": "medium",
       "priority": 2,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_016_002",
@@ -624,7 +666,7 @@
           "step_id": "opt_016_001",
           "category": "kernel_fusion",
           "priority": "high",
-          "description": "Implement ROPE+VIEW+SET_ROWS fusion to match CUDA parity — 15-30% latency reduction",
+          "description": "Implement ROPE+VIEW+SET_ROWS fusion to match CUDA parity \u2014 15-30% latency reduction",
           "expected_improvement": "15-30% latency reduction",
           "risk": "medium",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k ROPE -e ZES_ENABLE_SYSMAN=1"
@@ -641,7 +683,9 @@
       "overall_optimization_potential": "medium",
       "priority": 2,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_017_002",
@@ -674,7 +718,7 @@
           "step_id": "opt_017_001",
           "category": "kernel_fusion",
           "priority": "high",
-          "description": "Implement fused RMS_NORM+MUL kernel to match CUDA parity — 20-40% latency reduction per transformer layer (called 2x per layer)",
+          "description": "Implement fused RMS_NORM+MUL kernel to match CUDA parity \u2014 20-40% latency reduction per transformer layer (called 2x per layer)",
           "expected_improvement": "20-40% latency reduction",
           "risk": "medium",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k NORM -e ZES_ENABLE_SYSMAN=1"
@@ -700,7 +744,9 @@
       "overall_optimization_potential": "medium",
       "priority": 2,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_051_002",
@@ -732,7 +778,9 @@
       "overall_optimization_potential": "medium",
       "priority": 2,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_052_002",
@@ -747,7 +795,7 @@
           "step_id": "opt_052_001",
           "category": "feature_parity",
           "priority": "high",
-          "description": "CRITICAL: Add large-ncols support (fails for vocab > 1024) — implement oneDPL partial sort",
+          "description": "CRITICAL: Add large-ncols support (fails for vocab > 1024) \u2014 implement oneDPL partial sort",
           "expected_improvement": "Functional parity for real LLM vocab sizes (32K-128K)",
           "risk": "medium",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k TOP_K -e ZES_ENABLE_SYSMAN=1"
@@ -764,7 +812,9 @@
       "overall_optimization_potential": "low",
       "priority": 2,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_005_002",
@@ -788,7 +838,7 @@
           "step_id": "opt_005_001",
           "category": "functional_parity",
           "priority": "high",
-          "description": "Add batch dimension support (ne2>1, ne3>1) and GQA broadcasting to match CUDA parity — currently rejects batched outprod forcing CPU fallback",
+          "description": "Add batch dimension support (ne2>1, ne3>1) and GQA broadcasting to match CUDA parity \u2014 currently rejects batched outprod forcing CPU fallback",
           "expected_improvement": "Enables GPU path for batched outprod",
           "risk": "medium",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k OUT_PROD -e ZES_ENABLE_SYSMAN=1"
@@ -805,7 +855,9 @@
       "overall_optimization_potential": "medium",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_008_001",
@@ -864,7 +916,9 @@
       "overall_optimization_potential": "medium",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_009_001",
@@ -923,7 +977,9 @@
       "overall_optimization_potential": "medium",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_010_001",
@@ -973,7 +1029,9 @@
       "overall_optimization_potential": "medium",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_019_002",
@@ -1014,7 +1072,9 @@
       "overall_optimization_potential": "medium",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_024_001",
@@ -1039,7 +1099,7 @@
           "category": "work_group_size",
           "priority": "low",
           "description": "Replace custom sycl_max64/min64 with sycl::max/min",
-          "expected_improvement": "Negligible — code quality",
+          "expected_improvement": "Negligible \u2014 code quality",
           "risk": "low",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k CONV_TRANSPOSE_1D -e ZES_ENABLE_SYSMAN=1"
         },
@@ -1073,7 +1133,9 @@
       "overall_optimization_potential": "medium",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_026_001",
@@ -1123,7 +1185,9 @@
       "overall_optimization_potential": "medium",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_028_001",
@@ -1164,7 +1228,9 @@
       "overall_optimization_potential": "medium",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_029_001",
@@ -1196,7 +1262,9 @@
       "overall_optimization_potential": "medium",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_032_001",
@@ -1237,7 +1305,9 @@
       "overall_optimization_potential": "medium",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_033_001",
@@ -1305,7 +1375,9 @@
       "overall_optimization_potential": "medium",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_034_001",
@@ -1364,7 +1436,9 @@
       "overall_optimization_potential": "medium",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_038_003",
@@ -1405,7 +1479,9 @@
       "overall_optimization_potential": "low",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_007_001",
@@ -1446,7 +1522,9 @@
       "overall_optimization_potential": "low",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_011_001",
@@ -1496,7 +1574,9 @@
       "overall_optimization_potential": "low",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_012_001",
@@ -1537,7 +1617,9 @@
       "overall_optimization_potential": "low",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_014_001",
@@ -1569,7 +1651,9 @@
       "overall_optimization_potential": "low",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_018_001",
@@ -1610,7 +1694,9 @@
       "overall_optimization_potential": "low",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_020_001",
@@ -1660,7 +1746,9 @@
       "overall_optimization_potential": "low",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_021_001",
@@ -1675,7 +1763,7 @@
           "step_id": "opt_021_003",
           "category": "work_group_size",
           "priority": "low",
-          "description": "Convert nd_range<3> to nd_range<1> — cosmetic",
+          "description": "Convert nd_range<3> to nd_range<1> \u2014 cosmetic",
           "expected_improvement": "0-2%",
           "risk": "low",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k IM2COL -e ZES_ENABLE_SYSMAN=1"
@@ -1701,7 +1789,9 @@
       "overall_optimization_potential": "low",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_022_001",
@@ -1751,7 +1841,9 @@
       "overall_optimization_potential": "low",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_023_001",
@@ -1801,7 +1893,9 @@
       "overall_optimization_potential": "low",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_025_001",
@@ -1842,7 +1936,9 @@
       "overall_optimization_potential": "low",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_027_001",
@@ -1883,7 +1979,9 @@
       "overall_optimization_potential": "low",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_030_001",
@@ -1906,7 +2004,9 @@
       "overall_optimization_potential": "low",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_031_001",
@@ -1947,7 +2047,9 @@
       "overall_optimization_potential": "low",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_035_001",
@@ -1997,7 +2099,9 @@
       "overall_optimization_potential": "low",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_036_001",
@@ -2020,7 +2124,9 @@
       "overall_optimization_potential": "low",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_037_001",
@@ -2043,7 +2149,9 @@
       "overall_optimization_potential": "low",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_039_001",
@@ -2075,7 +2183,9 @@
       "overall_optimization_potential": "low",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_040_001",
@@ -2098,7 +2208,9 @@
       "overall_optimization_potential": "low",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_041_001",
@@ -2130,7 +2242,9 @@
       "overall_optimization_potential": "low",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_042_001",
@@ -2153,7 +2267,9 @@
       "overall_optimization_potential": "low",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_043_001",
@@ -2185,7 +2301,9 @@
       "overall_optimization_potential": "low",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_044_001",
@@ -2208,7 +2326,9 @@
       "overall_optimization_potential": "low",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_045_001",
@@ -2231,7 +2351,9 @@
       "overall_optimization_potential": "low",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_046_001",
@@ -2263,7 +2385,9 @@
       "overall_optimization_potential": "low",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_047_001",
@@ -2295,7 +2419,9 @@
       "overall_optimization_potential": "low",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_048_001",
@@ -2327,7 +2453,9 @@
       "overall_optimization_potential": "low",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_049_001",
@@ -2350,7 +2478,9 @@
       "overall_optimization_potential": "low",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_050_001",
@@ -2373,7 +2503,9 @@
       "overall_optimization_potential": "low",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_053_001",
@@ -2396,7 +2528,9 @@
       "overall_optimization_potential": "low",
       "priority": 3,
       "status": "pending",
-      "depends_on": ["opt_task_002"],
+      "depends_on": [
+        "opt_task_002"
+      ],
       "steps": [
         {
           "step_id": "opt_054_001",
@@ -2425,9 +2559,66 @@
       "description": "Re-run end-to-end inference benchmark on Intel Arc Pro B60 with the same models used in baseline (opt_task_003) to measure overall improvement from kernel optimizations.",
       "priority": 4,
       "status": "pending",
-      "depends_on": ["opt_task_004", "opt_task_005", "opt_task_006", "opt_task_007", "opt_task_008", "opt_task_009", "opt_task_010", "opt_task_011", "opt_task_012", "opt_task_013", "opt_task_014", "opt_task_015", "opt_task_016", "opt_task_017", "opt_task_018", "opt_task_019", "opt_task_020", "opt_task_021", "opt_task_022", "opt_task_023", "opt_task_024", "opt_task_025", "opt_task_026", "opt_task_027", "opt_task_028", "opt_task_029", "opt_task_030", "opt_task_031", "opt_task_032", "opt_task_033", "opt_task_034", "opt_task_035", "opt_task_036", "opt_task_037", "opt_task_038", "opt_task_039", "opt_task_040", "opt_task_041", "opt_task_042", "opt_task_043", "opt_task_044", "opt_task_045", "opt_task_046", "opt_task_047", "opt_task_048", "opt_task_049", "opt_task_050", "opt_task_051", "opt_task_052", "opt_task_053", "opt_task_054", "opt_task_055", "opt_task_056", "opt_task_057"],
+      "depends_on": [
+        "opt_task_004",
+        "opt_task_005",
+        "opt_task_006",
+        "opt_task_007",
+        "opt_task_008",
+        "opt_task_009",
+        "opt_task_010",
+        "opt_task_011",
+        "opt_task_012",
+        "opt_task_013",
+        "opt_task_014",
+        "opt_task_015",
+        "opt_task_016",
+        "opt_task_017",
+        "opt_task_018",
+        "opt_task_019",
+        "opt_task_020",
+        "opt_task_021",
+        "opt_task_022",
+        "opt_task_023",
+        "opt_task_024",
+        "opt_task_025",
+        "opt_task_026",
+        "opt_task_027",
+        "opt_task_028",
+        "opt_task_029",
+        "opt_task_030",
+        "opt_task_031",
+        "opt_task_032",
+        "opt_task_033",
+        "opt_task_034",
+        "opt_task_035",
+        "opt_task_036",
+        "opt_task_037",
+        "opt_task_038",
+        "opt_task_039",
+        "opt_task_040",
+        "opt_task_041",
+        "opt_task_042",
+        "opt_task_043",
+        "opt_task_044",
+        "opt_task_045",
+        "opt_task_046",
+        "opt_task_047",
+        "opt_task_048",
+        "opt_task_049",
+        "opt_task_050",
+        "opt_task_051",
+        "opt_task_052",
+        "opt_task_053",
+        "opt_task_054",
+        "opt_task_055",
+        "opt_task_056",
+        "opt_task_057"
+      ],
       "benchmark_command": "./syclgen/remote_run.sh -s b60 -t benchmark -e ZES_ENABLE_SYSMAN=1",
-      "kernels": ["all"]
+      "kernels": [
+        "all"
+      ]
     }
   ]
 }

@@ -1038,6 +1038,178 @@
           }
         ]
       }
+    },
+    {
+      "task_id": "opt_task_005",
+      "kernel": "mul_mat_vec_q (MMVQ)",
+      "step_id": "opt_002_004",
+      "description": "Replace dpct::permute_sub_group_by_xor butterfly reduction with sycl::reduce_over_group in all 11 legacy/multicol/reorder MMVQ kernels",
+      "outcome": "no_speedup",
+      "build_config": "Standard build (GGML_SYCL_F16=ON, no special defines)",
+      "notes": "Replaced all 11 instances of manual butterfly shuffle reduction (dpct::permute_sub_group_by_xor loop) with native sycl::reduce_over_group(sub_group, tmp, sycl::plus<float>()). Also updated leader-thread check from get_local_id(2)==0 to get_sub_group().get_local_linear_id()==0. Build succeeded, correctness passed (730/730), but benchmarks showed net regression. REVERTED.",
+      "benchmark_comparison": {
+        "test_case": "MUL_MAT(type_a=*,type_b=f32,m=4096,n=1..8,k=14336) - all quantized types",
+        "baseline_log": "logs/b60_benchmark_20260308_050530.log (opt_002_001 results)",
+        "new_log": "benchmark output from opt_002_004 run",
+        "summary_averages": {
+          "iq_types_all_n": {
+            "avg_speedup": 0.989,
+            "num_cases": 54,
+            "description": "IQ types (iq2_xxs, iq2_xs, iq2_s, iq3_xxs, iq1_s, iq1_m, iq4_nl, iq3_s, iq4_xs) across n=1..8"
+          },
+          "multicol_n1": {
+            "avg_speedup": 0.970,
+            "num_cases": 11,
+            "description": "Non-IQ types at n=1 (legacy kernel path)"
+          },
+          "multicol_n2_8": {
+            "avg_speedup": 0.961,
+            "num_cases": 55,
+            "description": "Non-IQ types at n=2..8 (multicol/reorder kernel path)"
+          },
+          "overall": {
+            "avg_speedup": 0.971,
+            "num_cases": 120,
+            "description": "All quantized types across all n values — net 2.9% regression"
+          }
+        },
+        "worst_regressions": [
+          {"type": "q4_0", "n": 3, "speedup": 0.697, "note": "30.3% regression in multicol at n=3"},
+          {"type": "q6_K", "n": 3, "speedup": 0.709, "note": "29.1% regression in multicol at n=3"},
+          {"type": "mxfp4", "n": 3, "speedup": 0.717, "note": "28.3% regression in multicol at n=3"},
+          {"type": "q5_0", "n": 3, "speedup": 0.730, "note": "27.0% regression in multicol at n=3"},
+          {"type": "q3_K", "n": 3, "speedup": 0.754, "note": "24.6% regression in multicol at n=3"},
+          {"type": "q2_K", "n": 3, "speedup": 0.786, "note": "21.4% regression in multicol at n=3"}
+        ],
+        "best_improvements": [
+          {"type": "q4_K", "n": 2, "speedup": 1.150, "note": "15.0% improvement"},
+          {"type": "q5_K", "n": 2, "speedup": 1.144, "note": "14.4% improvement"},
+          {"type": "iq2_xxs", "n": 2, "speedup": 1.143, "note": "14.3% improvement"},
+          {"type": "iq2_xxs", "n": 4, "speedup": 1.127, "note": "12.7% improvement"},
+          {"type": "iq2_xxs", "n": 8, "speedup": 1.113, "note": "11.3% improvement"},
+          {"type": "q4_K", "n": 3, "speedup": 1.091, "note": "9.1% improvement"}
+        ],
+        "observations": [
+          "sycl::reduce_over_group has higher latency than manual butterfly shuffle for most sub-group configurations on Xe2",
+          "Severe regressions concentrated at n=2 and n=3 for multicol types — possibly related to sub-group reduction implementation overhead",
+          "A few types (iq2_xxs, iq4_xs, q4_K, q5_K) showed improvements but not enough to offset widespread regressions",
+          "The Xe2 compiler/runtime appears to generate worse code for reduce_over_group than hand-rolled butterfly xor shuffles",
+          "Changes reverted; dpct::permute_sub_group_by_xor remains the preferred reduction pattern on this hardware"
+        ]
+      }
+    },
+    {
+      "task_id": "opt_task_005",
+      "kernel": "mul_mat_vec_q (MMVQ)",
+      "step_id": "opt_002_003",
+      "description": "Vectorized 64-bit loads (get_int2_from_*) for q4_0, q4_1, q5_0, q5_1, q8_0 — replace per-element int32 loads with coalesced int64 loads",
+      "outcome": "regression",
+      "build_config": "Standard build (GGML_SYCL_F16=ON, no special defines)",
+      "notes": "Replaced loop-based 32-bit loads with widened 64-bit load helpers (get_int2_from_int8_aligned, get_int2_from_uint8_aligned, get_int2_from_int8, get_int2_from_uint8) in 5 non-K formats (q4_0, q4_1, q5_0, q5_1, q8_0), both legacy and reorder paths. Also simplified get_int_from_int8/uint8 to use __builtin_memcpy. For q5_0/q5_1, optimized qh loads to single load + two shifts. Build succeeded, correctness passed (730/730), but benchmarks showed net regression. REVERTED.",
+      "benchmark_comparison": {
+        "test_case": "MUL_MAT(type_a=*,type_b=f32,m=4096,n=1..8,k=14336) - all quantized types",
+        "baseline_log": "logs/b60_benchmark_20260308_050530.log (opt_002_001 results)",
+        "new_log": "logs/b60_benchmark_20260308_104102.log",
+        "summary_averages": {
+          "modified_5_formats_n2_8": {
+            "avg_speedup": 0.914,
+            "num_cases": 25,
+            "description": "q4_0, q4_1, q5_0, q5_1, q8_0 at n=2..8 — average 8.6% regression"
+          },
+          "modified_5_formats_n1": {
+            "avg_speedup": 1.00,
+            "num_cases": 5,
+            "description": "Modified formats at n=1 — neutral (DMMV path, not MMVQ multicol)"
+          },
+          "unmodified_kquants_all_n": {
+            "avg_speedup": 1.00,
+            "num_cases": 30,
+            "description": "q2_K, q3_K, q4_K, q5_K, q6_K across all n — neutral, confirming changes isolated"
+          },
+          "overall_10_formats": {
+            "avg_speedup": 0.96,
+            "num_cases": 60,
+            "description": "All 10 non-IQ quantized types across all n values — net 4.0% regression"
+          }
+        },
+        "worst_regressions": [
+          {"type": "q4_0", "n": 8, "speedup": 0.75, "note": "~25% regression, worst case for q4_0"},
+          {"type": "q4_0", "n": 5, "speedup": 0.79, "note": "~21% regression"},
+          {"type": "q5_0", "n": 8, "speedup": 0.80, "note": "~20% regression"},
+          {"type": "q5_0", "n": 5, "speedup": 0.83, "note": "~17% regression"},
+          {"type": "q8_0", "n": 8, "speedup": 0.784, "note": "~21.6% regression despite some improvements at smaller n"},
+          {"type": "q6_K", "n": 8, "speedup": 0.847, "note": "~15.3% regression in unmodified format — possible cache pressure effect"}
+        ],
+        "best_improvements": [
+          {"type": "q8_0", "n": 2, "speedup": 1.122, "note": "12.2% improvement — only clear win"},
+          {"type": "q8_0", "n": 5, "speedup": 1.076, "note": "7.6% improvement"},
+          {"type": "q8_0", "n": 4, "speedup": 1.062, "note": "6.2% improvement"},
+          {"type": "q4_1", "n": 2, "speedup": 1.04, "note": "4% improvement at n=2 only"},
+          {"type": "q5_1", "n": 2, "speedup": 1.03, "note": "3% improvement at n=2 only"}
+        ],
+        "observations": [
+          "64-bit loads do not reduce total instruction count enough to offset increased register pressure on Xe2",
+          "q4_0 and q5_0 are worst affected (15-25% regressions at n>=4), likely because their original 32-bit load loop was well-optimized by the compiler",
+          "q8_0 shows mixed results — improves at n=2,4,5 but regresses badly at n=8, suggesting it benefits from coalescing at smaller batch sizes but hits register spill at n=8",
+          "n=1 is neutral across all formats because it uses the DMMV path, not the MMVQ multicol kernel",
+          "Unmodified K-quants confirm changes are isolated; q6_K n=8 anomaly (-15.3%) may be noise or shared cache pressure",
+          "The Xe2 compiler appears to handle small unrolled loops (2 iterations) efficiently enough that manual vectorization adds overhead",
+          "Changes reverted; original loop-based 32-bit loads with #pragma unroll remain the better approach on this hardware"
+        ]
+      }
+    },
+    {
+      "task_id": "opt_task_005",
+      "kernel": "mul_mat_vec_q (MMVQ)",
+      "step_id": "opt_002_002",
+      "description": "Cache Y vector in SLM (Shared Local Memory) to eliminate redundant global memory reads across sub-groups",
+      "outcome": "abandoned",
+      "build_config": "Standard build with SLM caching via use_slm template parameter and MMVQ_SLM_Y_LIMIT=49152",
+      "notes": "Implemented cooperative SLM load of Y vector (block_q8_1 blocks) in mul_mat_vec_q_multicol kernel. All 11 multicol launchers updated with slm_ok budget check and dual-path dispatch (use_slm=true/false). A/B benchmarked by toggling MMVQ_SLM_Y_LIMIT between 49152 (ON) and 0 (OFF).",
+      "benchmark_comparison": {
+        "slm_on_log": "logs/b60_benchmark_20260308_095124.log",
+        "slm_off_log": "logs/b60_benchmark_20260308_095950.log",
+        "summary": {
+          "n1_avg_diff_pct": 0.0,
+          "n2_n3_mixed": true,
+          "n2_n3_note": "Mixed results: some types 10-43% faster with SLM OFF, others 10-14% slower. Not consistently beneficial.",
+          "n4_avg_diff_pct": 0.09,
+          "n5_avg_diff_pct": 0.16,
+          "n8_avg_diff_pct": 0.17,
+          "n512_avg_diff_pct": 0.29,
+          "iq_types_avg_diff_pct": -0.59
+        },
+        "conclusion": "SLM caching has no measurable benefit at n>=4 (<1.4% diff, within noise). At n=2,3 effects are mixed and inconsistent across types. Xe2 L1 cache handles Y-vector access efficiently without explicit SLM management. Code reverted for simplicity."
+      }
+    },
+    {
+      "task_id": "opt_task_005",
+      "kernel": "mul_mat_vec_q (MMVQ)",
+      "step_id": "opt_002_006",
+      "description": "Add #pragma unroll to dequantization inner loops — Q4_K data-loading loops in vecdotq.hpp",
+      "outcome": "abandoned",
+      "build_config": "Standard build (GGML_SYCL_F16=ON, no special defines)",
+      "notes": "Added #pragma unroll to the only 2 loops missing it in the MMVQ path: vec_dot_q4_K_q8_1_common() and reorder_vec_dot_q_sycl<Q4_K>::operator() data-loading loops (QR4_K=2 iterations). All other loops in mmvq.cpp and vecdotq.hpp (IQ format loops, K-quant loops, reduction loops, reorder loops) already had #pragma unroll. Build succeeded, correctness passed (730/730), but benchmark showed 0% measurable improvement — Q4_K times within noise of opt_002_001 results. The compiler already unrolled these trivial 2-iteration loops. Code reverted.",
+      "timestamp": "2026-03-08T17:30:00Z",
+      "correctness": "pass",
+      "baseline_time_us": 95.07,
+      "optimized_time_us": 95.39,
+      "speedup": 1.0,
+      "benchmark_comparison": {
+        "test_case": "MUL_MAT(type_a=q4_K,type_b=f32,m=4096,n=1..512,k=14336)",
+        "baseline_log": "logs/b60_benchmark_20260308_050530.log (opt_002_001 results)",
+        "new_log": "logs/b60_benchmark_20260308_110651.log",
+        "q4_K_data": [
+          {"n": 1, "baseline_us": 95.27, "optimized_us": 95.39, "speedup": 0.999},
+          {"n": 2, "baseline_us": 162.77, "optimized_us": 163.74, "speedup": 0.994},
+          {"n": 3, "baseline_us": 227.52, "optimized_us": 226.92, "speedup": 1.003},
+          {"n": 4, "baseline_us": 300.28, "optimized_us": 301.20, "speedup": 0.997},
+          {"n": 5, "baseline_us": 365.27, "optimized_us": 364.09, "speedup": 1.003},
+          {"n": 8, "baseline_us": 554.87, "optimized_us": 553.09, "speedup": 1.003},
+          {"n": 512, "baseline_us": 1842.69, "optimized_us": 1824.29, "speedup": 1.010}
+        ],
+        "conclusion": "All values within <1% of opt_002_001 results. No measurable impact from #pragma unroll on 2-iteration data-loading loops — compiler already unrolls them."
+      }
     }
   ]
 }
