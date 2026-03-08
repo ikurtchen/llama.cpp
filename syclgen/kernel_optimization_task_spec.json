@@ -714,7 +714,10 @@
       "title": "Optimize norm (normalization kernels) kernel (medium potential)",
       "overall_optimization_potential": "medium",
       "priority": 2,
-      "status": "pending",
+      "status": "completed",
+      "completed": "2026-03-09T10:30:00Z",
+      "outcome": "partial_speedup",
+      "outcome_summary": "opt_017_004 GROUP_NORM 3→2 passes gave 1.49x avg speedup (KEPT). RMS_NORM/NORM/L2_NORM already at 97% peak BW (441-562 GB/s) — no room for improvement. Vectorization/adaptive WG skipped (already near-optimal). Fused RMS_NORM+MUL (opt_017_001) skipped — requires graph-level fusion infrastructure not yet present in SYCL backend.",
       "depends_on": [
         "opt_task_002"
       ],
@@ -726,6 +729,8 @@
           "description": "Use vec4 loads/stores on memory-bound normalization kernels",
           "expected_improvement": "10-25% throughput",
           "risk": "low",
+          "status": "skipped",
+          "skip_reason": "RMS_NORM/NORM/L2_NORM already at 97% peak BW (441-562 GB/s on B60). Vectorization cannot improve beyond hardware peak.",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k NORM -e ZES_ENABLE_SYSMAN=1"
         },
         {
@@ -735,6 +740,8 @@
           "description": "Add adaptive block_size (WARP_SIZE for small ncols, 1024 for large; SYCL always uses 256)",
           "expected_improvement": "5-15% throughput for edge cases",
           "risk": "low",
+          "status": "skipped",
+          "skip_reason": "block_reduce on Xe2 caps at 256 WIs (WARP_SIZE²), so can't go higher. Smaller WG only helps ncols < 256, but all benchmark cases have ncols >= 4096. No measurable benefit expected.",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k NORM -e ZES_ENABLE_SYSMAN=1"
         },
         {
@@ -744,15 +751,19 @@
           "description": "Replace sycl::sqrt with sycl::native::rsqrt in RMS_NORM",
           "expected_improvement": "2-5% compute reduction",
           "risk": "low",
+          "status": "skipped",
+          "skip_reason": "All norm kernels already use sycl::rsqrt (not sqrt). No sycl::sqrt calls to replace. Already optimal.",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k NORM -e ZES_ENABLE_SYSMAN=1"
         },
         {
           "step_id": "opt_017_001",
           "category": "kernel_fusion",
           "priority": "high",
-          "description": "Implement fused RMS_NORM+MUL kernel to match CUDA parity \u2014 20-40% latency reduction per transformer layer (called 2x per layer)",
+          "description": "Implement fused RMS_NORM+MUL kernel to match CUDA parity — 20-40% latency reduction per transformer layer (called 2x per layer)",
           "expected_improvement": "20-40% latency reduction",
           "risk": "medium",
+          "status": "skipped",
+          "skip_reason": "Requires graph-level fusion infrastructure (can_fuse, node lookahead) not present in SYCL backend. CUDA implements this in ggml-cuda.cu compute_graph with ggml_cuda_can_fuse() pattern scanning. High-value but high-risk — deferred to future dedicated fusion pass.",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k NORM -e ZES_ENABLE_SYSMAN=1"
         },
         {
@@ -762,6 +773,8 @@
           "description": "Reduce GROUP_NORM from 3 passes to 2 using float2 trick from NORM",
           "expected_improvement": "33% latency reduction for GROUP_NORM",
           "risk": "medium",
+          "status": "completed",
+          "actual_speedup": 1.488,
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k NORM -e ZES_ENABLE_SYSMAN=1"
         }
       ]

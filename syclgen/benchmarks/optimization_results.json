@@ -1491,6 +1491,55 @@
           "description": "1.29x average speedup across all 56 ROPE test cases. Biggest wins on compute-bound f32 small-tensor cases: rope_norm 2.66x avg, rope_neox 1.88x avg. Bandwidth-bound (v=1) cases show ~1.18x avg. f16 cases average 1.20x. Zero regressions below 0.98x. Peak reported bandwidth 918 GB/s exceeds theoretical peak (likely measurement artifact from v=1 large tensor amortization)."
         }
       }
+    },
+    {
+      "task_id": "opt_task_012",
+      "kernel": "GROUP_NORM (normalization)",
+      "step_id": "opt_017_004",
+      "description": "Reduce GROUP_NORM from 3 passes to 2 passes using float2 sum+sum_sq simultaneous accumulation",
+      "outcome": "significant_speedup",
+      "build_config": "Standard build (GGML_SYCL_F16=ON, no special defines)",
+      "timestamp": "2026-03-09T10:30:00Z",
+      "correctness": "pass (51/51 norm tests: GROUP_NORM 2/2, RMS_NORM 17/17, NORM 16/16, L2_NORM 16/16)",
+      "notes": "Replaced 3-pass GROUP_NORM (pass1: sum+reduce for mean, pass2: subtract_mean+write+sum_sq+reduce for variance, pass3: scale*read+write) with 2-pass approach using sycl::float2 accumulation: pass1 accumulates sum and sum-of-squares simultaneously (Var = E[x²]-E[x]²), pass2 writes (x-mean)*scale. Eliminates one full read+write pass over the data. Same approach already used by NORM kernel in this file. Also an improvement over CUDA GROUP_NORM which still uses 3 passes. SLM type changed from sycl::local_accessor<float> to sycl::local_accessor<sycl::float2> to support the float2 block_reduce.",
+      "benchmark_comparison": {
+        "test_case": "GROUP_NORM(type=f32,...) — 2 test configurations",
+        "baseline_log": "syclgen/benchmarks/baseline_results.json",
+        "new_log": "b60 benchmark 2026-03-09",
+        "data": [
+          {
+            "ne": "[64,64,320,1]",
+            "num_groups": 32,
+            "group_size": 40960,
+            "baseline_us": 62.10,
+            "new_us": 42.17,
+            "baseline_gbps": 157.30,
+            "new_gbps": 231.60,
+            "speedup": 1.473,
+            "note": "Small case: 40960 elements/group, 160 iterations/thread — reduction overhead is non-trivial relative to data passes"
+          },
+          {
+            "ne": "[128,128,640,1]",
+            "num_groups": 32,
+            "group_size": 327680,
+            "baseline_us": 1270.90,
+            "new_us": 846.07,
+            "baseline_gbps": 61.50,
+            "new_gbps": 92.34,
+            "speedup": 1.502,
+            "note": "Large case: 327680 elements/group, 1280 iterations/thread — eliminating the third pass saves ~425us of memory traffic"
+          }
+        ],
+        "overall": {
+          "avg_speedup": 1.488,
+          "num_cases": 2,
+          "best_speedup": 1.502,
+          "worst_speedup": 1.473,
+          "peak_bandwidth_gbps": 231.60,
+          "peak_pct_of_hw_peak": 50.8,
+          "description": "1.49x average speedup across both GROUP_NORM test cases by reducing 3 passes to 2. Large case improved from 62 to 92 GB/s. Bandwidth still well below peak (50.8%) due to GROUP_NORM's non-contiguous access pattern (groups span multiple channels) and high iteration count per thread."
+        }
+      }
     }
   ]
 }

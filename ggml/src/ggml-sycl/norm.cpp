@@ -114,7 +114,8 @@ void ggml_sycl_op_group_norm(ggml_backend_sycl_context & ctx, ggml_tensor * dst)
     sycl::range<1> local_range(block_size);
 
     stream->submit([&](sycl::handler & h) {
-        sycl::local_accessor<float, 1> shared_vals(num_warps, h);
+        // float2 shared memory for the two-component reduction (sum, sum_sq)
+        sycl::local_accessor<sycl::float2, 1> shared_vals(num_warps, h);
 
         h.parallel_for(
             sycl::nd_range<1>(global_range, local_range),
@@ -125,38 +126,33 @@ void ggml_sycl_op_group_norm(ggml_backend_sycl_context & ctx, ggml_tensor * dst)
                 const int start = gid * group_size + tid;
                 const int end   = sycl::min(gid * group_size + group_size, ne_elements);
 
-                float * sh = shared_vals.get_multi_ptr<sycl::access::decorated::no>().get_raw();
-
-                // --- Pass 1: compute mean ---
-                float tmp = 0.0f;
+                // --- Pass 1: accumulate sum and sum-of-squares in float2 ---
+                // Uses E[x] and E[x²] to compute variance as Var = E[x²] - E[x]²
+                // This eliminates the need for a separate mean-subtraction pass.
+                sycl::float2 acc(0.0f, 0.0f);
                 for (int j = start; j < end; j += block_size) {
-                    tmp += src0_d[j];
+                    const float xi = src0_d[j];
+                    acc.x() += xi;
+                    acc.y() += xi * xi;
                 }
-                tmp = block_reduce<block_reduce_method::SUM>(tmp, sh, item);
-                if (tid == 0) { sh[0] = tmp; }
-                item.barrier(sycl::access::fence_space::local_space);
-                tmp = sh[0];
 
-                const float mean = tmp / group_size;
+                sycl::float2 * sh = shared_vals.get_multi_ptr<sycl::access::decorated::no>().get_raw();
+                acc = block_reduce<block_reduce_method::SUM>(acc, sh, item);
 
-                // --- Pass 2: subtract mean + accumulate variance ---
-                tmp = 0.0f;
-                for (int j = start; j < end; j += block_size) {
-                    const float xi = src0_d[j] - mean;
-                    dst_d[j] = xi;
-                    tmp += xi * xi;
+                // Broadcast from sub-group 0 to all work-items
+                if (tid == 0) {
+                    sh[0] = acc;
                 }
-                tmp = block_reduce<block_reduce_method::SUM>(tmp, sh, item);
-                if (tid == 0) { sh[0] = tmp; }
                 item.barrier(sycl::access::fence_space::local_space);
-                tmp = sh[0];
+                acc = sh[0];
 
-                const float variance = tmp / group_size;
+                const float mean     = acc.x() / group_size;
+                const float variance = acc.y() / group_size - mean * mean;
                 const float scale    = sycl::rsqrt(variance + eps);
 
-                // --- Pass 3: scale ---
+                // --- Pass 2: normalize and write output ---
                 for (int j = start; j < end; j += block_size) {
-                    dst_d[j] *= scale;
+                    dst_d[j] = (src0_d[j] - mean) * scale;
                 }
             }
         );
