@@ -2404,6 +2404,41 @@
       },
       "average_speedup": 2.3,
       "notes": "Both Mamba-2 benchmark cases improved significantly. Native math (sycl::native::exp/log) is the dominant contributor for the compute-bound n_tok=512 case. Stable across 2 runs. 3/3 unit tests pass (Mamba-1 d_state=16, Mamba-2 d_state=128, Mamba-2 d_state=256)."
+    },
+    {
+      "optimization_id": "opt_034_001+003",
+      "task_id": "opt_task_026",
+      "kernel": "cross_entropy_loss",
+      "description": "WG 16->256 with block_reduce + native math (exp/log)",
+      "date": "2026-03-08",
+      "status": "verified",
+      "test_cases": [
+        {
+          "name": "CROSS_ENTROPY_LOSS ne=[32000,64]",
+          "baseline_us": 891.02,
+          "baseline_bw_gbs": 17.14,
+          "optimized_us": 71.00,
+          "optimized_bw_gbs": 215.07,
+          "speedup": 12.55
+        },
+        {
+          "name": "CROSS_ENTROPY_LOSS ne=[128256,16]",
+          "baseline_us": 3491.56,
+          "baseline_bw_gbs": 4.38,
+          "optimized_us": 256.24,
+          "optimized_bw_gbs": 59.71,
+          "speedup": 13.63
+        }
+      ],
+      "average_speedup": 13.09,
+      "unit_tests": "2/2 passed",
+      "changes": [
+        "WG size 16 -> 256 (CEL_BLOCK_SIZE)",
+        "block_reduce replacing warp_reduce for MAX and SUM reductions",
+        "sycl::native::exp and sycl::native::log replacing standard math",
+        "SLM broadcast for cross-warp communication after block_reduce",
+        "SLM logit caching (use_shared template) with 48KB threshold"
+      ]
     }
   ]
 }

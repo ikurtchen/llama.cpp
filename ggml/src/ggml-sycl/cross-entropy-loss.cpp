@@ -1,9 +1,11 @@
 #include "cross-entropy-loss.hpp"
 #include "sumrows.hpp"
 
-// Forward kernel — one sub-group (WARP_SIZE threads) per row.
+#define CEL_BLOCK_SIZE 256
+
+// Forward kernel — one work-group (CEL_BLOCK_SIZE threads) per row.
 // Three passes over nclasses:
-//   1. Find max logit (warp_reduce_max)
+//   1. Find max logit (block_reduce MAX)
 //   2. Compute sum of exp(logit - max) -> log(sum)
 //   3. Compute loss = -(logit - max - log_sum) * label, reduced / nrows
 // When use_shared=true, logits are cached in local (shared) memory.
@@ -13,11 +15,15 @@ static void cross_entropy_loss_f32_sycl(
     const int nclasses, const int nrows,
     sycl::queue & stream) {
 
-    const sycl::range<1> global(nrows * WARP_SIZE);
-    const sycl::range<1> local(WARP_SIZE);
+    constexpr int block_size = CEL_BLOCK_SIZE;
+    constexpr int num_warps = block_size / WARP_SIZE;
+
+    const sycl::range<1> global(nrows * block_size);
+    const sycl::range<1> local(block_size);
 
     stream.submit([&](sycl::handler & cgh) {
         sycl::local_accessor<float, 1> tmp_acc(use_shared ? nclasses : 0, cgh);
+        sycl::local_accessor<float, 1> reduce_acc(num_warps, cgh);
 
         cgh.parallel_for(
             sycl::nd_range<1>(global, local),
@@ -32,34 +38,44 @@ static void cross_entropy_loss_f32_sycl(
                 if constexpr (use_shared) {
                     tmp = tmp_acc.get_multi_ptr<sycl::access::decorated::no>().get_raw();
                 }
+                float * reduce_smem = reduce_acc.get_multi_ptr<sycl::access::decorated::no>().get_raw();
 
                 // Pass 1: find max logit
                 float max_logit = -INFINITY;
-                for (int i = tid; i < nclasses; i += WARP_SIZE) {
+                for (int i = tid; i < nclasses; i += block_size) {
                     const float val = row_logits[i];
                     max_logit = sycl::fmax(max_logit, val);
                     if constexpr (use_shared) {
                         tmp[i] = val;
                     }
                 }
-                max_logit = warp_reduce_max(max_logit);
+                max_logit = block_reduce<block_reduce_method::MAX, block_size>(max_logit, reduce_smem, item);
+                // Broadcast max from lane 0 to all threads via SLM
+                if (tid == 0) { reduce_smem[0] = max_logit; }
+                item.barrier(sycl::access::fence_space::local_space);
+                max_logit = reduce_smem[0];
+                item.barrier(sycl::access::fence_space::local_space);
 
                 // Pass 2: sum of exp(logit - max)
                 float sum = 0.0f;
-                for (int i = tid; i < nclasses; i += WARP_SIZE) {
+                for (int i = tid; i < nclasses; i += block_size) {
                     const float logit_i = use_shared ? tmp[i] : row_logits[i];
-                    sum += sycl::exp(logit_i - max_logit);
+                    sum += sycl::native::exp(logit_i - max_logit);
                 }
-                sum = warp_reduce_sum(sum);
-                sum = sycl::log(sum);
+                sum = block_reduce<block_reduce_method::SUM, block_size>(sum, reduce_smem, item);
+                // Broadcast sum from lane 0 to all threads
+                if (tid == 0) { reduce_smem[0] = sycl::native::log(sum); }
+                item.barrier(sycl::access::fence_space::local_space);
+                const float log_sum = reduce_smem[0];
+                item.barrier(sycl::access::fence_space::local_space);
 
                 // Pass 3: cross-entropy loss
                 float loss = 0.0f;
-                for (int i = tid; i < nclasses; i += WARP_SIZE) {
+                for (int i = tid; i < nclasses; i += block_size) {
                     const float logit_i = use_shared ? tmp[i] : row_logits[i];
-                    loss += (logit_i - max_logit - sum) * row_labels[i];
+                    loss += (logit_i - max_logit - log_sum) * row_labels[i];
                 }
-                loss = -warp_reduce_sum(loss) / (float)nrows;
+                loss = -block_reduce<block_reduce_method::SUM, block_size>(loss, reduce_smem, item) / (float)nrows;
 
                 if (tid == 0) {
                     dst[row] = loss;
@@ -68,7 +84,7 @@ static void cross_entropy_loss_f32_sycl(
     });
 }
 
-// Backward kernel — one sub-group (WARP_SIZE threads) per row.
+// Backward kernel — one work-group (CEL_BLOCK_SIZE threads) per row.
 // Two passes:
 //   1. Find max logit, compute exp(logit - max) and sum
 //   2. Output: (softmax(logit) - label) * grad / nrows
@@ -78,11 +94,15 @@ static void cross_entropy_loss_back_f32_sycl(
     float * dst, const int nclasses, const int nrows,
     sycl::queue & stream) {
 
-    const sycl::range<1> global(nrows * WARP_SIZE);
-    const sycl::range<1> local(WARP_SIZE);
+    constexpr int block_size = CEL_BLOCK_SIZE;
+    constexpr int num_warps = block_size / WARP_SIZE;
+
+    const sycl::range<1> global(nrows * block_size);
+    const sycl::range<1> local(block_size);
 
     stream.submit([&](sycl::handler & cgh) {
         sycl::local_accessor<float, 1> tmp_acc(use_shared ? nclasses : 0, cgh);
+        sycl::local_accessor<float, 1> reduce_acc(num_warps, cgh);
 
         cgh.parallel_for(
             sycl::nd_range<1>(global, local),
@@ -98,22 +118,28 @@ static void cross_entropy_loss_back_f32_sycl(
                 if constexpr (use_shared) {
                     tmp = tmp_acc.get_multi_ptr<sycl::access::decorated::no>().get_raw();
                 }
+                float * reduce_smem = reduce_acc.get_multi_ptr<sycl::access::decorated::no>().get_raw();
 
                 // Pass 1: find max logit
                 float maxval = -INFINITY;
-                for (int i = tid; i < nclasses; i += WARP_SIZE) {
+                for (int i = tid; i < nclasses; i += block_size) {
                     const float val = row_logits[i];
                     maxval = sycl::fmax(maxval, val);
                     if constexpr (use_shared) {
                         tmp[i] = val;
                     }
                 }
-                maxval = warp_reduce_max(maxval);
+                maxval = block_reduce<block_reduce_method::MAX, block_size>(maxval, reduce_smem, item);
+                // Broadcast max from lane 0 to all threads
+                if (tid == 0) { reduce_smem[0] = maxval; }
+                item.barrier(sycl::access::fence_space::local_space);
+                maxval = reduce_smem[0];
+                item.barrier(sycl::access::fence_space::local_space);
 
                 // Compute exp(logit - max) and accumulate sum
                 float sum = 0.0f;
-                for (int i = tid; i < nclasses; i += WARP_SIZE) {
-                    const float val = sycl::exp((use_shared ? tmp[i] : row_logits[i]) - maxval);
+                for (int i = tid; i < nclasses; i += block_size) {
+                    const float val = sycl::native::exp((use_shared ? tmp[i] : row_logits[i]) - maxval);
                     sum += val;
                     if constexpr (use_shared) {
                         tmp[i] = val;
@@ -121,12 +147,16 @@ static void cross_entropy_loss_back_f32_sycl(
                         row_dst[i] = val;
                     }
                 }
-                sum = warp_reduce_sum(sum);
-                const float sm_scale = 1.0f / sum;
+                sum = block_reduce<block_reduce_method::SUM, block_size>(sum, reduce_smem, item);
+                // Broadcast sm_scale from lane 0 to all threads
+                if (tid == 0) { reduce_smem[0] = 1.0f / sum; }
+                item.barrier(sycl::access::fence_space::local_space);
+                const float sm_scale = reduce_smem[0];
+                item.barrier(sycl::access::fence_space::local_space);
 
                 // Pass 2: output (softmax - label) * grad / nrows
                 const float d_by_nrows = grad[0] / (float)nrows;
-                for (int i = tid; i < nclasses; i += WARP_SIZE) {
+                for (int i = tid; i < nclasses; i += block_size) {
                     const float val = use_shared ? tmp[i] : row_dst[i];
                     row_dst[i] = (val * sm_scale - row_labels[i]) * d_by_nrows;
                 }
@@ -159,8 +189,8 @@ void ggml_sycl_cross_entropy_loss(ggml_backend_sycl_context & ctx, ggml_tensor *
     // Allocate temporary per-row loss buffer
     ggml_sycl_pool_alloc<float> dst_tmp(ctx.pool(), nrows);
 
-    const size_t nbytes_shared = ne00 * sizeof(float);
-    // 49152 = 48KB, typical local memory limit
+    const size_t nbytes_shared = ne00 * sizeof(float) + (CEL_BLOCK_SIZE / WARP_SIZE) * sizeof(float);
+    // 49152 = 48KB, conservative local memory limit (Xe2 has 64KB)
     if (nbytes_shared <= 49152) {
         cross_entropy_loss_f32_sycl<true>(src0_d, src1_d, dst_tmp.ptr, ne00, nrows, stream);
     } else {
@@ -196,7 +226,8 @@ void ggml_sycl_cross_entropy_loss_back(ggml_backend_sycl_context & ctx, ggml_ten
 
     sycl::queue & stream = *ctx.stream();
 
-    const size_t nbytes_shared = ne00 * sizeof(float);
+    const size_t nbytes_shared = ne00 * sizeof(float) + (CEL_BLOCK_SIZE / WARP_SIZE) * sizeof(float);
+    // 49152 = 48KB, conservative local memory limit (Xe2 has 64KB)
     if (nbytes_shared <= 49152) {
         cross_entropy_loss_back_f32_sycl<true>(grad_d, src0f_d, src1f_d, dst_d, ne00, nrows, stream);
     } else {
