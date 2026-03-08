@@ -2417,7 +2417,7 @@
           "name": "CROSS_ENTROPY_LOSS ne=[32000,64]",
           "baseline_us": 891.02,
           "baseline_bw_gbs": 17.14,
-          "optimized_us": 71.00,
+          "optimized_us": 71.0,
           "optimized_bw_gbs": 215.07,
           "speedup": 12.55
         },
@@ -2450,9 +2450,9 @@
       "test_cases": [
         {
           "name": "SOLVE_TRI n=64,k=32,b=4x4",
-          "baseline_gflops": 12.40,
+          "baseline_gflops": 12.4,
           "optimized_gflops": 12.42,
-          "speedup": 1.00,
+          "speedup": 1.0,
           "note": "n<=64 unchanged (still uses SLM)"
         },
         {
@@ -2465,20 +2465,20 @@
           "name": "SOLVE_TRI n=64,k=64,b=8x32",
           "baseline_gflops": 13.73,
           "optimized_gflops": 13.73,
-          "speedup": 1.00,
+          "speedup": 1.0,
           "note": "n<=64 unchanged"
         },
         {
           "name": "SOLVE_TRI n=128,k=128,b=4x32",
           "baseline_gflops": 4.59,
-          "optimized_gflops": 74.70,
+          "optimized_gflops": 74.7,
           "speedup": 16.28
         },
         {
           "name": "SOLVE_TRI n=256,k=128,b=4x2",
           "baseline_gflops": 70.88,
           "optimized_gflops": 70.88,
-          "speedup": 1.00,
+          "speedup": 1.0,
           "note": "n>128 unchanged (already used global memory)"
         }
       ],
@@ -2488,6 +2488,214 @@
         "MAX_N_SHARED reduced from 128 to 64",
         "n=128 now uses global memory path instead of overflowing 64KB SLM"
       ]
+    },
+    {
+      "optimization_id": "opt_031_001",
+      "task_id": "opt_task_031",
+      "kernel": "repeat_back",
+      "description": "WG 16\u2192256 + fast_div_modulo for tid23 % ne2 / tid23 / ne2",
+      "date": "2026-03-08",
+      "status": "no_speedup",
+      "test_cases": [
+        {
+          "name": "REPEAT_BACK(type=f32,ne=[4096,32,1,1],nr=[1,4,1,1])",
+          "optimized_us": 12.1,
+          "optimized_bandwidth_gbs": 80.71,
+          "note": "No baseline available. Launch-overhead dominated. Reverted."
+        },
+        {
+          "name": "REPEAT_BACK(type=f32,ne=[128,128,4,1],nr=[2,2,1,1])",
+          "optimized_us": 6.29,
+          "optimized_bandwidth_gbs": 77.6,
+          "note": "No baseline available. Launch-overhead dominated. Reverted."
+        }
+      ],
+      "avg_speedup": "N/A",
+      "notes": "No baseline data existed for REPEAT_BACK. Kernel is launch-overhead dominated at these sizes. WG increase + fast_div_modulo changes reverted."
+    },
+    {
+      "optimization_id": "opt_038_001",
+      "task_id": "opt_task_038",
+      "kernel": "count_equal",
+      "description": "WG 16\u2192256 + block_reduce replacing warp_reduce_sum",
+      "date": "2026-03-08",
+      "status": "no_speedup",
+      "test_cases": [
+        {
+          "name": "COUNT_EQUAL(type=f32,ne=[4096,512,1,1])",
+          "baseline_us": 10.85,
+          "optimized_us": 10.9,
+          "speedup": 1.0,
+          "note": "Launch-overhead dominated (~10us min). No change."
+        },
+        {
+          "name": "COUNT_EQUAL(type=f32,ne=[32000,64,1,1])",
+          "baseline_us": 10.83,
+          "optimized_us": 10.65,
+          "speedup": 1.02,
+          "note": "Launch-overhead dominated (~10us min). Within noise."
+        }
+      ],
+      "avg_speedup": 1.01,
+      "notes": "Both test cases are launch-overhead dominated at ~10us. WG=256 + block_reduce had no measurable effect. Reverted."
+    },
+    {
+      "optimization_id": "opt_039_001",
+      "task_id": "opt_task_039",
+      "kernel": "timestep_embedding",
+      "description": "Native math (exp/log/cos/sin \u2192 sycl::native:: variants)",
+      "date": "2026-03-08",
+      "status": "no_speedup",
+      "test_cases": [
+        {
+          "name": "TIMESTEP_EMBEDDING(type=f32,ne_a=[256,1,1,1],dim=320,max_period=10000)",
+          "baseline_us": 5.56,
+          "optimized_us": 5.38,
+          "speedup": 1.03,
+          "note": "Launch-overhead dominated (~5us). Within noise."
+        },
+        {
+          "name": "TIMESTEP_EMBEDDING(type=f32,ne_a=[1,1,1,1],dim=1280,max_period=10000)",
+          "baseline_us": 5.62,
+          "optimized_us": 5.36,
+          "speedup": 1.05,
+          "note": "Launch-overhead dominated (~5us). Within noise."
+        }
+      ],
+      "avg_speedup": 1.04,
+      "notes": "Both test cases are launch-overhead dominated at ~5us. Native math had no measurable effect at these tiny sizes. Reverted."
+    },
+    {
+      "optimization_id": "opt_058_001",
+      "task_id": "opt_task_058",
+      "title": "Full post-optimization benchmark comparison",
+      "date": "2026-03-08",
+      "outcome": "completed",
+      "summary": {
+        "total_test_cases_compared": 173,
+        "overall_geometric_mean_speedup": 1.51,
+        "total_regressions": 3,
+        "per_kernel_summary": [
+          {
+            "kernel": "CROSS_ENTROPY_LOSS",
+            "opt": "opt_034_001",
+            "cases": 2,
+            "avg_speedup": 12.96,
+            "min": 12.45,
+            "max": 13.47
+          },
+          {
+            "kernel": "SSM_CONV",
+            "opt": "opt_032_001",
+            "cases": 2,
+            "avg_speedup": 7.36,
+            "min": 1.0,
+            "max": 13.72
+          },
+          {
+            "kernel": "CPY",
+            "opt": "opt_019_001",
+            "cases": 12,
+            "avg_speedup": 5.99,
+            "min": 2.16,
+            "max": 9.5
+          },
+          {
+            "kernel": "SET_ROWS",
+            "opt": "opt_026_001",
+            "cases": 1,
+            "avg_speedup": 5.5,
+            "min": 5.5,
+            "max": 5.5
+          },
+          {
+            "kernel": "SSM_SCAN",
+            "opt": "opt_033_001",
+            "cases": 2,
+            "avg_speedup": 2.32,
+            "min": 1.62,
+            "max": 3.02
+          },
+          {
+            "kernel": "Unary ops",
+            "opt": "opt_010_002",
+            "cases": 16,
+            "avg_speedup": 1.88,
+            "min": 0.98,
+            "max": 3.44
+          },
+          {
+            "kernel": "SOFT_MAX",
+            "opt": "opt_015_001",
+            "cases": 29,
+            "avg_speedup": 1.81,
+            "min": 1.07,
+            "max": 4.2
+          },
+          {
+            "kernel": "binbcast",
+            "opt": "opt_013_001",
+            "cases": 8,
+            "avg_speedup": 1.56,
+            "min": 0.96,
+            "max": 2.24
+          },
+          {
+            "kernel": "GROUP_NORM",
+            "opt": "opt_017_004",
+            "cases": 2,
+            "avg_speedup": 1.49,
+            "min": 1.48,
+            "max": 1.5
+          },
+          {
+            "kernel": "ROPE",
+            "opt": "opt_016_002",
+            "cases": 56,
+            "avg_speedup": 1.29,
+            "min": 1.0,
+            "max": 2.88
+          },
+          {
+            "kernel": "MMVQ",
+            "opt": "opt_002_001",
+            "cases": 24,
+            "avg_speedup": 1.05,
+            "min": 0.87,
+            "max": 2.46
+          },
+          {
+            "kernel": "OUT_PROD",
+            "opt": "opt_005_001",
+            "cases": 2,
+            "avg_speedup": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "note": "new capability - batch/GQA support added"
+          },
+          {
+            "kernel": "TOP_K",
+            "opt": "opt_051_001",
+            "cases": 17,
+            "avg_speedup": 0.99,
+            "min": 0.94,
+            "max": 1.0,
+            "note": "new capability - large ncols via oneDPL radix sort"
+          },
+          {
+            "kernel": "ARGSORT",
+            "opt": "opt_051_002",
+            "cases": 0,
+            "note": "new capability - large ncols via oneDPL; no matching baseline cases"
+          },
+          {
+            "kernel": "SOLVE_TRI",
+            "opt": "opt_038_003",
+            "cases": 0,
+            "note": "SLM overflow fix; no matching baseline cases"
+          }
+        ]
+      }
     }
   ]
 }
