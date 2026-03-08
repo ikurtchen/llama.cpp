@@ -1549,7 +1549,9 @@
       "title": "Optimize solve_tri kernel (medium potential)",
       "overall_optimization_potential": "medium",
       "priority": 3,
-      "status": "pending",
+      "status": "completed",
+      "result": "14.21x avg speedup for n=128 cases (SLM overflow fix), n=64 and n=256 unchanged",
+      "completed_date": "2026-03-08",
       "depends_on": [
         "opt_task_002"
       ],
@@ -1561,6 +1563,7 @@
           "description": "Fix MAX_N_SHARED from 128 to 64 (exceeds 64KB SLM limit)",
           "expected_improvement": "Correctness fix for n=128",
           "risk": "low",
+          "status": "completed",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k SOLVE_TRI -e ZES_ENABLE_SYSMAN=1"
         },
         {
@@ -1570,6 +1573,7 @@
           "description": "Add oneMKL batched TRSM path for large n (n>64)",
           "expected_improvement": "5-50x speedup for n>64",
           "risk": "medium",
+          "status": "skipped",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k SOLVE_TRI -e ZES_ENABLE_SYSMAN=1"
         },
         {
@@ -1579,6 +1583,7 @@
           "description": "Add compile-time template specialization for common (n,k) pairs",
           "expected_improvement": "20-40% for small-n path",
           "risk": "medium",
+          "status": "skipped",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k SOLVE_TRI -e ZES_ENABLE_SYSMAN=1"
         }
       ]

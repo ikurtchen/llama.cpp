@@ -13,8 +13,9 @@
 // ============================================================================
 
 // Maximum n for which we load A into shared memory
-// n=128 means 128*128*4 = 64KB of shared memory — fits in most Intel GPUs
-#define MAX_N_SHARED 128
+// n=64 means 64*64*4 = 16KB of shared memory, well within Xe2's 64KB SLM.
+// n=128 would require 128*128*4 = 64KB for A alone, exceeding the limit.
+#define MAX_N_SHARED 64
 
 // --------------------------------------------------------------------------
 // General forward-substitution kernel

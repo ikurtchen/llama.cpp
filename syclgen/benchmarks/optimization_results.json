@@ -2439,6 +2439,55 @@
         "SLM broadcast for cross-warp communication after block_reduce",
         "SLM logit caching (use_shared template) with 48KB threshold"
       ]
+    },
+    {
+      "optimization_id": "opt_038_003",
+      "task_id": "opt_task_027",
+      "kernel": "solve_tri",
+      "description": "Fix MAX_N_SHARED from 128 to 64 (SLM overflow fix for n=128)",
+      "date": "2026-03-08",
+      "status": "verified",
+      "test_cases": [
+        {
+          "name": "SOLVE_TRI n=64,k=32,b=4x4",
+          "baseline_gflops": 12.40,
+          "optimized_gflops": 12.42,
+          "speedup": 1.00,
+          "note": "n<=64 unchanged (still uses SLM)"
+        },
+        {
+          "name": "SOLVE_TRI n=128,k=32,b=4x2",
+          "baseline_gflops": 4.52,
+          "optimized_gflops": 54.84,
+          "speedup": 12.13
+        },
+        {
+          "name": "SOLVE_TRI n=64,k=64,b=8x32",
+          "baseline_gflops": 13.73,
+          "optimized_gflops": 13.73,
+          "speedup": 1.00,
+          "note": "n<=64 unchanged"
+        },
+        {
+          "name": "SOLVE_TRI n=128,k=128,b=4x32",
+          "baseline_gflops": 4.59,
+          "optimized_gflops": 74.70,
+          "speedup": 16.28
+        },
+        {
+          "name": "SOLVE_TRI n=256,k=128,b=4x2",
+          "baseline_gflops": 70.88,
+          "optimized_gflops": 70.88,
+          "speedup": 1.00,
+          "note": "n>128 unchanged (already used global memory)"
+        }
+      ],
+      "average_speedup_n128": 14.21,
+      "unit_tests": "24/24 passed",
+      "changes": [
+        "MAX_N_SHARED reduced from 128 to 64",
+        "n=128 now uses global memory path instead of overflowing 64KB SLM"
+      ]
     }
   ]
 }
