@@ -788,7 +788,8 @@
       "title": "Optimize argsort (inline) kernel (medium potential)",
       "overall_optimization_potential": "medium",
       "priority": 2,
-      "status": "pending",
+      "status": "completed",
+      "results_summary": "opt_051_002 template sort order + code dedup: kept (no regression). opt_051_001 oneDPL radix sort for large ncols: kept (new capability, ARGSORT/TOP_K now support arbitrarily large ncols). 94/94 ARGSORT tests passed, 445/445 TOP_K tests passed.",
       "depends_on": [
         "opt_task_002"
       ],
@@ -800,6 +801,8 @@
           "description": "Template on sort order to eliminate runtime branch in hot loop",
           "expected_improvement": "2-5%",
           "risk": "low",
+          "status": "completed",
+          "actual_speedup": 0.998,
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k ARGSORT -e ZES_ENABLE_SYSMAN=1"
         },
         {
@@ -809,6 +812,8 @@
           "description": "Add oneDPL radix sort fallback for ncols > 1024",
           "expected_improvement": "Functional parity (avoids assertion failure)",
           "risk": "medium",
+          "status": "completed",
+          "actual_speedup": "N/A (new capability)",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k ARGSORT -e ZES_ENABLE_SYSMAN=1"
         }
       ]
@@ -822,7 +827,8 @@
       "title": "Optimize top_k (inline) kernel (medium potential)",
       "overall_optimization_potential": "medium",
       "priority": 2,
-      "status": "pending",
+      "status": "in_progress",
+      "progress_notes": "Large-ncols support (opt_052_001) done as part of opt_task_013 — TOP_K now reuses shared argsort_f32_i32_sycl_bitonic<DESC>() + oneDPL radix sort path. 445/445 TOP_K tests passed including ncols up to 524288. Remaining: opt_052_002 (fuse sort+copy).",
       "depends_on": [
         "opt_task_002"
       ],
@@ -843,6 +849,8 @@
           "description": "CRITICAL: Add large-ncols support (fails for vocab > 1024) \u2014 implement oneDPL partial sort",
           "expected_improvement": "Functional parity for real LLM vocab sizes (32K-128K)",
           "risk": "medium",
+          "status": "completed",
+          "actual_speedup": "N/A (new capability, shared with opt_task_013)",
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k TOP_K -e ZES_ENABLE_SYSMAN=1"
         }
       ]

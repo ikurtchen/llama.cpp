@@ -35,6 +35,12 @@
 #endif
 #include <sycl/half_type.hpp>
 
+#ifdef GGML_SYCL_USE_ONEDPL
+#    include <oneapi/dpl/algorithm>
+#    include <oneapi/dpl/execution>
+#    include <oneapi/dpl/iterator>
+#endif
+
 #include "ggml-sycl.h"
 #include "ggml-impl.h"
 #include "ggml-backend-impl.h"
@@ -3712,32 +3718,15 @@ static void ggml_sycl_op_argmax(ggml_backend_sycl_context & ctx, ggml_tensor * d
 // One work-group per row, work-group size = ncols_pad (next power of 2).
 // Uses local memory for the index array during the bitonic sort network.
 // ---------------------------------------------------------------------------
-static void ggml_sycl_op_argsort(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
-    const ggml_tensor * src0 = dst->src[0];
-
-    GGML_ASSERT(src0->type == GGML_TYPE_F32);
-    GGML_ASSERT(dst->type  == GGML_TYPE_I32);
-    GGML_ASSERT(ggml_is_contiguous(src0));
-
-    const int64_t ncols = src0->ne[0];
-    const int64_t nrows = ggml_nrows(src0);
-    const int ncols_pad = next_power_of_2((int) ncols);
-
-    // Bitonic sort in shared memory — ncols_pad must fit in local memory and work-group size limits
-    GGML_ASSERT(ncols_pad <= 1024);
-
-    const enum ggml_sort_order order = (enum ggml_sort_order) dst->op_params[0];
-
-    const float * src0_d = (const float *) src0->data;
-    int32_t *     dst_d  = (int32_t *)     dst->data;
-
-    sycl::queue & stream = *(ctx.stream());
+// Bitonic argsort kernel — templated on sort order for compile-time branch elimination
+template<ggml_sort_order order>
+static void argsort_f32_i32_sycl_bitonic(
+        const float * src0_d, int32_t * dst_d,
+        const int ncols, const int nrows, const int ncols_pad,
+        sycl::queue & stream) {
 
     const sycl::range<1> global_range(nrows * ncols_pad);
     const sycl::range<1> local_range(ncols_pad);
-
-    const int ncols_int = (int) ncols;
-    const bool ascending = (order == GGML_SORT_ORDER_ASC);
 
     stream.submit([&](sycl::handler & h) {
         sycl::local_accessor<int, 1> dst_row(ncols_pad, h);
@@ -3752,7 +3741,7 @@ static void ggml_sycl_op_argsort(ggml_backend_sycl_context & ctx, ggml_tensor * 
                     return;
                 }
 
-                const float * x_row = src0_d + (int64_t) row * ncols_int;
+                const float * x_row = src0_d + (int64_t) row * ncols;
 
                 // Initialize indices
                 dst_row[col] = col;
@@ -3765,8 +3754,8 @@ static void ggml_sycl_op_argsort(ggml_backend_sycl_context & ctx, ggml_tensor * 
                         const int ixj = col ^ j;
                         if (ixj > col) {
                             if ((col & k) == 0) {
-                                if (dst_row[col] >= ncols_int ||
-                                    (dst_row[ixj] < ncols_int && (ascending ?
+                                if (dst_row[col] >= ncols ||
+                                    (dst_row[ixj] < ncols && (order == GGML_SORT_ORDER_ASC ?
                                         x_row[dst_row[col]] > x_row[dst_row[ixj]] :
                                         x_row[dst_row[col]] < x_row[dst_row[ixj]])))
                                 {
@@ -3775,8 +3764,8 @@ static void ggml_sycl_op_argsort(ggml_backend_sycl_context & ctx, ggml_tensor * 
                                     dst_row[ixj] = tmp;
                                 }
                             } else {
-                                if (dst_row[ixj] >= ncols_int ||
-                                    (dst_row[col] < ncols_int && (ascending ?
+                                if (dst_row[ixj] >= ncols ||
+                                    (dst_row[col] < ncols && (order == GGML_SORT_ORDER_ASC ?
                                         x_row[dst_row[col]] < x_row[dst_row[ixj]] :
                                         x_row[dst_row[col]] > x_row[dst_row[ixj]])))
                                 {
@@ -3791,15 +3780,103 @@ static void ggml_sycl_op_argsort(ggml_backend_sycl_context & ctx, ggml_tensor * 
                 }
 
                 // Copy result to dst without padding
-                if (col < ncols_int) {
-                    dst_d[(int64_t) row * ncols_int + col] = dst_row[col];
+                if (col < ncols) {
+                    dst_d[(int64_t) row * ncols + col] = dst_row[col];
                 }
             });
     });
 }
 
+#ifdef GGML_SYCL_USE_ONEDPL
+// oneDPL-based argsort for ncols > 1024 (radix sort, matching CUDA's CUB path)
+template<ggml_sort_order order>
+static void argsort_f32_i32_sycl_radix(
+        const float * src0_d, int32_t * dst_d,
+        const int ncols, const int nrows,
+        ggml_backend_sycl_context & ctx,
+        sycl::queue & stream) {
+
+    // We need temporary key buffer (float) for sort_by_key — one row at a time
+    ggml_sycl_pool_alloc<float> tmp_keys_alloc(ctx.pool(), ncols);
+    float * tmp_keys = tmp_keys_alloc.get();
+
+    auto policy = oneapi::dpl::execution::make_device_policy(stream);
+
+    for (int row = 0; row < nrows; row++) {
+        const float * src_row = src0_d + (int64_t) row * ncols;
+        int32_t *     dst_row = dst_d  + (int64_t) row * ncols;
+
+        // Copy source values to tmp_keys (sort_by_key modifies keys in-place)
+        stream.memcpy(tmp_keys, src_row, ncols * sizeof(float));
+
+        // Initialize indices 0, 1, 2, ..., ncols-1
+        const int block_size = 256;
+        const int grid_size  = (ncols + block_size - 1) / block_size;
+        stream.parallel_for(
+            sycl::nd_range<1>(grid_size * block_size, block_size),
+            [=](sycl::nd_item<1> item) {
+                const int i = item.get_global_id(0);
+                if (i < ncols) {
+                    dst_row[i] = i;
+                }
+            });
+        stream.wait();
+
+        // Sort keys+indices together
+        if constexpr (order == GGML_SORT_ORDER_ASC) {
+            oneapi::dpl::sort_by_key(policy, tmp_keys, tmp_keys + ncols, dst_row,
+                                     std::less<float>());
+        } else {
+            oneapi::dpl::sort_by_key(policy, tmp_keys, tmp_keys + ncols, dst_row,
+                                     std::greater<float>());
+        }
+    }
+}
+#endif // GGML_SYCL_USE_ONEDPL
+
+static void ggml_sycl_op_argsort(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
+    const ggml_tensor * src0 = dst->src[0];
+
+    GGML_ASSERT(src0->type == GGML_TYPE_F32);
+    GGML_ASSERT(dst->type  == GGML_TYPE_I32);
+    GGML_ASSERT(ggml_is_contiguous(src0));
+
+    const int64_t ncols = src0->ne[0];
+    const int64_t nrows = ggml_nrows(src0);
+
+    const enum ggml_sort_order order = (enum ggml_sort_order) dst->op_params[0];
+
+    const float * src0_d = (const float *) src0->data;
+    int32_t *     dst_d  = (int32_t *)     dst->data;
+
+    sycl::queue & stream = *(ctx.stream());
+
+    const int ncols_pad = next_power_of_2((int) ncols);
+
+    if (ncols_pad <= 1024) {
+        // Bitonic sort path — fast for small ncols
+        if (order == GGML_SORT_ORDER_ASC) {
+            argsort_f32_i32_sycl_bitonic<GGML_SORT_ORDER_ASC>(src0_d, dst_d, (int)ncols, (int)nrows, ncols_pad, stream);
+        } else {
+            argsort_f32_i32_sycl_bitonic<GGML_SORT_ORDER_DESC>(src0_d, dst_d, (int)ncols, (int)nrows, ncols_pad, stream);
+        }
+    } else {
+#ifdef GGML_SYCL_USE_ONEDPL
+        // oneDPL radix sort path — handles arbitrarily large ncols
+        if (order == GGML_SORT_ORDER_ASC) {
+            argsort_f32_i32_sycl_radix<GGML_SORT_ORDER_ASC>(src0_d, dst_d, (int)ncols, (int)nrows, ctx, stream);
+        } else {
+            argsort_f32_i32_sycl_radix<GGML_SORT_ORDER_DESC>(src0_d, dst_d, (int)ncols, (int)nrows, ctx, stream);
+        }
+#else
+        GGML_ASSERT(false && "argsort with ncols > 1024 requires oneDPL (GGML_SYCL_USE_ONEDPL)");
+        GGML_UNUSED(ctx);
+#endif
+    }
+}
+
 // ---------------------------------------------------------------------------
-// TOP_K — bitonic argsort (descending) then copy first k indices per row
+// TOP_K — argsort (descending) then copy first k indices per row
 // ---------------------------------------------------------------------------
 static void ggml_sycl_op_top_k(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
     const ggml_tensor * src0 = dst->src[0];
@@ -3813,8 +3890,6 @@ static void ggml_sycl_op_top_k(ggml_backend_sycl_context & ctx, ggml_tensor * ds
     const int64_t k     = dst->ne[0];
     const int ncols_pad = next_power_of_2((int) ncols);
 
-    GGML_ASSERT(ncols_pad <= 1024);
-
     const float * src0_d = (const float *) src0->data;
     int32_t *     dst_d  = (int32_t *)     dst->data;
 
@@ -3827,67 +3902,15 @@ static void ggml_sycl_op_top_k(ggml_backend_sycl_context & ctx, ggml_tensor * ds
     const int ncols_int = (int) ncols;
     const int k_int     = (int) k;
 
-    // Step 1: Bitonic argsort in descending order into tmp
-    {
-        const sycl::range<1> global_range(nrows * ncols_pad);
-        const sycl::range<1> local_range(ncols_pad);
-
-        stream.submit([&](sycl::handler & h) {
-            sycl::local_accessor<int, 1> dst_row(ncols_pad, h);
-
-            h.parallel_for(
-                sycl::nd_range<1>(global_range, local_range),
-                [=](sycl::nd_item<1> item) {
-                    const int col = item.get_local_id(0);
-                    const int row = item.get_group(0);
-
-                    if (col >= ncols_pad) {
-                        return;
-                    }
-
-                    const float * x_row = src0_d + (int64_t) row * ncols_int;
-
-                    // Initialize indices
-                    dst_row[col] = col;
-
-                    sycl::group_barrier(item.get_group());
-
-                    // Bitonic sort network (descending)
-                    for (int bk = 2; bk <= ncols_pad; bk *= 2) {
-                        for (int j = bk / 2; j > 0; j /= 2) {
-                            const int ixj = col ^ j;
-                            if (ixj > col) {
-                                if ((col & bk) == 0) {
-                                    // Descending: swap if left < right (or left is out-of-bounds)
-                                    if (dst_row[col] >= ncols_int ||
-                                        (dst_row[ixj] < ncols_int &&
-                                         x_row[dst_row[col]] < x_row[dst_row[ixj]]))
-                                    {
-                                        const int t = dst_row[col];
-                                        dst_row[col] = dst_row[ixj];
-                                        dst_row[ixj] = t;
-                                    }
-                                } else {
-                                    if (dst_row[ixj] >= ncols_int ||
-                                        (dst_row[col] < ncols_int &&
-                                         x_row[dst_row[col]] > x_row[dst_row[ixj]]))
-                                    {
-                                        const int t = dst_row[col];
-                                        dst_row[col] = dst_row[ixj];
-                                        dst_row[ixj] = t;
-                                    }
-                                }
-                            }
-                            sycl::group_barrier(item.get_group());
-                        }
-                    }
-
-                    // Copy result to tmp without padding
-                    if (col < ncols_int) {
-                        tmp[(int64_t) row * ncols_int + col] = dst_row[col];
-                    }
-                });
-        });
+    // Step 1: Argsort in descending order into tmp
+    if (ncols_pad <= 1024) {
+        argsort_f32_i32_sycl_bitonic<GGML_SORT_ORDER_DESC>(src0_d, tmp, ncols_int, (int)nrows, ncols_pad, stream);
+    } else {
+#ifdef GGML_SYCL_USE_ONEDPL
+        argsort_f32_i32_sycl_radix<GGML_SORT_ORDER_DESC>(src0_d, tmp, ncols_int, (int)nrows, ctx, stream);
+#else
+        GGML_ASSERT(false && "top_k with ncols > 1024 requires oneDPL (GGML_SYCL_USE_ONEDPL)");
+#endif
     }
 
     // Step 2: Copy first k indices per row from tmp to dst
@@ -5233,11 +5256,19 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_MEAN:
             return op->src[0]->type == GGML_TYPE_F32 && ggml_is_contiguous(op->src[0]);
         case GGML_OP_ARGSORT:
+#ifdef GGML_SYCL_USE_ONEDPL
+            return op->src[0]->type == GGML_TYPE_F32 && ggml_is_contiguous(op->src[0]);
+#else
             // Bitonic sort requires ncols_pad (next power of 2) to fit in local memory and work-group size.
-            // Limit to 1024 columns, matching CUDA's non-CUB fallback.
+            // Limit to 1024 columns without oneDPL.
             return op->src[0]->type == GGML_TYPE_F32 && ggml_is_contiguous(op->src[0]) && op->src[0]->ne[0] <= 1024;
+#endif
         case GGML_OP_TOP_K:
+#ifdef GGML_SYCL_USE_ONEDPL
+            return op->src[0]->type == GGML_TYPE_F32 && ggml_is_contiguous(op->src[0]);
+#else
             return op->src[0]->type == GGML_TYPE_F32 && ggml_is_contiguous(op->src[0]) && op->src[0]->ne[0] <= 1024;
+#endif
         case GGML_OP_POOL_2D:
             return true;
         case GGML_OP_ACC:

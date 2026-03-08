@@ -1540,6 +1540,150 @@
           "description": "1.49x average speedup across both GROUP_NORM test cases by reducing 3 passes to 2. Large case improved from 62 to 92 GB/s. Bandwidth still well below peak (50.8%) due to GROUP_NORM's non-contiguous access pattern (groups span multiple channels) and high iteration count per thread."
         }
       }
+    },
+    {
+      "task_id": "opt_task_013",
+      "kernel": "ARGSORT / TOP_K",
+      "step_id": "opt_051_002",
+      "description": "Template bitonic sort on ggml_sort_order for compile-time branch elimination; extract shared argsort_f32_i32_sycl_bitonic<order>() function; TOP_K reuses shared function (dedup ~60 lines)",
+      "outcome": "kept_functional_improvement",
+      "build_config": "Standard build (GGML_SYCL_F16=ON, GGML_SYCL_USE_ONEDPL auto-detected)",
+      "timestamp": "2026-03-08T15:45:00Z",
+      "correctness": "pass (94/94 ARGSORT tests, 445/445 TOP_K tests)",
+      "notes": "Extracted bitonic sort into standalone template function argsort_f32_i32_sycl_bitonic<ggml_sort_order order>(). Dispatcher calls templated function instead of inline lambda with runtime bool. TOP_K now calls same function (descending order) instead of duplicating the sort code. No baseline comparison possible for ARGSORT (all baseline cases were ncols>1024 = 'not supported'). TOP_K small-ncols cases show no regression (ne=[1000,1,1,1],k=1: 19.34us vs baseline 19.24us).",
+      "benchmark_comparison": {
+        "test_case": "ARGSORT + TOP_K — no baseline comparison for new large-ncols cases",
+        "baseline_log": "syclgen/benchmarks/baseline_results.json",
+        "new_log": "b60 benchmark 2026-03-08",
+        "data": [
+          {
+            "op": "TOP_K",
+            "ne": "[1000,1,1,1]",
+            "k": 1,
+            "baseline_us": 19.24,
+            "new_us": 19.34,
+            "speedup": 0.995,
+            "note": "Small ncols bitonic path: no regression"
+          },
+          {
+            "op": "TOP_K",
+            "ne": "[1000,16,1,1]",
+            "k": 1,
+            "baseline_us": 19.87,
+            "new_us": 19.92,
+            "speedup": 0.997,
+            "note": "Small ncols bitonic path with 16 rows: no regression"
+          },
+          {
+            "op": "TOP_K",
+            "ne": "[1000,16,1,1]",
+            "k": 10,
+            "baseline_us": 19.83,
+            "new_us": 19.94,
+            "speedup": 0.994,
+            "note": "Small ncols bitonic path: no regression"
+          },
+          {
+            "op": "TOP_K",
+            "ne": "[1000,16,1,1]",
+            "k": 40,
+            "baseline_us": 19.84,
+            "new_us": 19.76,
+            "speedup": 1.004,
+            "note": "Small ncols bitonic path: no regression"
+          }
+        ],
+        "overall": {
+          "avg_speedup": 0.998,
+          "num_cases": 4,
+          "best_speedup": 1.004,
+          "worst_speedup": 0.994,
+          "description": "Template sort order + code dedup: no performance regression on existing cases. Primary value is code quality (shared function, compile-time specialization, 60 lines removed) and enabling the oneDPL radix sort fallback."
+        }
+      }
+    },
+    {
+      "task_id": "opt_task_013",
+      "kernel": "ARGSORT / TOP_K",
+      "step_id": "opt_051_001",
+      "description": "oneDPL radix sort fallback for ncols > 1024 (matching CUDA's CUB DeviceRadixSort path); removes ncols <= 1024 limitation",
+      "outcome": "kept_new_capability",
+      "build_config": "Standard build with oneDPL (GGML_SYCL_F16=ON, GGML_SYCL_USE_ONEDPL=ON via find_package)",
+      "timestamp": "2026-03-08T15:45:00Z",
+      "correctness": "pass (94/94 ARGSORT tests including ncols up to 1048576; 445/445 TOP_K tests including ncols up to 524288)",
+      "notes": "Added oneDPL sort_by_key-based argsort for large ncols, matching CUDA's CUB path. CMakeLists.txt auto-detects oneDPL with find_package(oneDPL QUIET). When found, GGML_SYCL_USE_ONEDPL is defined and supports_op removes the ncols<=1024 limit. When not found, falls back to bitonic sort with ncols<=1024 limit (same as before). No baseline comparison possible since all large-ncols cases were 'not supported' in baseline. Performance for large ncols via oneDPL radix sort: ARGSORT ncols=65000 nrows=16 takes 12.7ms, ncols=200000 nrows=1 takes 0.9ms, ncols=200000 nrows=16 takes 14.6ms. TOP_K ncols=65000 k=1 takes 474us/row, ncols=200000 k=1 takes 474us/row.",
+      "benchmark_comparison": {
+        "test_case": "ARGSORT + TOP_K large ncols — new capability, no baseline exists",
+        "baseline_log": "syclgen/benchmarks/baseline_results.json (all large cases were 'not supported')",
+        "new_log": "b60 benchmark 2026-03-08",
+        "data": [
+          {
+            "op": "ARGSORT",
+            "ne": "[65000,16,1,1]",
+            "baseline_us": "not_supported",
+            "new_us": 12710.53,
+            "bandwidth_gbps": 0.61,
+            "note": "NEW: large ncols via oneDPL radix sort"
+          },
+          {
+            "op": "ARGSORT",
+            "ne": "[200000,1,1,1]",
+            "baseline_us": "not_supported",
+            "new_us": 907.65,
+            "bandwidth_gbps": 1.64,
+            "note": "NEW: large ncols via oneDPL radix sort"
+          },
+          {
+            "op": "ARGSORT",
+            "ne": "[200000,16,1,1]",
+            "baseline_us": "not_supported",
+            "new_us": 14573.21,
+            "bandwidth_gbps": 1.64,
+            "note": "NEW: large ncols via oneDPL radix sort"
+          },
+          {
+            "op": "TOP_K",
+            "ne": "[65000,1,1,1]",
+            "k": 1,
+            "baseline_us": "not_supported",
+            "new_us": 474.62,
+            "bandwidth_gbps": 0.51,
+            "note": "NEW: large ncols via oneDPL radix sort"
+          },
+          {
+            "op": "TOP_K",
+            "ne": "[200000,1,1,1]",
+            "k": 1,
+            "baseline_us": "not_supported",
+            "new_us": 473.71,
+            "bandwidth_gbps": 1.57,
+            "note": "NEW: large ncols via oneDPL radix sort"
+          },
+          {
+            "op": "TOP_K",
+            "ne": "[65000,16,1,1]",
+            "k": 1,
+            "baseline_us": "not_supported",
+            "new_us": 7370.25,
+            "bandwidth_gbps": 0.53,
+            "note": "NEW: large ncols via oneDPL radix sort (16 rows)"
+          },
+          {
+            "op": "TOP_K",
+            "ne": "[200000,16,1,1]",
+            "k": 1,
+            "baseline_us": "not_supported",
+            "new_us": 7515.55,
+            "bandwidth_gbps": 1.59,
+            "note": "NEW: large ncols via oneDPL radix sort (16 rows)"
+          }
+        ],
+        "overall": {
+          "avg_speedup": "N/A (new capability)",
+          "num_cases": 7,
+          "description": "Enables ARGSORT and TOP_K for arbitrarily large ncols via oneDPL radix sort. Previously limited to ncols <= 1024. No performance regression on existing small-ncols cases. Matches CUDA parity with CUB DeviceRadixSort."
+        }
+      }
     }
   ]
 }
