@@ -1,0 +1,892 @@
+{
+  "timestamp": "2026-03-08T23:00:54+00:00",
+  "hardware": "Intel Arc Pro B60",
+  "server": "b60",
+  "build": "04d5a13f3",
+  "log_file": "b60_workload_20260308_230054.log",
+  "models": [
+    {
+      "name": "Qwen3-0.6B-Q8_0",
+      "size_gib": 0.59,
+      "params": "596.05M",
+      "results": [
+        {
+          "test": "pp128",
+          "n_ubatch": 1,
+          "throughput_ts": 92.86,
+          "stddev_ts": 0.65
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 1,
+          "throughput_ts": 76.58,
+          "stddev_ts": 0.43
+        },
+        {
+          "test": "pp128",
+          "n_ubatch": 8,
+          "throughput_ts": 514.5,
+          "stddev_ts": 1.4
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 8,
+          "throughput_ts": 74.61,
+          "stddev_ts": 0.25
+        },
+        {
+          "test": "pp128",
+          "n_ubatch": 16,
+          "throughput_ts": 819.39,
+          "stddev_ts": 1.54
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 16,
+          "throughput_ts": 75.42,
+          "stddev_ts": 0.46
+        },
+        {
+          "test": "pp128",
+          "n_ubatch": 32,
+          "throughput_ts": 1619.67,
+          "stddev_ts": 7.31
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 32,
+          "throughput_ts": 75.35,
+          "stddev_ts": 0.13
+        },
+        {
+          "test": "pp128",
+          "n_ubatch": 64,
+          "throughput_ts": 3026.02,
+          "stddev_ts": 22.23
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 64,
+          "throughput_ts": 75.31,
+          "stddev_ts": 0.08
+        },
+        {
+          "test": "pp128",
+          "n_ubatch": 128,
+          "throughput_ts": 5797.6,
+          "stddev_ts": 405.98
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 128,
+          "throughput_ts": 76.26,
+          "stddev_ts": 0.26
+        },
+        {
+          "test": "pp128",
+          "n_ubatch": 256,
+          "throughput_ts": 5710.92,
+          "stddev_ts": 237.28
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 256,
+          "throughput_ts": 74.64,
+          "stddev_ts": 0.21
+        },
+        {
+          "test": "pp128",
+          "n_ubatch": 512,
+          "throughput_ts": 5798.4,
+          "stddev_ts": 340.24
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 512,
+          "throughput_ts": 75.9,
+          "stddev_ts": 0.27
+        },
+        {
+          "test": "pp256",
+          "n_ubatch": 1,
+          "throughput_ts": 92.78,
+          "stddev_ts": 0.55
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 1,
+          "throughput_ts": 76.37,
+          "stddev_ts": 0.27
+        },
+        {
+          "test": "pp256",
+          "n_ubatch": 8,
+          "throughput_ts": 528.63,
+          "stddev_ts": 1.08
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 8,
+          "throughput_ts": 75.29,
+          "stddev_ts": 0.18
+        },
+        {
+          "test": "pp256",
+          "n_ubatch": 16,
+          "throughput_ts": 800.89,
+          "stddev_ts": 6.39
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 16,
+          "throughput_ts": 74.94,
+          "stddev_ts": 0.25
+        },
+        {
+          "test": "pp256",
+          "n_ubatch": 32,
+          "throughput_ts": 1656.38,
+          "stddev_ts": 4.26
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 32,
+          "throughput_ts": 75.97,
+          "stddev_ts": 0.21
+        },
+        {
+          "test": "pp256",
+          "n_ubatch": 64,
+          "throughput_ts": 3181.09,
+          "stddev_ts": 18.55
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 64,
+          "throughput_ts": 75.04,
+          "stddev_ts": 0.14
+        },
+        {
+          "test": "pp256",
+          "n_ubatch": 128,
+          "throughput_ts": 6060.5,
+          "stddev_ts": 52.84
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 128,
+          "throughput_ts": 75.14,
+          "stddev_ts": 0.31
+        },
+        {
+          "test": "pp256",
+          "n_ubatch": 256,
+          "throughput_ts": 8485.4,
+          "stddev_ts": 556.35
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 256,
+          "throughput_ts": 74.69,
+          "stddev_ts": 0.21
+        },
+        {
+          "test": "pp256",
+          "n_ubatch": 512,
+          "throughput_ts": 8530.1,
+          "stddev_ts": 465.71
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 512,
+          "throughput_ts": 75.56,
+          "stddev_ts": 0.27
+        },
+        {
+          "test": "pp512",
+          "n_ubatch": 1,
+          "throughput_ts": 103.8,
+          "stddev_ts": 0.78
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 1,
+          "throughput_ts": 75.41,
+          "stddev_ts": 0.41
+        },
+        {
+          "test": "pp512",
+          "n_ubatch": 8,
+          "throughput_ts": 528.36,
+          "stddev_ts": 1.39
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 8,
+          "throughput_ts": 75.62,
+          "stddev_ts": 0.23
+        },
+        {
+          "test": "pp512",
+          "n_ubatch": 16,
+          "throughput_ts": 822.0,
+          "stddev_ts": 2.18
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 16,
+          "throughput_ts": 75.54,
+          "stddev_ts": 0.21
+        },
+        {
+          "test": "pp512",
+          "n_ubatch": 32,
+          "throughput_ts": 1639.89,
+          "stddev_ts": 2.84
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 32,
+          "throughput_ts": 75.12,
+          "stddev_ts": 0.08
+        },
+        {
+          "test": "pp512",
+          "n_ubatch": 64,
+          "throughput_ts": 3290.42,
+          "stddev_ts": 3.88
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 64,
+          "throughput_ts": 76.46,
+          "stddev_ts": 0.26
+        },
+        {
+          "test": "pp512",
+          "n_ubatch": 128,
+          "throughput_ts": 6384.68,
+          "stddev_ts": 14.7
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 128,
+          "throughput_ts": 76.17,
+          "stddev_ts": 0.25
+        },
+        {
+          "test": "pp512",
+          "n_ubatch": 256,
+          "throughput_ts": 8867.04,
+          "stddev_ts": 14.77
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 256,
+          "throughput_ts": 74.73,
+          "stddev_ts": 0.31
+        },
+        {
+          "test": "pp512",
+          "n_ubatch": 512,
+          "throughput_ts": 9808.71,
+          "stddev_ts": 463.73
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 512,
+          "throughput_ts": 74.91,
+          "stddev_ts": 0.25
+        },
+        {
+          "test": "pp1024",
+          "n_ubatch": 1,
+          "throughput_ts": 109.31,
+          "stddev_ts": 0.14
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 1,
+          "throughput_ts": 75.71,
+          "stddev_ts": 0.3
+        },
+        {
+          "test": "pp1024",
+          "n_ubatch": 8,
+          "throughput_ts": 524.95,
+          "stddev_ts": 1.81
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 8,
+          "throughput_ts": 75.94,
+          "stddev_ts": 0.03
+        },
+        {
+          "test": "pp1024",
+          "n_ubatch": 16,
+          "throughput_ts": 821.3,
+          "stddev_ts": 5.95
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 16,
+          "throughput_ts": 75.23,
+          "stddev_ts": 0.83
+        },
+        {
+          "test": "pp1024",
+          "n_ubatch": 32,
+          "throughput_ts": 1654.65,
+          "stddev_ts": 1.66
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 32,
+          "throughput_ts": 75.46,
+          "stddev_ts": 0.17
+        },
+        {
+          "test": "pp1024",
+          "n_ubatch": 64,
+          "throughput_ts": 3302.58,
+          "stddev_ts": 4.29
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 64,
+          "throughput_ts": 76.87,
+          "stddev_ts": 0.24
+        },
+        {
+          "test": "pp1024",
+          "n_ubatch": 128,
+          "throughput_ts": 6455.83,
+          "stddev_ts": 34.91
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 128,
+          "throughput_ts": 76.77,
+          "stddev_ts": 0.12
+        },
+        {
+          "test": "pp1024",
+          "n_ubatch": 256,
+          "throughput_ts": 8440.92,
+          "stddev_ts": 184.41
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 256,
+          "throughput_ts": 75.42,
+          "stddev_ts": 0.19
+        },
+        {
+          "test": "pp1024",
+          "n_ubatch": 512,
+          "throughput_ts": 9478.91,
+          "stddev_ts": 221.34
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 512,
+          "throughput_ts": 75.06,
+          "stddev_ts": 0.18
+        },
+        {
+          "test": "pp2048",
+          "n_ubatch": 1,
+          "throughput_ts": 106.05,
+          "stddev_ts": 0.11
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 1,
+          "throughput_ts": 74.4,
+          "stddev_ts": 0.32
+        },
+        {
+          "test": "pp2048",
+          "n_ubatch": 8,
+          "throughput_ts": 519.36,
+          "stddev_ts": 2.38
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 8,
+          "throughput_ts": 75.1,
+          "stddev_ts": 0.17
+        },
+        {
+          "test": "pp2048",
+          "n_ubatch": 16,
+          "throughput_ts": 819.78,
+          "stddev_ts": 2.41
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 16,
+          "throughput_ts": 76.0,
+          "stddev_ts": 0.19
+        },
+        {
+          "test": "pp2048",
+          "n_ubatch": 32,
+          "throughput_ts": 1636.96,
+          "stddev_ts": 3.07
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 32,
+          "throughput_ts": 75.45,
+          "stddev_ts": 0.23
+        },
+        {
+          "test": "pp2048",
+          "n_ubatch": 64,
+          "throughput_ts": 3237.93,
+          "stddev_ts": 5.2
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 64,
+          "throughput_ts": 75.11,
+          "stddev_ts": 0.26
+        },
+        {
+          "test": "pp2048",
+          "n_ubatch": 128,
+          "throughput_ts": 6124.84,
+          "stddev_ts": 3.97
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 128,
+          "throughput_ts": 75.08,
+          "stddev_ts": 0.18
+        },
+        {
+          "test": "pp2048",
+          "n_ubatch": 256,
+          "throughput_ts": 7513.51,
+          "stddev_ts": 3.54
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 256,
+          "throughput_ts": 74.98,
+          "stddev_ts": 0.22
+        },
+        {
+          "test": "pp2048",
+          "n_ubatch": 512,
+          "throughput_ts": 8386.52,
+          "stddev_ts": 75.87
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 512,
+          "throughput_ts": 75.22,
+          "stddev_ts": 0.18
+        }
+      ]
+    },
+    {
+      "name": "Qwen3-8B-Q8_0",
+      "size_gib": 8.11,
+      "params": "8.19B",
+      "results": [
+        {
+          "test": "pp128",
+          "n_ubatch": 1,
+          "throughput_ts": 10.54,
+          "stddev_ts": 0.0
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 1,
+          "throughput_ts": 9.54,
+          "stddev_ts": 0.0
+        },
+        {
+          "test": "pp128",
+          "n_ubatch": 8,
+          "throughput_ts": 65.03,
+          "stddev_ts": 0.01
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 8,
+          "throughput_ts": 9.54,
+          "stddev_ts": 0.0
+        },
+        {
+          "test": "pp128",
+          "n_ubatch": 16,
+          "throughput_ts": 147.92,
+          "stddev_ts": 0.07
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 16,
+          "throughput_ts": 9.57,
+          "stddev_ts": 0.0
+        },
+        {
+          "test": "pp128",
+          "n_ubatch": 32,
+          "throughput_ts": 282.34,
+          "stddev_ts": 0.13
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 32,
+          "throughput_ts": 9.54,
+          "stddev_ts": 0.0
+        },
+        {
+          "test": "pp128",
+          "n_ubatch": 64,
+          "throughput_ts": 516.93,
+          "stddev_ts": 0.59
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 64,
+          "throughput_ts": 9.54,
+          "stddev_ts": 0.0
+        },
+        {
+          "test": "pp128",
+          "n_ubatch": 128,
+          "throughput_ts": 884.76,
+          "stddev_ts": 0.55
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 128,
+          "throughput_ts": 9.54,
+          "stddev_ts": 0.0
+        },
+        {
+          "test": "pp128",
+          "n_ubatch": 256,
+          "throughput_ts": 887.09,
+          "stddev_ts": 0.77
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 256,
+          "throughput_ts": 9.54,
+          "stddev_ts": 0.0
+        },
+        {
+          "test": "pp128",
+          "n_ubatch": 512,
+          "throughput_ts": 885.68,
+          "stddev_ts": 1.42
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 512,
+          "throughput_ts": 9.54,
+          "stddev_ts": 0.0
+        },
+        {
+          "test": "pp256",
+          "n_ubatch": 1,
+          "throughput_ts": 10.54,
+          "stddev_ts": 0.0
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 1,
+          "throughput_ts": 9.55,
+          "stddev_ts": 0.0
+        },
+        {
+          "test": "pp256",
+          "n_ubatch": 8,
+          "throughput_ts": 65.14,
+          "stddev_ts": 0.02
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 8,
+          "throughput_ts": 9.55,
+          "stddev_ts": 0.0
+        },
+        {
+          "test": "pp256",
+          "n_ubatch": 16,
+          "throughput_ts": 149.03,
+          "stddev_ts": 0.03
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 16,
+          "throughput_ts": 9.57,
+          "stddev_ts": 0.0
+        },
+        {
+          "test": "pp256",
+          "n_ubatch": 32,
+          "throughput_ts": 284.7,
+          "stddev_ts": 0.12
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 32,
+          "throughput_ts": 9.54,
+          "stddev_ts": 0.0
+        },
+        {
+          "test": "pp256",
+          "n_ubatch": 64,
+          "throughput_ts": 529.18,
+          "stddev_ts": 0.19
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 64,
+          "throughput_ts": 9.54,
+          "stddev_ts": 0.0
+        },
+        {
+          "test": "pp256",
+          "n_ubatch": 128,
+          "throughput_ts": 914.5,
+          "stddev_ts": 0.44
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 128,
+          "throughput_ts": 9.54,
+          "stddev_ts": 0.0
+        },
+        {
+          "test": "pp256",
+          "n_ubatch": 256,
+          "throughput_ts": 1472.29,
+          "stddev_ts": 1.67
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 256,
+          "throughput_ts": 9.55,
+          "stddev_ts": 0.0
+        },
+        {
+          "test": "pp256",
+          "n_ubatch": 512,
+          "throughput_ts": 1471.63,
+          "stddev_ts": 0.79
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 512,
+          "throughput_ts": 9.54,
+          "stddev_ts": 0.0
+        },
+        {
+          "test": "pp512",
+          "n_ubatch": 1,
+          "throughput_ts": 10.52,
+          "stddev_ts": 0.0
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 1,
+          "throughput_ts": 9.55,
+          "stddev_ts": 0.0
+        },
+        {
+          "test": "pp512",
+          "n_ubatch": 8,
+          "throughput_ts": 65.18,
+          "stddev_ts": 0.02
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 8,
+          "throughput_ts": 9.54,
+          "stddev_ts": 0.0
+        },
+        {
+          "test": "pp512",
+          "n_ubatch": 16,
+          "throughput_ts": 149.0,
+          "stddev_ts": 0.03
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 16,
+          "throughput_ts": 9.56,
+          "stddev_ts": 0.01
+        },
+        {
+          "test": "pp512",
+          "n_ubatch": 32,
+          "throughput_ts": 285.32,
+          "stddev_ts": 0.14
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 32,
+          "throughput_ts": 9.54,
+          "stddev_ts": 0.0
+        },
+        {
+          "test": "pp512",
+          "n_ubatch": 64,
+          "throughput_ts": 532.2,
+          "stddev_ts": 0.54
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 64,
+          "throughput_ts": 9.54,
+          "stddev_ts": 0.0
+        },
+        {
+          "test": "pp512",
+          "n_ubatch": 128,
+          "throughput_ts": 928.71,
+          "stddev_ts": 0.37
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 128,
+          "throughput_ts": 9.54,
+          "stddev_ts": 0.0
+        },
+        {
+          "test": "pp512",
+          "n_ubatch": 256,
+          "throughput_ts": 1506.2,
+          "stddev_ts": 0.66
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 256,
+          "throughput_ts": 9.55,
+          "stddev_ts": 0.0
+        },
+        {
+          "test": "pp512",
+          "n_ubatch": 512,
+          "throughput_ts": 1937.44,
+          "stddev_ts": 1.45
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 512,
+          "throughput_ts": 9.55,
+          "stddev_ts": 0.0
+        },
+        {
+          "test": "pp1024",
+          "n_ubatch": 1,
+          "throughput_ts": 10.46,
+          "stddev_ts": 0.0
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 1,
+          "throughput_ts": 9.55,
+          "stddev_ts": 0.0
+        },
+        {
+          "test": "pp1024",
+          "n_ubatch": 8,
+          "throughput_ts": 65.05,
+          "stddev_ts": 0.01
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 8,
+          "throughput_ts": 9.54,
+          "stddev_ts": 0.0
+        },
+        {
+          "test": "pp1024",
+          "n_ubatch": 16,
+          "throughput_ts": 147.65,
+          "stddev_ts": 0.04
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 16,
+          "throughput_ts": 9.57,
+          "stddev_ts": 0.0
+        },
+        {
+          "test": "pp1024",
+          "n_ubatch": 32,
+          "throughput_ts": 285.19,
+          "stddev_ts": 0.17
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 32,
+          "throughput_ts": 9.55,
+          "stddev_ts": 0.0
+        },
+        {
+          "test": "pp1024",
+          "n_ubatch": 64,
+          "throughput_ts": 530.07,
+          "stddev_ts": 0.25
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 64,
+          "throughput_ts": 9.54,
+          "stddev_ts": 0.0
+        },
+        {
+          "test": "pp1024",
+          "n_ubatch": 128,
+          "throughput_ts": 921.7,
+          "stddev_ts": 0.42
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 128,
+          "throughput_ts": 9.54,
+          "stddev_ts": 0.0
+        },
+        {
+          "test": "pp1024",
+          "n_ubatch": 256,
+          "throughput_ts": 1485.72,
+          "stddev_ts": 0.91
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 256,
+          "throughput_ts": 9.55,
+          "stddev_ts": 0.0
+        },
+        {
+          "test": "pp1024",
+          "n_ubatch": 512,
+          "throughput_ts": 1895.43,
+          "stddev_ts": 0.97
+        },
+        {
+          "test": "tg32",
+          "n_ubatch": 512,
+          "throughput_ts": 9.55,
+          "stddev_ts": 0.0
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total_tests": 72,
+    "models_benchmarked": 2,
+    "notes": ""
+  }
+}
