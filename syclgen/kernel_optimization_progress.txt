@@ -12,6 +12,16 @@
 
 ## Recent Optimization Results
 
+### opt_task_060: conv selective loop unroll (2026-03-10)
+- **Status**: COMPLETED - SELECTIVE SPEEDUP
+- **Change**: Added `#pragma unroll 4` to CONV_2D inner loops (c_in, ky, kx) and CONV_TRANSPOSE_1D inner loops (c, i). CONV_2D_DW and CONV_TRANSPOSE_2D left unmodified (unroll regressed those kernels).
+- **CONV_2D high-channel speedup**: 1.16-1.22x (both f32 and f16)
+- **CONV_TRANSPOSE_1D speedup**: 1.23-1.24x
+- **CONV_2D low-channel regression**: 0.68-0.89x (1-4 channel cases, unroll overhead)
+- **Time-weighted net CONV_2D speedup**: ~1.05x (large workloads dominate)
+- **Unit tests**: 1691/1691 passed
+- Total optimization steps: 208
+
 ### opt_task_059: element_wise vec4 vectorization (2026-03-10)
 - **Status**: COMPLETED - SPEEDUP
 - **Change**: Vec4 vectorization for unary_op_kernel — each work-item processes 4 elements with sycl::float4 loads/stores (F32) or uint64_t-based 4xhalf loads/stores (F16). Scalar tail for k%4!=0.

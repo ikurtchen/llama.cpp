@@ -47,12 +47,14 @@ void ggml_sycl_op_conv_transpose_1d(ggml_backend_sycl_context & ctx, ggml_tensor
 
             float accumulator = 0;
 
+            #pragma unroll 4
             for (int c = 0; c < src0_ne2; c++) {
                 const int idx = global_index % dst_ne0;
 
                 const int kernel_offset = (src0_ne0 * src0_ne1 * c) + (out_index * src0_ne0);
                 const int input_offset = src1_ne0 * c;
 
+                #pragma unroll 4
                 for (int i = 0; i < src1_ne0; i++) {
                     if (!(idx >= i * s0 && idx < i * s0 + src0_ne0)) {
                         continue;
@@ -129,6 +131,7 @@ static void conv2d_sycl(const float * X_D, const T * K_D, float * Y_D,
 
             float acc = 0.0f;
 
+            #pragma unroll 4
             for (int64_t c_in = 0; c_in < IC; ++c_in) {
                 // calculate_kernel_bounds
                 const int64_t y_min = sycl_max64(0, (PD_Y - out_y * ST_Y + DL_Y - 1) / DL_Y);
@@ -136,10 +139,12 @@ static void conv2d_sycl(const float * X_D, const T * K_D, float * Y_D,
                 const int64_t x_min = sycl_max64(0, (PD_X - out_x * ST_X + DL_X - 1) / DL_X);
                 const int64_t x_max = sycl_min64(KW, (IW + PD_X - out_x * ST_X + DL_X - 1) / DL_X);
 
+                #pragma unroll 4
                 for (int64_t ky = y_min; ky < y_max; ++ky) {
                     // calculate_input_coord
                     const int64_t in_y = out_y * ST_Y + ky * DL_Y - PD_Y;
 
+                    #pragma unroll 4
                     for (int64_t kx = x_min; kx < x_max; ++kx) {
                         const int64_t in_x = out_x * ST_X + kx * DL_X - PD_X;
 
