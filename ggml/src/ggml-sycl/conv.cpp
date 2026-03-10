@@ -97,7 +97,10 @@ static inline int64_t sycl_min64(int64_t a, int64_t b) {
     return (a < b) ? a : b;
 }
 
-template <typename T>
+// UNROLL_IC: when true, apply #pragma unroll 4 on the c_in loop (benefits IC >= 8).
+//            When false, skip c_in unroll to avoid overhead for low channel counts.
+//            Inner ky/kx loops are always unrolled (kernel dims are typically small).
+template <typename T, bool UNROLL_IC>
 static void conv2d_sycl(const float * X_D, const T * K_D, float * Y_D,
                          const conv2d_params P, sycl::queue & stream) {
     const int block_size = SYCL_CONV2D_BLOCK_SIZE;
@@ -111,7 +114,6 @@ static void conv2d_sycl(const float * X_D, const T * K_D, float * Y_D,
     const int64_t PD_X = P.PD_X, PD_Y = P.PD_Y;
     const int64_t DL_X = P.DL_X, DL_Y = P.DL_Y;
     const int64_t IC = P.IC, OC = P.OC;
-    const int64_t B = P.B;
     const int64_t TOTAL = P.TOTAL;
 
     stream.parallel_for(
@@ -131,31 +133,54 @@ static void conv2d_sycl(const float * X_D, const T * K_D, float * Y_D,
 
             float acc = 0.0f;
 
-            #pragma unroll 4
-            for (int64_t c_in = 0; c_in < IC; ++c_in) {
-                // calculate_kernel_bounds
-                const int64_t y_min = sycl_max64(0, (PD_Y - out_y * ST_Y + DL_Y - 1) / DL_Y);
-                const int64_t y_max = sycl_min64(KH, (IH + PD_Y - out_y * ST_Y + DL_Y - 1) / DL_Y);
-                const int64_t x_min = sycl_max64(0, (PD_X - out_x * ST_X + DL_X - 1) / DL_X);
-                const int64_t x_max = sycl_min64(KW, (IW + PD_X - out_x * ST_X + DL_X - 1) / DL_X);
-
+            // Conditionally unroll the c_in loop: beneficial for IC >= 8,
+            // but adds overhead for very small IC (1-4 channels)
+            if constexpr (UNROLL_IC) {
                 #pragma unroll 4
-                for (int64_t ky = y_min; ky < y_max; ++ky) {
-                    // calculate_input_coord
-                    const int64_t in_y = out_y * ST_Y + ky * DL_Y - PD_Y;
+                for (int64_t c_in = 0; c_in < IC; ++c_in) {
+                    // calculate_kernel_bounds
+                    const int64_t y_min = sycl_max64(0, (PD_Y - out_y * ST_Y + DL_Y - 1) / DL_Y);
+                    const int64_t y_max = sycl_min64(KH, (IH + PD_Y - out_y * ST_Y + DL_Y - 1) / DL_Y);
+                    const int64_t x_min = sycl_max64(0, (PD_X - out_x * ST_X + DL_X - 1) / DL_X);
+                    const int64_t x_max = sycl_min64(KW, (IW + PD_X - out_x * ST_X + DL_X - 1) / DL_X);
 
                     #pragma unroll 4
-                    for (int64_t kx = x_min; kx < x_max; ++kx) {
-                        const int64_t in_x = out_x * ST_X + kx * DL_X - PD_X;
+                    for (int64_t ky = y_min; ky < y_max; ++ky) {
+                        const int64_t in_y = out_y * ST_Y + ky * DL_Y - PD_Y;
 
-                        // whcn_layout::input_index
-                        const int64_t input_idx = n * (IC * IW * IH) + c_in * IW * IH + in_y * IW + in_x;
-                        // whcn_layout::kernel_index
-                        const int64_t kernel_idx = c_out * (IC * KH * KW) + c_in * (KH * KW) + ky * KW + kx;
+                        #pragma unroll 4
+                        for (int64_t kx = x_min; kx < x_max; ++kx) {
+                            const int64_t in_x = out_x * ST_X + kx * DL_X - PD_X;
 
-                        const float input_val = X_D[input_idx];
-                        const float kernel_val = static_cast<float>(K_D[kernel_idx]);
-                        acc += input_val * kernel_val;
+                            const int64_t input_idx = n * (IC * IW * IH) + c_in * IW * IH + in_y * IW + in_x;
+                            const int64_t kernel_idx = c_out * (IC * KH * KW) + c_in * (KH * KW) + ky * KW + kx;
+
+                            const float input_val = X_D[input_idx];
+                            const float kernel_val = static_cast<float>(K_D[kernel_idx]);
+                            acc += input_val * kernel_val;
+                        }
+                    }
+                }
+            } else {
+                for (int64_t c_in = 0; c_in < IC; ++c_in) {
+                    const int64_t y_min = sycl_max64(0, (PD_Y - out_y * ST_Y + DL_Y - 1) / DL_Y);
+                    const int64_t y_max = sycl_min64(KH, (IH + PD_Y - out_y * ST_Y + DL_Y - 1) / DL_Y);
+                    const int64_t x_min = sycl_max64(0, (PD_X - out_x * ST_X + DL_X - 1) / DL_X);
+                    const int64_t x_max = sycl_min64(KW, (IW + PD_X - out_x * ST_X + DL_X - 1) / DL_X);
+
+                    for (int64_t ky = y_min; ky < y_max; ++ky) {
+                        const int64_t in_y = out_y * ST_Y + ky * DL_Y - PD_Y;
+
+                        for (int64_t kx = x_min; kx < x_max; ++kx) {
+                            const int64_t in_x = out_x * ST_X + kx * DL_X - PD_X;
+
+                            const int64_t input_idx = n * (IC * IW * IH) + c_in * IW * IH + in_y * IW + in_x;
+                            const int64_t kernel_idx = c_out * (IC * KH * KW) + c_in * (KH * KW) + ky * KW + kx;
+
+                            const float input_val = X_D[input_idx];
+                            const float kernel_val = static_cast<float>(K_D[kernel_idx]);
+                            acc += input_val * kernel_val;
+                        }
                     }
                 }
             }
@@ -206,10 +231,22 @@ void ggml_sycl_op_conv2d(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
     const int64_t total = (int64_t)B * OC * OH * OW;
     conv2d_params params = { IW, IH, OW, OH, KW, KH, ST_X, ST_Y, PD_X, PD_Y, DL_X, DL_Y, IC, OC, B, total };
 
+    // Dispatch with conditional unrolling: IC >= 8 benefits from #pragma unroll 4,
+    // while IC < 8 (1-4 channels) regresses due to unroll overhead
+    const bool unroll_ic = (IC >= 8);
+
     if (kernel->type == GGML_TYPE_F16) {
-        conv2d_sycl<sycl::half>(X_D, (const sycl::half *) kernel->data, Y_D, params, stream);
+        if (unroll_ic) {
+            conv2d_sycl<sycl::half, true>(X_D, (const sycl::half *) kernel->data, Y_D, params, stream);
+        } else {
+            conv2d_sycl<sycl::half, false>(X_D, (const sycl::half *) kernel->data, Y_D, params, stream);
+        }
     } else {
-        conv2d_sycl<float>(X_D, (const float *) kernel->data, Y_D, params, stream);
+        if (unroll_ic) {
+            conv2d_sycl<float, true>(X_D, (const float *) kernel->data, Y_D, params, stream);
+        } else {
+            conv2d_sycl<float, false>(X_D, (const float *) kernel->data, Y_D, params, stream);
+        }
     }
 }
 

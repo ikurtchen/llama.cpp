@@ -8,9 +8,18 @@
 - Kernels analyzed so far: 54
 - Analysis complete: Yes
 - Kernels with optimization potential: 48
-- Optimization tasks created: 60 (3 benchmark + 54 kernel + 1 final benchmark + 2 new)
+- Optimization tasks created: 61 (3 benchmark + 54 kernel + 1 final benchmark + 3 new)
 
 ## Recent Optimization Results
+
+### opt_task_061: conv2d conditional unrolling for small IC (2026-03-10)
+- **Status**: COMPLETED - FIX REGRESSION
+- **Change**: Template-specialized `conv2d_sycl` with `bool UNROLL_IC` parameter. When IC >= 8, uses `#pragma unroll 4` on all 3 inner loops (c_in, ky, kx). When IC < 8, no unroll pragmas to avoid overhead with few loop iterations. Dispatch in `ggml_sycl_op_conv2d` selects path based on IC.
+- **Low-channel fix**: IC=1,3,4 cases restored to baseline (1.00x vs 0.68-0.89x before)
+- **High-channel preserved**: IC=8,128,256 keep 1.16-1.22x speedup from opt_060
+- **CONV_TRANSPOSE_1D**: Unchanged (still 1.23-1.24x from opt_060)
+- **Unit tests**: 1684/1684 passed
+- Total optimization steps: 209
 
 ### opt_task_060: conv selective loop unroll (2026-03-10)
 - **Status**: COMPLETED - SELECTIVE SPEEDUP

@@ -2858,6 +2858,32 @@
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k <CONV_OP_NAME> -e ZES_ENABLE_SYSMAN=1, check ggml/include/ggml.h for conv ops"
         }
       ]
+    },
+    {
+      "task_id": "opt_task_061",
+      "type": "kernel_optimization",
+      "kernel_id": "sk_024",
+      "kernel_name": "conv",
+      "source_file": "ggml/src/ggml-sycl/conv.cpp",
+      "title": "Optimize conv kernel (medium potential)",
+      "overall_optimization_potential": "medium",
+      "priority": 3,
+      "status": "completed",
+      "depends_on": [
+        "opt_task_002"
+      ],
+      "steps": [
+        {
+          "step_id": "opt_024_002",
+          "category": "loop_unroll",
+          "priority": "medium",
+          "description": "Fix small conv2d perf regression caused by add loop unroll #pragma, it is best if it can keep perf improvement for large ones",
+          "expected_improvement": "1.1-1.3x throughput",
+          "risk": "low",
+          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k <CONV_OP_NAME> -e ZES_ENABLE_SYSMAN=1, check ggml/include/ggml.h for conv ops"
+        }
+      ]
     }
+
   ]
 }
