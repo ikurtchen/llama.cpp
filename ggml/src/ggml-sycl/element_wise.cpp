@@ -82,28 +82,102 @@ static float op_trunc(float x) { return truncf(x); }
 // ============================================================================
 // Generic unary kernel dispatch templates
 // Mirrors the CUDA unary_op_kernel / unary_cuda / ggml_cuda_op_unary pattern.
+// Vec4 vectorization: each work-item processes 4 elements for better memory
+// throughput on Xe2 GPUs.
 // ============================================================================
 
-// Per-element unary kernel (float)
-template <float (*op)(float), typename T>
-static void unary_op_kernel(const T * x, T * dst, const int k,
-                            const sycl::nd_item<1> & item) {
+// Vec4 unary kernel — each work-item loads/stores 4 elements
+template <float (*op)(float)>
+static void unary_op_kernel_vec4_f32(const float * x, float * dst, const int k4,
+                                      const sycl::nd_item<1> & item) {
     const int i = item.get_global_id(0);
+    if (i >= k4) {
+        return;
+    }
+    const int base = i * 4;
+    const sycl::float4 in = *reinterpret_cast<const sycl::float4 *>(x + base);
+    sycl::float4 out;
+    out.s0() = op(in.s0());
+    out.s1() = op(in.s1());
+    out.s2() = op(in.s2());
+    out.s3() = op(in.s3());
+    *reinterpret_cast<sycl::float4 *>(dst + base) = out;
+}
+
+template <float (*op)(float)>
+static void unary_op_kernel_vec4_f16(const sycl::half * x, sycl::half * dst, const int k4,
+                                      const sycl::nd_item<1> & item) {
+    const int i = item.get_global_id(0);
+    if (i >= k4) {
+        return;
+    }
+    const int base = i * 4;
+    // Load 4 halfs (8 bytes) as a single 64-bit load via uint64_t
+    const uint64_t bits = *reinterpret_cast<const uint64_t *>(x + base);
+    const sycl::half * hp = reinterpret_cast<const sycl::half *>(&bits);
+    sycl::half out[4];
+    out[0] = (sycl::half)op((float)hp[0]);
+    out[1] = (sycl::half)op((float)hp[1]);
+    out[2] = (sycl::half)op((float)hp[2]);
+    out[3] = (sycl::half)op((float)hp[3]);
+    *reinterpret_cast<uint64_t *>(dst + base) = *reinterpret_cast<const uint64_t *>(out);
+}
+
+// Scalar tail kernel for remaining elements (k % 4 != 0)
+template <float (*op)(float), typename T>
+static void unary_op_kernel_scalar(const T * x, T * dst, const int k,
+                                    const int offset,
+                                    const sycl::nd_item<1> & item) {
+    const int i = offset + item.get_global_id(0);
     if (i >= k) {
         return;
     }
     dst[i] = (T)op((float)x[i]);
 }
 
-// SYCL launch wrapper
-template <float (*op)(float), typename T>
-static void unary_sycl(const T * x, T * dst, const int k, sycl::queue & stream) {
-    const int num_blocks = (k + SYCL_NEG_BLOCK_SIZE - 1) / SYCL_NEG_BLOCK_SIZE;
-    stream.parallel_for(
-        sycl::nd_range<1>(num_blocks * SYCL_NEG_BLOCK_SIZE, SYCL_NEG_BLOCK_SIZE),
-        [=](sycl::nd_item<1> item) {
-            unary_op_kernel<op>(x, dst, k, item);
-        });
+// SYCL launch wrapper — vec4 path with scalar tail
+template <float (*op)(float)>
+static void unary_sycl(const float * x, float * dst, const int k, sycl::queue & stream) {
+    const int k4 = k / 4;
+    if (k4 > 0) {
+        const int num_blocks = (k4 + SYCL_NEG_BLOCK_SIZE - 1) / SYCL_NEG_BLOCK_SIZE;
+        stream.parallel_for(
+            sycl::nd_range<1>(num_blocks * SYCL_NEG_BLOCK_SIZE, SYCL_NEG_BLOCK_SIZE),
+            [=](sycl::nd_item<1> item) {
+                unary_op_kernel_vec4_f32<op>(x, dst, k4, item);
+            });
+    }
+    const int tail = k - k4 * 4;
+    if (tail > 0) {
+        const int tail_blocks = (tail + SYCL_NEG_BLOCK_SIZE - 1) / SYCL_NEG_BLOCK_SIZE;
+        stream.parallel_for(
+            sycl::nd_range<1>(tail_blocks * SYCL_NEG_BLOCK_SIZE, SYCL_NEG_BLOCK_SIZE),
+            [=](sycl::nd_item<1> item) {
+                unary_op_kernel_scalar<op>(x, dst, k, k4 * 4, item);
+            });
+    }
+}
+
+template <float (*op)(float)>
+static void unary_sycl(const sycl::half * x, sycl::half * dst, const int k, sycl::queue & stream) {
+    const int k4 = k / 4;
+    if (k4 > 0) {
+        const int num_blocks = (k4 + SYCL_NEG_BLOCK_SIZE - 1) / SYCL_NEG_BLOCK_SIZE;
+        stream.parallel_for(
+            sycl::nd_range<1>(num_blocks * SYCL_NEG_BLOCK_SIZE, SYCL_NEG_BLOCK_SIZE),
+            [=](sycl::nd_item<1> item) {
+                unary_op_kernel_vec4_f16<op>(x, dst, k4, item);
+            });
+    }
+    const int tail = k - k4 * 4;
+    if (tail > 0) {
+        const int tail_blocks = (tail + SYCL_NEG_BLOCK_SIZE - 1) / SYCL_NEG_BLOCK_SIZE;
+        stream.parallel_for(
+            sycl::nd_range<1>(tail_blocks * SYCL_NEG_BLOCK_SIZE, SYCL_NEG_BLOCK_SIZE),
+            [=](sycl::nd_item<1> item) {
+                unary_op_kernel_scalar<op>(x, dst, k, k4 * 4, item);
+            });
+    }
 }
 
 // Host dispatch: extract pointers from ggml_tensor and launch

@@ -2803,6 +2803,61 @@
         "summary": "Full post-optimization benchmark completed. 173 test cases compared across 15 optimized kernel groups. Overall geometric mean speedup: 1.51x. 3 minor regressions (all within noise). Top speedups: CROSS_ENTROPY_LOSS 12.96x, SSM_CONV 7.36x, CPY 5.99x, SET_ROWS 5.50x, SSM_SCAN 2.32x, Unary ops 1.88x, SOFT_MAX 1.81x, binbcast 1.56x, GROUP_NORM 1.49x, ROPE 1.29x, MMVQ 1.05x.",
         "benchmark_date": "2026-03-08"
       }
+    },
+    {
+      "task_id": "opt_task_059",
+      "type": "kernel_optimization",
+      "kernel_id": "sk_010",
+      "kernel_name": "element_wise (unary ops)",
+      "source_file": "ggml/src/ggml-sycl/element_wise.cpp",
+      "title": "Optimize element_wise (unary ops) kernel (medium potential)",
+      "overall_optimization_potential": "medium",
+      "priority": 3,
+      "status": "completed",
+      "started_at": "2026-03-10T00:00:00Z",
+      "completed_at": "2026-03-10T13:30:00Z",
+      "result": "speedup",
+      "avg_speedup_vs_raw_baseline": 1.79,
+      "avg_speedup_vs_post_native_math": 1.30,
+      "depends_on": [
+        "opt_task_002"
+      ],
+      "steps": [
+        {
+          "step_id": "opt_010_001",
+          "category": "vectorization",
+          "priority": "high",
+          "description": "Use vec4/vec8 loads/stores for all element-wise unary ops. NOTE, IGNORE PREVIOUS FINDINGS, JUST HAVE A TRY",
+          "expected_improvement": "1.5-2x throughput for memory-bound ops",
+          "risk": "low",
+          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k <UNARY_OP_NAME> -e ZES_ENABLE_SYSMAN=1, check ggml/include/ggml.h for the list of unary ops"
+        }
+      ]
+    },
+    {
+      "task_id": "opt_task_060",
+      "type": "kernel_optimization",
+      "kernel_id": "sk_024",
+      "kernel_name": "conv",
+      "source_file": "ggml/src/ggml-sycl/conv.cpp",
+      "title": "Optimize conv kernel (medium potential)",
+      "overall_optimization_potential": "medium",
+      "priority": 3,
+      "status": "pending",
+      "depends_on": [
+        "opt_task_002"
+      ],
+      "steps": [
+        {
+          "step_id": "opt_024_002",
+          "category": "loop_unroll",
+          "priority": "medium",
+          "description": "Add #pragma unroll to hot inner loops in all 5 convolution kernels, add different control path if some cases have improvement and some have regression",
+          "expected_improvement": "1.1-1.3x throughput",
+          "risk": "low",
+          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k <CONV_OP_NAME> -e ZES_ENABLE_SYSMAN=1, check ggml/include/ggml.h for conv ops"
+        }
+      ]
     }
   ]
 }

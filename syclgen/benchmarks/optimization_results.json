@@ -2566,6 +2566,132 @@
       "notes": "Both test cases are launch-overhead dominated at ~5us. Native math had no measurable effect at these tiny sizes. Reverted."
     },
     {
+      "optimization_id": "opt_059_001",
+      "task_id": "opt_task_059",
+      "kernel": "element_wise (unary ops)",
+      "description": "Vec4 vectorization for unary_op_kernel - each work-item processes 4 elements with sycl::float4 loads/stores (F32) or uint64_t-based 4xhalf loads/stores (F16). Scalar tail for k%4!=0.",
+      "date": "2026-03-10",
+      "status": "speedup",
+      "test_cases": [
+        {
+          "name": "SILU(type=f32,ne_a=[4096,128,1,1],v=0)",
+          "baseline_us": 5.10,
+          "optimized_us": 5.13,
+          "speedup": 0.99,
+          "note": "Already near peak, within noise"
+        },
+        {
+          "name": "SILU(type=f32,ne_a=[14336,512,1,1],v=0)",
+          "baseline_us": 154.72,
+          "optimized_us": 150.18,
+          "speedup": 1.03,
+          "note": "Post-native-math baseline"
+        },
+        {
+          "name": "GELU(type=f32,ne_a=[4096,128,1,1],v=0)",
+          "baseline_us": 17.55,
+          "optimized_us": 5.04,
+          "speedup": 3.48,
+          "note": "Pre-native-math baseline (raw)"
+        },
+        {
+          "name": "GELU(type=f32,ne_a=[14336,512,1,1],v=0)",
+          "baseline_us": 154.56,
+          "optimized_us": 150.20,
+          "speedup": 1.03,
+          "note": "Post-native-math baseline"
+        },
+        {
+          "name": "RELU(type=f32,ne_a=[4096,128,1,1],v=0)",
+          "baseline_us": 9.62,
+          "optimized_us": 4.81,
+          "speedup": 2.00,
+          "note": "Simple op, vec4 helps memory BW significantly"
+        },
+        {
+          "name": "RELU(type=f32,ne_a=[14336,512,1,1],v=0)",
+          "baseline_us": 227.61,
+          "optimized_us": 148.80,
+          "speedup": 1.53,
+          "note": "Simple op, big BW improvement"
+        },
+        {
+          "name": "TANH(type=f32,ne_a=[4096,128,1,1],v=0)",
+          "baseline_us": 14.08,
+          "optimized_us": 5.10,
+          "speedup": 2.76,
+          "note": "Combined native math + vec4 vs raw baseline"
+        },
+        {
+          "name": "TANH(type=f32,ne_a=[14336,512,1,1],v=0)",
+          "baseline_us": 139.05,
+          "optimized_us": 131.48,
+          "speedup": 1.06,
+          "note": "Post-native-math baseline, modest improvement"
+        },
+        {
+          "name": "ABS(type=f32,ne_a=[4096,128,1,1],v=0)",
+          "baseline_us": 6.56,
+          "optimized_us": 4.83,
+          "speedup": 1.36,
+          "note": "Simple op, vec4 helps"
+        },
+        {
+          "name": "ABS(type=f32,ne_a=[14336,512,1,1],v=0)",
+          "baseline_us": 234.08,
+          "optimized_us": 150.16,
+          "speedup": 1.56,
+          "note": "Simple op, 234->365 GB/s BW improvement"
+        },
+        {
+          "name": "NEG(type=f32,ne_a=[4096,128,1,1],v=0)",
+          "baseline_us": 9.63,
+          "optimized_us": 4.86,
+          "speedup": 1.98,
+          "note": "Simple op, vec4 helps"
+        },
+        {
+          "name": "NEG(type=f32,ne_a=[14336,512,1,1],v=0)",
+          "baseline_us": 153.29,
+          "optimized_us": 150.00,
+          "speedup": 1.02,
+          "note": "Post-native-math baseline, minimal"
+        },
+        {
+          "name": "SIGMOID(type=f32,ne_a=[4096,128,1,1],v=0)",
+          "baseline_us": 4.95,
+          "optimized_us": 4.83,
+          "speedup": 1.02,
+          "note": "Already near peak"
+        },
+        {
+          "name": "SIGMOID(type=f32,ne_a=[14336,512,1,1],v=0)",
+          "baseline_us": 151.81,
+          "optimized_us": 149.48,
+          "speedup": 1.02,
+          "note": "Post-native-math baseline"
+        },
+        {
+          "name": "SQR(type=f32,ne=[4096,128,1,1])",
+          "baseline_us": 9.89,
+          "optimized_us": 4.95,
+          "speedup": 2.00,
+          "note": "Simple op, vec4 helps significantly"
+        },
+        {
+          "name": "SQR(type=f32,ne=[14336,512,1,1])",
+          "baseline_us": 321.82,
+          "optimized_us": 150.24,
+          "speedup": 2.14,
+          "note": "Simple op, 170->364 GB/s BW improvement"
+        }
+      ],
+      "avg_speedup_vs_raw_baseline": 1.79,
+      "avg_speedup_vs_post_native_math_large": 1.30,
+      "notes": "Vec4 vectorization for all F32/F16 unary ops. Each work-item processes 4 elements using sycl::float4 or uint64_t-based 4xhalf loads/stores. Biggest wins on simple BW-bound ops (ABS, NEG, RELU, SQR: 1.3-2.1x). Compute-heavy ops (SILU, GELU, SIGMOID) that were already near peak BW after native math show modest 1.02-1.06x. All 147 unit tests passed including F16 and odd sizes.",
+      "unit_tests_passed": "147/147 (all F16+F32 unary ops, including odd sizes like [5,7,11,13])"
+    },
+    {
       "optimization_id": "opt_058_001",
       "task_id": "opt_task_058",
       "title": "Full post-optimization benchmark comparison",

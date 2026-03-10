@@ -8,7 +8,17 @@
 - Kernels analyzed so far: 54
 - Analysis complete: Yes
 - Kernels with optimization potential: 48
-- Optimization tasks created: 58 (3 benchmark + 54 kernel + 1 final benchmark)
+- Optimization tasks created: 60 (3 benchmark + 54 kernel + 1 final benchmark + 2 new)
+
+## Recent Optimization Results
+
+### opt_task_059: element_wise vec4 vectorization (2026-03-10)
+- **Status**: COMPLETED - SPEEDUP
+- **Change**: Vec4 vectorization for unary_op_kernel — each work-item processes 4 elements with sycl::float4 loads/stores (F32) or uint64_t-based 4xhalf loads/stores (F16). Scalar tail for k%4!=0.
+- **Avg speedup vs raw baseline**: 1.79x (includes native math from opt_010_002)
+- **Avg speedup vs post-native-math (large tensor)**: 1.30x (vec4 contribution alone)
+- **Key wins**: Simple BW-bound ops (ABS 1.56x, RELU 1.53x, SQR 2.14x) benefited most
+- **Unit tests**: 147/147 passed (F16+F32, including odd sizes)
 - Total optimization steps: 208
 - Task spec: syclgen/kernel_optimization_task_spec.json
 
