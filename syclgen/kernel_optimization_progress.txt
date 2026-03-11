@@ -8,9 +8,22 @@
 - Kernels analyzed so far: 54
 - Analysis complete: Yes
 - Kernels with optimization potential: 48
-- Optimization tasks created: 61 (3 benchmark + 54 kernel + 1 final benchmark + 3 new + 14 regression fixes)
+- Optimization tasks created: 77 (3 benchmark + 54 kernel + 1 final benchmark + 3 new + 3 additional + 13 regression fixes)
 
 ## Recent Optimization Results
+
+### opt_task_065: CPY regression fix (2026-03-11)
+- **Status**: COMPLETED - REGRESSION FIXED
+- **Root causes**: (1) SYCL_CPY_BLOCK_SIZE changed from 32→256 hurt non-contiguous generic kernel; (2) Missing quantization kernels (f32↔q4_0, etc.); (3) DPC++ compiler generates worse code for `template<typename src_t, typename dst_t>` with inline cast vs baseline `template<cpy_kernel_t cpy_1>` function-pointer pattern for permuted copies.
+- **Fix**: Reverted SYCL_CPY_BLOCK_SIZE to 32 (generic kernel), added CPY_CONTIGUOUS_BLOCK_SIZE=256 (contiguous kernel only), restored all quantization kernels and supports_op entries, switched generic kernel back to baseline function-pointer template pattern.
+- **f32→f16 contiguous**: 134→694 GB/s (**5.2x speedup preserved**)
+- **f32→f32 perm[0,2,1,3]**: 72→180 GB/s (**regression eliminated**, matches baseline)
+- **f32→q4_0 / q4_0→f32**: restored (matching baseline 44/9 GB/s)
+- **f32→f32 transpose**: 125→165 GB/s (**1.3x speedup preserved**)
+- **f16→f16 transpose [768,1024,256]**: 81→157 GB/s (**1.9x speedup preserved**)
+- **f16→f16 transpose [786432,256]**: 83→74 GB/s (-11%, minor niche shape)
+- **Unit tests**: 162/162 passed (0 failures)
+- Total optimization steps: 211
 
 ### opt_task_064: ARGMAX regression fix (2026-03-11)
 - **Status**: COMPLETED - REGRESSION FIXED

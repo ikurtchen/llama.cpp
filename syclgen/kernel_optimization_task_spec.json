@@ -2818,7 +2818,7 @@
       "completed_at": "2026-03-10T13:30:00Z",
       "result": "speedup",
       "avg_speedup_vs_raw_baseline": 1.79,
-      "avg_speedup_vs_post_native_math": 1.30,
+      "avg_speedup_vs_post_native_math": 1.3,
       "depends_on": [
         "opt_task_002"
       ],
@@ -2965,7 +2965,7 @@
       "title": "Handle regression for CPY",
       "overall_optimization_potential": "medium",
       "priority": 3,
-      "status": "pending",
+      "status": "completed",
       "depends_on": [
         "opt_task_002"
       ],
