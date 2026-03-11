@@ -3608,106 +3608,64 @@ static void ggml_sycl_op_fill(ggml_backend_sycl_context & ctx, ggml_tensor * dst
 // ---------------------------------------------------------------------------
 // ARGMAX — find index of maximum value per row
 // One work-group per row, block_size = 256.
-// Custom (value, index) pair reduction via sub-group shuffles + local memory.
+// SLM-based tree reduction matching baseline pattern (3D nd_range).
 // ---------------------------------------------------------------------------
-static constexpr int ARGMAX_BLOCK_SIZE = 256;
 
 static void ggml_sycl_op_argmax(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
-    const ggml_tensor * src0 = dst->src[0];
-
-    GGML_ASSERT(src0->type == GGML_TYPE_F32);
+    GGML_ASSERT(dst->src[0]->type == GGML_TYPE_F32);
     GGML_ASSERT(dst->type  == GGML_TYPE_I32);
-    GGML_ASSERT(ggml_is_contiguous(src0));
 
-    const int64_t ne00  = src0->ne[0];
-    const int64_t nrows = ggml_nrows(src0);
+    dpct::queue_ptr main_stream = ctx.stream();
+    SYCL_CHECK(ggml_sycl_set_device(ctx.device));
 
-    const float * src0_d = (const float *) src0->data;
-    int32_t *     dst_d  = (int32_t *)     dst->data;
+    const float * src0_dd = static_cast<const float *>(dst->src[0]->data);
+    int32_t *     dst_dd  = static_cast<int32_t *>(dst->data);
 
-    sycl::queue & stream = *(ctx.stream());
+    const int64_t ncols = dst->src[0]->ne[0];
+    const int64_t nrows = ggml_nrows(dst->src[0]);
 
-    // Round block size up to a multiple of WARP_SIZE, capped at 256
-    const int num_threads = std::min<int>(ARGMAX_BLOCK_SIZE,
-                                          (int)((ne00 + WARP_SIZE - 1) / WARP_SIZE * WARP_SIZE));
-    // Ensure multiple of WARP_SIZE
-    const int block_size = ((num_threads + WARP_SIZE - 1) / WARP_SIZE) * WARP_SIZE;
+    const sycl::range<3> block_dims(1, 1, SYCL_ARGMAX_BLOCK_SIZE);
+    const sycl::range<3> block_nums(1, nrows, 1);
 
-    constexpr int max_warps = ARGMAX_BLOCK_SIZE / WARP_SIZE;  // 16
+    main_stream->submit([&](sycl::handler & cgh) {
+        sycl::local_accessor<float, 1> shared_data(256, cgh);
+        sycl::local_accessor<int,   1> shared_indices(256, cgh);
 
-    const sycl::range<1> global_range(nrows * block_size);
-    const sycl::range<1> local_range(block_size);
+        cgh.parallel_for(
+            sycl::nd_range<3>(block_nums * block_dims, block_dims),
+            [=](sycl::nd_item<3> item_ct1) {
+                const int tid = item_ct1.get_local_id(2);
+                const int row = item_ct1.get_global_id(1);
 
-    const int ncols = (int) ne00;
+                float max_val = -INFINITY;
+                int   max_idx = -1;
 
-    stream.submit([&](sycl::handler & h) {
-        // Shared memory for cross-warp reduction: max_warps floats + max_warps ints
-        sycl::local_accessor<float, 1> shared_maxval(max_warps, h);
-        sycl::local_accessor<int,   1> shared_argmax(max_warps, h);
-
-        h.parallel_for(
-            sycl::nd_range<1>(global_range, local_range),
-            [=](sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
-                const int local_id = item.get_local_id(0);
-                const int bs       = item.get_local_range(0);
-                const int row      = item.get_group(0);
-
-                const float * rowx = src0_d + (int64_t) row * ncols;
-
-                // Per-thread max scan
-                float maxval = -FLT_MAX;
-                int   argmax = -1;
-                for (int col = local_id; col < ncols; col += bs) {
-                    const float val = rowx[col];
-                    if (val > maxval) {
-                        maxval = val;
-                        argmax = col;
+                for (int col = tid; col < ncols; col += 256) {
+                    float val = src0_dd[row * ncols + col];
+                    if (val > max_val) {
+                        max_val = val;
+                        max_idx = col;
                     }
                 }
 
-                // Intra-warp reduction via sub-group shuffles
-                auto sg = item.get_sub_group();
-                #pragma unroll
-                for (int offset = WARP_SIZE / 2; offset > 0; offset >>= 1) {
-                    const float val = sycl::permute_group_by_xor(sg, maxval, offset);
-                    const int   col = sycl::permute_group_by_xor(sg, argmax, offset);
-                    if (val > maxval) {
-                        maxval = val;
-                        argmax = col;
-                    }
-                }
+                shared_data[tid] = max_val;
+                shared_indices[tid] = max_idx;
+                item_ct1.barrier(sycl::access::fence_space::local_space);
 
-                const int n_warps = bs / WARP_SIZE;
-                const int warp_id = local_id / WARP_SIZE;
-                const int lane_id = local_id % WARP_SIZE;
-
-                if (n_warps > 1) {
-                    // Lane 0 of each warp writes partial result
-                    if (lane_id == 0) {
-                        shared_maxval[warp_id] = maxval;
-                        shared_argmax[warp_id] = argmax;
-                    }
-                    item.barrier(sycl::access::fence_space::local_space);
-
-                    // First warp reads all partials and reduces
-                    if (warp_id == 0) {
-                        maxval = (lane_id < n_warps) ? shared_maxval[lane_id] : -FLT_MAX;
-                        argmax = (lane_id < n_warps) ? shared_argmax[lane_id] : -1;
-
-                        #pragma unroll
-                        for (int offset = WARP_SIZE / 2; offset > 0; offset >>= 1) {
-                            const float val = sycl::permute_group_by_xor(sg, maxval, offset);
-                            const int   col = sycl::permute_group_by_xor(sg, argmax, offset);
-                            if (val > maxval) {
-                                maxval = val;
-                                argmax = col;
-                            }
+                for (int stride = 256 / 2; stride > 0; stride >>= 1) {
+                    if (tid < stride) {
+                        float val1 = shared_data[tid];
+                        float val2 = shared_data[tid + stride];
+                        if (val2 > val1) {
+                            shared_data[tid] = val2;
+                            shared_indices[tid] = shared_indices[tid + stride];
                         }
                     }
+                    item_ct1.barrier(sycl::access::fence_space::local_space);
                 }
 
-                if (warp_id == 0 && lane_id == 0) {
-                    dst_d[row] = argmax;
+                if (tid == 0) {
+                    dst_dd[row] = shared_indices[0];
                 }
             });
     });

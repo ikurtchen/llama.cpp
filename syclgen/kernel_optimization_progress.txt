@@ -8,9 +8,19 @@
 - Kernels analyzed so far: 54
 - Analysis complete: Yes
 - Kernels with optimization potential: 48
-- Optimization tasks created: 61 (3 benchmark + 54 kernel + 1 final benchmark + 3 new)
+- Optimization tasks created: 61 (3 benchmark + 54 kernel + 1 final benchmark + 3 new + 14 regression fixes)
 
 ## Recent Optimization Results
+
+### opt_task_064: ARGMAX regression fix (2026-03-11)
+- **Status**: COMPLETED - REGRESSION FIXED
+- **Change**: Reverted ARGMAX kernel from 1D nd_range with constexpr block size to baseline 3D nd_range pattern. Used dpct::queue_ptr, SYCL_CHECK(ggml_sycl_set_device), hardcoded 256 literals, and row * ncols + col memory access pattern.
+- **Root cause**: The 1D nd_range with pre-computed row pointer and constexpr block size compiled to different (slower) code on Intel GPU for large inputs.
+- **ne=[32000,512,1,1]**: 294.17 us → 197.10 us (48.36% regression eliminated, now 0.6% faster than baseline 198.28 us)
+- **ne=[32,10,1,1]**: 5.80 us → 5.96 us (no regression, matches baseline 6.03 us)
+- **ne=[1024,10,1,1]**: 5.76 us → 5.95 us (no regression, matches baseline 5.99 us)
+- **Unit tests**: 7/7 passed
+- Total optimization steps: 210
 
 ### opt_task_061: conv2d conditional unrolling for small IC (2026-03-10)
 - **Status**: COMPLETED - FIX REGRESSION

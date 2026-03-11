@@ -3395,6 +3395,46 @@
           "description": "Small n_token=1 regressions (5.5-11.8%) fully resolved. Fixed kernel matches or exceeds baseline on all 4 test cases. n_token=512 cases show 1.01x improvement over baseline."
         }
       }
+    },
+    {
+      "task_id": "opt_task_064",
+      "kernel": "argmax (inline)",
+      "step_id": "opt_050_001",
+      "description": "Fix ARGMAX regression: revert to baseline 3D nd_range pattern",
+      "outcome": "regression_fixed",
+      "file_changed": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "root_cause": "The optimized ARGMAX used 1D nd_range with pre-computed row pointer and constexpr block size, which compiled to different code on Intel GPU. Reverted to baseline 3D nd_range pattern with identical memory access (row * ncols + col), hardcoded 256 literals, and dpct::queue_ptr + SYCL_CHECK(ggml_sycl_set_device) to match original.",
+      "benchmark_data": [
+        {
+          "config": "ARGMAX(type=f32,ne=[32,10,1,1])",
+          "baseline_us": 6.03,
+          "regressed_us": 5.80,
+          "fixed_us": 5.96,
+          "regression_pct": -3.8,
+          "fixed_vs_baseline": 1.01,
+          "note": "No regression in this case, performance maintained"
+        },
+        {
+          "config": "ARGMAX(type=f32,ne=[1024,10,1,1])",
+          "baseline_us": 5.99,
+          "regressed_us": 5.76,
+          "fixed_us": 5.95,
+          "regression_pct": -3.8,
+          "fixed_vs_baseline": 1.01,
+          "note": "No regression in this case, performance maintained"
+        },
+        {
+          "config": "ARGMAX(type=f32,ne=[32000,512,1,1])",
+          "baseline_us": 198.28,
+          "regressed_us": 294.17,
+          "fixed_us": 197.10,
+          "regression_pct": 48.36,
+          "fixed_vs_baseline": 1.01,
+          "note": "48.36% regression fully eliminated, now 0.6% faster than baseline"
+        }
+      ],
+      "unit_tests": "7/7 passed",
+      "summary": "Reverted ARGMAX kernel from 1D nd_range with constexpr block size to baseline 3D nd_range pattern. The large-input regression (48.36%) was fully eliminated. The fix achieves 197.10 us vs 198.28 us baseline for the critical ne=[32000,512,1,1] case."
     }
   ]
 }
