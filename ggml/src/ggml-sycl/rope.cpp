@@ -46,9 +46,8 @@ static inline void rope_yarn(
 template <bool forward, bool has_ff, typename T>
 static void rope_norm_sycl(
         const T * x, T * dst,
-        const int ne00, const int ne01, const int ne02,
-        const int s01, const int s02, const int s03,
-        const int s1, const int s2, const int s3,
+        const int ne0, const int ne1,
+        const int s1, const int s2,
         const int n_dims, const int nr,
         const int32_t * pos,
         const float freq_scale, const float freq_base,
@@ -57,28 +56,27 @@ static void rope_norm_sycl(
         const float * freq_factors,
         sycl::queue & q) {
 
-    GGML_ASSERT(ne00 % 2 == 0);
+    GGML_ASSERT(ne0 % 2 == 0);
     const int block_size = SYCL_ROPE_BLOCK_SIZE;
-    const int n_blocks_x = (ne00 + 2 * block_size - 1) / (2 * block_size);
-    // grid: (nr, n_blocks_x)   block: (1, block_size)
+    const int n_blocks_x = (ne0 + 2 * block_size - 1) / (2 * block_size);
     const float theta_scale = sycl::pow(freq_base, -2.0f / n_dims);
     const float theta_scale_log2 = sycl::log2(theta_scale);
 
+    const sycl::range<3> block_dims(1, block_size, 1);
+    const sycl::range<3> block_nums(1, n_blocks_x, nr);
+
     q.parallel_for(
-        sycl::nd_range<2>(
-            sycl::range<2>(nr, n_blocks_x * block_size),
-            sycl::range<2>(1, block_size)),
-        [=](sycl::nd_item<2> item) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
-            const int i0 = 2 * (item.get_global_id(1));
-            if (i0 >= ne00) return;
+        sycl::nd_range<3>(block_nums * block_dims, block_dims),
+        [=](sycl::nd_item<3> item) {
+            const int i0 = 2 * (item.get_local_range(1) * item.get_group(1) + item.get_local_id(1));
+            if (i0 >= ne0) return;
 
-            const int row_dst = item.get_global_id(0);
-            const uint32_t i3 = row_dst / (ne01 * ne02);
-            const uint32_t i2 = (row_dst - i3 * ne01 * ne02) / ne01;
-            const uint32_t i1 = row_dst - i3 * ne01 * ne02 - i2 * ne01;
+            const int row      = item.get_local_range(2) * item.get_group(2) + item.get_local_id(2);
+            const int row0     = row % ne1;
+            const int channel0 = row / ne1;
 
-            const int idst = i0 + i1 * s1  + i2 * s2  + i3 * s3;
-            const int ix   = i0 + i1 * s01 + i2 * s02 + i3 * s03;
+            const int idst = row * ne0 + i0;
+            const int ix   = channel0 * s2 + row0 * s1 + i0;
 
             if (i0 >= n_dims) {
                 dst[idst + 0] = x[ix + 0];
@@ -86,7 +84,7 @@ static void rope_norm_sycl(
                 return;
             }
 
-            const float theta_base = pos[i2] * sycl::native::exp2(theta_scale_log2 * (i0 / 2.0f));
+            const float theta_base = pos[channel0] * sycl::native::exp2(theta_scale_log2 * (i0 / 2.0f));
             const float freq_factor = has_ff ? freq_factors[i0 / 2] : 1.0f;
 
             float cos_theta, sin_theta;
@@ -107,9 +105,8 @@ static void rope_norm_sycl(
 template <bool forward, bool has_ff, typename T>
 static void rope_neox_sycl(
         const T * x, T * dst,
-        const int ne00, const int ne01, const int ne02,
-        const int s01, const int s02, const int s03,
-        const int s1, const int s2, const int s3,
+        const int ne0, const int ne1,
+        const int s1, const int s2,
         const int n_dims, const int nr,
         const int32_t * pos,
         const float freq_scale, const float freq_base,
@@ -118,27 +115,27 @@ static void rope_neox_sycl(
         const float * freq_factors,
         sycl::queue & q) {
 
-    GGML_ASSERT(ne00 % 2 == 0);
+    GGML_ASSERT(ne0 % 2 == 0);
     const int block_size = SYCL_ROPE_BLOCK_SIZE;
-    const int n_blocks_x = (ne00 + 2 * block_size - 1) / (2 * block_size);
+    const int n_blocks_x = (ne0 + 2 * block_size - 1) / (2 * block_size);
     const float theta_scale = sycl::pow(freq_base, -2.0f / n_dims);
     const float theta_scale_log2 = sycl::log2(theta_scale);
 
+    const sycl::range<3> block_dims(1, block_size, 1);
+    const sycl::range<3> block_nums(1, n_blocks_x, nr);
+
     q.parallel_for(
-        sycl::nd_range<2>(
-            sycl::range<2>(nr, n_blocks_x * block_size),
-            sycl::range<2>(1, block_size)),
-        [=](sycl::nd_item<2> item) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
-            const int i0 = 2 * (item.get_global_id(1));
-            if (i0 >= ne00) return;
+        sycl::nd_range<3>(block_nums * block_dims, block_dims),
+        [=](sycl::nd_item<3> item) {
+            const int i0 = 2 * (item.get_local_range(1) * item.get_group(1) + item.get_local_id(1));
+            if (i0 >= ne0) return;
 
-            const int row_dst = item.get_global_id(0);
-            const uint32_t i3 = row_dst / (ne01 * ne02);
-            const uint32_t i2 = (row_dst - i3 * ne01 * ne02) / ne01;
-            const uint32_t i1 = row_dst - i3 * ne01 * ne02 - i2 * ne01;
+            const int row      = item.get_local_range(2) * item.get_group(2) + item.get_local_id(2);
+            const int row0     = row % ne1;
+            const int channel0 = row / ne1;
 
-            const int idst = i0 / 2 + i1 * s1  + i2 * s2  + i3 * s3;
-            const int ix   = i0 / 2 + i1 * s01 + i2 * s02 + i3 * s03;
+            const int idst = row * ne0 + i0 / 2;
+            const int ix   = channel0 * s2 + row0 * s1 + i0 / 2;
 
             if (i0 >= n_dims) {
                 dst[idst + i0 / 2 + 0] = x[ix + i0 / 2 + 0];
@@ -146,7 +143,7 @@ static void rope_neox_sycl(
                 return;
             }
 
-            const float theta_base = pos[i2] * sycl::native::exp2(theta_scale_log2 * (i0 / 2.0f));
+            const float theta_base = pos[channel0] * sycl::native::exp2(theta_scale_log2 * (i0 / 2.0f));
             const float freq_factor = has_ff ? freq_factors[i0 / 2] : 1.0f;
 
             float cos_theta, sin_theta;
@@ -167,9 +164,8 @@ static void rope_neox_sycl(
 template <bool forward, bool has_ff, typename T>
 static void rope_multi_sycl(
         const T * x, T * dst,
-        const int ne00, const int ne01, const int ne02,
-        const int s01, const int s02, const int s03,
-        const int s1, const int s2, const int s3,
+        const int ne0, const int ne1, const int ne2,
+        const int s1, const int s2,
         const int n_dims, const int nr,
         const int32_t * pos,
         const float freq_scale, const float freq_base,
@@ -180,27 +176,27 @@ static void rope_multi_sycl(
         const bool is_imrope,
         sycl::queue & q) {
 
-    GGML_ASSERT(ne00 % 2 == 0);
+    GGML_ASSERT(ne0 % 2 == 0);
     const int block_size = SYCL_ROPE_BLOCK_SIZE;
-    const int n_blocks_x = (ne00 + 2 * block_size - 1) / (2 * block_size);
+    const int n_blocks_x = (ne0 + 2 * block_size - 1) / (2 * block_size);
     const float theta_scale = sycl::pow(freq_base, -2.0f / n_dims);
     const float theta_scale_log2 = sycl::log2(theta_scale);
 
+    const sycl::range<3> block_dims(1, block_size, 1);
+    const sycl::range<3> block_nums(1, n_blocks_x, nr);
+
     q.parallel_for(
-        sycl::nd_range<2>(
-            sycl::range<2>(nr, n_blocks_x * block_size),
-            sycl::range<2>(1, block_size)),
-        [=](sycl::nd_item<2> item) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
-            const int i0 = 2 * (item.get_global_id(1));
-            if (i0 >= ne00) return;
+        sycl::nd_range<3>(block_nums * block_dims, block_dims),
+        [=](sycl::nd_item<3> item) {
+            const int i0 = 2 * (item.get_local_range(1) * item.get_group(1) + item.get_local_id(1));
+            if (i0 >= ne0) return;
 
-            const int row_dst = item.get_global_id(0);
-            const uint32_t i3 = row_dst / (ne01 * ne02);
-            const uint32_t i2 = (row_dst - i3 * ne01 * ne02) / ne01;
-            const uint32_t i1 = row_dst - i3 * ne01 * ne02 - i2 * ne01;
+            const int row      = item.get_local_range(2) * item.get_group(2) + item.get_local_id(2);
+            const int row0     = row % ne1;
+            const int channel0 = row / ne1;
 
-            const int idst = i0 / 2 + i1 * s1  + i2 * s2  + i3 * s3;
-            const int ix   = i0 / 2 + i1 * s01 + i2 * s02 + i3 * s03;
+            const int idst = row * ne0 + i0 / 2;
+            const int ix   = channel0 * s2 + row0 * s1 + i0 / 2;
 
             if (i0 >= n_dims) {
                 dst[idst + i0 / 2 + 0] = x[ix + i0 / 2 + 0];
@@ -216,23 +212,23 @@ static void rope_multi_sycl(
             float theta_base = 0.0f;
             if (is_imrope) {
                 if (sector % 3 == 1 && sector < 3 * sections.v[1]) {           // h
-                    theta_base = pos[i2 + ne02 * 1] * theta_pow;
+                    theta_base = pos[channel0 + ne2 * 1] * theta_pow;
                 } else if (sector % 3 == 2 && sector < 3 * sections.v[2]) {    // w
-                    theta_base = pos[i2 + ne02 * 2] * theta_pow;
+                    theta_base = pos[channel0 + ne2 * 2] * theta_pow;
                 } else if (sector % 3 == 0 && sector < 3 * sections.v[0]) {    // t
-                    theta_base = pos[i2] * theta_pow;
+                    theta_base = pos[channel0] * theta_pow;
                 } else {
-                    theta_base = pos[i2 + ne02 * 3] * theta_pow;
+                    theta_base = pos[channel0 + ne2 * 3] * theta_pow;
                 }
             } else {
                 if (sector < sections.v[0]) {
-                    theta_base = pos[i2] * theta_pow;
+                    theta_base = pos[channel0] * theta_pow;
                 } else if (sector >= sections.v[0] && sector < sec_w) {
-                    theta_base = pos[i2 + ne02 * 1] * theta_pow;
+                    theta_base = pos[channel0 + ne2 * 1] * theta_pow;
                 } else if (sector >= sec_w && sector < sec_w + sections.v[2]) {
-                    theta_base = pos[i2 + ne02 * 2] * theta_pow;
+                    theta_base = pos[channel0 + ne2 * 2] * theta_pow;
                 } else if (sector >= sec_w + sections.v[2]) {
-                    theta_base = pos[i2 + ne02 * 3] * theta_pow;
+                    theta_base = pos[channel0 + ne2 * 3] * theta_pow;
                 }
             }
 
@@ -256,9 +252,8 @@ static void rope_multi_sycl(
 template <bool forward, bool has_ff, typename T>
 static void rope_vision_sycl(
         const T * x, T * dst,
-        const int ne00, const int ne01, const int ne02,
-        const int s01, const int s02, const int s03,
-        const int s1, const int s2, const int s3,
+        const int ne0, const int ne1, const int ne2,
+        const int s1, const int s2,
         const int n_dims, const int nr,
         const int32_t * pos,
         const float freq_scale, const float freq_base,
@@ -268,27 +263,27 @@ static void rope_vision_sycl(
         const mrope_sections sections,
         sycl::queue & q) {
 
-    GGML_ASSERT(ne00 % 2 == 0);
+    GGML_ASSERT(ne0 % 2 == 0);
     const int block_size = SYCL_ROPE_BLOCK_SIZE;
-    const int n_blocks_x = (ne00 + 2 * block_size - 1) / (2 * block_size);
+    const int n_blocks_x = (ne0 + 2 * block_size - 1) / (2 * block_size);
     const float theta_scale = sycl::pow(freq_base, -2.0f / n_dims);
     const float theta_scale_log2 = sycl::log2(theta_scale);
 
+    const sycl::range<3> block_dims(1, block_size, 1);
+    const sycl::range<3> block_nums(1, n_blocks_x, nr);
+
     q.parallel_for(
-        sycl::nd_range<2>(
-            sycl::range<2>(nr, n_blocks_x * block_size),
-            sycl::range<2>(1, block_size)),
-        [=](sycl::nd_item<2> item) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
-            const int i0 = 2 * (item.get_global_id(1));
-            if (i0 >= ne00) return;
+        sycl::nd_range<3>(block_nums * block_dims, block_dims),
+        [=](sycl::nd_item<3> item) {
+            const int i0 = 2 * (item.get_local_range(1) * item.get_group(1) + item.get_local_id(1));
+            if (i0 >= ne0) return;
 
-            const int row_dst = item.get_global_id(0);
-            const uint32_t i3 = row_dst / (ne01 * ne02);
-            const uint32_t i2 = (row_dst - i3 * ne01 * ne02) / ne01;
-            const uint32_t i1 = row_dst - i3 * ne01 * ne02 - i2 * ne01;
+            const int row      = item.get_local_range(2) * item.get_group(2) + item.get_local_id(2);
+            const int row0     = row % ne1;
+            const int channel0 = row / ne1;
 
-            const int idst = i0 / 2 + i1 * s1  + i2 * s2  + i3 * s3;
-            const int ix   = i0 / 2 + i1 * s01 + i2 * s02 + i3 * s03;
+            const int idst = row * ne0 + i0 / 2;
+            const int ix   = channel0 * s2 + row0 * s1 + i0 / 2;
 
             const int sect_dims = sections.v[0] + sections.v[1];
             const int sec_w     = sections.v[1] + sections.v[0];
@@ -297,10 +292,10 @@ static void rope_vision_sycl(
             float theta_base = 0.0f;
             if (sector < sections.v[0]) {
                 const int p = sector;
-                theta_base  = pos[i2] * sycl::native::exp2(theta_scale_log2 * (float)p);
+                theta_base  = pos[channel0] * sycl::native::exp2(theta_scale_log2 * (float)p);
             } else if (sector >= sections.v[0] && sector < sec_w) {
                 const int p = sector - sections.v[0];
-                theta_base  = pos[i2 + ne02] * sycl::native::exp2(theta_scale_log2 * (float)p);
+                theta_base  = pos[channel0 + ne2] * sycl::native::exp2(theta_scale_log2 * (float)p);
             }
 
             const float freq_factor = has_ff ? freq_factors[i0 / 2] : 1.0f;
@@ -337,11 +332,6 @@ static void ggml_sycl_op_rope_impl(ggml_backend_sycl_context & ctx, ggml_tensor 
 
     const int s01 = src0->nb[1] / ggml_type_size(src0->type);
     const int s02 = src0->nb[2] / ggml_type_size(src0->type);
-    const int s03 = src0->nb[3] / ggml_type_size(src0->type);
-
-    const int s1 = dst->nb[1] / ggml_type_size(dst->type);
-    const int s2 = dst->nb[2] / ggml_type_size(dst->type);
-    const int s3 = dst->nb[3] / ggml_type_size(dst->type);
 
     const int n_dims     = ((int32_t *) dst->op_params)[1];
     const int mode       = ((int32_t *) dst->op_params)[2];
@@ -383,15 +373,6 @@ static void ggml_sycl_op_rope_impl(ggml_backend_sycl_context & ctx, ggml_tensor 
     sycl::queue & q = *ctx.stream();
 
     // ── type dispatch macro ──
-    #define DISPATCH_ROPE(launch_fn, ...) \
-        do { \
-            if (src0->type == GGML_TYPE_F32) { \
-                launch_fn<forward, false, float>((const float *)src0->data, (float *)dst->data, __VA_ARGS__); \
-            } else { \
-                launch_fn<forward, false, sycl::half>((const sycl::half *)src0->data, (sycl::half *)dst->data, __VA_ARGS__); \
-            } \
-        } while (0)
-
     #define DISPATCH_ROPE_FF(launch_fn, ...) \
         do { \
             if (src0->type == GGML_TYPE_F32) { \
@@ -411,27 +392,26 @@ static void ggml_sycl_op_rope_impl(ggml_backend_sycl_context & ctx, ggml_tensor 
 
     if (is_neox) {
         DISPATCH_ROPE_FF(rope_neox_sycl,
-            ne00, ne01, ne02, s01, s02, s03, s1, s2, s3,
+            ne00, ne01, s01, s02,
             n_dims, nr, pos, freq_scale, freq_base,
             ext_factor, attn_factor, corr_dims, freq_factors, q);
     } else if (is_mrope && !is_vision) {
         DISPATCH_ROPE_FF(rope_multi_sycl,
-            ne00, ne01, ne02, s01, s02, s03, s1, s2, s3,
+            ne00, ne01, ne02, s01, s02,
             n_dims, nr, pos, freq_scale, freq_base,
             ext_factor, attn_factor, corr_dims, freq_factors, sections, is_imrope, q);
     } else if (is_vision) {
         DISPATCH_ROPE_FF(rope_vision_sycl,
-            ne00, ne01, ne02, s01, s02, s03, s1, s2, s3,
+            ne00, ne01, ne02, s01, s02,
             n_dims, nr, pos, freq_scale, freq_base,
             ext_factor, attn_factor, corr_dims, freq_factors, sections, q);
     } else {
         DISPATCH_ROPE_FF(rope_norm_sycl,
-            ne00, ne01, ne02, s01, s02, s03, s1, s2, s3,
+            ne00, ne01, s01, s02,
             n_dims, nr, pos, freq_scale, freq_base,
             ext_factor, attn_factor, corr_dims, freq_factors, q);
     }
 
-    #undef DISPATCH_ROPE
     #undef DISPATCH_ROPE_FF
 }
 
