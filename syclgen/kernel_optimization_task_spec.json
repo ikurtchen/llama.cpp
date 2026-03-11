@@ -3037,7 +3037,7 @@
       "title": "Handle regression for MEAN and SUM_ROWS",
       "overall_optimization_potential": "medium",
       "priority": 3,
-      "status": "pending",
+      "status": "completed",
       "depends_on": [
         "opt_task_002"
       ],

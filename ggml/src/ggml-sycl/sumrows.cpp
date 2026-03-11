@@ -2,16 +2,65 @@
 
 // ---------------------------------------------------------------------------
 // reduce_rows_f32 — SYCL port of ggml-cuda/reduce_rows.cuh
-// One work-group per row, block_size = 256 work-items.
-// Uses 8x unrolling and block_reduce<SUM> for the final reduction.
+//
+// Adaptive block sizing:
+//   - ncols < 256 : block_size = WARP_SIZE, simple scalar loop + warp_reduce_sum
+//                    (no SLM needed — avoids wasting work-items for small rows)
+//   - ncols >= 256: block_size = 256, 8x unroll + block_reduce<SUM>
+//
 // When norm==true the row sum is divided by ncols (used by MEAN).
 // ---------------------------------------------------------------------------
 
 static constexpr int SUMROWS_BLOCK_SIZE = 256;
 
-void reduce_rows_f32_sycl(const float * x, float * dst, int ncols, int nrows,
-                           bool norm, sycl::queue & stream) {
+// Small-row path: one warp (WARP_SIZE work-items) per row, warp_reduce_sum.
+static void reduce_rows_f32_small(const float * x, float * dst, int ncols,
+                                  int nrows, bool norm, sycl::queue & stream) {
+    const sycl::range<1> global_range(nrows * WARP_SIZE);
+    const sycl::range<1> local_range(WARP_SIZE);
 
+    stream.submit([&](sycl::handler & h) {
+        if (norm) {
+            h.parallel_for(
+                sycl::nd_range<1>(global_range, local_range),
+                [=](sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                    const int row = item.get_group(0);
+                    const int col = item.get_local_id(0);
+
+                    float sum = 0.0f;
+                    for (int i = col; i < ncols; i += WARP_SIZE) {
+                        sum += x[row * ncols + i];
+                    }
+                    sum = warp_reduce_sum(sum);
+
+                    if (col == 0) {
+                        dst[row] = sum / ncols;
+                    }
+                });
+        } else {
+            h.parallel_for(
+                sycl::nd_range<1>(global_range, local_range),
+                [=](sycl::nd_item<1> item) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                    const int row = item.get_group(0);
+                    const int col = item.get_local_id(0);
+
+                    float sum = 0.0f;
+                    for (int i = col; i < ncols; i += WARP_SIZE) {
+                        sum += x[row * ncols + i];
+                    }
+                    sum = warp_reduce_sum(sum);
+
+                    if (col == 0) {
+                        dst[row] = sum;
+                    }
+                });
+        }
+    });
+}
+
+// Large-row path: 256 work-items per row, 8x unroll + block_reduce<SUM>.
+static void reduce_rows_f32_large(const float * x, float * dst, int ncols,
+                                  int nrows, bool norm, sycl::queue & stream) {
     const sycl::range<1> global_range(nrows * SUMROWS_BLOCK_SIZE);
     const sycl::range<1> local_range(SUMROWS_BLOCK_SIZE);
     constexpr int num_warps = SUMROWS_BLOCK_SIZE / WARP_SIZE;
@@ -87,6 +136,15 @@ void reduce_rows_f32_sycl(const float * x, float * dst, int ncols, int nrows,
                 });
         }
     });
+}
+
+void reduce_rows_f32_sycl(const float * x, float * dst, int ncols, int nrows,
+                           bool norm, sycl::queue & stream) {
+    if (ncols < SUMROWS_BLOCK_SIZE) {
+        reduce_rows_f32_small(x, dst, ncols, nrows, norm, stream);
+    } else {
+        reduce_rows_f32_large(x, dst, ncols, nrows, norm, stream);
+    }
 }
 
 // ---------------------------------------------------------------------------
