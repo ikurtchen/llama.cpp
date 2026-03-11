@@ -1,95 +1,76 @@
 #include "repeat_back.hpp"
 
-#include <algorithm>
-#include <cstdint>
+#include "common.hpp"
 
-// ============================================================================
-// repeat_back kernel — sums over repeated dimensions
-// Grid: (ceil(ne0/WARP_SIZE), ne1, ne2*ne3)
-// ============================================================================
-
-template <typename T>
-static void k_repeat_back(const T * __restrict__ src, T * __restrict__ dst,
-                          const int64_t ne00, const int64_t ne01,
-                          const int64_t ne02, const int64_t ne03,
-                          const size_t s00, const size_t s01,
-                          const size_t s02, const size_t s03,
-                          const int64_t ne0, const int64_t ne1,
-                          const int64_t ne2, const int64_t ne3,
-                          const sycl::nd_item<3> & item) {
-
-    const int64_t tid0  = (int64_t)item.get_group(2) * item.get_local_range(2) + item.get_local_id(2);
-    const int64_t tid1  = (int64_t)item.get_group(1) * item.get_local_range(1) + item.get_local_id(1);
-    const int64_t tid23 = (int64_t)item.get_group(0) * item.get_local_range(0) + item.get_local_id(0);
-    const int64_t tid2  = tid23 % ne2;
-    const int64_t tid3  = tid23 / ne2;
-
-    if (tid0 >= ne0) {
-        return;
-    }
-
-    T sum = 0;
-    for (int64_t i3 = tid3; i3 < ne03; i3 += ne3) {
-        for (int64_t i2 = tid2; i2 < ne02; i2 += ne2) {
-            for (int64_t i1 = tid1; i1 < ne01; i1 += ne1) {
-                for (int64_t i0 = tid0; i0 < ne00; i0 += ne0) {
-                    sum += src[i3*s03 + i2*s02 + i1*s01 + i0*s00];
-                }
-            }
-        }
-    }
-    dst[tid3*ne2*ne1*ne0 + tid2*ne1*ne0 + tid1*ne0 + tid0] = sum;
-}
-
-template <typename T>
-static void repeat_back_sycl(
-        const T * src, T * dst,
-        const int64_t ne00, const int64_t ne01, const int64_t ne02, const int64_t ne03,
-        const size_t s00, const size_t s01, const size_t s02, const size_t s03,
-        const int64_t ne0, const int64_t ne1, const int64_t ne2, const int64_t ne3,
-        sycl::queue & stream) {
-
-    // block_dims = (WARP_SIZE, 1, 1) → SYCL range<3>(z=1, y=1, x=WARP_SIZE)
-    sycl::range<3> block_dims(1, 1, WARP_SIZE);
-    unsigned int gx = (ne0 + WARP_SIZE - 1) / WARP_SIZE;
-    sycl::range<3> grid_dims(ne2 * ne3, ne1, gx * WARP_SIZE);
-
-    stream.parallel_for(
-        sycl::nd_range<3>(grid_dims, block_dims),
-        [=](sycl::nd_item<3> item) {
-            k_repeat_back(src, dst, ne00, ne01, ne02, ne03,
-                          s00, s01, s02, s03, ne0, ne1, ne2, ne3, item);
-        });
-}
+#define GGML_ASSERT_TENSOR_FITS_INT(t) \
+    GGML_ASSERT((t)->ne[0] < INT_MAX && (t)->ne[1] < INT_MAX && (t)->ne[2] < INT_MAX && (t)->ne[3] < INT_MAX)
 
 void ggml_sycl_op_repeat_back(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
-    const ggml_tensor * src0 = dst->src[0];
+    GGML_ASSERT(dst->src[0]->type == GGML_TYPE_F32);
+    GGML_ASSERT(dst->type == GGML_TYPE_F32);
 
-    GGML_ASSERT(src0->type == dst->type);
-    GGML_ASSERT(ggml_is_contiguous(dst));
-    GGML_ASSERT(ggml_can_repeat(dst, src0));
+    const float * src0_dd = (const float *) dst->src[0]->data;
+    float *       dst_dd  = (float *) dst->data;
 
-    sycl::queue & stream = *(ctx.stream());
+    GGML_ASSERT_TENSOR_FITS_INT(dst);
+    GGML_ASSERT_TENSOR_FITS_INT(dst->src[0]);
 
-    GGML_TENSOR_UNARY_OP_LOCALS;
+    const int ne0 = dst->ne[0], ne1 = dst->ne[1], ne2 = dst->ne[2], ne3 = dst->ne[3];
+    const int ne00 = dst->src[0]->ne[0], ne01 = dst->src[0]->ne[1], ne02 = dst->src[0]->ne[2],
+              ne03 = dst->src[0]->ne[3];
 
-    GGML_ASSERT(ne2*ne3 <= (1 << 15));
+    const int nr0 = ne00 / ne0;
+    const int nr1 = ne01 / ne1;
+    const int nr2 = ne02 / ne2;
+    const int nr3 = ne03 / ne3;
 
-    const size_t ts  = ggml_type_size(src0->type);
-    const size_t s00 = nb00 / ts;
-    const size_t s01 = nb01 / ts;
-    const size_t s02 = nb02 / ts;
-    const size_t s03 = nb03 / ts;
+    const int nb0 = dst->src[0]->nb[0];
+    const int nb1 = dst->src[0]->nb[1];
+    const int nb2 = dst->src[0]->nb[2];
+    const int nb3 = dst->src[0]->nb[3];
 
-    switch (dst->type) {
-        case GGML_TYPE_F32: {
-            const float * src0_d = (const float *) src0->data;
-            float       * dst_d  = (float       *) dst->data;
-            repeat_back_sycl(src0_d, dst_d, ne00, ne01, ne02, ne03,
-                             s00, s01, s02, s03, ne0, ne1, ne2, ne3, stream);
-        } break;
-        default: {
-            GGML_ASSERT(false);
-        } break;
-    }
+    const char * base = (const char *) src0_dd;
+
+    const size_t  total      = (size_t) ne0 * ne1 * ne2 * ne3;
+    constexpr int BLOCK_SIZE = 256;
+    const int     num_blocks = (total + BLOCK_SIZE - 1) / BLOCK_SIZE;
+
+    const float inv_ne0      = 1.0f / ne0;
+    const float inv_ne_01    = 1.0f / (ne0 * ne1);
+    const float inv_ne_012   = 1.0f / (ne0 * ne1 * ne2);
+    const int   repeat_count = nr0 * nr1 * nr2 * nr3;
+
+    queue_ptr stream = ctx.stream();
+
+    stream->parallel_for(
+        sycl::nd_range<1>(sycl::range<1>(num_blocks * BLOCK_SIZE), sycl::range<1>(BLOCK_SIZE)),
+        [=](sycl::nd_item<1> item_ct1) {
+            const size_t i = item_ct1.get_global_linear_id();
+            if (i >= total) {
+                return;
+            }
+
+            const int i3 = (int) (i * inv_ne_012);
+            const int i2 = (int) (i * inv_ne_01) - i3 * ne2;
+            const int i1 = (int) (i * inv_ne0) - (int) (i * inv_ne_01) * ne1;
+            const int i0 = i - (int) (i * inv_ne0) * ne0;
+
+            int   j0 = 0, j1 = 0, j2 = 0, j3 = 0;
+            float acc = 0.0f;
+
+            for (int j = 0; j < repeat_count; ++j) {
+                const float * ptr = (const float *) (base + (i0 + j0 * ne0) * nb0 + (i1 + j1 * ne1) * nb1 +
+                    (i2 + j2 * ne2) * nb2 + (i3 + j3 * ne3) * nb3);
+                acc += *ptr;
+
+                int carry = (++j0 >= nr0);
+                j0 -= carry * nr0;
+                carry = (carry && (++j1 >= nr1));
+                j1 -= carry * nr1;
+                carry = (carry && (++j2 >= nr2));
+                j2 -= carry * nr2;
+                j3 += carry;
+            }
+            dst_dd[i] = acc;
+        });
 }
