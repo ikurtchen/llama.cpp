@@ -3133,7 +3133,7 @@
       "title": "Handle regression for ROLL",
       "overall_optimization_potential": "medium",
       "priority": 3,
-      "status": "pending",
+      "status": "completed",
       "depends_on": [
         "opt_task_002"
       ],
