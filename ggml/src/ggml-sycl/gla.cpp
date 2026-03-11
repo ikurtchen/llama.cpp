@@ -29,6 +29,7 @@ static void gated_linear_attn_f32_sycl(
 
                 float state[head_size];
 
+#pragma unroll
                 for (int i = 0; i < head_size; i++) {
                     state[i] = s[batch_i * state_size + head_i * head_size * head_size + i * head_size + tid];
                 }
@@ -63,6 +64,7 @@ static void gated_linear_attn_f32_sycl(
                     dst[t] = y * scale;
                 }
 
+#pragma unroll
                 for (int i = 0; i < head_size; i++) {
                     dst[T * C + batch_i * state_size + head_i * head_size * head_size + i * head_size + tid] = state[i];
                 }
