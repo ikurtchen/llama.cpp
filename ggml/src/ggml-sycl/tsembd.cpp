@@ -39,7 +39,7 @@ void ggml_sycl_op_timestep_embedding(ggml_backend_sycl_context & ctx, ggml_tenso
             }
 
             const float timestep = src0_d[i];
-            const float freq = sycl::exp(-sycl::log((float) max_period) * j / half);
+            const float freq = sycl::native::exp(-(sycl::log((float) max_period)) * j / half);
             const float arg  = timestep * freq;
             embed_data[j]        = sycl::cos(arg);
             embed_data[j + half] = sycl::sin(arg);
