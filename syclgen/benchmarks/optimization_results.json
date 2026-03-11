@@ -3336,6 +3336,65 @@
           "description": "All four ops restored to baseline performance after revert. ADD/SUB/MUL within 0.1% of baseline. DIV within 2.9% of baseline (60.45 vs 58.76 us). The prior WG 128->256 optimization from opt_task_009 is also lost, but the regression fix takes priority."
         }
       }
+    },
+    {
+      "optimization_id": "opt_041_001",
+      "task_id": "opt_task_063",
+      "kernel": "add-id (ADD_ID)",
+      "step_id": "opt_041_001",
+      "description": "Fix ADD_ID regression by replacing hardcoded WG size 768 with hardware max_work_group_size (1024 on B60 dGPU)",
+      "outcome": "regression_fixed",
+      "date": "2026-03-11",
+      "source_file": "ggml/src/ggml-sycl/add-id.cpp",
+      "notes": "ADD_ID kernel used hardcoded 768 for max threads per work-group (from pre-upstream-fix code), while the baseline used ggml_sycl_info().max_work_group_sizes[ctx.device] which is 1024 on B60. For ne00=2880 with n_token=1, having 1024 threads vs 768 means each thread processes fewer elements (3 vs 4) and better sub-group occupancy. Fix: changed hardcoded 768 to hardware max_work_group_size query.",
+      "benchmark_comparison": {
+        "test_case": "ADD_ID(type_a=f32,type_b=f32,n_embd=2880,n_experts_used=4)",
+        "data": [
+          {
+            "config": "n_experts=128, n_token=1",
+            "baseline_us": 6.19,
+            "regressed_us": 6.53,
+            "fixed_us": 5.87,
+            "regression_pct": 5.5,
+            "fixed_vs_baseline": 1.05,
+            "note": "1.05x better than baseline after fix"
+          },
+          {
+            "config": "n_experts=32, n_token=1",
+            "baseline_us": 5.87,
+            "regressed_us": 6.56,
+            "fixed_us": 5.97,
+            "regression_pct": 11.8,
+            "fixed_vs_baseline": 0.98,
+            "note": "Matches baseline (~1.00x)"
+          },
+          {
+            "config": "n_experts=128, n_token=512",
+            "baseline_us": 125.04,
+            "regressed_us": 124.61,
+            "fixed_us": 123.31,
+            "regression_pct": -0.3,
+            "fixed_vs_baseline": 1.01,
+            "note": "1.01x better than baseline"
+          },
+          {
+            "config": "n_experts=32, n_token=512",
+            "baseline_us": 124.12,
+            "regressed_us": 122.96,
+            "fixed_us": 122.53,
+            "regression_pct": -0.9,
+            "fixed_vs_baseline": 1.01,
+            "note": "1.01x better than baseline"
+          }
+        ],
+        "summary": {
+          "root_cause": "Hardcoded WG size 768 instead of querying hardware max_work_group_size (1024 on B60)",
+          "fix": "Changed hardcoded 768 to ggml_sycl_info().max_work_group_sizes[ctx.device]",
+          "n_token_1_regression_eliminated": true,
+          "n_token_512_no_regression": true,
+          "description": "Small n_token=1 regressions (5.5-11.8%) fully resolved. Fixed kernel matches or exceeds baseline on all 4 test cases. n_token=512 cases show 1.01x improvement over baseline."
+        }
+      }
     }
   ]
 }

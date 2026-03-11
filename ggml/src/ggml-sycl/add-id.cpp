@@ -26,10 +26,9 @@ void ggml_sycl_add_id(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
 
     dpct::queue_ptr stream = ctx.stream();
 
-    // CUDA mapping:
-    //   grid  = dim3(ne01, ne02)   — one block per (i1, i2)
-    //   block = min(ne00, 768)     — threads sweep over the column dimension i0
-    const int threads = std::min(static_cast<int>(ne00), 768);
+    // Use hardware max work-group size (1024 on dGPU, may be smaller on iGPU)
+    const unsigned int max_wg = ggml_sycl_info().max_work_group_sizes[ctx.device];
+    const int threads = std::min(static_cast<unsigned int>(ne00), max_wg);
 
     // SYCL nd_range<2>:
     //   dimension 0  → ne01 work-groups of size `threads`  (maps to blockIdx.x / threadIdx.x)
@@ -38,7 +37,6 @@ void ggml_sycl_add_id(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
     const sycl::range<2> local_range(threads, 1);
 
     // Capture the byte-stride values needed to compute row addresses on the device.
-    // Using the same pointer-arithmetic scheme as the CUDA kernel.
     const size_t k_nb01 = nb01;
     const size_t k_nb02 = nb02;
     const size_t k_nb11 = nb11;
