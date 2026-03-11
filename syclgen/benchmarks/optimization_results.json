@@ -3267,6 +3267,75 @@
         "threshold": "IC >= 8 triggers UNROLL_IC=true",
         "description": "Conditional unrolling eliminates all low-channel regressions from opt_060 while preserving high-channel gains. Template bool UNROLL_IC selected at dispatch time based on IC."
       }
+    },
+    {
+      "optimization_id": "opt_013_001_revert",
+      "task_id": "opt_task_062",
+      "kernel": "binbcast (ADD/SUB/MUL/DIV)",
+      "step_id": "opt_013_001",
+      "description": "Fix ~20% regression on ADD/SUB/MUL/DIV by reverting binbcast.cpp and binbcast.hpp to baseline",
+      "outcome": "regression_fixed",
+      "date": "2026-03-11",
+      "notes": "binbcast kernel had ~20% regressions on ADD/SUB/MUL/DIV with ne=[4096,1,1,1], nr=[1,512,1,1]. Multiple optimization attempts failed: (1) enum dispatch to eliminate runtime op switch, (2) function pointer template approach, (3) surgical fixes targeting 64-bit casts, (4) block_size differences. None resolved the regression. Root cause was cumulative changes from prior optimization passes (opt_task_009 WG 128->256 was beneficial, but subsequent modifications introduced the regression). The only viable solution was reverting binbcast.cpp and binbcast.hpp to their baseline (pre-optimization) state, which restored original performance.",
+      "benchmark_comparison": {
+        "test_case": "ADD/SUB/MUL/DIV with ne=[4096,1,1,1], nr=[1,512,1,1]",
+        "baseline_log": "logs_2nd_test/logs_origin/b60_benchmark_20260310_143322.log",
+        "regressed_log": "logs_2nd_test/logs_optimization/b60_benchmark_20260310_150229.log",
+        "data": [
+          {
+            "op": "ADD",
+            "shape": "ne=[4096,1,1,1],nr=[1,512,1,1]",
+            "baseline_us": 58.64,
+            "regressed_us": 70.73,
+            "after_revert_us": 58.69,
+            "after_revert_gbps": 399.34,
+            "regression_pct": 20.62,
+            "revert_restored": true
+          },
+          {
+            "op": "SUB",
+            "shape": "ne=[4096,1,1,1],nr=[1,512,1,1]",
+            "baseline_us": 58.61,
+            "regressed_us": 70.73,
+            "after_revert_us": 58.68,
+            "after_revert_gbps": 399.39,
+            "regression_pct": 20.49,
+            "revert_restored": true
+          },
+          {
+            "op": "MUL",
+            "shape": "ne=[4096,1,1,1],nr=[1,512,1,1]",
+            "baseline_us": 58.69,
+            "regressed_us": 70.71,
+            "after_revert_us": 58.69,
+            "after_revert_gbps": 399.36,
+            "regression_pct": 20.48,
+            "revert_restored": true
+          },
+          {
+            "op": "DIV",
+            "shape": "ne=[4096,1,1,1],nr=[1,512,1,1]",
+            "baseline_us": 58.76,
+            "regressed_us": 70.56,
+            "after_revert_us": 60.45,
+            "after_revert_gbps": 387.73,
+            "regression_pct": 20.10,
+            "revert_restored": true,
+            "note": "DIV slightly slower than baseline (60.45 vs 58.76) but regression eliminated (was 70.56)"
+          }
+        ],
+        "summary": {
+          "avg_regression_pct": 20.42,
+          "resolution": "Full revert of binbcast.cpp and binbcast.hpp to baseline",
+          "investigation_attempts": [
+            "Enum dispatch to eliminate runtime op switch — no improvement",
+            "Function pointer template approach — no improvement",
+            "Surgical fixes targeting 64-bit casts — no improvement",
+            "Block_size differences analysis — no improvement"
+          ],
+          "description": "All four ops restored to baseline performance after revert. ADD/SUB/MUL within 0.1% of baseline. DIV within 2.9% of baseline (60.45 vs 58.76 us). The prior WG 128->256 optimization from opt_task_009 is also lost, but the regression fix takes priority."
+        }
+      }
     }
   ]
 }
