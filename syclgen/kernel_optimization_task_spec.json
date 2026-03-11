@@ -2883,7 +2883,390 @@
           "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k <CONV_OP_NAME> -e ZES_ENABLE_SYSMAN=1, check ggml/include/ggml.h for conv ops"
         }
       ]
+    },
+    {
+      "task_id": "opt_task_062",
+      "type": "kernel_optimization",
+      "kernel_id": "sk_013",
+      "kernel_name": "binbcast",
+      "source_file": "ggml/src/ggml-sycl/binbcast.cpp",
+      "title": "Handle regression for ADD, DIV, MUL and SUB",
+      "overall_optimization_potential": "medium",
+      "priority": 3,
+      "status": "pending",
+      "depends_on": [
+        "opt_task_002"
+      ],
+      "steps": [
+        {
+          "step_id": "opt_013_001",
+          "category": "regression",
+          "priority": "medium",
+          "description": "ADD(type=f32,ne=[4096,1,1,1],nr=[1,512,1,1],nf=1,perm1=0) 20.62% regression, DIV(type=f32,ne=[4096,1,1,1],nr=[1,512,1,1],nf=1,perm1=0) 20.10% regression, MUL(type=f32,ne=[4096,1,1,1],nr=[1,512,1,1],nf=1,perm1=0) 20.48% regression, SUB(type=f32,ne=[4096,1,1,1],nr=[1,512,1,1],nf=1,perm1=0) 20.49% regression. Refer to /localdisk/kurt/workspace/code/xpu/llama.cpp.orig/ggml/src/ggml-sycl/binbcast.cpp for baseline implementation. Refer to logs_2nd_test/logs_origin/b60_benchmark_20260310_143322.log for baseline perf, and refer to logs_2nd_test/logs_optimization/b60_benchmark_20260310_150229.log for optimized perf. You do not need to run the perf again, I have verified the regression.",
+          "risk": "low",
+          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k <OP_NAME> -e ZES_ENABLE_SYSMAN=1, check ggml/include/ggml.h for op names"
+        }
+      ]
+    },
+    {
+      "task_id": "opt_task_063",
+      "type": "kernel_optimization",
+      "kernel_id": "sk_041",
+      "name": "add-id",
+      "source_file": "ggml/src/ggml-sycl/add-id.cpp",
+      "title": "Handle regression for ADD_ID",
+      "overall_optimization_potential": "medium",
+      "priority": 3,
+      "status": "pending",
+      "depends_on": [
+        "opt_task_002"
+      ],
+      "steps": [
+        {
+          "step_id": "opt_041_001",
+          "category": "regression",
+          "priority": "medium",
+          "description": "small n_token=1 case, 5.49% ~ 11.75% regression: ADD_ID(type_a=f32,type_b=f32,n_embd=2880,n_experts=128,n_experts_used=4,n_token=1), ADD_ID(type_a=f32,type_b=f32,n_embd=2880,n_experts=32,n_experts_used=4,n_token=1). Refer to logs_2nd_test/logs_origin/b60_benchmark_20260310_143322.log for baseline perf, and refer to logs_2nd_test/logs_optimization/b60_benchmark_20260310_150229.log for optimized perf. You do not need to run the perf again, I have verified the regression.",
+          "risk": "low",
+          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k <OP_NAME> -e ZES_ENABLE_SYSMAN=1, check ggml/include/ggml.h for op names"
+        }
+      ]
+    },
+    {
+      "task_id": "opt_task_064",
+      "type": "kernel_optimization",
+      "kernel_id": "sk_050",
+      "name": "argmax (inline)",
+      "source_file": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "title": "Handle regression for ARGMAX",
+      "overall_optimization_potential": "medium",
+      "priority": 3,
+      "status": "pending",
+      "depends_on": [
+        "opt_task_002"
+      ],
+      "steps": [
+        {
+          "step_id": "opt_050_001",
+          "category": "regression",
+          "priority": "medium",
+          "description": "ARGMAX(type=f32,ne=[32000,512,1,1]), Large items has regression: 48.36%. Don't use [[sycl::reqd_sub_group_size(WARP_SIZE)]], and don't use sycl::permute_group_by_xor to reduce, WARP_SIZE is too small, just reduce manually across block. Refer to logs_2nd_test/logs_origin/b60_benchmark_20260310_143322.log for baseline perf, and refer to logs_2nd_test/logs_optimization/b60_benchmark_20260310_150229.log for optimized perf. You do not need to run the perf again, I have verified the regression.",
+          "risk": "low",
+          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k <OP_NAME> -e ZES_ENABLE_SYSMAN=1, check ggml/include/ggml.h for op names"
+        }
+      ]
+    },
+    {
+      "task_id": "opt_task_065",
+      "type": "kernel_optimization",
+      "kernel_id": "sk_019",
+      "name": "cpy",
+      "source_file": "ggml/src/ggml-sycl/cpy.cpp",
+      "title": "Handle regression for CPY",
+      "overall_optimization_potential": "medium",
+      "priority": 3,
+      "status": "pending",
+      "depends_on": [
+        "opt_task_002"
+      ],
+      "steps": [
+        {
+          "step_id": "opt_019_001",
+          "category": "regression",
+          "priority": "medium",
+          "description": "Cases has regression: CPY(type_src=f16,type_dst=f16,ne=[786432,256,1,1],permute_src=[0,0,0,0],permute_dst=[0,0,0,0],_src_transpose=1), CPY(type_src=f16,type_dst=f16,ne=[786432,256,1,1],permute_src=[1,0,2,3],permute_dst=[0,0,0,0],_src_transpose=0), CPY(type_src=f32,type_dst=f32,ne=[3072,512,2,1],permute_src=[0,2,1,3],permute_dst=[0,0,0,0],_src_transpose=0), CPY(type_src=f32,type_dst=f32,ne=[8192,512,2,1],permute_src=[0,2,1,3],permute_dst=[0,0,0,0],_src_transpose=0). Cases not supportted: CPY(type_src=f32,type_dst=q4_0,ne=[8192,512,2,1],permute_src=[0,0,0,0],permute_dst=[0,0,0,0],_src_transpose=0), CPY(type_src=q4_0,type_dst=f32,ne=[8192,512,2,1],permute_src=[0,0,0,0],permute_dst=[0,0,0,0],_src_transpose=0). Refer to /localdisk/kurt/workspace/code/xpu/llama.cpp.orig/ggml/src/ggml-sycl/cpy.cpp for baseline implementation. Note, Block size is changed to 256 vs baseline 32. Refer to logs_2nd_test/logs_origin/b60_benchmark_20260310_143322.log for baseline perf, and refer to logs_2nd_test/logs_optimization/b60_benchmark_20260310_150229.log for optimized perf. You do not need to run the perf again, I have verified the regression.",
+          "risk": "low",
+          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k <OP_NAME> -e ZES_ENABLE_SYSMAN=1, check ggml/include/ggml.h for op names"
+        }
+      ]
+    },
+    {
+      "task_id": "opt_task_066",
+      "type": "kernel_optimization",
+      "kernel_id": "sk_029",
+      "name": "gla",
+      "source_file": "ggml/src/ggml-sycl/gla.cpp",
+      "title": "Handle regression for GATED_LINEAR_ATTN",
+      "overall_optimization_potential": "medium",
+      "priority": 3,
+      "status": "pending",
+      "depends_on": [
+        "opt_task_002"
+      ],
+      "steps": [
+        {
+          "step_id": "opt_066_001",
+          "category": "regression",
+          "priority": "medium",
+          "description": "GATED_LINEAR_ATTN(type=f32,head_count=32,head_size=64,n_seq_tokens=32,n_seqs=4), GATED_LINEAR_ATTN(type=f32,head_count=32,head_size=64,n_seq_tokens=512,n_seqs=1): 9.80%~22.08% regression, missing loop unroll. Refer to logs_2nd_test/logs_origin/b60_benchmark_20260310_143322.log for baseline perf, and refer to logs_2nd_test/logs_optimization/b60_benchmark_20260310_150229.log for optimized perf. You do not need to run the perf again, I have verified the regression.",
+          "risk": "low",
+          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k <OP_NAME> -e ZES_ENABLE_SYSMAN=1, check ggml/include/ggml.h for op names"
+        }
+      ]
+    },
+    {
+      "task_id": "opt_task_067",
+      "type": "kernel_optimization",
+      "kernel_id": "sk_017",
+      "name": "norm",
+      "source_file": "ggml/src/ggml-sycl/norm.cpp",
+      "title": "Handle regression for GROUP_NORM and L2_NORM",
+      "overall_optimization_potential": "medium",
+      "priority": 3,
+      "status": "pending",
+      "depends_on": [
+        "opt_task_002"
+      ],
+      "steps": [
+        {
+          "step_id": "opt_067_001",
+          "category": "regression",
+          "priority": "medium",
+          "description": "GROUP_NORM(type=f32,ne=[128,128,640,1],num_groups=32,eps=0.000001), GROUP_NORM(type=f32,ne=[64,64,320,1],num_groups=32,eps=0.000001): regression 25.74%~47.74%, L2_NORM(type=f32,ne=[128,128,320,1],eps=0.000000,v=0): 522.32% regression. Block size 256 vs 16(<1024) or max_work_group_sizes (>= 1024) in baseline. Refer to /localdisk/kurt/workspace/code/xpu/llama.cpp.orig/ggml/src/ggml-sycl/norm.cpp for baseline implementation. Refer to logs_2nd_test/logs_origin/b60_benchmark_20260310_143322.log for baseline perf, and refer to logs_2nd_test/logs_optimization/b60_benchmark_20260310_150229.log for optimized perf. You do not need to run the perf again, I have verified the regression.",
+          "risk": "low",
+          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k <OP_NAME> -e ZES_ENABLE_SYSMAN=1, check ggml/include/ggml.h for op names"
+        }
+      ]
+    },
+    {
+      "task_id": "opt_task_068",
+      "type": "kernel_optimization",
+      "kernel_id": "sk_039",
+      "name": "sumrows",
+      "source_file": "ggml/src/ggml-sycl/sumrows.cpp",
+      "title": "Handle regression for MEAN and SUM_ROWS",
+      "overall_optimization_potential": "medium",
+      "priority": 3,
+      "status": "pending",
+      "depends_on": [
+        "opt_task_002"
+      ],
+      "steps": [
+        {
+          "step_id": "opt_039_001",
+          "category": "regression",
+          "priority": "medium",
+          "description": "MEAN(type=f32,ne=[128,8192,1,1]): small col case: 603.68%, SUM_ROWS(type=f32,ne=[128,8192,1,1],permute=0,slice=0): small col case: 710.93%. Refer to /localdisk/kurt/workspace/code/xpu/llama.cpp.orig/ggml/src/ggml-sycl/ggml-sycl.cpp::sum_rows_f32_sycl for baseline implementation. Note: block size 256 (> 128) vs 16 on baseline. Refer to logs_2nd_test/logs_origin/b60_benchmark_20260310_143322.log for baseline perf, and refer to logs_2nd_test/logs_optimization/b60_benchmark_20260310_150229.log for optimized perf. You do not need to run the perf again, I have verified the regression.",
+          "risk": "low",
+          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k <OP_NAME> -e ZES_ENABLE_SYSMAN=1, check ggml/include/ggml.h for op names"
+        }
+      ]
+    },
+    {
+      "task_id": "opt_task_069",
+      "type": "kernel_optimization",
+      "kernel_id": "sk_022",
+      "name": "pad",
+      "source_file": "ggml/src/ggml-sycl/pad.cpp",
+      "title": "Handle regression for PAD",
+      "overall_optimization_potential": "medium",
+      "priority": 3,
+      "status": "pending",
+      "depends_on": [
+        "opt_task_002"
+      ],
+      "steps": [
+        {
+          "step_id": "opt_022_001",
+          "category": "regression",
+          "priority": "medium",
+          "description": "PAD(type=f32,ne_a=[4095,511,1,1],pad_0=1,pad_1=1,circular=0), PAD(type=f32,ne_a=[4096,512,1,1],pad_0=0,pad_1=0,circular=0), PAD(type=f32,ne_a=[512,512,3,1],pad_0=32,pad_1=32,circular=0): regression 36.73% 36.77% 33.88%. Refer to /localdisk/kurt/workspace/code/xpu/llama.cpp.orig/ggml/src/ggml-sycl/pad.cpp for baseline implementation. Refer to logs_2nd_test/logs_origin/b60_benchmark_20260310_143322.log for baseline perf, and refer to logs_2nd_test/logs_optimization/b60_benchmark_20260310_150229.log for optimized perf. You do not need to run the perf again, I have verified the regression.",
+          "risk": "low",
+          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k <OP_NAME> -e ZES_ENABLE_SYSMAN=1, check ggml/include/ggml.h for op names"
+        }
+      ]
+    },
+    {
+      "task_id": "opt_task_070",
+      "type": "kernel_optimization",
+      "kernel_id": "sk_023",
+      "name": "pad_reflect_1d",
+      "source_file": "ggml/src/ggml-sycl/pad_reflect_1d.cpp",
+      "title": "Handle regression for PAD_REFLECT_1D",
+      "overall_optimization_potential": "medium",
+      "priority": 3,
+      "status": "pending",
+      "depends_on": [
+        "opt_task_002"
+      ],
+      "steps": [
+        {
+          "step_id": "opt_023_001",
+          "category": "regression",
+          "priority": "medium",
+          "description": "PAD_REFLECT_1D(type=f32,ne_a=[3000,384,1,1],pad_0=10,pad_1=9), PAD_REFLECT_1D(type=f32,ne_a=[3000,384,4,1],pad_0=10,pad_1=9), PAD_REFLECT_1D(type=f32,ne_a=[3000,80,1,1],pad_0=10,pad_1=9), PAD_REFLECT_1D(type=f32,ne_a=[3000,80,4,1],pad_0=10,pad_1=9): Regression 17.23% 17.33% 4.50% 6.10%. Refer to /localdisk/kurt/workspace/code/xpu/llama.cpp.orig/ggml/src/ggml-sycl/pad_reflect_1d.cpp for baseline implementation. Refer to logs_2nd_test/logs_origin/b60_benchmark_20260310_143322.log for baseline perf, and refer to logs_2nd_test/logs_optimization/b60_benchmark_20260310_150229.log for optimized perf. You do not need to run the perf again, I have verified the regression.",
+          "risk": "low",
+          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k <OP_NAME> -e ZES_ENABLE_SYSMAN=1, check ggml/include/ggml.h for op names"
+        }
+      ]
+    },
+    {
+      "task_id": "opt_task_071",
+      "type": "kernel_optimization",
+      "kernel_id": "sk_014",
+      "name": "repeat_back",
+      "source_file": "ggml/src/ggml-sycl/repeat_back.cpp",
+      "title": "Handle regression for REPEAT_BACK",
+      "overall_optimization_potential": "medium",
+      "priority": 3,
+      "status": "pending",
+      "depends_on": [
+        "opt_task_002"
+      ],
+      "steps": [
+        {
+          "step_id": "opt_014_001",
+          "category": "regression",
+          "priority": "medium",
+          "description": "REPEAT_BACK(type=f32,ne=[128,128,4,1],nr=[2,2,1,1],v=0), REPEAT_BACK(type=f32,ne=[4096,32,1,1],nr=[1,4,1,1],v=0), Regression: 14.34%~115.60%. block size WARP_SIZE vs 256 on baseline. Refer to logs_2nd_test/logs_origin/b60_benchmark_20260310_143322.log for baseline perf, and refer to logs_2nd_test/logs_optimization/b60_benchmark_20260310_150229.log for optimized perf. You do not need to run the perf again, I have verified the regression.",
+          "risk": "low",
+          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k <OP_NAME> -e ZES_ENABLE_SYSMAN=1, check ggml/include/ggml.h for op names"
+        }
+      ]
+    },
+    {
+      "task_id": "opt_task_072",
+      "type": "kernel_optimization",
+      "kernel_id": "sk_031",
+      "name": "roll",
+      "source_file": "ggml/src/ggml-sycl/roll.cpp",
+      "title": "Handle regression for ROLL",
+      "overall_optimization_potential": "medium",
+      "priority": 3,
+      "status": "pending",
+      "depends_on": [
+        "opt_task_002"
+      ],
+      "steps": [
+        {
+          "step_id": "opt_031_001",
+          "category": "regression",
+          "priority": "medium",
+          "description": "ROLL(shift0=0,shift1=0,shift3=0,shift4=0) 20.63%, Special case: all 0. Refer to logs_2nd_test/logs_origin/b60_benchmark_20260310_143322.log for baseline perf, and refer to logs_2nd_test/logs_optimization/b60_benchmark_20260310_150229.log for optimized perf. You do not need to run the perf again, I have verified the regression.",
+          "risk": "low",
+          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k <OP_NAME> -e ZES_ENABLE_SYSMAN=1, check ggml/include/ggml.h for op names"
+        }
+      ]
+    },
+    {
+      "task_id": "opt_task_073",
+      "type": "kernel_optimization",
+      "kernel_id": "sk_016",
+      "name": "rope",
+      "source_file": "ggml/src/ggml-sycl/rope.cpp",
+      "title": "Handle regression for ROPE",
+      "overall_optimization_potential": "medium",
+      "priority": 3,
+      "status": "pending",
+      "depends_on": [
+        "opt_task_002"
+      ],
+      "steps": [
+        {
+          "step_id": "opt_016_001",
+          "category": "regression",
+          "priority": "medium",
+          "description": "RoPE as significant regression. Refer to /localdisk/kurt/workspace/code/xpu/llama.cpp.orig/ggml/src/ggml-sycl/rope.cpp for baseline implementation. Refer to logs_2nd_test/logs_origin/b60_benchmark_20260310_143322.log for baseline perf, and refer to logs_2nd_test/logs_optimization/b60_benchmark_20260310_150229.log for optimized perf. You do not need to run the perf again, I have verified the regression.",
+          "risk": "low",
+          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k <OP_NAME> -e ZES_ENABLE_SYSMAN=1, check ggml/include/ggml.h for op names"
+        }
+      ]
+    },
+    {
+      "task_id": "opt_task_074",
+      "type": "kernel_optimization",
+      "kernel_id": "sk_028",
+      "name": "wkv",
+      "source_file": "ggml/src/ggml-sycl/wkv.cpp",
+      "title": "Handle regression for RWKV_WKV6 and RWKV_WKV7",
+      "overall_optimization_potential": "medium",
+      "priority": 3,
+      "status": "pending",
+      "depends_on": [
+        "opt_task_002"
+      ],
+      "steps": [
+        {
+          "step_id": "opt_028_001",
+          "category": "regression",
+          "priority": "medium",
+          "description": "RWKV_WKV6(type=f32,head_count=32,head_size=64,n_seq_tokens=32,n_seqs=4), RWKV_WKV6(type=f32,head_count=32,head_size=64,n_seq_tokens=512,n_seqs=1), RWKV_WKV7(type=f32,head_count=32,head_size=64,n_seq_tokens=32,n_seqs=4), RWKV_WKV7(type=f32,head_count=32,head_size=64,n_seq_tokens=512,n_seqs=1): Regression 2.52% 16.80% 5.20% 20.75%. Refer to /localdisk/kurt/workspace/code/xpu/llama.cpp.orig/ggml/src/ggml-sycl/wkv.cpp for baseline implementation. Refer to logs_2nd_test/logs_origin/b60_benchmark_20260310_143322.log for baseline perf, and refer to logs_2nd_test/logs_optimization/b60_benchmark_20260310_150229.log for optimized perf. You do not need to run the perf again, I have verified the regression.",
+          "risk": "low",
+          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k <OP_NAME> -e ZES_ENABLE_SYSMAN=1, check ggml/include/ggml.h for op names"
+        }
+      ]
+    },
+    {
+      "task_id": "opt_task_075",
+      "type": "kernel_optimization",
+      "kernel_id": "sk_015",
+      "name": "softmax",
+      "source_file": "ggml/src/ggml-sycl/softmax.cpp",
+      "title": "Handle regression for SOFT_MAX",
+      "overall_optimization_potential": "medium",
+      "priority": 3,
+      "status": "pending",
+      "depends_on": [
+        "opt_task_002"
+      ],
+      "steps": [
+        {
+          "step_id": "opt_015_001",
+          "category": "regression",
+          "priority": "medium",
+          "description": "SOFT_MAX has significant regression. Refer to /localdisk/kurt/workspace/code/xpu/llama.cpp.orig/ggml/src/ggml-sycl/softmax.cpp for baseline implementation. Refer to logs_2nd_test/logs_origin/b60_benchmark_20260310_143322.log for baseline perf, and refer to logs_2nd_test/logs_optimization/b60_benchmark_20260310_150229.log for optimized perf. You do not need to run the perf again, I have verified the regression. Also check GGML_OP_SOFT_MAX_BACK when refine the code.",
+          "risk": "low",
+          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k <OP_NAME> -e ZES_ENABLE_SYSMAN=1, check ggml/include/ggml.h for op names"
+        }
+      ]
+    },
+    {
+      "task_id": "opt_task_076",
+      "type": "kernel_optimization",
+      "kernel_id": "sk_030",
+      "name": "tsembd",
+      "source_file": "ggml/src/ggml-sycl/tsembd.cpp",
+      "title": "Handle regression for TIMESTEP_EMBEDDING",
+      "overall_optimization_potential": "medium",
+      "priority": 3,
+      "status": "pending",
+      "depends_on": [
+        "opt_task_002"
+      ],
+      "steps": [
+        {
+          "step_id": "opt_030_001",
+          "category": "regression",
+          "priority": "medium",
+          "description": "TIMESTEP_EMBEDDING(type=f32,ne_a=[1,1,1,1],dim=1280,max_period=10000), TIMESTEP_EMBEDDING(type=f32,ne_a=[256,1,1,1],dim=320,max_period=10000): regression 6.39% 3.80%. Refer to /localdisk/kurt/workspace/code/xpu/llama.cpp.orig/ggml/src/ggml-sycl/tsembd.cpp for baseline implementation. Refer to logs_2nd_test/logs_origin/b60_benchmark_20260310_143322.log for baseline perf, and refer to logs_2nd_test/logs_optimization/b60_benchmark_20260310_150229.log for optimized perf. You do not need to run the perf again, I have verified the regression. Also check GGML_OP_SOFT_MAX_BACK when refine the code.",
+          "risk": "low",
+          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k <OP_NAME> -e ZES_ENABLE_SYSMAN=1, check ggml/include/ggml.h for op names"
+        }
+      ]
+    },
+    {
+      "task_id": "opt_task_077",
+      "type": "kernel_optimization",
+      "kernel_id": "sk_052",
+      "name": "top_k (inline)",
+      "source_file": "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "title": "Handle regression for TOP_K",
+      "overall_optimization_potential": "medium",
+      "priority": 3,
+      "status": "pending",
+      "depends_on": [
+        "opt_task_002"
+      ],
+      "steps": [
+        {
+          "step_id": "opt_052_001",
+          "category": "regression",
+          "priority": "medium",
+          "description": "TOP_K(type=f32,ne=[1000,1,1,1],k=1,ties=0), TOP_K(type=f32,ne=[1000,16,1,1],k=1,ties=0), TOP_K(type=f32,ne=[200000,1,1,1],k=1,ties=0), TOP_K(type=f32,ne=[200000,16,1,1],k=1,ties=0), TOP_K(type=f32,ne=[200000,16,1,1],k=10,ties=0), TOP_K(type=f32,ne=[65000,1,1,1],k=1,ties=0), TOP_K(type=f32,ne=[65000,16,1,1],k=1,ties=0), TOP_K(type=f32,ne=[65000,16,1,1],k=10,ties=0): topk 1 cases and some topk 10 cases have regression. Refer to /localdisk/kurt/workspace/code/xpu/llama.cpp.orig/ggml/src/ggml-sycl/ggml-sycl.cpp::ggml_sycl_op_top_k for baseline implementation. Refer to logs_2nd_test/logs_origin/b60_benchmark_20260310_143322.log for baseline perf, and refer to logs_2nd_test/logs_optimization/b60_benchmark_20260310_150229.log for optimized perf. You do not need to run the perf again, I have verified the regression. Also check GGML_OP_SOFT_MAX_BACK when refine the code.",
+          "risk": "low",
+          "post_step_benchmark": "After implementing, run: ./syclgen/remote_run.sh -s b60 -t benchmark -k <OP_NAME> -e ZES_ENABLE_SYSMAN=1, check ggml/include/ggml.h for op names"
+        }
+      ]
     }
-
   ]
 }
