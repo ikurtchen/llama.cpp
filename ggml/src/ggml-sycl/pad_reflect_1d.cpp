@@ -38,6 +38,10 @@ void ggml_sycl_op_pad_reflect_1d(ggml_backend_sycl_context & ctx, ggml_tensor * 
     constexpr int64_t bx     = SYCL_PAD_REFLECT_1D_BLOCK_SIZE;
     const int64_t     tiles0 = (ne0 + bx - 1) / bx;
 
+    // Precompute fast division constants for tiles0 to avoid expensive
+    // integer division/modulo in the kernel (critical for non-power-of-2 divisors).
+    const sycl::uint3 tiles0_packed = init_fastdiv_values((uint32_t) tiles0);
+
     // grid: dim0=i3(ne03), dim1=i2(ne02), dim2=combined i1*tiles0 (with local size bx)
     sycl::range<3> global_range(ne03, ne02, ne01 * tiles0 * bx);
     sycl::range<3> local_range(1, 1, bx);
@@ -53,9 +57,10 @@ void ggml_sycl_op_pad_reflect_1d(ggml_backend_sycl_context & ctx, ggml_tensor * 
             const int64_t i3 = item.get_group(0);
             const int64_t i2 = item.get_group(1);
 
-            const int64_t group_x = item.get_group(2);
-            const int64_t i1      = group_x / tiles0;
-            const int64_t tile0   = group_x % tiles0;
+            const uint32_t        group_x    = (uint32_t) item.get_group(2);
+            const sycl::uint2     div_mod    = fast_div_modulo(group_x, tiles0_packed);
+            const int64_t         i1         = div_mod.x();
+            const int64_t         tile0      = div_mod.y();
             const int64_t i0      = item.get_local_id(2) + tile0 * bx;
 
             if (i0 >= ne0) {
