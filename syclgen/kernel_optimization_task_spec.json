@@ -3181,7 +3181,7 @@
       "title": "Handle regression for RWKV_WKV6 and RWKV_WKV7",
       "overall_optimization_potential": "medium",
       "priority": 3,
-      "status": "pending",
+      "status": "completed",
       "depends_on": [
         "opt_task_002"
       ],
