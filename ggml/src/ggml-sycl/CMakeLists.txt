@@ -148,6 +148,11 @@ if (GGML_SYCL_GRAPH)
     target_compile_definitions(ggml-sycl PRIVATE GGML_SYCL_GRAPH)
 endif()
 
+if (GGML_SYCL_PROFILING)
+    target_compile_definitions(ggml-sycl PRIVATE GGML_SYCL_PROFILING DPCT_PROFILING_ENABLED)
+    message(STATUS "SYCL profiling enabled - Chrome trace will be written to sycl_trace.json")
+endif()
+
 # Link against oneDPL for radix sort (argsort/top_k with large ncols)
 find_package(oneDPL QUIET)
 if (oneDPL_FOUND)

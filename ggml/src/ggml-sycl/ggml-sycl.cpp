@@ -91,6 +91,196 @@ int g_ggml_sycl_disable_dnn = 0;
 int g_ggml_sycl_prioritize_dmmv = 0;
 int g_ggml_sycl_use_async_mem_op = 0;
 
+#ifdef GGML_SYCL_PROFILING
+#include <atomic>
+
+// Format source tensor shapes as a JSON fragment: , "src0": {"type":"f16","ne":[...]}, ...
+static std::string format_src_shapes_json(const ggml_sycl_profiling_info & info) {
+    std::string result;
+    for (int s = 0; s < info.n_src; s++) {
+        if (info.src[s].type == GGML_TYPE_COUNT) continue; // null source (gap)
+        char buf[256];
+        snprintf(buf, sizeof(buf),
+            ", \"src%d\": {\"type\": \"%s\", \"ne\": [%" PRId64 ", %" PRId64 ", %" PRId64 ", %" PRId64 "]}",
+            s, ggml_type_name(info.src[s].type),
+            info.src[s].ne[0], info.src[s].ne[1], info.src[s].ne[2], info.src[s].ne[3]);
+        result += buf;
+    }
+    return result;
+}
+
+void ggml_backend_sycl_context::write_profiling_info() {
+    if (profiling_info.empty()) {
+        return;
+    }
+
+    // Wait for all device events and extract device timestamps
+    // We use two barriers to bracket each op:
+    //   pre_event.command_end    = when all prior work finished (device became ready)
+    //   post_event.command_start = when post-barrier begins (= kernel finished)
+    // Note: pre_event.command_end can be BEFORE the host dispatches the kernel
+    // (device was idle waiting for host), so we clamp during output.
+    for (auto & info : profiling_info) {
+        try {
+            info.post_event.wait();
+            info.device_start_ns = info.pre_event.get_profiling_info<sycl::info::event_profiling::command_end>();
+            info.device_end_ns   = info.post_event.get_profiling_info<sycl::info::event_profiling::command_start>();
+        } catch (sycl::exception const& e) {
+            GGML_LOG_WARN("ggml-sycl: profiling query failed for op %s: %s\n",
+                          info.op_name.c_str(), e.what());
+            info.device_start_ns = 0;
+            info.device_end_ns   = 0;
+        }
+    }
+
+    // --- Write Chrome Trace JSON ---
+    // Use a static counter so each backend instance writes a unique file
+    // (llama-bench creates separate contexts for pp and tg tests)
+    static std::atomic<int> trace_counter{0};
+    int trace_id = trace_counter.fetch_add(1);
+
+    char trace_filename[64];
+    snprintf(trace_filename, sizeof(trace_filename), "sycl_trace_%d.json", trace_id);
+    FILE * ftrace = fopen(trace_filename, "w");
+    if (!ftrace) {
+        GGML_LOG_ERROR("ggml-sycl: failed to open %s for writing\n", trace_filename);
+        return;
+    }
+
+    // Find the earliest host timestamp to use as the base (so trace starts near 0)
+    uint64_t host_base_ns = profiling_info[0].host_start_ns;
+    for (const auto & info : profiling_info) {
+        if (info.host_start_ns < host_base_ns) {
+            host_base_ns = info.host_start_ns;
+        }
+    }
+
+    // Use "ts" in microseconds as Chrome trace expects
+    fprintf(ftrace, "{\n\"traceEvents\": [\n");
+
+    bool first = true;
+    for (const auto & info : profiling_info) {
+        // Host event: duration from host_start to host_end (dispatch overhead)
+        double host_start_us = (double)(info.host_start_ns - host_base_ns) / 1000.0;
+        double host_dur_us   = (double)(info.host_end_ns - info.host_start_ns) / 1000.0;
+        double host_end_us   = host_start_us + host_dur_us;
+
+        if (!first) fprintf(ftrace, ",\n");
+        first = false;
+
+        // Use tensor_name if non-empty, otherwise op_name
+        const char * label = info.tensor_name.empty() ? info.op_name.c_str() : info.tensor_name.c_str();
+
+        // Host track — shows dispatch time on CPU
+        fprintf(ftrace,
+            "{\"name\": \"%s [%s]\", \"cat\": \"Host\", \"ph\": \"X\", "
+            "\"ts\": %.3f, \"dur\": %.3f, "
+            "\"pid\": \"SYCL Device %d\", \"tid\": \"Host\"",
+            label, info.op_name.c_str(),
+            host_start_us, host_dur_us,
+            device);
+
+        // Add op details as args
+        std::string src_json = format_src_shapes_json(info);
+        fprintf(ftrace, ", \"args\": {\"op\": \"%s\", \"tensor\": \"%s\", \"graph_node\": %d"
+            ", \"type\": \"%s\""
+            ", \"ne\": [%" PRId64 ", %" PRId64 ", %" PRId64 ", %" PRId64 "]"
+            ", \"nb\": [%zu, %zu, %zu, %zu]"
+            "%s}",
+            info.op_name.c_str(), info.tensor_name.c_str(), info.graph_node_index,
+            ggml_type_name(info.type),
+            info.ne[0], info.ne[1], info.ne[2], info.ne[3],
+            info.nb[0], info.nb[1], info.nb[2], info.nb[3],
+            src_json.c_str());
+        fprintf(ftrace, "}");
+
+        // Device track — shows actual GPU execution
+        // Device duration is accurate (from device clock, self-consistent).
+        // Absolute placement uses per-op anchoring to avoid clock-drift:
+        //   device bar starts at host_end (host finished dispatch = earliest device can begin)
+        //   device bar duration = raw device duration from profiling events
+        if (info.device_start_ns > 0 && info.device_end_ns > info.device_start_ns) {
+            double dev_dur_us   = (double)(info.device_end_ns - info.device_start_ns) / 1000.0;
+            double dev_start_us = host_end_us;  // device starts after host dispatch completes
+
+            fprintf(ftrace, ",\n"
+                "{\"name\": \"%s [%s]\", \"cat\": \"Device\", \"ph\": \"X\", "
+                "\"ts\": %.3f, \"dur\": %.3f, "
+                "\"pid\": \"SYCL Device %d\", \"tid\": \"Device\""
+                ", \"args\": {\"op\": \"%s\", \"tensor\": \"%s\", \"graph_node\": %d"
+                ", \"type\": \"%s\""
+                ", \"ne\": [%" PRId64 ", %" PRId64 ", %" PRId64 ", %" PRId64 "]"
+                ", \"nb\": [%zu, %zu, %zu, %zu]"
+                "%s"
+                ", \"device_raw_start_ns\": %" PRIu64 ", \"device_raw_end_ns\": %" PRIu64 "}"
+                "}",
+                label, info.op_name.c_str(),
+                dev_start_us, dev_dur_us,
+                device,
+                info.op_name.c_str(), info.tensor_name.c_str(), info.graph_node_index,
+                ggml_type_name(info.type),
+                info.ne[0], info.ne[1], info.ne[2], info.ne[3],
+                info.nb[0], info.nb[1], info.nb[2], info.nb[3],
+                src_json.c_str(),
+                info.device_start_ns, info.device_end_ns);
+        }
+    }
+
+    fprintf(ftrace, "\n],\n");
+    fprintf(ftrace, "\"displayTimeUnit\": \"us\"\n");
+    fprintf(ftrace, "}\n");
+    fclose(ftrace);
+
+    // --- Write CSV summary ---
+    char csv_filename[64];
+    snprintf(csv_filename, sizeof(csv_filename), "sycl_profiling_%d.csv", trace_id);
+    FILE * fcsv = fopen(csv_filename, "w");
+    if (!fcsv) {
+        GGML_LOG_ERROR("ggml-sycl: failed to open %s for writing\n", csv_filename);
+    } else {
+        fprintf(fcsv, "graph_node,op,tensor,type,ne0,ne1,ne2,ne3,nb0,nb1,nb2,nb3,"
+                      "n_src,src0_type,src0_ne0,src0_ne1,src0_ne2,src0_ne3,"
+                      "src1_type,src1_ne0,src1_ne1,src1_ne2,src1_ne3,"
+                      "host_dispatch_us,device_exec_us\n");
+        for (const auto & info : profiling_info) {
+            double host_us   = (double)(info.host_end_ns - info.host_start_ns) / 1000.0;
+            double device_us = 0.0;
+            if (info.device_end_ns > info.device_start_ns) {
+                device_us = (double)(info.device_end_ns - info.device_start_ns) / 1000.0;
+            }
+            // Output tensor shape
+            fprintf(fcsv, "%d,%s,%s,%s,%" PRId64 ",%" PRId64 ",%" PRId64 ",%" PRId64 ",%zu,%zu,%zu,%zu,%d,",
+                info.graph_node_index, info.op_name.c_str(), info.tensor_name.c_str(),
+                ggml_type_name(info.type),
+                info.ne[0], info.ne[1], info.ne[2], info.ne[3],
+                info.nb[0], info.nb[1], info.nb[2], info.nb[3],
+                info.n_src);
+            // src0
+            if (info.n_src > 0 && info.src[0].type != GGML_TYPE_COUNT) {
+                fprintf(fcsv, "%s,%" PRId64 ",%" PRId64 ",%" PRId64 ",%" PRId64 ",",
+                    ggml_type_name(info.src[0].type),
+                    info.src[0].ne[0], info.src[0].ne[1], info.src[0].ne[2], info.src[0].ne[3]);
+            } else {
+                fprintf(fcsv, ",,,,,");
+            }
+            // src1
+            if (info.n_src > 1 && info.src[1].type != GGML_TYPE_COUNT) {
+                fprintf(fcsv, "%s,%" PRId64 ",%" PRId64 ",%" PRId64 ",%" PRId64 ",",
+                    ggml_type_name(info.src[1].type),
+                    info.src[1].ne[0], info.src[1].ne[1], info.src[1].ne[2], info.src[1].ne[3]);
+            } else {
+                fprintf(fcsv, ",,,,,");
+            }
+            fprintf(fcsv, "%.3f,%.3f\n", host_us, device_us);
+        }
+        fclose(fcsv);
+    }
+
+    GGML_LOG_INFO("ggml-sycl: profiling data written to %s and %s (%zu ops across %d graph computes)\n",
+                  trace_filename, csv_filename, profiling_info.size(), profiling_graph_count);
+}
+#endif
+
 static ggml_sycl_device_info ggml_sycl_init() {
     ggml_sycl_device_info info = {};
 
@@ -4689,6 +4879,10 @@ static const char * ggml_backend_sycl_get_name(ggml_backend_t backend) {
 static void ggml_backend_sycl_free(ggml_backend_t backend) {
     ggml_backend_sycl_context * sycl_ctx = (ggml_backend_sycl_context *)backend->context;
 
+#ifdef GGML_SYCL_PROFILING
+    sycl_ctx->write_profiling_info();
+#endif
+
     delete sycl_ctx;
     delete backend;
 }
@@ -4782,6 +4976,10 @@ catch (sycl::exception const &exc) {
 static void ggml_backend_sycl_graph_compute_impl(ggml_backend_sycl_context * sycl_ctx, ggml_cgraph * cgraph) {
     ggml_sycl_set_main_device(sycl_ctx->device);
 
+#ifdef GGML_SYCL_PROFILING
+    sycl_ctx->profiling_graph_count++;
+#endif
+
     for (int i = 0; i < cgraph->n_nodes; i++) {
         ggml_tensor * node = cgraph->nodes[i];
         if (ggml_is_empty(node) || node->op == GGML_OP_RESHAPE || node->op == GGML_OP_TRANSPOSE || node->op == GGML_OP_VIEW || node->op == GGML_OP_PERMUTE || node->op == GGML_OP_NONE) {
@@ -4798,7 +4996,54 @@ static void ggml_backend_sycl_graph_compute_impl(ggml_backend_sycl_context * syc
             }
         }
 #endif
+
+#ifdef GGML_SYCL_PROFILING
+        // Submit a barrier BEFORE the op to mark device start time
+        const queue_ptr stream = sycl_ctx->stream(sycl_ctx->device, 0);
+        sycl::event pre_evt = stream->ext_oneapi_submit_barrier();
+        const auto host_start = std::chrono::steady_clock::now();
+#endif
+
         bool ok = ggml_sycl_compute_forward(*sycl_ctx, node);
+
+#ifdef GGML_SYCL_PROFILING
+        // Submit a barrier AFTER the op to mark device end time
+        sycl::event post_evt = stream->ext_oneapi_submit_barrier();
+        const auto host_end = std::chrono::steady_clock::now();
+
+        ggml_sycl_profiling_info info;
+        info.op_name          = ggml_op_name(node->op);
+        info.tensor_name      = node->name;
+        info.graph_node_index = i;
+        for (int d = 0; d < GGML_MAX_DIMS; d++) {
+            info.ne[d] = node->ne[d];
+            info.nb[d] = node->nb[d];
+        }
+        info.type             = node->type;
+        info.n_src            = 0;
+        for (int s = 0; s < GGML_MAX_SRC; s++) {
+            if (node->src[s] != nullptr) {
+                info.src[s].type = node->src[s]->type;
+                for (int d = 0; d < GGML_MAX_DIMS; d++) {
+                    info.src[s].ne[d] = node->src[s]->ne[d];
+                }
+                info.n_src = s + 1;
+            } else {
+                info.src[s].type = GGML_TYPE_COUNT;
+                for (int d = 0; d < GGML_MAX_DIMS; d++) {
+                    info.src[s].ne[d] = 0;
+                }
+            }
+        }
+        info.host_start_ns    = std::chrono::duration_cast<std::chrono::nanoseconds>(host_start.time_since_epoch()).count();
+        info.host_end_ns      = std::chrono::duration_cast<std::chrono::nanoseconds>(host_end.time_since_epoch()).count();
+        info.pre_event        = pre_evt;
+        info.post_event       = post_evt;
+        info.device_start_ns  = 0;
+        info.device_end_ns    = 0;
+        sycl_ctx->profiling_info.push_back(std::move(info));
+#endif
+
         if (!ok) {
             GGML_LOG_ERROR("%s: error: op not supported %s (%s)\n", __func__, node->name, ggml_op_name(node->op));
         }

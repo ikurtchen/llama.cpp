@@ -288,6 +288,45 @@ struct ggml_tensor_extra_gpu {
 
 void release_extra_gpu(ggml_tensor_extra_gpu * extra, std::vector<queue_ptr> streams={});
 
+#ifdef GGML_SYCL_PROFILING
+#include <chrono>
+#include <cinttypes>
+
+struct ggml_sycl_profiling_src_info {
+    enum ggml_type type;
+    int64_t ne[GGML_MAX_DIMS];
+};
+
+struct ggml_sycl_profiling_info {
+    std::string op_name;       // ggml op name (e.g. "MUL_MAT")
+    std::string tensor_name;   // tensor name (e.g. "blk.0.attn_q")
+    int         graph_node_index; // node index in the compute graph
+
+    // Output tensor shape info
+    int64_t ne[GGML_MAX_DIMS]; // number of elements per dimension
+    size_t  nb[GGML_MAX_DIMS]; // stride in bytes per dimension
+    enum ggml_type type;       // element type (e.g. GGML_TYPE_F16)
+
+    // Source tensor shapes (up to GGML_MAX_SRC)
+    int n_src;                              // number of non-null source tensors
+    ggml_sycl_profiling_src_info src[GGML_MAX_SRC];
+
+    // Host-side timestamps (nanoseconds, steady_clock)
+    uint64_t host_start_ns;    // before dispatching to device
+    uint64_t host_end_ns;      // after dispatch returns (before sync)
+
+    // Device-side barrier events — bracket the kernel(s) for this op
+    // pre_event: barrier submitted BEFORE the op (its command_end = device start)
+    // post_event: barrier submitted AFTER the op (its command_end = device end)
+    sycl::event pre_event;
+    sycl::event post_event;
+
+    // Device timestamps filled during write (nanoseconds)
+    uint64_t device_start_ns;
+    uint64_t device_end_ns;
+};
+#endif
+
 namespace sycl_ex = sycl::ext::oneapi::experimental;
 struct ggml_backend_sycl_context {
     int device;
@@ -410,6 +449,13 @@ struct ggml_backend_sycl_context {
     }
 
     ggml_sycl_pool & host_pool() { return host_pool(device); }
+
+#ifdef GGML_SYCL_PROFILING
+    std::vector<ggml_sycl_profiling_info> profiling_info;
+    int profiling_graph_count = 0;
+
+    void write_profiling_info();
+#endif
 };
 
 // common device functions
