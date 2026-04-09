@@ -90,6 +90,7 @@ int g_ggml_sycl_disable_graph = 0;
 int g_ggml_sycl_disable_dnn = 0;
 int g_ggml_sycl_prioritize_dmmv = 0;
 int g_ggml_sycl_use_async_mem_op = 0;
+int g_ggml_sycl_dnnl_direct_q8_0 = 0;
 
 #ifdef GGML_SYCL_PROFILING
 #include <atomic>
@@ -429,6 +430,7 @@ static void ggml_check_sycl() try {
         g_ggml_sycl_disable_graph = get_sycl_env("GGML_SYCL_DISABLE_GRAPH", 1);
         g_ggml_sycl_disable_dnn = get_sycl_env("GGML_SYCL_DISABLE_DNN", 0);
         g_ggml_sycl_prioritize_dmmv = get_sycl_env("GGML_SYCL_PRIORITIZE_DMMV", 0);
+        g_ggml_sycl_dnnl_direct_q8_0 = get_sycl_env("GGML_SYCL_DNNL_DIRECT_Q8_0", 0);
         GGML_SYCL_DEBUG("[SYCL] call ggml_check_sycl\n");
         GGML_LOG_INFO("Running with Environment Variables:\n");
         GGML_LOG_INFO("  GGML_SYCL_DEBUG: %d\n", g_ggml_sycl_debug);
@@ -444,6 +446,9 @@ static void ggml_check_sycl() try {
         GGML_LOG_INFO("  GGML_SYCL_DISABLE_DNN: DNN disabled by compile flag\n");
 #endif
         GGML_LOG_INFO("  GGML_SYCL_PRIORITIZE_DMMV: %d\n", g_ggml_sycl_prioritize_dmmv);
+#if GGML_SYCL_DNNL
+        GGML_LOG_INFO("  GGML_SYCL_DNNL_DIRECT_Q8_0: %d\n", g_ggml_sycl_dnnl_direct_q8_0);
+#endif
         GGML_LOG_INFO("Build with Macros:\n");
 #if defined(GGML_SYCL_FORCE_MMQ)
         GGML_LOG_INFO("  GGML_SYCL_FORCE_MMQ: yes\n");
@@ -3042,6 +3047,111 @@ static bool can_use_mul_mat_vec_q(const ggml_tensor * src0, const ggml_tensor * 
            src1->ne[1] <= MMVQ_MAX_BATCH_SIZE;
 }
 
+#if GGML_SYCL_DNNL
+// Direct oneDNN path for Q8_0 prefill: Q8_0 -> FP16, FP32 -> FP16, then oneDNN matmul FP16xFP16->FP32
+// Bypasses the ggml_sycl_op_mul_mat template wrapper for simpler/direct control.
+// Enabled by GGML_SYCL_DNNL_DIRECT_Q8_0=1 environment variable.
+static void ggml_sycl_mul_mat_dnnl_direct_q8_0(
+        ggml_backend_sycl_context & ctx,
+        const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) try {
+
+    GGML_ASSERT(src0->type == GGML_TYPE_Q8_0);
+    GGML_ASSERT(src1->type == GGML_TYPE_F32);
+    GGML_ASSERT(dst->type  == GGML_TYPE_F32);
+    GGML_ASSERT(ggml_is_contiguous(src0));
+    GGML_ASSERT(ggml_is_contiguous(src1));
+
+    const int64_t ne00 = src0->ne[0]; // K (inner dim)
+    const int64_t ne01 = src0->ne[1]; // M (rows of weight, output rows)
+    const int64_t ne10 = src1->ne[0]; // K
+    const int64_t ne11 = src1->ne[1]; // N (number of tokens / columns)
+
+    GGML_ASSERT(ne00 == ne10);
+
+    const int64_t M = ne01;
+    const int64_t N = ne11;
+    const int64_t K = ne00;
+
+    queue_ptr stream = ctx.stream();
+
+    GGML_SYCL_DEBUG("[SYCL][OP] call %s: M=%ld N=%ld K=%ld\n", __func__, (long)M, (long)N, (long)K);
+
+    // Step 1: Dequantize Q8_0 weights to FP16
+    ggml_sycl_pool_alloc<sycl::half> src0_f16(ctx.pool(), M * K);
+    {
+        const to_fp16_sycl_t to_fp16 = ggml_get_to_fp16_sycl(GGML_TYPE_Q8_0, dst);
+        GGML_ASSERT(to_fp16 != nullptr);
+        to_fp16((const char *)src0->data, src0_f16.get(), M * K, stream);
+    }
+
+    // Step 2: Convert FP32 activations to FP16
+    ggml_sycl_pool_alloc<sycl::half> src1_f16(ctx.pool(), N * K);
+    {
+        const to_fp16_sycl_t to_fp16 = ggml_get_to_fp16_sycl(GGML_TYPE_F32, dst);
+        GGML_ASSERT(to_fp16 != nullptr);
+        to_fp16((const char *)src1->data, src1_f16.get(), N * K, stream);
+    }
+
+    // Step 3: oneDNN matmul  FP16 x FP16 -> FP32
+    // src0 is weight [K, M] stored row-major (ne0=K, ne1=M), we need to transpose to get [M, K]
+    // src1 is activation [K, N] stored row-major
+    // dst is [M, N]
+    //
+    // oneDNN matmul: C(M,N) = A(M,K) x B(K,N)
+    //   A = src0 transposed: logical [M, K], physical [K, M] with strides [1, K]  (column-major view)
+    //   B = src1:            logical [K, N], physical [K, N] with strides [N, 1]   (row-major)
+    //   C = dst:             logical [M, N], physical col-major strides [1, M]
+
+    auto eng    = ctx.engine_dnnl(stream);
+    auto strm   = ctx.stream_dnnl(stream);
+
+    using dt  = dnnl::memory::data_type;
+    using tag = dnnl::memory::format_tag;
+
+    // A(M,K) = src0_f16 transposed: data is [M][K] in row-major after dequant
+    // Actually, dequant produces linear M*K elements in src0's storage order.
+    // src0 layout: ne0=K, ne1=M => elements are stored as M rows of K elements => row-major [M, K]
+    // So A_md: dims={M, K}, strides={K, 1} (row-major)
+    const auto a_md = dnnl::memory::desc({M, K}, dt::f16, {K, 1});
+
+    // B(K,N) = src1_f16: ne0=K, ne1=N => row-major [N, K] transposed = [K, N] col-major
+    // Actually src1 layout: ne0=K, ne1=N => stored as N rows of K => need it as [K, N]
+    // So B is [K, N] with data laid out as [N][K] => strides={1, K}
+    const auto b_md = dnnl::memory::desc({K, N}, dt::f16, {1, K});
+
+    // C(M,N) = dst: ne0=M, ne1=N => stored as N rows of M => column-major [M, N] with strides={1, M}
+    const auto c_md = dnnl::memory::desc({M, N}, dt::f32, {1, M});
+
+    dnnl::primitive_attr attr;
+    attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+    attr.set_fpmath_mode(dnnl::fpmath_mode::f16);
+
+    auto matmul_pd = dnnl::matmul::primitive_desc(eng, a_md, b_md, c_md, attr);
+
+    auto a_mem = dnnl::memory(a_md, eng, src0_f16.get());
+    auto b_mem = dnnl::memory(b_md, eng, src1_f16.get());
+    auto c_mem = dnnl::memory(matmul_pd.dst_desc(), eng, dst->data);
+
+    auto scratchpad_mem = ctx.get_scratchpad_mem(matmul_pd.scratchpad_desc(), eng, stream);
+
+    auto matmul_prim = dnnl::matmul(matmul_pd);
+
+    matmul_prim.execute(strm, {
+        {DNNL_ARG_SRC,        a_mem},
+        {DNNL_ARG_WEIGHTS,    b_mem},
+        {DNNL_ARG_DST,        c_mem},
+        {DNNL_ARG_SCRATCHPAD, scratchpad_mem},
+    });
+
+    GGML_SYCL_DEBUG("[SYCL][OP] call %s done\n", __func__);
+}
+catch (sycl::exception const &exc) {
+    std::cerr << exc.what() << "Exception caught at file:" << __FILE__
+              << ", line:" << __LINE__ << std::endl;
+    std::exit(1);
+}
+#endif // GGML_SYCL_DNNL
+
 static void ggml_sycl_mul_mat(ggml_backend_sycl_context & ctx, const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
     scope_op_debug_print scope_dbg_print(__func__, dst, /*num_src=*/2);
     const bool split = ggml_backend_buffer_is_sycl_split(src0->buffer);
@@ -3105,6 +3215,19 @@ static void ggml_sycl_mul_mat(ggml_backend_sycl_context & ctx, const ggml_tensor
     } else if (!split && src0->type == GGML_TYPE_F16 && !ggml_is_transposed(src0) && !ggml_is_transposed(src1) && src1->ne[2] * src1->ne[3] > 1) {
         // KQ + KQV multi-batch
         ggml_sycl_mul_mat_batched_sycl(ctx, src0, src1, dst);
+#if GGML_SYCL_DNNL
+    } else if (g_ggml_sycl_dnnl_direct_q8_0 && !split
+               && src0->type == GGML_TYPE_Q8_0
+               && src1->type == GGML_TYPE_F32
+               && dst->type  == GGML_TYPE_F32
+               && src1->ne[1] > 1
+               && src0->ne[2] == 1 && src0->ne[3] == 1
+               && src1->ne[2] == 1 && src1->ne[3] == 1
+               && ggml_is_contiguous(src0)
+               && ggml_is_contiguous(src1)) {
+        // Direct oneDNN path for Q8_0 prefill (experimental, 2D only)
+        ggml_sycl_mul_mat_dnnl_direct_q8_0(ctx, src0, src1, dst);
+#endif
     } else if (use_dequantize_mul_mat_vec) {
         opt_for_reorder(&ctx, src0, src1, dst, mul_mat_algo::DMMV);
         ggml_sycl_op_mul_mat<no_quantize_q8_1>(ctx, src0, src1, dst, ggml_sycl_op_dequantize_mul_mat_vec);
