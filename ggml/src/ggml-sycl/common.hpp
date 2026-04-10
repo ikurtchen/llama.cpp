@@ -601,6 +601,9 @@ static T block_reduce(T val, T * shared_vals, const ItemT & item) {
 
     if (block_size > WARP_SIZE) {
         assert((block_size <= 1024) && (block_size % WARP_SIZE) == 0);
+        // The inter-warp pass reads num_warps partials into a single warp,
+        // so num_warps must fit within one warp (i.e. block_size <= WARP_SIZE^2).
+        assert(block_size / WARP_SIZE <= WARP_SIZE);
 
         const int local_id = static_cast<int>(item.get_local_id(0));
         const int warp_id  = local_id / WARP_SIZE;
