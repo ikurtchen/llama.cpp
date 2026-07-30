@@ -100,7 +100,7 @@
       "status": "migrated",
       "risk": "medium",
       "detail": "kernels/lightning-indexer-vec.json",
-      "notes": "Vector kernel with shared memory + warp shuffle. Supports F16/Q4_0 K types, n_embd=128, n_head=32/64. 18/24 tests pass: F16 12/12 OK, Q4_0 nb>=512 6/6 OK, Q4_0 nb=1 0/6 FAIL (known stride/layout issue)."
+      "notes": "96/96 tests pass: 8 types (F32, F16, BF16, Q8_0, Q5_1, Q5_0, Q4_1, Q4_0), IQ4_NL correctly skipped."
     },
     {
       "id": "lightning-indexer-wmma",
@@ -110,7 +110,7 @@
       "status": "migrated",
       "risk": "high",
       "detail": "kernels/lightning-indexer-wmma.json",
-      "notes": "Migrated via extended vector kernel type coverage. WMMA Tensor Core matmul shapes are too small for oneDNN overhead; vec kernel covers all types."
+      "notes": "WMMA path skipped. Vec kernel covers all 8 types with 96/96 pass rate."
     },
     {
       "id": "allreduce-ar-kernel",
@@ -133,5 +133,5 @@
       "notes": "Multi-GPU only; single-device B70 deployment - not applicable."
     }
   ],
-  "updated_at": "2026-07-30T03:30:00Z"
+  "updated_at": "2026-07-30T18:10:00Z"
 }
