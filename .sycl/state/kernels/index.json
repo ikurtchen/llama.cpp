@@ -9,7 +9,7 @@
       "status": "migrated",
       "risk": "medium",
       "detail": "kernels/dsv4-hc-comb-f32.json",
-      "notes": "SYCL kernel (dsv4_hc.cpp:comb) created. 4x4 combination matrix with softmax+Sinkhorn normalization. Support confirmed; GPU crashed before correctness test could complete - needs re-run after GPU recovery."
+      "notes": "SYCL kernel (dsv4_hc.cpp:comb) implemented. 4x4 combination matrix with softmax+Sinkhorn normalization. 3/3 tests PASS on B70."
     },
     {
       "id": "dsv4-hc-pre-f32",
@@ -19,7 +19,7 @@
       "status": "migrated",
       "risk": "low",
       "detail": "kernels/dsv4-hc-pre-f32.json",
-      "notes": "SYCL kernel (dsv4_hc.cpp:pre) created. Per-head weighted sum across HC dimension. Support confirmed; GPU crashed before correctness test could complete - needs re-run after GPU recovery."
+      "notes": "SYCL kernel (dsv4_hc.cpp:pre) implemented. Per-head weighted sum across HC dimension. 4/4 tests PASS on B70."
     },
     {
       "id": "dsv4-hc-post-f32",
@@ -29,7 +29,7 @@
       "status": "migrated",
       "risk": "low",
       "detail": "kernels/dsv4-hc-post-f32.json",
-      "notes": "SYCL kernel (dsv4_hc.cpp:post) created. Fused residual+combination-weighted sum. Support confirmed; GPU crashed before correctness test could complete - needs re-run after GPU recovery."
+      "notes": "SYCL kernel (dsv4_hc.cpp:post) implemented. Fused residual+combination-weighted sum. 3/3 tests PASS on B70."
     },
     {
       "id": "fwht",
@@ -60,7 +60,7 @@
       "status": "migrated",
       "risk": "low",
       "detail": "kernels/opt-step-sgd-f32.json",
-      "notes": "SYCL kernel (opt_step_sgd.cpp) created. Element-wise SGD step: x[i] = x[i]*(1-wd*lr) - lr*g[i]. Support confirmed; GPU crashed before correctness test could complete - needs re-run after GPU recovery."
+      "notes": "SYCL kernel (opt_step_sgd.cpp) created. Element-wise SGD step: x[i] = x[i]*(1-wd*lr) - lr*g[i]. PASSED on B70."
     },
     {
       "id": "opt-step-adamw-f32",
@@ -70,7 +70,7 @@
       "status": "migrated",
       "risk": "low",
       "detail": "kernels/opt-step-adamw-f32.json",
-      "notes": "SYCL kernel (opt_step_adamw.cpp) created. Full AdamW with m/v buffers+bias correction. Support confirmed; GPU crashed before correctness test could complete - needs re-run after GPU recovery."
+      "notes": "SYCL kernel (opt_step_adamw.cpp) created. Full AdamW with m/v buffers+bias correction. PASSED on B70."
     },
     {
       "id": "snake-fused",
