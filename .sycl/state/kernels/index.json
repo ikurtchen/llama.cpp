@@ -93,6 +93,16 @@
       "notes": "NOT a standalone GGML_OP. SOFTCAP is a fusion of SCALE+TANH+SCALE handled individually in SYCL backend. Fused kernel (softcap.cpp) created for future fusion optimization."
     },
     {
+      "id": "lightning-indexer-vec",
+      "source": "ggml/src/ggml-cuda/lightning-indexer.cu:244",
+      "source_lang": "cuda",
+      "target_style": "plain-sycl",
+      "status": "migrated",
+      "risk": "medium",
+      "detail": "kernels/lightning-indexer-vec.json",
+      "notes": "SYCL kernel (lightning_indexer.cpp) created. Vector fallback with shared memory + warp shuffle. Handles F32/F16 K types, supports n_embd=128 n_head=32/64. Compiles but GPU testing blocked by hardware failure."
+    },
+    {
       "id": "lightning-indexer-wmma",
       "source": "ggml/src/ggml-cuda/lightning-indexer.cu:19",
       "source_lang": "cuda",
@@ -100,17 +110,7 @@
       "status": "pending",
       "risk": "high",
       "detail": "kernels/lightning-indexer-wmma.json",
-      "notes": "[was: Model-specific (lightning-attention). Requires sycl::joint_matrix which is compl]"
-    },
-    {
-      "id": "lightning-indexer-vec",
-      "source": "ggml/src/ggml-cuda/lightning-indexer.cu:244",
-      "source_lang": "cuda",
-      "target_style": "plain-sycl",
-      "status": "pending",
-      "risk": "medium",
-      "detail": "kernels/lightning-indexer-vec.json",
-      "notes": "[was: Model-specific (lightning-attention fallback). Only needed if lightning-indexer-]"
+      "notes": "WMMA kernel stub in lightning_indexer.cpp. Full oneDNN-based Q*K^T matmul implementation pending. Currently falls through to vec kernel."
     },
     {
       "id": "allreduce-ar-kernel",
