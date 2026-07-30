@@ -12,25 +12,17 @@ static inline void dequantize_k_vec_4(const void * k_base, sycl::float4 * dst, i
         constexpr int QK = QK4_0;
         const block_q4_0 * x = (const block_q4_0 *) k_base;
 
-        const int ib   = i0 / QK;
-        const int iqs  = i0 % (QK / 2);
-        const int shift = (i0 % QK) / (QK / 2);
+        const int ib  = i0 / QK;
+        const int iqs = i0 % (QK / 2);
 
-        unsigned int q;
-        q =  (unsigned int)x[ib].qs[iqs]
-          | ((unsigned int)x[ib].qs[iqs + 1] << 8)
-          | ((unsigned int)x[ib].qs[iqs + 2] << 16)
-          | ((unsigned int)x[ib].qs[iqs + 3] << 24);
-        q >>= 4 * shift;
-        q &= 0x0F0F0F0F;
-        q -= 0x08080808;
+        const int vui0 = x[ib].qs[iqs + 0];
+        const int vui1 = x[ib].qs[iqs + 1];
 
         const float d = x[ib].d;
-        const int8_t * q8 = (const int8_t *) &q;
-        dst->x() = d * q8[0];
-        dst->y() = d * q8[1];
-        dst->z() = d * q8[2];
-        dst->w() = d * q8[3];
+        dst->x() = d * ((float)((int8_t)((vui0 & 0xF)      - 8)));
+        dst->y() = d * ((float)((int8_t)((vui0 >> 4)        - 8)));
+        dst->z() = d * ((float)((int8_t)((vui1 & 0xF)      - 8)));
+        dst->w() = d * ((float)((int8_t)((vui1 >> 4)        - 8)));
     } else if constexpr (TYPE_K == GGML_TYPE_F16) {
         const sycl::half * src = (const sycl::half *) k_base + i0;
         dst->x() = (float)src[0];
