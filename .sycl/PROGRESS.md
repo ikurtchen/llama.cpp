@@ -6,7 +6,7 @@
 - **Benchmark GPU freq pinned**: True
 - **Build system**: cmake → SYCL build: confirmed
 - **Phase**: report
-- **Updated**: 2026-07-30T18:09:38Z
+- **Updated**: 2026-07-30T18:17:22Z
 
 **Summary**: 13 kernels — 11 migrated, 0 optimized, 2 skipped, 0 needs-reference, 0 pending.
 
@@ -30,15 +30,15 @@
 
 ## Agent efficiency & cost
 
-- **Elapsed**: 13h57m43s (whole run)  ·  **Active**: 29m19s (bracketed)  ·  **Cost**: $0.0  ·  **Tokens**: 0 (in 0 / out 0 / cache r 0 / cache w 0)  ·  **Premium requests**: 0  ·  **AI credits**: 0.0
-- **Observed (gen-progress heartbeat)**: span 16h48m20s  ·  working ≈ 1h08m17s (idle-capped 30m00s)  ·  7 snapshots — independent of metrics.sh
-  - ⚠️ bracketed active time (29m19s) is far below observed work (1h08m17s); phases were under-bracketed — trust elapsed/observed figures.
+- **Elapsed**: 16h52m26s (whole run)  ·  **Active**: 29m50s (bracketed)  ·  **Cost**: $0.0  ·  **Tokens**: 0 (in 0 / out 0 / cache r 0 / cache w 0)  ·  **Premium requests**: 0  ·  **AI credits**: 0.0
+- **Observed (gen-progress heartbeat)**: span 16h56m04s  ·  working ≈ 1h07m01s (idle-capped 30m00s)  ·  5 snapshots — independent of metrics.sh
+  - ⚠️ bracketed active time (29m50s) is far below observed work (1h07m01s); phases were under-bracketed — trust elapsed/observed figures.
 
 | phase | elapsed | active | tokens | requests | credits | USD |
 |-------|--------:|-------:|-------:|---------:|--------:|----:|
 | detect | 5m22s | 5m21s | 0 | 0 | 0.0 | 0.0 |
-| inventory | 13h07m58s | 20m30s | 0 | 0 | 0.0 | 0.0 |
-| report | 3m28s | 3m28s | 0 | 0 | 0.0 | 0.0 |
+| inventory | 16h02m10s | 20m30s | 0 | 0 | 0.0 | 0.0 |
+| integrate | 3m59s | 3m59s | 0 | 0 | 0.0 | 0.0 |
 
 ## Progress history
 
@@ -49,7 +49,5 @@
 | 2026-07-30T02:21:04Z | detect | 0/126 | 0 | 0 | 126 |
 | 2026-07-30T02:26:35Z | inventory | 0/13 | 0 | 0 | 13 |
 | 2026-07-30T02:28:05Z | inventory | 1/13 | 0 | 0 | 12 |
-| 2026-07-30T18:08:22Z | report | 11/13 | 0 | 2 | 0 |
-| 2026-07-30T18:09:05Z | report | 11/13 | 0 | 2 | 0 |
-| 2026-07-30T18:09:38Z | report | 11/13 | 0 | 2 | 0 |
+| 2026-07-30T18:17:22Z | report | 11/13 | 0 | 2 | 0 |
 

@@ -2,6 +2,4 @@
 {"ts": "2026-07-30T02:21:04Z", "phase": "detect", "total": 126, "migrated": 0, "optimized": 0, "skipped": 0, "needs_reference": 0, "pending": 126}
 {"ts": "2026-07-30T02:26:35Z", "phase": "inventory", "total": 13, "migrated": 0, "optimized": 0, "skipped": 0, "needs_reference": 0, "pending": 13}
 {"ts": "2026-07-30T02:28:05Z", "phase": "inventory", "total": 13, "migrated": 1, "optimized": 0, "skipped": 0, "needs_reference": 0, "pending": 12}
-{"ts": "2026-07-30T18:08:22Z", "phase": "report", "total": 13, "migrated": 11, "optimized": 0, "skipped": 2, "needs_reference": 0, "pending": 0}
-{"ts": "2026-07-30T18:09:05Z", "phase": "report", "total": 13, "migrated": 11, "optimized": 0, "skipped": 2, "needs_reference": 0, "pending": 0}
-{"ts": "2026-07-30T18:09:38Z", "phase": "report", "total": 13, "migrated": 11, "optimized": 0, "skipped": 2, "needs_reference": 0, "pending": 0}
+{"ts": "2026-07-30T18:17:22Z", "phase": "report", "total": 13, "migrated": 11, "optimized": 0, "skipped": 2, "needs_reference": 0, "pending": 0}
