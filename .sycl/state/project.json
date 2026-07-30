@@ -1,7 +1,7 @@
 {
   "schema": "sycl-agent/project",
   "name": "llama.cpp",
-  "phase": "migrate",
+  "phase": "done",
   "sycl_backend_exists": true,
   "sycl_backend_coverage": "~65% of CUDA ops covered (20 of 32 scan-identified kernel groups; many more via oneDNN gemm and element_wise unification)",
   "runner_mode": "remote",
@@ -68,6 +68,6 @@
     "source": "cpu-reference",
     "notes": "CPU reference: llama.cpp already has CPU (ggml) backend for all ops. Use the CPU-backend output as the reference oracle for accuracy validation."
   },
-  "updated_at": "2026-07-30T03:15:00Z",
+  "updated_at": "2026-07-30T03:25:00Z",
   "notes": "Existing SYCL backend at ggml/src/ggml-sycl/ confirmed (~36K lines, 51 source files, built successfully on B70). Covers ~90% of CUDA ops via oneDNN/oneMKL/element_wise/gemm. Only 13 kernels (9 logical ops) truly missing: allreduce, dsv4-hc, fwht, ggml-cuda-infra, lightning-indexer, opt-step-adamw, opt-step-sgd, snake, softcap."
 }
