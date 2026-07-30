@@ -13,16 +13,23 @@ static inline void dequantize_k_vec_4(const void * k_base, sycl::float4 * dst, i
         const block_q4_0 * x = (const block_q4_0 *) k_base;
 
         const int ib  = i0 / QK;
-        const int iqs = i0 % (QK / 2);
-
-        const int vui0 = x[ib].qs[iqs + 0];
-        const int vui1 = x[ib].qs[iqs + 1];
+        const int pos = i0 % QK;
 
         const float d = x[ib].d;
-        dst->x() = d * ((float)((int8_t)((vui0 & 0xF)      - 8)));
-        dst->y() = d * ((float)((int8_t)((vui0 >> 4)        - 8)));
-        dst->z() = d * ((float)((int8_t)((vui1 & 0xF)      - 8)));
-        dst->w() = d * ((float)((int8_t)((vui1 >> 4)        - 8)));
+        if (pos < QK / 2) {
+            // Low nibbles: values at positions 0..15 within each block
+            dst->x() = d * ((float)((int8_t)((x[ib].qs[pos + 0] & 0xF) - 8)));
+            dst->y() = d * ((float)((int8_t)((x[ib].qs[pos + 1] & 0xF) - 8)));
+            dst->z() = d * ((float)((int8_t)((x[ib].qs[pos + 2] & 0xF) - 8)));
+            dst->w() = d * ((float)((int8_t)((x[ib].qs[pos + 3] & 0xF) - 8)));
+        } else {
+            // High nibbles: values at positions 16..31 within each block
+            const int qs_off = pos - QK / 2;
+            dst->x() = d * ((float)((int8_t)((x[ib].qs[qs_off + 0] >> 4) - 8)));
+            dst->y() = d * ((float)((int8_t)((x[ib].qs[qs_off + 1] >> 4) - 8)));
+            dst->z() = d * ((float)((int8_t)((x[ib].qs[qs_off + 2] >> 4) - 8)));
+            dst->w() = d * ((float)((int8_t)((x[ib].qs[qs_off + 3] >> 4) - 8)));
+        }
     } else if constexpr (TYPE_K == GGML_TYPE_F16) {
         const sycl::half * src = (const sycl::half *) k_base + i0;
         dst->x() = (float)src[0];
@@ -48,6 +55,10 @@ static void lightning_indexer_kernel_vec_f16(
         int64_t nem3,
         float       * local_smem,
         const sycl::nd_item<3> & item) {
+
+    (void)n_stream;
+    (void)n_batch;
+    (void)nb2;
 
     constexpr int K_VECS_PER_WARP   = K_VECS_PER_BLOCK / WARPS_PER_BLOCK;
     constexpr int THREADS_PER_BLOCK = WARPS_PER_BLOCK * WARP_SIZE_K;
@@ -167,6 +178,10 @@ static void lightning_indexer_kernel_vec_q4_0(
         int64_t nem3,
         float       * local_smem,
         const sycl::nd_item<3> & item) {
+
+    (void)n_stream;
+    (void)n_batch;
+    (void)nb2;
 
     constexpr int K_VECS_PER_WARP   = K_VECS_PER_BLOCK / WARPS_PER_BLOCK;
     constexpr int THREADS_PER_BLOCK = WARPS_PER_BLOCK * WARP_SIZE_K;
