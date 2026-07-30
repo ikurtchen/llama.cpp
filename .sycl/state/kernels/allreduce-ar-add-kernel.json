@@ -1,0 +1,26 @@
+{
+  "id": "allreduce-ar-add-kernel",
+  "name": "ggml_cuda_ar_add_kernel",
+  "source": "ggml/src/ggml-cuda/allreduce.cu:207",
+  "source_lang": "cuda",
+  "target_style": "plain-sycl",
+  "status": "pending",
+  "risk": "medium",
+  "algorithm": "Post-allreduce addition: adds reduced data back to output buffer. Simple element-wise vector add.",
+  "cuda_constructs": [],
+  "io_spec": {
+    "inputs": {
+      "data": "const T_src* (reduced peer data)"
+    },
+    "outputs": {
+      "data": "T_dst* (in-place accumulate)"
+    },
+    "dtypes": "f32, f16"
+  },
+  "reference": {
+    "kind": "cpu-backend",
+    "notes": "llama.cpp CPU (ggml) backend produces the reference output"
+  },
+  "notes": "Only useful together with allreduce-ar-kernel. Can be trivially implemented if allreduce is needed.",
+  "updated_at": "2026-07-30T02:26:23Z"
+}

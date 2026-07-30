@@ -1,0 +1,27 @@
+{
+  "id": "dsv4-hc-pre-f32",
+  "name": "dsv4_hc_pre_f32",
+  "source": "ggml/src/ggml-cuda/dsv4-hc.cu:103",
+  "source_lang": "cuda",
+  "target_style": "plain-sycl",
+  "status": "pending",
+  "risk": "low",
+  "algorithm": "DSv4 pre-processing: computes per-head QK dot products for combination scores.",
+  "cuda_constructs": [],
+  "io_spec": {
+    "inputs": {
+      "q": "const float*",
+      "k": "const float*"
+    },
+    "outputs": {
+      "comb": "float* (combination scores)"
+    },
+    "dtypes": "f32"
+  },
+  "reference": {
+    "kind": "cpu-backend",
+    "notes": "llama.cpp CPU (ggml) backend produces the reference output"
+  },
+  "notes": "Preprocessing step for DSv4 attention combination.",
+  "updated_at": "2026-07-30T02:26:23Z"
+}

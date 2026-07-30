@@ -43,6 +43,7 @@
 #    include <sycl/ext/oneapi/virtual_mem/virtual_mem.hpp>
 #    define GGML_SYCL_SUPPORT_VMM
 #endif
+
 #include <sycl/half_type.hpp>
 
 #include "ggml.h"
@@ -75,6 +76,9 @@
 #include "ggml-sycl/gated_delta_net.hpp"
 #include "ggml-sycl/pool.hpp"
 #include "ggml-sycl/cross_entropy_loss.hpp"
+
+// Forward declaration for FWHT (defined in fwht_sycl.cpp)
+bool ggml_sycl_op_fwht(ggml_backend_sycl_context & ctx, const ggml_tensor * src, ggml_tensor * dst);
 
 #define MEM_SIZE_2M	0x00200000
 #define MEM_SIZE_1G	0x40000000
@@ -4395,6 +4399,15 @@ static bool can_use_mul_mat_vec_q(const ggml_tensor * src0, const ggml_tensor * 
 
 static void ggml_sycl_mul_mat(ggml_backend_sycl_context & ctx, const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
     scope_op_debug_print scope_dbg_print(__func__, dst, /*num_src=*/2);
+
+    // FWHT optimization: transform src1 in-place when src0 is a Hadamard matrix
+    {
+        const int32_t hint = ggml_get_op_params_i32(dst, 1);
+        if (hint == GGML_HINT_SRC0_IS_HADAMARD && ggml_sycl_op_fwht(ctx, src1, dst)) {
+            return;
+        }
+    }
+
     const bool split = ggml_backend_buffer_is_sycl_split(src0->buffer);
     int64_t min_compute_capability = INT_MAX;
 

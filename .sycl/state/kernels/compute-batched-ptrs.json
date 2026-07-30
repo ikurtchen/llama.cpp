@@ -1,0 +1,26 @@
+{
+  "id": "compute-batched-ptrs",
+  "name": "k_compute_batched_ptrs",
+  "source": "ggml/src/ggml-cuda/ggml-cuda.cu:1335",
+  "source_lang": "cuda",
+  "target_style": "plain-sycl",
+  "status": "pending",
+  "risk": "low",
+  "algorithm": "Compute batched pointer arrays: maps linear indices to device pointers for batched kernel launches. Infrastructure kernel.",
+  "cuda_constructs": [],
+  "io_spec": {
+    "inputs": {
+      "base_ptrs": "metadata struct"
+    },
+    "outputs": {
+      "batched_ptrs": "void** [n_batches]"
+    },
+    "dtypes": "pointer arithmetic"
+  },
+  "reference": {
+    "kind": "cpu-backend",
+    "notes": "llama.cpp CPU (ggml) backend produces the reference output"
+  },
+  "notes": "Infrastructure kernel for batched operations. May be handled differently in SYCL via explicit SYCL kernel batch semantics.",
+  "updated_at": "2026-07-30T02:26:23Z"
+}

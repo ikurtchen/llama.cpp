@@ -1,0 +1,81 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "sycl-agent kernel detail",
+  "type": "object",
+  "properties": {
+    "id": { "type": "string" },
+    "name": { "type": "string" },
+    "source": { "type": "string", "description": "Source location, e.g. src/foo.cu:vecAdd or ops/rms.py:rms_kernel" },
+    "source_lang": {
+      "type": "string",
+      "enum": ["cuda", "triton"],
+      "default": "cuda",
+      "description": "Original kernel language. Absent = cuda (backward compatible)."
+    },
+    "target_style": {
+      "type": "string",
+      "enum": ["plain-sycl", "sycl-tla"],
+      "default": "plain-sycl",
+      "description": "SYCL target style. Absent = plain-sycl. sycl-tla for tiled XMX-bound tensor algebra."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "migrated", "skipped", "needs-reference", "optimizing"]
+    },
+    "risk": { "type": "string", "enum": ["low", "medium", "high"] },
+    "algorithm": { "type": "string", "description": "Algorithm summary (intent, not syntax)." },
+    "cuda_constructs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "e.g. warp-shuffle, __shared__, atomicAdd, cooperative-groups, cuBLAS."
+    },
+    "triton_constructs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "e.g. block-ptr, masked-load, tl.dot, tl.sum, tl.atomic_add, autotune, num_stages, constexpr."
+    },
+    "io_spec": {
+      "type": "object",
+      "description": "Inputs/outputs: names, dtypes, shapes/sizes; for Triton also grid + meta-params."
+    },
+    "reference": {
+      "type": "object",
+      "properties": {
+        "kind": { "type": "string", "enum": ["cuda-golden", "triton-golden", "torch-ref", "cpu", "analytical", "none"] },
+        "path": { "type": "string", "description": "Reference impl/input spec under .sycl/state/kernels/<id>/ref/" },
+        "crosscheck": { "type": "string", "enum": ["pass", "fail", "skipped", "-"], "description": "One-time original-vs-CPU-oracle cross-check result." },
+        "crosscheck_source": { "type": "string", "enum": ["cuda", "triton"], "description": "Which original kernel validated the CPU oracle." }
+      }
+    },
+    "sycl_impl": { "type": "string", "description": "Path to the SYCL implementation file." },
+    "unit_test": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string" },
+        "result": { "type": "string", "enum": ["pass", "fail", "-"] },
+        "tolerance": { "type": "string", "description": "e.g. rtol=1e-5, atol=1e-6" }
+      }
+    },
+    "performance": {
+      "type": "object",
+      "properties": {
+        "bound": { "type": "string", "enum": ["memory", "compute", "unknown"] },
+        "arithmetic_intensity": { "type": "number" },
+        "baseline": { "type": "string", "description": "e.g. 210 GB/s or 0.9 ms" },
+        "optimized": { "type": "string" },
+        "fraction_of_peak": { "type": "number" },
+        "meets_expectation": { "type": "boolean" }
+      }
+    },
+    "optimization": {
+      "type": "object",
+      "properties": {
+        "status": { "type": "string", "enum": ["pending", "in-progress", "done", "skipped"] },
+        "trials_file": { "type": "string", "description": ".sycl/state/optimization/<id>.json" }
+      }
+    },
+    "notes": { "type": "string" },
+    "updated_at": { "type": "string", "format": "date-time" }
+  },
+  "required": ["id", "source", "status"]
+}

@@ -1,0 +1,31 @@
+{
+  "id": "allreduce-ar-kernel",
+  "name": "ggml_cuda_ar_kernel",
+  "source": "ggml/src/ggml-cuda/allreduce.cu:109",
+  "source_lang": "cuda",
+  "target_style": "plain-sycl",
+  "status": "pending",
+  "risk": "high",
+  "algorithm": "GPU-to-GPU all-reduce via NVLink peer-memory signal protocol. Coordinates multiple GPUs using device-level semaphores with ld.global.acquire/st.global.release semantics.",
+  "cuda_constructs": [
+    "cooperative-groups",
+    "__shared__",
+    "atomicAdd",
+    "peer memory access"
+  ],
+  "io_spec": {
+    "inputs": {
+      "data": "T_dst* (local GPU buffer)"
+    },
+    "outputs": {
+      "data": "T_dst* (reduced across all GPUs)"
+    },
+    "dtypes": "f32, f16, bf16"
+  },
+  "reference": {
+    "kind": "cpu-backend",
+    "notes": "llama.cpp CPU (ggml) backend produces the reference output"
+  },
+  "notes": "Multi-GPU only. Uses ld.global.acquire/st.global.release which are CUDA-specific. Skip for single-GPU SYCL builds; needs SYCL multi-device approach if multi-GPU target required.",
+  "updated_at": "2026-07-30T02:26:23Z"
+}

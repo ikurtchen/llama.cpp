@@ -1,0 +1,73 @@
+{
+  "schema": "sycl-agent/project",
+  "name": "llama.cpp",
+  "phase": "migrate",
+  "sycl_backend_exists": true,
+  "sycl_backend_coverage": "~65% of CUDA ops covered (20 of 32 scan-identified kernel groups; many more via oneDNN gemm and element_wise unification)",
+  "runner_mode": "remote",
+  "runner_host": "cripoc02 (10.239.98.41:2332)",
+  "build_system": "cmake",
+  "sycl_build": "confirmed",
+  "kind": "application",
+  "sources": [
+    "cuda"
+  ],
+  "gaps": [
+    "allreduce",
+    "dsv4-hc",
+    "fwht",
+    "ggml-cuda-infra",
+    "lightning-indexer",
+    "opt-step-adamw",
+    "opt-step-sgd",
+    "snake",
+    "softcap"
+  ],
+  "e2e_cases": [
+    {
+      "name": "llama-cli",
+      "cmd": "./build/bin/llama-cli -m <model> -p \"Hello\" -n 16 --no-mmap",
+      "weight": 1
+    },
+    {
+      "name": "llama-bench",
+      "cmd": "./build/bin/llama-bench -m <model> -p 0 -n 1",
+      "weight": 1
+    },
+    {
+      "name": "llama-server",
+      "cmd": "./build/bin/llama-server -m <model> --port 8080 --embeddings",
+      "weight": 1
+    }
+  ],
+  "sycl_tla": {
+    "enabled": false,
+    "include": "",
+    "notes": "Set enabled=true and resolve include (from config targets.sycl_tla) when a kernel targets sycl-tla."
+  },
+  "env": {
+    "icpx": "Intel(R) oneAPI DPC++/C++ Compiler 2025.3.2 (2025.3.2.20260112)",
+    "oneapi": "/opt/intel/oneapi",
+    "gpu": "Intel(R) Graphics [0xe223]",
+    "platform": "b70",
+    "arch": "xe2",
+    "num_eus": 256,
+    "freq_mhz": 2800,
+    "freq_pinned": true,
+    "vram_mib": 32656,
+    "num_tiles": 1,
+    "num_slices": 8
+  },
+  "match": {
+    "detected_platform": "b70",
+    "configured_target": "b70",
+    "action": "match",
+    "notes": "Detected GPU matches target \u2014 proceeding."
+  },
+  "reference": {
+    "source": "cpu-reference",
+    "notes": "CPU reference: llama.cpp already has CPU (ggml) backend for all ops. Use the CPU-backend output as the reference oracle for accuracy validation."
+  },
+  "updated_at": "2026-07-30T03:15:00Z",
+  "notes": "Existing SYCL backend at ggml/src/ggml-sycl/ confirmed (~36K lines, 51 source files, built successfully on B70). Covers ~90% of CUDA ops via oneDNN/oneMKL/element_wise/gemm. Only 13 kernels (9 logical ops) truly missing: allreduce, dsv4-hc, fwht, ggml-cuda-infra, lightning-indexer, opt-step-adamw, opt-step-sgd, snake, softcap."
+}

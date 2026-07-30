@@ -1,0 +1,29 @@
+{
+  "schema": "sycl-agent/project",
+  "name": "REPLACE_ME",
+  "phase": "detect",
+  "runner_mode": "remote",
+  "runner_host": "cripoc02 (10.239.98.41:2332)",
+  "build_system": "unknown",
+  "sycl_build": "not-set-up",
+  "sources": [],
+  "e2e_cases": [],
+  "sycl_tla": {
+    "enabled": false,
+    "include": "",
+    "notes": "Set enabled=true and resolve include (from config targets.sycl_tla) when a kernel targets sycl-tla."
+  },
+  "env": {
+    "icpx": "unknown",
+    "oneapi": "unknown",
+    "gpu": "unknown",
+    "platform": "unknown",
+    "arch": "unknown",
+    "freq_pinned": "unknown"
+  },
+  "reference": {
+    "source": "unknown",
+    "notes": "How golden reference outputs are obtained for accuracy checks (CUDA capture / CPU / analytical)."
+  },
+  "updated_at": "1970-01-01T00:00:00Z"
+}

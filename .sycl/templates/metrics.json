@@ -1,0 +1,17 @@
+{
+  "schema": "sycl-agent/metrics",
+  "unit": { "time": "seconds", "cost": "USD (if reported) and/or tokens (uncached + cached) and/or GitHub AI credits / premium requests" },
+  "session": { "elapsed_wall_seconds": 0, "active_wall_seconds": 0, "observed_span_seconds": 0, "observed_work_seconds": 0, "observed_snapshots": 0, "started_at": null, "ended_at": null },
+  "totals": { "wall_clock_seconds": 0, "elapsed_wall_seconds": 0, "tokens_in": 0, "tokens_out": 0, "cache_read": 0, "cache_write": 0, "tokens_total": 0, "requests": 0, "credits": 0, "cost_usd": 0 },
+  "phases": {
+    "detect":      { "wall_clock_seconds": 0, "elapsed_wall_seconds": 0, "tokens_in": 0, "tokens_out": 0, "cache_read": 0, "cache_write": 0, "tokens_total": 0, "requests": 0, "credits": 0, "cost_usd": 0 },
+    "inventory":   { "wall_clock_seconds": 0, "elapsed_wall_seconds": 0, "tokens_in": 0, "tokens_out": 0, "cache_read": 0, "cache_write": 0, "tokens_total": 0, "requests": 0, "credits": 0, "cost_usd": 0 },
+    "migrate":     { "wall_clock_seconds": 0, "elapsed_wall_seconds": 0, "tokens_in": 0, "tokens_out": 0, "cache_read": 0, "cache_write": 0, "tokens_total": 0, "requests": 0, "credits": 0, "cost_usd": 0 },
+    "integrate":   { "wall_clock_seconds": 0, "elapsed_wall_seconds": 0, "tokens_in": 0, "tokens_out": 0, "cache_read": 0, "cache_write": 0, "tokens_total": 0, "requests": 0, "credits": 0, "cost_usd": 0 },
+    "profile-e2e": { "wall_clock_seconds": 0, "elapsed_wall_seconds": 0, "tokens_in": 0, "tokens_out": 0, "cache_read": 0, "cache_write": 0, "tokens_total": 0, "requests": 0, "credits": 0, "cost_usd": 0 },
+    "optimize":    { "wall_clock_seconds": 0, "elapsed_wall_seconds": 0, "tokens_in": 0, "tokens_out": 0, "cache_read": 0, "cache_write": 0, "tokens_total": 0, "requests": 0, "credits": 0, "cost_usd": 0 },
+    "done":        { "wall_clock_seconds": 0, "elapsed_wall_seconds": 0, "tokens_in": 0, "tokens_out": 0, "cache_read": 0, "cache_write": 0, "tokens_total": 0, "requests": 0, "credits": 0, "cost_usd": 0 },
+    "report":      { "wall_clock_seconds": 0, "elapsed_wall_seconds": 0, "tokens_in": 0, "tokens_out": 0, "cache_read": 0, "cache_write": 0, "tokens_total": 0, "requests": 0, "credits": 0, "cost_usd": 0 }
+  },
+  "updated_at": "1970-01-01T00:00:00Z"
+}

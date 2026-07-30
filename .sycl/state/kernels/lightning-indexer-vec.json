@@ -1,0 +1,32 @@
+{
+  "id": "lightning-indexer-vec",
+  "name": "lightning_indexer_kernel_vec",
+  "source": "ggml/src/ggml-cuda/lightning-indexer.cu:244",
+  "source_lang": "cuda",
+  "target_style": "plain-sycl",
+  "status": "pending",
+  "risk": "medium",
+  "algorithm": "Lightning attention indexer vector path (non-WMMA fallback). Each warp processes one K vector with float4 loads and shared memory Q tiles. Element-wise dot product.",
+  "cuda_constructs": [
+    "__shared__",
+    "warp-shuffle"
+  ],
+  "io_spec": {
+    "inputs": {
+      "Q": "const float*",
+      "K": "const char* (quantized/fp16)",
+      "W": "const float*",
+      "M": "const half*"
+    },
+    "outputs": {
+      "dst": "float*"
+    },
+    "dtypes": "f32"
+  },
+  "reference": {
+    "kind": "cpu-backend",
+    "notes": "llama.cpp CPU (ggml) backend produces the reference output"
+  },
+  "notes": "Non-WMMA fallback for lightning attention. Simpler to port than the WMMA version.",
+  "updated_at": "2026-07-30T02:26:23Z"
+}

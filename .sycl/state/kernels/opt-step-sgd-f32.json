@@ -1,0 +1,27 @@
+{
+  "id": "opt-step-sgd-f32",
+  "name": "opt_step_sgd_f32",
+  "source": "ggml/src/ggml-cuda/opt-step-sgd.cu:6",
+  "source_lang": "cuda",
+  "target_style": "plain-sycl",
+  "status": "pending",
+  "risk": "low",
+  "algorithm": "SGD optimizer step: element-wise x -= lr * g (with optional weight decay). Training-only kernel.",
+  "cuda_constructs": [],
+  "io_spec": {
+    "inputs": {
+      "x": "float* [k]",
+      "g": "const float* [k] (gradient)"
+    },
+    "outputs": {
+      "x": "float* (updated in-place)"
+    },
+    "dtypes": "f32"
+  },
+  "reference": {
+    "kind": "cpu-backend",
+    "notes": "llama.cpp CPU (ggml) backend produces the reference output"
+  },
+  "notes": "Training-only kernel. Trivial element-wise update. Not needed for inference.",
+  "updated_at": "2026-07-30T02:26:23Z"
+}

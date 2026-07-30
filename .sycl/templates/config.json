@@ -1,0 +1,90 @@
+{
+  "schema": "sycl-agent/config",
+  "runner": {
+    "mode": "remote",
+    "proxy_note": "Optional HTTP(S) proxy for commands that need Internet access (git clone, pip/apt, downloading reference repos). Set http/https on the runner that actually reaches the Internet; leave \"\" to run direct. When set, run.sh always exports http_proxy/https_proxy (+ upper-case) and no_proxy for every command on that runner.",
+    "env_note": "Optional extra environment variables applied to EVERY command on the runner, as a list of \"KEY=VALUE\" strings (e.g. \"ONEAPI_DEVICE_SELECTOR=level_zero:gpu\", \"HF_HOME=/scratch/hf\"). Values are shell-quoted, so spaces/special chars are safe over SSH. Exported last, so they override tool/proxy defaults.",
+    "local": {
+      "env_setup": "source /opt/intel/oneapi/setvars.sh 2>/dev/null || true",
+      "env": [],
+      "proxy": {
+        "http": "",
+        "https": "",
+        "no_proxy": "localhost,127.0.0.1"
+      }
+    },
+    "remote": {
+      "host": "10.239.98.41",
+      "port": 2332,
+      "user": "root",
+      "workdir": "/workspace/PROJECT",
+      "env_setup": "source /opt/intel/oneapi/setvars.sh",
+      "identity_file": "",
+      "env": [],
+      "proxy": {
+        "http": "",
+        "https": "",
+        "no_proxy": "localhost,127.0.0.1"
+      }
+    }
+  },
+  "target": {
+    "platform": "b70",
+    "gpu": "Intel Arc Pro B70",
+    "arch": "xe2",
+    "codename": "Battlemage",
+    "aot_device": "bmg-g31",
+    "peak_fp32_tflops": 22.94,
+    "peak_fp16_bf16_xmx_tflops": 183.5,
+    "peak_int8_xmx_tops": 367,
+    "peak_bandwidth_gbps": 608,
+    "vram_gb": 32,
+    "on_mismatch": "halt"
+  },
+  "toolchain": {
+    "cxx": "icpx",
+    "cxx_flags": "-fsycl -O3",
+    "aot_target": "-fsycl-targets=spir64_gen -Xs \"-device bmg-g31\""
+  },
+  "tools": {
+    "unitrace_home": "/workspace/intel_gpu_tools/applications.analyzers.profilingtoolsinterfaces.sdk/tools/unitrace",
+    "unitrace_use_installed": false,
+    "unitrace": "",
+    "metrics_platform": "bmg",
+    "vtune": "vtune",
+    "xpu_smi": "xpu-smi"
+  },
+  "benchmark": {
+    "warmup": 3,
+    "iters": 20,
+    "require_freq_pinned": true,
+    "e2e_cases_note": "Optional. If the project has multiple e2e test cases / workloads (different drivers, model configs, or input scenarios), list them as {\"name\", \"cmd\", \"weight\"}. integrate requires EVERY case to pass; profile-e2e sums weighted per-kernel wall-clock across all cases into ONE ranking; the report shows per-case baseline->final + a geomean. Empty = single default workload.",
+    "e2e_cases": []
+  },
+  "targets": {
+    "note": "SYCL target style for migrated kernels. Default is plain hand-written SYCL 2020. sycl-tla is a CUTLASS-style header-only tile library reserved for XMX-bound tiled tensor algebra (GEMM/attention); see framework skill sycl-reference/references/sycl-tla-patterns.md for the decision rule.",
+    "style_default": "plain-sycl",
+    "sycl_tla": {
+      "enabled": true,
+      "include": "",
+      "note": "Header-only; add this include dir to the SYCL build. Leave \"\" to fall back to the reference_repos 'sycl-tla' path."
+    }
+  },
+  "reference_repos": {
+    "enabled": true,
+    "note": "Local upstream repos the agent may consult (read-only) for how real Intel-GPU SYCL code is written. Toggle each repo with its own \"enabled\" flag (top-level \"enabled\" gates them all). Set path to \"\" or \"enabled\": false to disable one. Absolute paths on the machine that runs the agent. The agent extracts patterns/approaches only — it never copies code verbatim (respect upstream licenses). The installer can clone missing enabled repos on demand using each entry's \"url\" (empty url = not auto-clonable; leave/edit \"path\" manually).",
+    "repos": [
+      { "name": "oneDNN",                       "enabled": true,  "path": "/home/kurt/workspace/code/xpu/oneDNN",                                        "url": "https://github.com/uxlfoundation/oneDNN.git",                "use": "Production Intel-GPU SYCL/oneAPI primitives (GEMM, conv, reorder, softmax, norm): blocking, sub-group + XMX/DPAS usage, memory layouts." },
+      { "name": "sycl-tla",                      "enabled": true,  "path": "/home/kurt/workspace/code/xpu/sycl-tla",                                      "url": "https://github.com/intel/sycl-tla.git",                      "use": "CUTLASS-style tiled tensor algebra for Intel GPU: high-performance GEMM/attention tiling, joint_matrix (XMX) templates." },
+      { "name": "intel-llvm",                    "enabled": false, "path": "/home/kurt/workspace/code/xpu/llvm",                                          "url": "https://github.com/intel/llvm.git",                          "use": "DPC++ compiler + SYCL runtime/headers: authoritative SYCL 2020 API semantics and sycl::ext::oneapi::* extensions (sub-group, joint_matrix, bfloat16)." },
+      { "name": "igc",                           "enabled": false, "path": "/home/kurt/workspace/code/xpu/igc_workspace/igc",                             "url": "https://github.com/intel/intel-graphics-compiler.git",       "use": "Intel Graphics Compiler: how SYCL/SPIR-V lowers to Xe ISA, built-in/intrinsic behavior, codegen constraints." },
+      { "name": "compute-runtime",               "enabled": false, "path": "/home/kurt/workspace/code/xpu/compute-runtime",                               "url": "https://github.com/intel/compute-runtime.git",               "use": "Level-Zero/OpenCL GPU driver (NEO): device limits, allocation/USM behavior, queue/submission semantics." },
+      { "name": "pytorch",                       "enabled": false, "path": "/home/kurt/workspace/code/ai_frameworks/pytorch",                             "url": "https://github.com/pytorch/pytorch.git",                     "use": "ATen XPU SYCL kernels (aten/src/ATen/native/xpu, c10/xpu): elementwise, reduction, indexing, normalization on Intel GPU." },
+      { "name": "vllm-xpu",                       "enabled": false, "path": "/home/kurt/workspace/code/xpu/vllm/applications.ai.gpu.vllm-xpu",             "url": "",                                                           "use": "vLLM Intel-GPU backend: attention, paged KV-cache, sampling — end-to-end LLM-serving kernel structure on XPU." },
+      { "name": "vllm-xpu-kernels",              "enabled": true,  "path": "/home/kurt/workspace/code/xpu/vllm/vllm-xpu-kernels",                         "url": "https://github.com/intel/vllm-xpu-kernels.git",              "use": "Standalone high-performance SYCL kernels for vLLM XPU: attention, quantization, MoE — concrete kernel examples." },
+      { "name": "intel-xpu-backend-for-triton",  "enabled": false, "path": "/home/kurt/workspace/code/xpu/intel-xpu-backend-for-triton",                  "url": "https://github.com/intel/intel-xpu-backend-for-triton.git",  "use": "Triton Intel-GPU backend: SPIR-V/Xe lowering, block pointers, DPAS tiling — codegen + optimization patterns." },
+      { "name": "metrics-library",               "enabled": false, "path": "/home/kurt/workspace/tools/intel_gpu_tools/metrics-library",                  "url": "https://github.com/intel/metrics-library.git",               "use": "Intel Metrics Library: GPU performance-counter programming — semantics of profiling metrics." },
+      { "name": "metrics-discovery",             "enabled": false, "path": "/home/kurt/workspace/tools/intel_gpu_tools/metrics-discovery",                "url": "https://github.com/intel/metrics-discovery.git",             "use": "Metrics Discovery API: enumerates HW metrics/counters — meaning of counters surfaced by the profiler." }
+    ]
+  }
+}

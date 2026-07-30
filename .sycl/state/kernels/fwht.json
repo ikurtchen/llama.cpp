@@ -1,0 +1,29 @@
+{
+  "id": "fwht",
+  "name": "fwht_cuda",
+  "source": "ggml/src/ggml-cuda/fwht.cu:6",
+  "source_lang": "cuda",
+  "target_style": "plain-sycl",
+  "status": "pending",
+  "risk": "low",
+  "algorithm": "Fast Walsh-Hadamard Transform: recursive butterfly network using warp shuffle for data exchange. Used as a pre-processing hint (GGML_HINT_SRC0_IS_HADAMARD).",
+  "cuda_constructs": [
+    "warp-shuffle"
+  ],
+  "io_spec": {
+    "inputs": {
+      "src": "const float* [n_rows, ne]",
+      "scale": "float"
+    },
+    "outputs": {
+      "dst": "float* [same shape]"
+    },
+    "dtypes": "f32"
+  },
+  "reference": {
+    "kind": "cpu-backend",
+    "notes": "llama.cpp CPU (ggml) backend produces the reference output"
+  },
+  "notes": "Uses warp shuffle for butterfly exchange. Map to sycl::group_broadcast/shuffle. Used by some quantization schemes.",
+  "updated_at": "2026-07-30T02:26:23Z"
+}

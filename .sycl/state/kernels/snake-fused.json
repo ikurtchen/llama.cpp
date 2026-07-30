@@ -1,0 +1,28 @@
+{
+  "id": "snake-fused",
+  "name": "snake_kernel (fused)",
+  "source": "ggml/src/ggml-cuda/snake.cu:9",
+  "source_lang": "cuda",
+  "target_style": "plain-sycl",
+  "status": "pending",
+  "risk": "low",
+  "algorithm": "Snake activation (fused): x + (1/theta) * sin^2(theta * x). CUDA implements this as a fused version of MUL->SIN->SQR->MUL->ADD chain. Also has backward pass for training.",
+  "cuda_constructs": [],
+  "io_spec": {
+    "inputs": {
+      "x": "const T* [k]",
+      "a": "const T*",
+      "inv_b": "const T*"
+    },
+    "outputs": {
+      "dst": "T* [k]"
+    },
+    "dtypes": "T = f32, f16, bf16"
+  },
+  "reference": {
+    "kind": "cpu",
+    "notes": "llama.cpp CPU (ggml) backend produces the reference output"
+  },
+  "notes": "Fused kernel replacing 5-element chain. Equivalent to standard element-wise ops but fused for performance. Can be emulated via 5 separate element-wise ops (already in SYCL).",
+  "updated_at": "2026-07-30T02:26:23Z"
+}

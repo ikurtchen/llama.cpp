@@ -1,0 +1,27 @@
+{
+  "id": "dsv4-hc-post-f32",
+  "name": "dsv4_hc_post_f32",
+  "source": "ggml/src/ggml-cuda/dsv4-hc.cu:140",
+  "source_lang": "cuda",
+  "target_style": "plain-sycl",
+  "status": "pending",
+  "risk": "low",
+  "algorithm": "DSv4 post-processing: applies combination weights to V and writes final output.",
+  "cuda_constructs": [],
+  "io_spec": {
+    "inputs": {
+      "comb": "const float*",
+      "v": "const float*"
+    },
+    "outputs": {
+      "dst": "float*"
+    },
+    "dtypes": "f32"
+  },
+  "reference": {
+    "kind": "cpu-backend",
+    "notes": "llama.cpp CPU (ggml) backend produces the reference output"
+  },
+  "notes": "Post-processing for DSv4 head combination.",
+  "updated_at": "2026-07-30T02:26:23Z"
+}

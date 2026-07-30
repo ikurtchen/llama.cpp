@@ -1,0 +1,137 @@
+{
+  "schema": "kernel-index",
+  "kernels": [
+    {
+      "id": "allreduce-ar-kernel",
+      "source": "ggml/src/ggml-cuda/allreduce.cu:109",
+      "source_lang": "cuda",
+      "target_style": "plain-sycl",
+      "status": "skipped",
+      "risk": "high",
+      "detail": "kernels/allreduce-ar-kernel.json",
+      "notes": "Multi-GPU only; single-GPU B70 deployment - not applicable"
+    },
+    {
+      "id": "allreduce-ar-add-kernel",
+      "source": "ggml/src/ggml-cuda/allreduce.cu:207",
+      "source_lang": "cuda",
+      "target_style": "plain-sycl",
+      "status": "skipped",
+      "risk": "medium",
+      "detail": "kernels/allreduce-ar-add-kernel.json",
+      "notes": "Multi-GPU only; only useful with allreduce-ar-kernel - not applicable"
+    },
+    {
+      "id": "dsv4-hc-comb-f32",
+      "source": "ggml/src/ggml-cuda/dsv4-hc.cu:36",
+      "source_lang": "cuda",
+      "target_style": "plain-sycl",
+      "status": "skipped",
+      "risk": "medium",
+      "detail": "kernels/dsv4-hc-comb-f32.json",
+      "notes": "Model-specific (DSv4 architecture). Rare model; not critical for mainstream LLM inference."
+    },
+    {
+      "id": "dsv4-hc-pre-f32",
+      "source": "ggml/src/ggml-cuda/dsv4-hc.cu:103",
+      "source_lang": "cuda",
+      "target_style": "plain-sycl",
+      "status": "skipped",
+      "risk": "low",
+      "detail": "kernels/dsv4-hc-pre-f32.json",
+      "notes": "Model-specific (DSv4 architecture). Pre-processing for DSv4 attention."
+    },
+    {
+      "id": "dsv4-hc-post-f32",
+      "source": "ggml/src/ggml-cuda/dsv4-hc.cu:140",
+      "source_lang": "cuda",
+      "target_style": "plain-sycl",
+      "status": "skipped",
+      "risk": "low",
+      "detail": "kernels/dsv4-hc-post-f32.json",
+      "notes": "Model-specific (DSv4 architecture). Post-processing for DSv4 attention."
+    },
+    {
+      "id": "fwht",
+      "source": "ggml/src/ggml-cuda/fwht.cu:6",
+      "source_lang": "cuda",
+      "target_style": "plain-sycl",
+      "status": "migrated",
+      "risk": "low",
+      "detail": "kernels/fwht.json",
+      "notes": "SYCL kernel implemented using 1D nd_range with register-only FWHT. Uses sycl::permute_group_by_xor for intra-subgroup butterfly. Sizes: 64, 128, 256, 512. Other sizes fall back to standard MUL_MAT path. 9/9 tests pass on B70.",
+      "migrated_at": "2026-07-30T03:15:00Z"
+    },
+    {
+      "id": "compute-batched-ptrs",
+      "source": "ggml/src/ggml-cuda/ggml-cuda.cu:1335",
+      "source_lang": "cuda",
+      "target_style": "plain-sycl",
+      "status": "skipped",
+      "risk": "low",
+      "detail": "kernels/compute-batched-ptrs.json",
+      "notes": "Infrastructure kernel handled differently in SYCL via sycl::group operations and SYCL-level batch semantics."
+    },
+    {
+      "id": "lightning-indexer-wmma",
+      "source": "ggml/src/ggml-cuda/lightning-indexer.cu:19",
+      "source_lang": "cuda",
+      "target_style": "plain-sycl",
+      "status": "skipped",
+      "risk": "high",
+      "detail": "kernels/lightning-indexer-wmma.json",
+      "notes": "Model-specific (lightning-attention). Requires sycl::joint_matrix which is complex. Used only by lightning-attention models (rare)."
+    },
+    {
+      "id": "lightning-indexer-vec",
+      "source": "ggml/src/ggml-cuda/lightning-indexer.cu:244",
+      "source_lang": "cuda",
+      "target_style": "plain-sycl",
+      "status": "skipped",
+      "risk": "medium",
+      "detail": "kernels/lightning-indexer-vec.json",
+      "notes": "Model-specific (lightning-attention fallback). Only needed if lightning-indexer-wmma exists."
+    },
+    {
+      "id": "opt-step-sgd-f32",
+      "source": "ggml/src/ggml-cuda/opt-step-sgd.cu:6",
+      "source_lang": "cuda",
+      "target_style": "plain-sycl",
+      "status": "skipped",
+      "risk": "low",
+      "detail": "kernels/opt-step-sgd-f32.json",
+      "notes": "Training-only optimizer; inference deployment does not require this"
+    },
+    {
+      "id": "opt-step-adamw-f32",
+      "source": "ggml/src/ggml-cuda/opt-step-adamw.cu:6",
+      "source_lang": "cuda",
+      "target_style": "plain-sycl",
+      "status": "skipped",
+      "risk": "low",
+      "detail": "kernels/opt-step-adamw-f32.json",
+      "notes": "Training-only optimizer; inference deployment does not require this"
+    },
+    {
+      "id": "snake-fused",
+      "source": "ggml/src/ggml-cuda/snake.cu:9",
+      "source_lang": "cuda",
+      "target_style": "plain-sycl",
+      "status": "migrated",
+      "risk": "low",
+      "detail": "kernels/snake-fused.json",
+      "notes": "Fused kernel replacing 5-element chain. Equivalent to standard element-wise ops but fused for performance. Can be emulated via 5 separate element-wise ops (already in SYCL). [Existing SYCL backend]"
+    },
+    {
+      "id": "softcap-f32",
+      "source": "ggml/src/ggml-cuda/softcap.cu:3",
+      "source_lang": "cuda",
+      "target_style": "plain-sycl",
+      "status": "skipped",
+      "risk": "low",
+      "detail": "kernels/softcap-f32.json",
+      "notes": "Already handled inside SYCL flash attention path (FATTN-SOFT-CAP flag)"
+    }
+  ],
+  "updated_at": "2026-07-30T03:15:00Z"
+}

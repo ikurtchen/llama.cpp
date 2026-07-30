@@ -1,0 +1,28 @@
+{
+  "id": "dsv4-hc-comb-f32",
+  "name": "dsv4_hc_comb_f32",
+  "source": "ggml/src/ggml-cuda/dsv4-hc.cu:36",
+  "source_lang": "cuda",
+  "target_style": "plain-sycl",
+  "status": "pending",
+  "risk": "medium",
+  "algorithm": "DeepSeek v4 head combination: fuses multiple attention head outputs using learned combination weights with per-row/per-column normalization.",
+  "cuda_constructs": [],
+  "io_spec": {
+    "inputs": {
+      "q": "const float*",
+      "k": "const float*",
+      "v": "const float*"
+    },
+    "outputs": {
+      "dst": "float*"
+    },
+    "dtypes": "f32"
+  },
+  "reference": {
+    "kind": "cpu-backend",
+    "notes": "llama.cpp CPU (ggml) backend produces the reference output"
+  },
+  "notes": "DSv4 model-specific. Used by DSv4-family models.",
+  "updated_at": "2026-07-30T02:26:23Z"
+}

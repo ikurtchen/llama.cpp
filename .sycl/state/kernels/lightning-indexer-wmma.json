@@ -1,0 +1,33 @@
+{
+  "id": "lightning-indexer-wmma",
+  "name": "lightning_indexer_kernel_wmma",
+  "source": "ggml/src/ggml-cuda/lightning-indexer.cu:19",
+  "source_lang": "cuda",
+  "target_style": "plain-sycl",
+  "status": "pending",
+  "risk": "high",
+  "algorithm": "Lightning attention Q*K^T indexer using WMMA/Tensor Core. Multi-warp cooperation with shared memory tiles for Q, K (quantized/fp16), and QK results. Complex inner loops over WMMA tiles.",
+  "cuda_constructs": [
+    "warp-shuffle",
+    "__shared__",
+    "wmma"
+  ],
+  "io_spec": {
+    "inputs": {
+      "Q": "const float* [n_batch, n_stream, n_head, N_EMBD]",
+      "K": "const char* (quantized/fp16) [n_batch, n_kv, n_head, N_EMBD]",
+      "W": "const float* [n_head, n_head]",
+      "M": "const half* (mask)"
+    },
+    "outputs": {
+      "dst": "float* [n_batch, n_stream, n_kv, n_head]"
+    },
+    "dtypes": "f32, quantized K, f16 mask"
+  },
+  "reference": {
+    "kind": "cpu-backend",
+    "notes": "llama.cpp CPU (ggml) backend produces the reference output"
+  },
+  "notes": "Hardest gap kernel. WMMA -> SYCL joint_matrix translation needed. Available only on Turing+.",
+  "updated_at": "2026-07-30T02:26:23Z"
+}

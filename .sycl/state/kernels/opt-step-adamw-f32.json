@@ -1,0 +1,29 @@
+{
+  "id": "opt-step-adamw-f32",
+  "name": "opt_step_adamw_f32",
+  "source": "ggml/src/ggml-cuda/opt-step-adamw.cu:6",
+  "source_lang": "cuda",
+  "target_style": "plain-sycl",
+  "status": "pending",
+  "risk": "low",
+  "algorithm": "AdamW optimizer step: maintains m/v buffers, bias correction, weight decay. Element-wise with per-element sqrt division. Training-only kernel.",
+  "cuda_constructs": [],
+  "io_spec": {
+    "inputs": {
+      "x": "float* [k]",
+      "g": "const float* [k]",
+      "g_m": "float* [k]",
+      "g_v": "float* [k]"
+    },
+    "outputs": {
+      "x, g_m, g_v": "float* (updated in-place)"
+    },
+    "dtypes": "f32"
+  },
+  "reference": {
+    "kind": "cpu-backend",
+    "notes": "llama.cpp CPU (ggml) backend produces the reference output"
+  },
+  "notes": "Training-only kernel. Standard AdamW element-wise formula. Not needed for inference-only deployment.",
+  "updated_at": "2026-07-30T02:26:23Z"
+}

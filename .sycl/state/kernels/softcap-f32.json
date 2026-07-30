@@ -1,0 +1,28 @@
+{
+  "id": "softcap-f32",
+  "name": "softcap_f32",
+  "source": "ggml/src/ggml-cuda/softcap.cu:3",
+  "source_lang": "cuda",
+  "target_style": "plain-sycl",
+  "status": "pending",
+  "risk": "low",
+  "algorithm": "Logit softcapping: dst[i] = softcap * tanh(x[i] / softcap) * scale. Prevents logits from growing unboundedly. Also used inside flash attention (which is already covered by SYCL).",
+  "cuda_constructs": [],
+  "io_spec": {
+    "inputs": {
+      "x": "const float* [k]",
+      "softcap": "float",
+      "scale": "float"
+    },
+    "outputs": {
+      "dst": "float* [k]"
+    },
+    "dtypes": "f32"
+  },
+  "reference": {
+    "kind": "cpu-backend",
+    "notes": "llama.cpp CPU (ggml) backend produces the reference output"
+  },
+  "notes": "Simple element-wise transcendentals. Also already handled inside flash-attention path in SYCL. Standalone kernel needed only if softcap is used outside flash attention.",
+  "updated_at": "2026-07-30T02:26:23Z"
+}
