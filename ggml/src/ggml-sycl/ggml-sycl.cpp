@@ -80,6 +80,7 @@
 #include "ggml-sycl/opt_step_sgd.hpp"
 #include "ggml-sycl/opt_step_adamw.hpp"
 #include "ggml-sycl/dsv4_hc.hpp"
+#include "ggml-sycl/lightning_indexer.hpp"
 
 // Forward declaration for FWHT (defined in fwht_sycl.cpp)
 bool ggml_sycl_op_fwht(ggml_backend_sycl_context & ctx, const ggml_tensor * src, ggml_tensor * dst);
@@ -5262,6 +5263,9 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
         case GGML_OP_DSV4_HC_POST:
             ggml_sycl_op_dsv4_hc_post(ctx, dst);
             break;
+        case GGML_OP_LIGHTNING_INDEXER:
+            ggml_sycl_lightning_indexer(ctx, dst);
+            break;
         default:
             return false;
     }
@@ -6059,6 +6063,8 @@ static bool do_ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, cons
         case GGML_OP_DSV4_HC_PRE:
         case GGML_OP_DSV4_HC_POST:
             return op->type == GGML_TYPE_F32;
+        case GGML_OP_LIGHTNING_INDEXER:
+            return ggml_sycl_lightning_indexer_supported(device, op);
         default:
             return false;
     }
