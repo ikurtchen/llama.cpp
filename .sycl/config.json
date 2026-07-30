@@ -18,7 +18,7 @@
       "port": 2332,
       "user": "root",
       "workdir": "/workspace/llama.cpp",
-      "env_setup": "source /opt/intel/oneapi/setvars.sh",
+      "env_setup": "source /opt/intel/oneapi/setvars.sh --force",
       "identity_file": "",
       "env": [],
       "proxy": {

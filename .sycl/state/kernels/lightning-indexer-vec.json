@@ -4,7 +4,7 @@
   "source": "ggml/src/ggml-cuda/lightning-indexer.cu:244",
   "source_lang": "cuda",
   "target_style": "plain-sycl",
-  "status": "pending",
+  "status": "migrated",
   "risk": "medium",
   "algorithm": "Lightning attention indexer vector path (non-WMMA fallback). Each warp processes one K vector with float4 loads and shared memory Q tiles. Element-wise dot product.",
   "cuda_constructs": [
@@ -27,6 +27,11 @@
     "kind": "cpu-backend",
     "notes": "llama.cpp CPU (ggml) backend produces the reference output"
   },
-  "notes": "Non-WMMA fallback for lightning attention. Simpler to port than the WMMA version.",
+  "notes": "Extended from 2 types to 8 types. Single template kernel. Dequantize per type matches CUDA get_dequantize_V. IQ4_NL excluded from supports_op.",
+  "unit_test": {
+    "verdict": "pass",
+    "details": "96/96 tests pass. 8 types (F32, F16, BF16, Q8_0, Q5_1, Q5_0, Q4_1, Q4_0) x nb=[512,1] x (nh=32,64) x (ns=1,4) x (nm=1,4) for ns=4. IQ4_NL correctly skipped by supports_op."
+  },
+  "migrated_commit": "aba574c6e",
   "updated_at": "2026-07-30T02:26:23Z"
 }

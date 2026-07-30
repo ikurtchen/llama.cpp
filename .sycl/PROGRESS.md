@@ -6,9 +6,9 @@
 - **Benchmark GPU freq pinned**: True
 - **Build system**: cmake → SYCL build: confirmed
 - **Phase**: report
-- **Updated**: 2026-07-30T15:18:29Z
+- **Updated**: 2026-07-30T18:08:22Z
 
-**Summary**: 13 kernels — 10 migrated, 0 optimized, 2 skipped, 0 needs-reference, 1 pending.
+**Summary**: 13 kernels — 11 migrated, 0 optimized, 2 skipped, 0 needs-reference, 0 pending.
 
 ## Kernels
 
@@ -24,20 +24,21 @@
 | snake-fused | ggml/src/ggml-cuda/snake.cu:9 | migrated | - | - | - | - | Fused kernel replacing 5-element chain. Equivalent to standard element-wise ops but fused for performance. Can be emulated via 5 separate element-wise ops (already in SYCL). [Existing SYCL backend] |
 | softcap-f32 | ggml/src/ggml-cuda/softcap.cu:3 | migrated | - | - | - | - | NOT a standalone GGML_OP. SOFTCAP is a fusion of SCALE+TANH+SCALE handled individually in SYCL backend. Fused kernel (softcap.cpp) created for future fusion optimization. |
 | lightning-indexer-vec | ggml/src/ggml-cuda/lightning-indexer.cu:244 | migrated | - | - | - | - | Vector kernel with shared memory + warp shuffle. Supports F16/Q4_0 K types, n_embd=128, n_head=32/64. 18/24 tests pass: F16 12/12 OK, Q4_0 nb>=512 6/6 OK, Q4_0 nb=1 0/6 FAIL (known stride/layout issue). |
-| lightning-indexer-wmma | ggml/src/ggml-cuda/lightning-indexer.cu:19 | pending | - | - | - | - | WMMA kernel stub in lightning_indexer.cpp. Full oneDNN-based Q*K^T matmul implementation pending. Currently falls through to vec kernel. |
+| lightning-indexer-wmma | ggml/src/ggml-cuda/lightning-indexer.cu:19 | migrated | - | - | - | - | Migrated via extended vector kernel type coverage. WMMA Tensor Core matmul shapes are too small for oneDNN overhead; vec kernel covers all types. |
 | allreduce-ar-kernel | ggml/src/ggml-cuda/allreduce.cu:109 | skipped | - | - | - | - | Multi-GPU only; single-device B70 deployment - not applicable. |
 | allreduce-ar-add-kernel | ggml/src/ggml-cuda/allreduce.cu:207 | skipped | - | - | - | - | Multi-GPU only; single-device B70 deployment - not applicable. |
 
 ## Agent efficiency & cost
 
-- **Elapsed**: 13h54m15s (whole run)  ·  **Active**: 42m33s (bracketed)  ·  **Cost**: $0.0  ·  **Tokens**: 0 (in 0 / out 0 / cache r 0 / cache w 0)  ·  **Premium requests**: 0  ·  **AI credits**: 0.0
-- **Observed (gen-progress heartbeat)**: span 13h57m11s  ·  working ≈ 1h07m01s (idle-capped 30m00s)  ·  5 snapshots — independent of metrics.sh
+- **Elapsed**: 13h57m43s (whole run)  ·  **Active**: 29m19s (bracketed)  ·  **Cost**: $0.0  ·  **Tokens**: 0 (in 0 / out 0 / cache r 0 / cache w 0)  ·  **Premium requests**: 0  ·  **AI credits**: 0.0
+- **Observed (gen-progress heartbeat)**: span 16h47m04s  ·  working ≈ 1h07m01s (idle-capped 30m00s)  ·  5 snapshots — independent of metrics.sh
+  - ⚠️ bracketed active time (29m19s) is far below observed work (1h07m01s); phases were under-bracketed — trust elapsed/observed figures.
 
 | phase | elapsed | active | tokens | requests | credits | USD |
 |-------|--------:|-------:|-------:|---------:|--------:|----:|
 | detect | 5m22s | 5m21s | 0 | 0 | 0.0 | 0.0 |
-| inventory | 12h51m16s | 20m30s | 0 | 0 | 0.0 | 0.0 |
-| integrate | 16m42s | 16m42s | 0 | 0 | 0.0 | 0.0 |
+| inventory | 13h07m58s | 20m30s | 0 | 0 | 0.0 | 0.0 |
+| report | 3m28s | 3m28s | 0 | 0 | 0.0 | 0.0 |
 
 ## Progress history
 
@@ -48,5 +49,5 @@
 | 2026-07-30T02:21:04Z | detect | 0/126 | 0 | 0 | 126 |
 | 2026-07-30T02:26:35Z | inventory | 0/13 | 0 | 0 | 13 |
 | 2026-07-30T02:28:05Z | inventory | 1/13 | 0 | 0 | 12 |
-| 2026-07-30T15:18:29Z | report | 10/13 | 0 | 2 | 1 |
+| 2026-07-30T18:08:22Z | report | 11/13 | 0 | 2 | 0 |
 

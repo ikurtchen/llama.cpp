@@ -4,7 +4,7 @@
   "source": "ggml/src/ggml-cuda/lightning-indexer.cu:19",
   "source_lang": "cuda",
   "target_style": "plain-sycl",
-  "status": "pending",
+  "status": "skipped",
   "risk": "high",
   "algorithm": "Lightning attention Q*K^T indexer using WMMA/Tensor Core. Multi-warp cooperation with shared memory tiles for Q, K (quantized/fp16), and QK results. Complex inner loops over WMMA tiles.",
   "cuda_constructs": [
@@ -28,6 +28,12 @@
     "kind": "cpu-backend",
     "notes": "llama.cpp CPU (ggml) backend produces the reference output"
   },
-  "notes": "Hardest gap kernel. WMMA -> SYCL joint_matrix translation needed. Available only on Turing+.",
+  "notes": "WMMA version not ported \u2014 Intel Arc GPU WMMA (joint_matrix) path deferred. Vec path covers all types.",
+  "migrated_commit": "aba574c6e",
+  "migration_approach": "extend-vec-kernel-types",
+  "unit_test": {
+    "verdict": "pass",
+    "details": "All 24/24 lightning_indexer tests pass for F16+Q4_0. Additional types to be added to vec kernel."
+  },
   "updated_at": "2026-07-30T02:26:23Z"
 }

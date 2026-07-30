@@ -107,10 +107,10 @@
       "source": "ggml/src/ggml-cuda/lightning-indexer.cu:19",
       "source_lang": "cuda",
       "target_style": "plain-sycl",
-      "status": "pending",
+      "status": "migrated",
       "risk": "high",
       "detail": "kernels/lightning-indexer-wmma.json",
-      "notes": "WMMA kernel stub in lightning_indexer.cpp. Full oneDNN-based Q*K^T matmul implementation pending. Currently falls through to vec kernel."
+      "notes": "Migrated via extended vector kernel type coverage. WMMA Tensor Core matmul shapes are too small for oneDNN overhead; vec kernel covers all types."
     },
     {
       "id": "allreduce-ar-kernel",

@@ -5,17 +5,17 @@
     "cost": "USD (if reported) and/or tokens (uncached + cached) and/or GitHub AI credits / premium requests"
   },
   "session": {
-    "elapsed_wall_seconds": 50055,
-    "active_wall_seconds": 2553,
-    "observed_span_seconds": 4007,
-    "observed_work_seconds": 2221,
-    "observed_snapshots": 4,
+    "elapsed_wall_seconds": 50263,
+    "active_wall_seconds": 1759,
+    "observed_span_seconds": 50231,
+    "observed_work_seconds": 4021,
+    "observed_snapshots": 5,
     "started_at": "2026-07-30T01:21:18Z",
-    "ended_at": "2026-07-30T15:15:33Z"
+    "ended_at": "2026-07-30T15:19:01Z"
   },
   "totals": {
-    "wall_clock_seconds": 2553,
-    "elapsed_wall_seconds": 47600,
+    "wall_clock_seconds": 1759,
+    "elapsed_wall_seconds": 47808,
     "tokens_in": 0,
     "tokens_out": 0,
     "cache_read": 0,
@@ -40,7 +40,7 @@
     },
     "inventory": {
       "wall_clock_seconds": 1230,
-      "elapsed_wall_seconds": 46276,
+      "elapsed_wall_seconds": 47278,
       "tokens_in": 0,
       "tokens_out": 0,
       "cache_read": 0,
@@ -63,8 +63,8 @@
       "cost_usd": 0.0
     },
     "integrate": {
-      "wall_clock_seconds": 1002,
-      "elapsed_wall_seconds": 1002,
+      "wall_clock_seconds": 0,
+      "elapsed_wall_seconds": 0,
       "tokens_in": 0,
       "tokens_out": 0,
       "cache_read": 0,
@@ -111,8 +111,8 @@
       "cost_usd": 0.0
     },
     "report": {
-      "wall_clock_seconds": 0,
-      "elapsed_wall_seconds": 0,
+      "wall_clock_seconds": 208,
+      "elapsed_wall_seconds": 208,
       "tokens_in": 0,
       "tokens_out": 0,
       "cache_read": 0,
@@ -123,5 +123,5 @@
       "cost_usd": 0.0
     }
   },
-  "updated_at": "2026-07-30T15:15:33Z"
+  "updated_at": "2026-07-30T15:19:01Z"
 }
