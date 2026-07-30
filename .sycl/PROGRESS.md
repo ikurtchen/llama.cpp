@@ -5,8 +5,8 @@
 - **Toolchain**: Intel(R) oneAPI DPC++/C++ Compiler 2025.3.2 (2025.3.2.20260112)  ·  **GPU**: Intel(R) Graphics [0xe223] (xe2)  ·  **oneAPI**: /opt/intel/oneapi
 - **Benchmark GPU freq pinned**: True
 - **Build system**: cmake → SYCL build: confirmed
-- **Phase**: migrate
-- **Updated**: 2026-07-30T10:22:30Z
+- **Phase**: report
+- **Updated**: 2026-07-30T15:18:29Z
 
 **Summary**: 13 kernels — 10 migrated, 0 optimized, 2 skipped, 0 needs-reference, 1 pending.
 
@@ -23,21 +23,21 @@
 | opt-step-adamw-f32 | ggml/src/ggml-cuda/opt-step-adamw.cu:6 | migrated | - | - | - | - | SYCL kernel (opt_step_adamw.cpp) created. Full AdamW with m/v buffers+bias correction. PASSED on B70. |
 | snake-fused | ggml/src/ggml-cuda/snake.cu:9 | migrated | - | - | - | - | Fused kernel replacing 5-element chain. Equivalent to standard element-wise ops but fused for performance. Can be emulated via 5 separate element-wise ops (already in SYCL). [Existing SYCL backend] |
 | softcap-f32 | ggml/src/ggml-cuda/softcap.cu:3 | migrated | - | - | - | - | NOT a standalone GGML_OP. SOFTCAP is a fusion of SCALE+TANH+SCALE handled individually in SYCL backend. Fused kernel (softcap.cpp) created for future fusion optimization. |
-| lightning-indexer-vec | ggml/src/ggml-cuda/lightning-indexer.cu:244 | migrated | - | - | - | - | SYCL kernel (lightning_indexer.cpp) created. Vector fallback with shared memory + warp shuffle. Handles F32/F16 K types, supports n_embd=128 n_head=32/64. Compiles but GPU testing blocked by hardware failure. |
+| lightning-indexer-vec | ggml/src/ggml-cuda/lightning-indexer.cu:244 | migrated | - | - | - | - | Vector kernel with shared memory + warp shuffle. Supports F16/Q4_0 K types, n_embd=128, n_head=32/64. 18/24 tests pass: F16 12/12 OK, Q4_0 nb>=512 6/6 OK, Q4_0 nb=1 0/6 FAIL (known stride/layout issue). |
 | lightning-indexer-wmma | ggml/src/ggml-cuda/lightning-indexer.cu:19 | pending | - | - | - | - | WMMA kernel stub in lightning_indexer.cpp. Full oneDNN-based Q*K^T matmul implementation pending. Currently falls through to vec kernel. |
 | allreduce-ar-kernel | ggml/src/ggml-cuda/allreduce.cu:109 | skipped | - | - | - | - | Multi-GPU only; single-device B70 deployment - not applicable. |
 | allreduce-ar-add-kernel | ggml/src/ggml-cuda/allreduce.cu:207 | skipped | - | - | - | - | Multi-GPU only; single-device B70 deployment - not applicable. |
 
 ## Agent efficiency & cost
 
-- **Elapsed**: 1h06m47s (whole run)  ·  **Active**: 25m51s (bracketed)  ·  **Cost**: $0.0  ·  **Tokens**: 0 (in 0 / out 0 / cache r 0 / cache w 0)  ·  **Premium requests**: 0  ·  **AI credits**: 0.0
-- **Observed (gen-progress heartbeat)**: span 9h01m12s  ·  working ≈ 1h07m01s (idle-capped 30m00s)  ·  5 snapshots — independent of metrics.sh
-  - ⚠️ bracketed active time (25m51s) is far below observed work (1h07m01s); phases were under-bracketed — trust elapsed/observed figures.
+- **Elapsed**: 13h54m15s (whole run)  ·  **Active**: 42m33s (bracketed)  ·  **Cost**: $0.0  ·  **Tokens**: 0 (in 0 / out 0 / cache r 0 / cache w 0)  ·  **Premium requests**: 0  ·  **AI credits**: 0.0
+- **Observed (gen-progress heartbeat)**: span 13h57m11s  ·  working ≈ 1h07m01s (idle-capped 30m00s)  ·  5 snapshots — independent of metrics.sh
 
 | phase | elapsed | active | tokens | requests | credits | USD |
 |-------|--------:|-------:|-------:|---------:|--------:|----:|
 | detect | 5m22s | 5m21s | 0 | 0 | 0.0 | 0.0 |
-| inventory | 20m30s | 20m30s | 0 | 0 | 0.0 | 0.0 |
+| inventory | 12h51m16s | 20m30s | 0 | 0 | 0.0 | 0.0 |
+| integrate | 16m42s | 16m42s | 0 | 0 | 0.0 | 0.0 |
 
 ## Progress history
 
@@ -48,5 +48,5 @@
 | 2026-07-30T02:21:04Z | detect | 0/126 | 0 | 0 | 126 |
 | 2026-07-30T02:26:35Z | inventory | 0/13 | 0 | 0 | 13 |
 | 2026-07-30T02:28:05Z | inventory | 1/13 | 0 | 0 | 12 |
-| 2026-07-30T10:22:30Z | migrate | 10/13 | 0 | 2 | 1 |
+| 2026-07-30T15:18:29Z | report | 10/13 | 0 | 2 | 1 |
 

@@ -1,7 +1,7 @@
 {
   "schema": "sycl-agent/project",
   "name": "llama.cpp",
-  "phase": "migrate",
+  "phase": "report",
   "sycl_backend_exists": true,
   "sycl_backend_coverage": "~65% of CUDA ops covered (20 of 32 scan-identified kernel groups; many more via oneDNN gemm and element_wise unification)",
   "runner_mode": "remote",
@@ -17,7 +17,6 @@
     "dsv4-hc",
     "fwht",
     "ggml-cuda-infra",
-    "lightning-indexer",
     "opt-step-adamw",
     "opt-step-sgd",
     "snake",

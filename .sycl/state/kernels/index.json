@@ -100,7 +100,7 @@
       "status": "migrated",
       "risk": "medium",
       "detail": "kernels/lightning-indexer-vec.json",
-      "notes": "SYCL kernel (lightning_indexer.cpp) created. Vector fallback with shared memory + warp shuffle. Handles F32/F16 K types, supports n_embd=128 n_head=32/64. Compiles but GPU testing blocked by hardware failure."
+      "notes": "Vector kernel with shared memory + warp shuffle. Supports F16/Q4_0 K types, n_embd=128, n_head=32/64. 18/24 tests pass: F16 12/12 OK, Q4_0 nb>=512 6/6 OK, Q4_0 nb=1 0/6 FAIL (known stride/layout issue)."
     },
     {
       "id": "lightning-indexer-wmma",
