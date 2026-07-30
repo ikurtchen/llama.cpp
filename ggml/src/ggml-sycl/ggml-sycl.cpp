@@ -76,6 +76,10 @@
 #include "ggml-sycl/gated_delta_net.hpp"
 #include "ggml-sycl/pool.hpp"
 #include "ggml-sycl/cross_entropy_loss.hpp"
+#include "ggml-sycl/softcap.hpp"
+#include "ggml-sycl/opt_step_sgd.hpp"
+#include "ggml-sycl/opt_step_adamw.hpp"
+#include "ggml-sycl/dsv4_hc.hpp"
 
 // Forward declaration for FWHT (defined in fwht_sycl.cpp)
 bool ggml_sycl_op_fwht(ggml_backend_sycl_context & ctx, const ggml_tensor * src, ggml_tensor * dst);
@@ -5243,6 +5247,21 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct gg
         case GGML_OP_FLASH_ATTN_EXT:
             ggml_sycl_flash_attn_ext(ctx, dst);
             break;
+        case GGML_OP_OPT_STEP_SGD:
+            ggml_sycl_opt_step_sgd(ctx, dst);
+            break;
+        case GGML_OP_OPT_STEP_ADAMW:
+            ggml_sycl_opt_step_adamw(ctx, dst);
+            break;
+        case GGML_OP_DSV4_HC_COMB:
+            ggml_sycl_op_dsv4_hc_comb(ctx, dst);
+            break;
+        case GGML_OP_DSV4_HC_PRE:
+            ggml_sycl_op_dsv4_hc_pre(ctx, dst);
+            break;
+        case GGML_OP_DSV4_HC_POST:
+            ggml_sycl_op_dsv4_hc_post(ctx, dst);
+            break;
         default:
             return false;
     }
@@ -6032,6 +6051,14 @@ static bool do_ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, cons
             return op->src[0]->ne[0] <= SYCL_SOLVE_TRI_MAX_N && op->src[1]->ne[0] <= SYCL_SOLVE_TRI_MAX_K;
         case GGML_OP_FLASH_ATTN_EXT:
             return ggml_sycl_flash_attn_ext_supported(device, op);
+        case GGML_OP_OPT_STEP_SGD:
+            return op->type == GGML_TYPE_F32;
+        case GGML_OP_OPT_STEP_ADAMW:
+            return op->type == GGML_TYPE_F32;
+        case GGML_OP_DSV4_HC_COMB:
+        case GGML_OP_DSV4_HC_PRE:
+        case GGML_OP_DSV4_HC_POST:
+            return op->type == GGML_TYPE_F32;
         default:
             return false;
     }

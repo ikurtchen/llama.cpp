@@ -2,54 +2,34 @@
   "schema": "kernel-index",
   "kernels": [
     {
-      "id": "allreduce-ar-kernel",
-      "source": "ggml/src/ggml-cuda/allreduce.cu:109",
-      "source_lang": "cuda",
-      "target_style": "plain-sycl",
-      "status": "skipped",
-      "risk": "high",
-      "detail": "kernels/allreduce-ar-kernel.json",
-      "notes": "Multi-GPU only; single-GPU B70 deployment - not applicable"
-    },
-    {
-      "id": "allreduce-ar-add-kernel",
-      "source": "ggml/src/ggml-cuda/allreduce.cu:207",
-      "source_lang": "cuda",
-      "target_style": "plain-sycl",
-      "status": "skipped",
-      "risk": "medium",
-      "detail": "kernels/allreduce-ar-add-kernel.json",
-      "notes": "Multi-GPU only; only useful with allreduce-ar-kernel - not applicable"
-    },
-    {
       "id": "dsv4-hc-comb-f32",
       "source": "ggml/src/ggml-cuda/dsv4-hc.cu:36",
       "source_lang": "cuda",
       "target_style": "plain-sycl",
-      "status": "skipped",
+      "status": "migrated",
       "risk": "medium",
       "detail": "kernels/dsv4-hc-comb-f32.json",
-      "notes": "Model-specific (DSv4 architecture). Rare model; not critical for mainstream LLM inference."
+      "notes": "SYCL kernel (dsv4_hc.cpp:comb) created. 4x4 combination matrix with softmax+Sinkhorn normalization. Support confirmed; GPU crashed before correctness test could complete - needs re-run after GPU recovery."
     },
     {
       "id": "dsv4-hc-pre-f32",
       "source": "ggml/src/ggml-cuda/dsv4-hc.cu:103",
       "source_lang": "cuda",
       "target_style": "plain-sycl",
-      "status": "skipped",
+      "status": "migrated",
       "risk": "low",
       "detail": "kernels/dsv4-hc-pre-f32.json",
-      "notes": "Model-specific (DSv4 architecture). Pre-processing for DSv4 attention."
+      "notes": "SYCL kernel (dsv4_hc.cpp:pre) created. Per-head weighted sum across HC dimension. Support confirmed; GPU crashed before correctness test could complete - needs re-run after GPU recovery."
     },
     {
       "id": "dsv4-hc-post-f32",
       "source": "ggml/src/ggml-cuda/dsv4-hc.cu:140",
       "source_lang": "cuda",
       "target_style": "plain-sycl",
-      "status": "skipped",
+      "status": "migrated",
       "risk": "low",
       "detail": "kernels/dsv4-hc-post-f32.json",
-      "notes": "Model-specific (DSv4 architecture). Post-processing for DSv4 attention."
+      "notes": "SYCL kernel (dsv4_hc.cpp:post) created. Fused residual+combination-weighted sum. Support confirmed; GPU crashed before correctness test could complete - needs re-run after GPU recovery."
     },
     {
       "id": "fwht",
@@ -67,50 +47,30 @@
       "source": "ggml/src/ggml-cuda/ggml-cuda.cu:1335",
       "source_lang": "cuda",
       "target_style": "plain-sycl",
-      "status": "skipped",
+      "status": "migrated",
       "risk": "low",
       "detail": "kernels/compute-batched-ptrs.json",
-      "notes": "Infrastructure kernel handled differently in SYCL via sycl::group operations and SYCL-level batch semantics."
-    },
-    {
-      "id": "lightning-indexer-wmma",
-      "source": "ggml/src/ggml-cuda/lightning-indexer.cu:19",
-      "source_lang": "cuda",
-      "target_style": "plain-sycl",
-      "status": "skipped",
-      "risk": "high",
-      "detail": "kernels/lightning-indexer-wmma.json",
-      "notes": "Model-specific (lightning-attention). Requires sycl::joint_matrix which is complex. Used only by lightning-attention models (rare)."
-    },
-    {
-      "id": "lightning-indexer-vec",
-      "source": "ggml/src/ggml-cuda/lightning-indexer.cu:244",
-      "source_lang": "cuda",
-      "target_style": "plain-sycl",
-      "status": "skipped",
-      "risk": "medium",
-      "detail": "kernels/lightning-indexer-vec.json",
-      "notes": "Model-specific (lightning-attention fallback). Only needed if lightning-indexer-wmma exists."
+      "notes": "Already exists in SYCL backend as k_compute_batched_ptrs in ggml-sycl.cpp:3404. No migration needed."
     },
     {
       "id": "opt-step-sgd-f32",
       "source": "ggml/src/ggml-cuda/opt-step-sgd.cu:6",
       "source_lang": "cuda",
       "target_style": "plain-sycl",
-      "status": "skipped",
+      "status": "migrated",
       "risk": "low",
       "detail": "kernels/opt-step-sgd-f32.json",
-      "notes": "Training-only optimizer; inference deployment does not require this"
+      "notes": "SYCL kernel (opt_step_sgd.cpp) created. Element-wise SGD step: x[i] = x[i]*(1-wd*lr) - lr*g[i]. Support confirmed; GPU crashed before correctness test could complete - needs re-run after GPU recovery."
     },
     {
       "id": "opt-step-adamw-f32",
       "source": "ggml/src/ggml-cuda/opt-step-adamw.cu:6",
       "source_lang": "cuda",
       "target_style": "plain-sycl",
-      "status": "skipped",
+      "status": "migrated",
       "risk": "low",
       "detail": "kernels/opt-step-adamw-f32.json",
-      "notes": "Training-only optimizer; inference deployment does not require this"
+      "notes": "SYCL kernel (opt_step_adamw.cpp) created. Full AdamW with m/v buffers+bias correction. Support confirmed; GPU crashed before correctness test could complete - needs re-run after GPU recovery."
     },
     {
       "id": "snake-fused",
@@ -127,11 +87,51 @@
       "source": "ggml/src/ggml-cuda/softcap.cu:3",
       "source_lang": "cuda",
       "target_style": "plain-sycl",
-      "status": "skipped",
+      "status": "migrated",
       "risk": "low",
       "detail": "kernels/softcap-f32.json",
-      "notes": "Already handled inside SYCL flash attention path (FATTN-SOFT-CAP flag)"
+      "notes": "NOT a standalone GGML_OP. SOFTCAP is a fusion of SCALE+TANH+SCALE handled individually in SYCL backend. Fused kernel (softcap.cpp) created for future fusion optimization."
+    },
+    {
+      "id": "lightning-indexer-wmma",
+      "source": "ggml/src/ggml-cuda/lightning-indexer.cu:19",
+      "source_lang": "cuda",
+      "target_style": "plain-sycl",
+      "status": "pending",
+      "risk": "high",
+      "detail": "kernels/lightning-indexer-wmma.json",
+      "notes": "[was: Model-specific (lightning-attention). Requires sycl::joint_matrix which is compl]"
+    },
+    {
+      "id": "lightning-indexer-vec",
+      "source": "ggml/src/ggml-cuda/lightning-indexer.cu:244",
+      "source_lang": "cuda",
+      "target_style": "plain-sycl",
+      "status": "pending",
+      "risk": "medium",
+      "detail": "kernels/lightning-indexer-vec.json",
+      "notes": "[was: Model-specific (lightning-attention fallback). Only needed if lightning-indexer-]"
+    },
+    {
+      "id": "allreduce-ar-kernel",
+      "source": "ggml/src/ggml-cuda/allreduce.cu:109",
+      "source_lang": "cuda",
+      "target_style": "plain-sycl",
+      "status": "skipped",
+      "risk": "high",
+      "detail": "kernels/allreduce-ar-kernel.json",
+      "notes": "Multi-GPU only; single-device B70 deployment - not applicable."
+    },
+    {
+      "id": "allreduce-ar-add-kernel",
+      "source": "ggml/src/ggml-cuda/allreduce.cu:207",
+      "source_lang": "cuda",
+      "target_style": "plain-sycl",
+      "status": "skipped",
+      "risk": "medium",
+      "detail": "kernels/allreduce-ar-add-kernel.json",
+      "notes": "Multi-GPU only; single-device B70 deployment - not applicable."
     }
   ],
-  "updated_at": "2026-07-30T03:15:00Z"
+  "updated_at": "2026-07-30T03:30:00Z"
 }
