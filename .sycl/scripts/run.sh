@@ -188,7 +188,7 @@ do_sync() {
   # profiling artifacts / logs we later want to pull back. Fetch them with `run.sh pull`.
   rsync -az --delete \
     -e "$RSYNC_SSH" \
-    --exclude '.git/' --exclude 'build/' --exclude '*.o' \
+    --exclude '.git/' --exclude 'build/' --exclude 'build_sycl/' --exclude '*.o' \
     --exclude '.sycl/logs/' --exclude '.sycl/reports/' \
     "$PROJECT_DIR/" "${REMOTE_DEST}:${REMOTE_WORKDIR}/"
 }
