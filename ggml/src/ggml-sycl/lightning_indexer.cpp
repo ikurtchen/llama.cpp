@@ -4,6 +4,25 @@
 
 constexpr int WARP_SIZE_K = 32;
 
+// Optimization: use SYCL group collectives for warp reduction instead of manual shuffle loops.
+// This replaces warp_reduce_sum with reduce_over_group for fewer barriers and better codegen.
+template <int WARP_SIZE>
+inline float warp_reduce_sum_group(const float val, const sycl::sub_group & sg) {
+    (void)WARP_SIZE;
+    return sycl::reduce_over_group(sg, val, sycl::plus<float>());
+}
+
+// Optimization: manual XOR butterfly reduction — profile vs reduce_over_group on B70
+template <int WARP_SIZE>
+inline float warp_reduce_sum_xor(float val, const sycl::sub_group & sg) {
+    (void)sg;
+#pragma unroll
+    for (int offset = WARP_SIZE / 2; offset > 0; offset >>= 1) {
+        val += sycl::permute_group_by_xor(sg, val, offset);
+    }
+    return val;
+}
+
 // Dequantize 4 values from K at given element offset i0 into float4.
 // Matches CUDA get_dequantize_V<type, float, 4>() calling convention.
 template <ggml_type TYPE_K>
@@ -157,6 +176,8 @@ inline void dequantize_k_vec_4(const void * k_base, sycl::float4 * dst, int i0) 
 
 // Vector-based lightning indexer kernel template.
 // Each warp processes K_VECS_PER_WARP K-vectors. All warps in a block cooperate via shared memory.
+// Uses sycl::reduce_over_group for warp-level reduction and [[intel::grf_size(256)]] large GRF
+// to accommodate register pressure from k_reg_f[8] (32 floats) plus dequantize intermediates.
 template <int WARPS_PER_BLOCK, int K_VECS_PER_BLOCK, int N_EMBD, int N_HEAD, ggml_type TYPE_K>
 static void lightning_indexer_kernel_vec(
         const float * Q, const char * K, const float * W, const sycl::half * M, float * dst,
@@ -187,6 +208,8 @@ static void lightning_indexer_kernel_vec(
 
     const int start_kv_block = item.get_group(0) * K_VECS_PER_BLOCK;
     const int start_kv       = start_kv_block + i_warp * K_VECS_PER_WARP;
+
+    auto sg = item.get_sub_group();
 
     const char  * q_base = (const char  *)                 Q + i_batch * nbq2 + i_stream * nbq3;
     const float * w_base = (const float *) ((const char *) W + i_batch * nbw1 + i_stream * nbw3);
@@ -239,9 +262,10 @@ static void lightning_indexer_kernel_vec(
                 qk[k] += q_vec.w() * k_reg_f[k].w();
             }
 
+            // OPTIMIZATION: use sycl::reduce_over_group instead of manual shuffle loop
 #pragma unroll
             for (int k = 0; k < K_VECS_PER_WARP; ++k) {
-                float sum = warp_reduce_sum<WARP_SIZE_K>(qk[k], item);
+                float sum = warp_reduce_sum_group<WARP_SIZE_K>(qk[k], sg);
                 if (i_lane == 0) {
                     sum = (sum > 0.0f) ? sum : 0.0f;
                     score_k[k] += sum * w_val;
@@ -271,11 +295,13 @@ static void lightning_indexer_kernel_vec(
     }
 }
 
-// Macro to dispatch a typed kernel instantiation for the given N_EMBD/N_HEAD pair
+// Macro to dispatch a typed kernel instantiation for the given N_EMBD/N_HEAD pair.
+// OPTIMIZED: large GRF mode (256 registers) to eliminate spills from dequantize + reduce_over_group.
 #define LIGHTNING_INDEXER_VEC_DISPATCH(n_embd, n_head, k_type)                                    \
     cgh.parallel_for(                                                                              \
         sycl::nd_range<3>(grid * block, block),                                                    \
-        [=](sycl::nd_item<3> item) [[sycl::reqd_sub_group_size(WARP_SIZE_K)]] {                    \
+        [=](sycl::nd_item<3> item) [[sycl::reqd_sub_group_size(WARP_SIZE_K)]                          \
+                                   [[intel::grf_size(256)]] {                                      \
             lightning_indexer_kernel_vec<WARPS_PER_BLOCK, K_VECS_PER_BLOCK, n_embd, n_head, k_type>( \
                 q_d, k_d, w_d, m_d, dst_d,                                                         \
                 n_stream, n_batch, n_kv,                                                            \
@@ -327,6 +353,9 @@ void ggml_sycl_lightning_indexer(ggml_backend_sycl_context & ctx, ggml_tensor * 
     const sycl::half  * m_d   = (const sycl::half  *) m->data;
     float             * dst_d = (      float       *) dst->data;
 
+    // OPTIMIZED: K_VECS_PER_WARP=8 with large GRF (256 regs) to accommodate register pressure.
+    // WARPS_PER_BLOCK=8 x WARP_SIZE=32 = 256 threads per block.
+    // K_VECS_PER_BLOCK=64, so each block processes more KVs with fewer blocks.
     constexpr int K_VECS_PER_WARP  = 8;
     constexpr int WARPS_PER_BLOCK  = 8;
     constexpr int K_VECS_PER_BLOCK = K_VECS_PER_WARP * WARPS_PER_BLOCK;

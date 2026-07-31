@@ -33,5 +33,17 @@
     "details": "96/96 tests pass. 8 types (F32, F16, BF16, Q8_0, Q5_1, Q5_0, Q4_1, Q4_0) x nb=[512,1] x (nh=32,64) x (ns=1,4) x (nm=1,4) for ns=4. IQ4_NL correctly skipped by supports_op."
   },
   "migrated_commit": "aba574c6e",
-  "updated_at": "2026-07-30T02:26:23Z"
+  "updated_at": "2026-07-30T02:26:23Z",
+  "optimizations": [
+    "reduce_over_group: replaced manual shuffle warp_reduce_sum with sycl::reduce_over_group",
+    "large_grf: [[intel::grf_size(256)]] on kernel lambda to eliminate register spills from dequantize+reduction",
+    "K_VECS_PER_WARP=8 with largeGRF (tried K_VECS_PER_WARP=4, no perf difference)"
+  ],
+  "optimization_result": {
+    "correctness": "96/96 passed",
+    "peak_tflops": 1.7,
+    "baseline_tflops": 1.69,
+    "speedup": "~1.0x (no measurable improvement)",
+    "bottleneck_analysis": "kernel is bandwidth/dequantize-bound, not compute-bound. Only 4 FMAs per lane per inner loop iteration with global memory dequantize. Peak throughput limited to ~1.7 TFLOPS regardless of register/GRF tuning."
+  }
 }
