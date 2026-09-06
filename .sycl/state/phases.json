@@ -79,13 +79,13 @@
       "notes": ""
     },
     "profile-e2e": {
-      "status": "active",
+      "status": "exited",
       "entered_at": "2026-09-06T22:06:43Z",
-      "exited_at": "",
+      "exited_at": "2026-09-06T22:41:13Z",
       "gate": {
-        "result": "pending",
-        "attempts": 0,
-        "checked_at": "",
+        "result": "pass",
+        "attempts": 1,
+        "checked_at": "2026-09-06T22:41:13Z",
         "unmet": []
       },
       "waivers": [],
@@ -218,5 +218,5 @@
     },
     "changes": []
   },
-  "updated_at": "2026-09-06T22:06:43Z"
+  "updated_at": "2026-09-06T22:41:13Z"
 }

@@ -5,8 +5,8 @@
 - **Toolchain**: Intel(R) oneAPI DPC++/C++ Compiler 2025.3.2 (2025.3.2.20260112)  ·  **GPU**: Intel(R) Graphics [0xe223] (Arc Pro B70, Battlemage) (xe2)  ·  **oneAPI**: /opt/intel/oneapi (2025.3.2)
 - **Benchmark GPU freq pinned**: True
 - **Build system**: cmake → SYCL build: set-up (ggml/src/ggml-sycl/ builds via icpx -fsycl, AOT bmg-g31, links oneMKL; registers as backend SYCL0)
-- **Phase**: profile-e2e
-- **Updated**: 2026-09-06T22:40:50Z
+- **Phase**: optimize
+- **Updated**: 2026-09-06T22:41:28Z
 
 **Summary**: 76 kernels — 73 migrated, 0 optimized, 2 skipped, 0 needs-reference, 0 pending.
 
@@ -37,7 +37,7 @@
 
 ## Phase gates
 
-- **Closed**: 5/9  ·  a phase is exited only by `evidence.sh gate <phase>`; anything else is an ungated exit
+- **Closed**: 6/9  ·  a phase is exited only by `evidence.sh gate <phase>`; anything else is an ungated exit
 
 | phase | status | gate | attempts | unmet criteria |
 |-------|--------|------|----------|----------------|
@@ -46,7 +46,7 @@
 | scaffold | exited | pass | 2 | - |
 | migrate | exited | pass | 3 | - |
 | integrate | exited | pass | 2 | - |
-| profile-e2e | active | pending | 0 | - |
+| profile-e2e | exited | pass | 1 | - |
 | optimize | pending | pending | 0 | - |
 | done | pending | pending | 0 | - |
 | report | pending | pending | 0 | - |
@@ -138,7 +138,7 @@
 ## Agent efficiency & cost
 
 - **Elapsed**: 5h02m01s (whole run)  ·  **Active**: 4h30m37s (bracketed)  ·  **Cost**: $0.0  ·  **Tokens**: 256612832 (in 8803075 / out 1255396 / cache r 245376631 / cache w 1177730)  ·  **Premium requests**: 2017  ·  **AI credits**: 2011.0
-- **Observed (gen-progress heartbeat)**: span 6h56m19s  ·  working ≈ 5h55m06s (idle-capped 30m00s)  ·  39 snapshots — independent of metrics.sh
+- **Observed (gen-progress heartbeat)**: span 6h56m57s  ·  working ≈ 5h55m44s (idle-capped 30m00s)  ·  40 snapshots — independent of metrics.sh
 
 | phase | elapsed | active | tokens | requests | credits | USD |
 |-------|--------:|-------:|-------:|---------:|--------:|----:|
@@ -151,7 +151,6 @@
 <!-- append-only from logs/progress.jsonl — one row per gen-progress run -->
 | time (UTC) | phase | migrated | optimized | skipped | pending |
 |------------|-------|---------:|----------:|--------:|--------:|
-| 2026-09-06T21:29:58Z | migrate | 50/76 | 0 | 1 | 24 |
 | 2026-09-06T21:31:38Z | migrate | 51/76 | 0 | 1 | 23 |
 | 2026-09-06T21:32:17Z | migrate | 52/76 | 0 | 1 | 22 |
 | 2026-09-06T21:32:28Z | migrate | 57/76 | 0 | 1 | 17 |
@@ -163,6 +162,7 @@
 | 2026-09-06T21:53:18Z | migrate | 73/76 | 0 | 2 | 0 |
 | 2026-09-06T22:07:18Z | profile-e2e | 73/76 | 0 | 2 | 0 |
 | 2026-09-06T22:40:50Z | profile-e2e | 73/76 | 0 | 2 | 0 |
+| 2026-09-06T22:41:28Z | optimize | 73/76 | 0 | 2 | 0 |
 
 ## Lessons
 

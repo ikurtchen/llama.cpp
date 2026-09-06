@@ -1,7 +1,7 @@
 {
   "schema": "sycl-agent/project",
   "name": "llama.cpp",
-  "phase": "profile-e2e",
+  "phase": "optimize",
   "runner_mode": "remote",
   "runner_host": "cripoc02 (10.239.98.41:2332)",
   "build_system": "cmake",
