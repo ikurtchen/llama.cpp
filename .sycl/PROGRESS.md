@@ -6,7 +6,7 @@
 - **Benchmark GPU freq pinned**: True
 - **Build system**: cmake → SYCL build: set-up (ggml/src/ggml-sycl/ builds via icpx -fsycl, AOT bmg-g31, links oneMKL; registers as backend SYCL0)
 - **Phase**: migrate
-- **Updated**: 2026-09-06T21:46:43Z
+- **Updated**: 2026-09-06T21:50:06Z
 
 **Summary**: 76 kernels — 73 migrated, 0 optimized, 2 skipped, 0 needs-reference, 0 pending.
 
@@ -85,7 +85,7 @@
 | flash-attn-mma-f16 | ggml/src/ggml-cuda/fattn.cu:ggml_cuda_flash_attn_ext_mma_f16_shall_use_sparse,ggml_cuda_flash_attn_ext_mma_f16_switch_ncols1,ggml_cuda_flash_attn_ext_mma_f16_switch_ncols2,ggml_cuda_flash_attn_ext_mma_f16 | migrated | test-backend-ops FLASH_ATTN_EXT: 324/324 supported cases passed on SYCL0, 0 failed, unsupported cases fell back per supports_op | - | 394→0 | - | - | Risk reason: tensor-core MMA pipelines, sparse path selection, and streamed partial-result handling make this the hardest attention variant. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated as one unified plain-SYCL online-softmax kernel in ggml/src/ggml-sycl/fattn.cpp with the public declaration in fattn.hpp, instead of mirroring CUDA's separate vec/tile/mma/common dispatch split. This SYCL path permanently registers GGML_OP_FLASH_ATTN_EXT in ggml/src/ggml-sycl/ggml-sycl.cpp. Scope is the dense decoder path only: Q=f32/f16, K/V=f16, dst=f32, additive mask, ALiBi, and GQA for head dims 64/80/128. Residual/waiver: Q8_0 KV-cache variants (f16-q8_0, q8_0-f16, q8_0-q8_0), sinks, logit softcap, sparse n_kv_max mask compaction/streamed fixup, and the full CUDA MMA feature matrix are not implemented; those configurations fall back. |
 | fwht | ggml/src/ggml-cuda/fwht.cu:fwht_cuda,ggml_cuda_op_fwht | migrated | pass | - | 83→52 | - | - | Risk reason: butterfly transform ordering matters, but the kernel structure is regular. Reference oracle: ggml-cpu backend via tests/test-backend-ops. SYCL wires the FWHT path through ggml_sycl_op_mul_mat() when GGML_HINT_SRC0_IS_HADAMARD selects the Hadamard fast path. |
 | gated-delta-net | ggml/src/ggml-cuda/gated_delta_net.cu:launch_gated_delta_net,ggml_cuda_op_gated_delta_net_impl,ggml_cuda_op_gated_delta_net,ggml_cuda_op_gated_delta_net_fused_cache | migrated | pass | - | 271→197 | - | - | Risk reason: recurrent stateful update with warp reductions and rollback-slot semantics is complex. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
-| getrows | ggml/src/ggml-cuda/getrows.cu:k_get_rows,k_get_rows_kq,k_get_rows_float,k_get_rows_float_vec,k_get_rows_back_float,get_rows_cuda_q,get_rows_cuda_kq,get_rows_cuda_float,ggml_cuda_get_rows_switch_src0_type,get_rows_cuda,ggml_cuda_op_get_rows,ggml_cuda_op_get_rows_back | migrated | pass | - | 419→262 | - | - | Risk reason: forward uses many type/layout cases and backward performs index-based reductions. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated the forward GET_ROWS path for dense F32/F16 and quantized Q8_0 src0 tensors, including contiguous src1 layouts exercised by the inherited test-backend-ops harness. Evidence run executed 13/13 supported GET_ROWS cases on SYCL0. Residuals: BF16, I32, non-Q8_0 quantized src0 types, GET_ROWS_BACK, and src1 layouts that fail the current ggml_is_contiguous(src1) gate (for example v=1 cases with be1=7). |
+| getrows | ggml/src/ggml-cuda/getrows.cu:k_get_rows,k_get_rows_kq,k_get_rows_float,k_get_rows_float_vec,k_get_rows_back_float,get_rows_cuda_q,get_rows_cuda_kq,get_rows_cuda_float,ggml_cuda_get_rows_switch_src0_type,get_rows_cuda,ggml_cuda_op_get_rows,ggml_cuda_op_get_rows_back | migrated | pass | - | 419→224 | - | - | Risk reason: forward uses many type/layout cases and backward performs index-based reductions. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated the forward GET_ROWS path for dense F32/F16 and quantized Q8_0 src0 tensors, including the batched/broadcast cases exercised by the inherited test-backend-ops harness. Current evidence run executed 13/13 supported GET_ROWS cases on SYCL0 with no ERR lines and no DEVICE_LOST crash. Residuals: BF16, I32, non-Q8_0 quantized src0 types, GET_ROWS_BACK, and non-contiguous src1 layouts that fail the current ggml_is_contiguous(src1) gate (for example v=1 cases with be1=7). |
 | batched-ptrs | ggml/src/ggml-cuda/ggml-cuda.cu:k_compute_batched_ptrs | skipped | - | - | 20→0 | - | - | Skipped for a non-difficulty reason. k_compute_batched_ptrs is a CUDA-internal helper that builds per-batch pointer arrays for cuBLAS batched GEMM. The SYCL backend's oneMKL batched GEMM path in ggml/src/ggml-sycl/mmf.cpp uses GEMM_BATCH with strided batch metadata and does not need manual pointer-array setup, so the functionality is already covered by the migrated batched MUL_MAT path. |
 | gla | ggml/src/ggml-cuda/gla.cu:gated_linear_attn_f32,ggml_cuda_op_gated_linear_attn | migrated | pass | - | 75→117 | - | - | Risk reason: recurrent attention update with custom memory layout is specialized and stateful. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | im2col | ggml/src/ggml-cuda/im2col.cu:im2col_kernel,im2col_cuda,im2col_cuda_f16,im2col_cuda_f32,ggml_cuda_op_im2col,im2col_3d_kernel,im2col_3d_cuda,im2col_3d_cuda_f16,im2col_3d_cuda_f32,ggml_cuda_op_im2col_3d | migrated | pass | - | 223→226 | - | - | Risk reason: multi-axis patch extraction and padding logic need exact matching. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
@@ -135,7 +135,7 @@
 ## Agent efficiency & cost
 
 - **Elapsed**: 5h02m01s (whole run)  ·  **Active**: 4h30m37s (bracketed)  ·  **Cost**: $0.0  ·  **Tokens**: 256612832 (in 8803075 / out 1255396 / cache r 245376631 / cache w 1177730)  ·  **Premium requests**: 2017  ·  **AI credits**: 2011.0
-- **Observed (gen-progress heartbeat)**: span 6h02m12s  ·  working ≈ 5h04m31s (idle-capped 30m00s)  ·  35 snapshots — independent of metrics.sh
+- **Observed (gen-progress heartbeat)**: span 6h05m35s  ·  working ≈ 5h07m54s (idle-capped 30m00s)  ·  36 snapshots — independent of metrics.sh
 
 | phase | elapsed | active | tokens | requests | credits | USD |
 |-------|--------:|-------:|-------:|---------:|--------:|----:|
@@ -148,7 +148,6 @@
 <!-- append-only from logs/progress.jsonl — one row per gen-progress run -->
 | time (UTC) | phase | migrated | optimized | skipped | pending |
 |------------|-------|---------:|----------:|--------:|--------:|
-| 2026-09-06T19:31:45Z | migrate | 42/76 | 0 | 2 | 31 |
 | 2026-09-06T19:31:56Z | migrate | 44/76 | 0 | 2 | 29 |
 | 2026-09-06T19:32:17Z | migrate | 42/76 | 0 | 0 | 33 |
 | 2026-09-06T20:22:24Z | migrate | 44/76 | 0 | 0 | 31 |
@@ -160,4 +159,5 @@
 | 2026-09-06T21:38:26Z | migrate | 67/76 | 0 | 1 | 7 |
 | 2026-09-06T21:45:37Z | migrate | 69/76 | 0 | 1 | 5 |
 | 2026-09-06T21:46:43Z | migrate | 73/76 | 0 | 2 | 0 |
+| 2026-09-06T21:50:06Z | migrate | 73/76 | 0 | 2 | 0 |
 

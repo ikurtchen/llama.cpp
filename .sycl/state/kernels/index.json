@@ -427,7 +427,7 @@
       "detail": ".sycl/state/kernels/getrows.json",
       "loc": {
         "source_code": 419,
-        "sycl_code": 262
+        "sycl_code": 224
       },
       "target_style": "plain-sycl",
       "sycl_file": "ggml/src/ggml-sycl/getrows.cpp",
@@ -437,7 +437,7 @@
       ],
       "unit_test": {
         "result": "pass",
-        "evidence": "test-getrows-20260906T190355Z-994aec"
+        "evidence": "test-getrows-20260906T214955Z-2dfec3"
       }
     },
     {
@@ -1038,5 +1038,5 @@
       }
     }
   ],
-  "updated_at": "2026-09-06T21:46:32Z"
+  "updated_at": "2026-09-06T21:50:06Z"
 }
