@@ -3,7 +3,7 @@
   "name": "l2-norm",
   "source": "ggml/src/ggml-cuda/norm.cu:l2_norm_f32,l2_norm_f32_cuda,ggml_cuda_op_l2_norm",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "medium",
   "algorithm": "Normalize each row/vector by its L2 norm.",
   "cuda_constructs": [
@@ -34,7 +34,7 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: per-row reduction plus rescaling. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:35Z",
+  "updated_at": "2026-09-06T17:39:38Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -71,5 +71,16 @@
     "unresolved": [],
     "method": "span",
     "measured_at": "2026-09-06T16:21:35Z"
+  },
+  "target_style": "plain-sycl",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/norm.cpp",
+    "ggml/src/ggml-sycl/norm.hpp"
+  ],
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "NORM,RMS_NORM,GROUP_NORM,L2_NORM",
+    "result": "pass",
+    "evidence": "test-norm-family-20260906T173938Z-737da8"
   }
 }

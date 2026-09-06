@@ -3,7 +3,7 @@
   "name": "rms-norm-family",
   "source": "ggml/src/ggml-cuda/norm.cu:rms_norm_f32,rms_norm_back_f32,rms_norm_f32_cuda,rms_norm_back_f32_cuda,ggml_cuda_op_rms_norm,ggml_cuda_op_rms_norm_fused,ggml_cuda_op_rms_norm_fused_add,ggml_cuda_op_rms_norm_back",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "medium",
   "algorithm": "Compute RMS normalization per row, including fused multiply/add epilogues and the backward pass.",
   "cuda_constructs": [
@@ -47,7 +47,7 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: reduction numerics plus fused broadcast epilogues need exact matching. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:37Z",
+  "updated_at": "2026-09-06T17:39:38Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -102,5 +102,16 @@
     "source_spec": [
       "ggml/src/ggml-cuda/norm.cu:326-446"
     ]
+  },
+  "target_style": "plain-sycl",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/norm.cpp",
+    "ggml/src/ggml-sycl/norm.hpp"
+  ],
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "NORM,RMS_NORM,GROUP_NORM,L2_NORM",
+    "result": "pass",
+    "evidence": "test-norm-family-20260906T173938Z-737da8"
   }
 }

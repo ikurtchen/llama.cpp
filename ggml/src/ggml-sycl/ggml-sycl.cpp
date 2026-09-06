@@ -20,6 +20,7 @@
 #include "arange.hpp"
 #include "argsort.hpp"
 #include "argmax.hpp"
+#include "norm.hpp"
 #include "top-k.hpp"
 #include "set-rows.hpp"
 #include "reduce_rows.hpp"
@@ -260,6 +261,18 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, ggml_tens
         case GGML_OP_LOG:
             ggml_sycl_op_log(ctx, dst);
             return true;
+        case GGML_OP_NORM:
+            ggml_sycl_op_norm(ctx, dst);
+            return true;
+        case GGML_OP_RMS_NORM:
+            ggml_sycl_op_rms_norm(ctx, dst);
+            return true;
+        case GGML_OP_GROUP_NORM:
+            ggml_sycl_op_group_norm(ctx, dst);
+            return true;
+        case GGML_OP_L2_NORM:
+            ggml_sycl_op_l2_norm(ctx, dst);
+            return true;
         case GGML_OP_ROPE:
             ggml_sycl_op_rope(ctx, dst);
             return true;
@@ -447,6 +460,11 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_COS:
         case GGML_OP_LOG:
             return ggml_sycl_supports_unary_f32f16(op);
+        case GGML_OP_NORM:
+        case GGML_OP_RMS_NORM:
+        case GGML_OP_GROUP_NORM:
+        case GGML_OP_L2_NORM:
+            return ggml_sycl_supports_norm(op);
         case GGML_OP_ROPE:
             return ggml_sycl_supports_rope(op);
         case GGML_OP_DIAG_MASK_INF:

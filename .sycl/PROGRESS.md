@@ -6,9 +6,9 @@
 - **Benchmark GPU freq pinned**: True
 - **Build system**: cmake → SYCL build: set-up (ggml/src/ggml-sycl/ builds via icpx -fsycl, AOT bmg-g31, links oneMKL; registers as backend SYCL0)
 - **Phase**: migrate
-- **Updated**: 2026-09-06T17:15:50Z
+- **Updated**: 2026-09-06T17:38:08Z
 
-**Summary**: 76 kernels — 16 migrated, 0 optimized, 0 skipped, 0 needs-reference, 59 pending.
+**Summary**: 76 kernels — 20 migrated, 0 optimized, 0 skipped, 0 needs-reference, 55 pending.
 
 **Code migrated**: 15949 source code lines (76 files; attributed per kernel: cuda 16006) → 0 SYCL code lines (0 files)  ·  ratio 0.0×  ·  44.0% of the project's CUDA/Triton code lines  ·  measured 75/75 kernels
 
@@ -88,9 +88,9 @@
 | batched-ptrs | ggml/src/ggml-cuda/ggml-cuda.cu:k_compute_batched_ptrs | pending | - | - | 20→0 | - | - | Risk reason: simple pointer arithmetic kernel. Reference oracle: analytical pointer mapping plus backend GEMM tests. |
 | gla | ggml/src/ggml-cuda/gla.cu:gated_linear_attn_f32,ggml_cuda_op_gated_linear_attn | pending | - | - | 73→0 | - | - | Risk reason: recurrent attention update with custom memory layout is specialized and stateful. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | im2col | ggml/src/ggml-cuda/im2col.cu:im2col_kernel,im2col_cuda,im2col_cuda_f16,im2col_cuda_f32,ggml_cuda_op_im2col,im2col_3d_kernel,im2col_3d_cuda,im2col_3d_cuda_f16,im2col_3d_cuda_f32,ggml_cuda_op_im2col_3d | pending | - | - | 219→0 | - | - | Risk reason: multi-axis patch extraction and padding logic need exact matching. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
-| l2-norm | ggml/src/ggml-cuda/norm.cu:l2_norm_f32,l2_norm_f32_cuda,ggml_cuda_op_l2_norm | pending | - | - | 58→0 | - | - | Risk reason: per-row reduction plus rescaling. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
-| layer-norm | ggml/src/ggml-cuda/norm.cu:norm_f32,norm_f32_cuda,ggml_cuda_op_norm | pending | - | - | 58→0 | - | - | Risk reason: reduction numerics and arbitrary row/channel/sample strides matter. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
-| group-norm | ggml/src/ggml-cuda/norm.cu:group_norm_f32,group_norm_f32_cuda,ggml_cuda_op_group_norm | pending | - | - | 49→0 | - | - | Risk reason: grouped reduction boundaries and shared-memory reductions need validation. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
+| l2-norm | ggml/src/ggml-cuda/norm.cu:l2_norm_f32,l2_norm_f32_cuda,ggml_cuda_op_l2_norm | migrated | pass | - | 58→0 | - | - | Risk reason: per-row reduction plus rescaling. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
+| layer-norm | ggml/src/ggml-cuda/norm.cu:norm_f32,norm_f32_cuda,ggml_cuda_op_norm | migrated | pass | - | 58→0 | - | - | Risk reason: reduction numerics and arbitrary row/channel/sample strides matter. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
+| group-norm | ggml/src/ggml-cuda/norm.cu:group_norm_f32,group_norm_f32_cuda,ggml_cuda_op_group_norm | migrated | pass | - | 49→0 | - | - | Risk reason: grouped reduction boundaries and shared-memory reductions need validation. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | lightning-indexer | ggml/src/ggml-cuda/lightning-indexer.cu:lightning_indexer_kernel_wmma,lightning_indexer_kernel_vec,ggml_cuda_lightning_indexer_supported | pending | - | - | 417→0 | - | - | Risk reason: custom WMMA sparse-index scoring is highly specialized and architecture-sensitive. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | mean | ggml/src/ggml-cuda/mean.cu:divide_by_count | migrated | pass | - | 85→0 | - | - | Risk reason: reduction path switches between CUB and custom row reduction. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Scope matches CUDA: requires ggml_is_contiguous(src0). |
 | mmf | ggml/src/ggml-cuda/mmf.cu:mmf_get_rows_per_block,ggml_cuda_mul_mat_f,ggml_cuda_should_use_mmf | pending | - | - | 603→0 | - | - | Risk reason: tensor-core tile layouts and optional expert-routing path make this a high-care dense matmul port. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
@@ -107,7 +107,7 @@
 | pool1d | ggml/src/ggml-cuda/pool1d.cu:pool1d_nchw_kernel,pool1d_nchw_kernel_f32_f32_cuda,ggml_cuda_op_pool1d | pending | - | - | 69→0 | - | - | Risk reason: window geometry and boundary handling need verification. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | pool2d | ggml/src/ggml-cuda/pool2d.cu:pool2d_nchw_kernel,pool2d_nchw_kernel_f32_f32_cuda,ggml_cuda_op_pool2d | pending | - | - | 80→0 | - | - | Risk reason: multidimensional window indexing and padding logic matter. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | quantize | ggml/src/ggml-cuda/quantize.cu:nvfp4_native_scale_error,quantize_q8_1,quantize_mmq_nvfp4,quantize_mmq_mxfp4,quantize_mmq_q8_1,quantize_row_q8_1_cuda,quantize_mmq_q8_1_cuda,quantize_scatter_mmq_q8_1_cuda,quantize_scatter_mmq_fp4_cuda,quantize_mmq_fp4_cuda | pending | - | - | 557→0 | - | - | Risk reason: quantization error behavior, fp4 packing, and MoE scatter paths are precision-sensitive. Reference oracle: analytical quantization semantics plus downstream ggml-cpu op tests. |
-| rms-norm | ggml/src/ggml-cuda/norm.cu:rms_norm_f32,rms_norm_back_f32,rms_norm_f32_cuda,rms_norm_back_f32_cuda,ggml_cuda_op_rms_norm,ggml_cuda_op_rms_norm_fused,ggml_cuda_op_rms_norm_fused_add,ggml_cuda_op_rms_norm_back | pending | - | - | 344→0 | - | - | Risk reason: reduction numerics plus fused broadcast epilogues need exact matching. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
+| rms-norm | ggml/src/ggml-cuda/norm.cu:rms_norm_f32,rms_norm_back_f32,rms_norm_f32_cuda,rms_norm_back_f32_cuda,ggml_cuda_op_rms_norm,ggml_cuda_op_rms_norm_fused,ggml_cuda_op_rms_norm_fused_add,ggml_cuda_op_rms_norm_back | migrated | pass | - | 344→0 | - | - | Risk reason: reduction numerics plus fused broadcast epilogues need exact matching. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | rms-norm-rope | ggml/src/ggml-cuda/rope.cu:rms_norm_mul_rope_f32,rms_norm_mul_rope_cuda,ggml_cuda_op_rms_norm_mul_rope_fused | pending | - | - | 197→0 | - | - | Risk reason: fused norm + RoPE changes operation order and is hot-path relevant. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | roll | ggml/src/ggml-cuda/roll.cu:roll_f32_cuda,ggml_cuda_op_roll | pending | - | - | 43→0 | - | - | Risk reason: pure index remap. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | rope | ggml/src/ggml-cuda/rope.cu:rope_yarn,rope_vision,ggml_cuda_op_rope_impl,ggml_cuda_op_rope,ggml_cuda_op_rope_back,ggml_cuda_op_rope_fused | migrated | 282/282 passed (mode 0/2 all variants); mode 8/24/40 correctly report not-supported | - | 578→0 | - | - | Risk reason: several RoPE layouts, YaRN scaling, and fused view/set_rows behavior must all match the CPU backend. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated: NORMAL (mode=0) and NEOX (mode=2) only, with YaRN scaling and freq_factors, F32/F16, n_offs (partial rotary) supported. mrope/imrope/vision (mode=8/24/40) and rope_back not migrated - out of scope for Qwen3 dense text path, tracked as residual. |
@@ -134,8 +134,8 @@
 ## Agent efficiency & cost
 
 - **Elapsed**: 27m27s (whole run)  ·  **Active**: 13m14s (bracketed)  ·  **Cost**: $0.0  ·  **Tokens**: 0 (in 0 / out 0 / cache r 0 / cache w 0)  ·  **Premium requests**: 0  ·  **AI credits**: 0.0
-- **Observed (gen-progress heartbeat)**: span 1h31m19s  ·  working ≈ 1h31m19s (idle-capped 30m00s)  ·  13 snapshots — independent of metrics.sh
-  - ⚠️ bracketed active time (13m14s) is far below observed work (1h31m19s); phases were under-bracketed — trust elapsed/observed figures.
+- **Observed (gen-progress heartbeat)**: span 1h53m37s  ·  working ≈ 1h53m37s (idle-capped 30m00s)  ·  14 snapshots — independent of metrics.sh
+  - ⚠️ bracketed active time (13m14s) is far below observed work (1h53m37s); phases were under-bracketed — trust elapsed/observed figures.
 
 | phase | elapsed | active | tokens | requests | credits | USD |
 |-------|--------:|-------:|-------:|---------:|--------:|----:|
@@ -147,7 +147,6 @@
 <!-- append-only from logs/progress.jsonl — one row per gen-progress run -->
 | time (UTC) | phase | migrated | optimized | skipped | pending |
 |------------|-------|---------:|----------:|--------:|--------:|
-| 2026-09-06T15:59:07Z | inventory | 0/0 | 0 | 0 | 0 |
 | 2026-09-06T16:12:08Z | migrate | 0/0 | 0 | 0 | 0 |
 | 2026-09-06T16:21:47Z | migrate | 0/75 | 0 | 0 | 75 |
 | 2026-09-06T16:27:05Z | migrate | 4/75 | 0 | 0 | 71 |
@@ -159,4 +158,5 @@
 | 2026-09-06T17:12:56Z | migrate | 16/75 | 0 | 1 | 58 |
 | 2026-09-06T17:13:43Z | migrate | 16/75 | 0 | 0 | 59 |
 | 2026-09-06T17:15:50Z | migrate | 16/76 | 0 | 0 | 59 |
+| 2026-09-06T17:38:08Z | migrate | 20/76 | 0 | 0 | 55 |
 

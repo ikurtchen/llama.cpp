@@ -426,7 +426,7 @@
       "id": "l2-norm",
       "source": "ggml/src/ggml-cuda/norm.cu:l2_norm_f32,l2_norm_f32_cuda,ggml_cuda_op_l2_norm",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "medium",
       "detail": ".sycl/state/kernels/l2-norm.json",
       "loc": {
@@ -438,7 +438,7 @@
       "id": "layer-norm",
       "source": "ggml/src/ggml-cuda/norm.cu:norm_f32,norm_f32_cuda,ggml_cuda_op_norm",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "medium",
       "detail": ".sycl/state/kernels/layer-norm.json",
       "loc": {
@@ -450,7 +450,7 @@
       "id": "group-norm",
       "source": "ggml/src/ggml-cuda/norm.cu:group_norm_f32,group_norm_f32_cuda,ggml_cuda_op_group_norm",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "medium",
       "detail": ".sycl/state/kernels/group-norm.json",
       "loc": {
@@ -654,7 +654,7 @@
       "id": "rms-norm",
       "source": "ggml/src/ggml-cuda/norm.cu:rms_norm_f32,rms_norm_back_f32,rms_norm_f32_cuda,rms_norm_back_f32_cuda,ggml_cuda_op_rms_norm,ggml_cuda_op_rms_norm_fused,ggml_cuda_op_rms_norm_fused_add,ggml_cuda_op_rms_norm_back",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "medium",
       "detail": ".sycl/state/kernels/rms-norm.json",
       "loc": {

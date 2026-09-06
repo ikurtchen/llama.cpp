@@ -3,7 +3,7 @@
   "name": "group-norm",
   "source": "ggml/src/ggml-cuda/norm.cu:group_norm_f32,group_norm_f32_cuda,ggml_cuda_op_group_norm",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "medium",
   "algorithm": "Normalize each group of channels/elements by computing group mean and variance, then rescaling inside each group.",
   "cuda_constructs": [
@@ -40,7 +40,7 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: grouped reduction boundaries and shared-memory reductions need validation. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:35Z",
+  "updated_at": "2026-09-06T17:39:38Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -77,5 +77,16 @@
     "unresolved": [],
     "method": "span",
     "measured_at": "2026-09-06T16:21:35Z"
+  },
+  "target_style": "plain-sycl",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/norm.cpp",
+    "ggml/src/ggml-sycl/norm.hpp"
+  ],
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "NORM,RMS_NORM,GROUP_NORM,L2_NORM",
+    "result": "pass",
+    "evidence": "test-norm-family-20260906T173938Z-737da8"
   }
 }
