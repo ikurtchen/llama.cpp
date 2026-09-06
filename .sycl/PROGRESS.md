@@ -6,9 +6,9 @@
 - **Benchmark GPU freq pinned**: True
 - **Build system**: cmake → SYCL build: set-up (ggml/src/ggml-sycl/ builds via icpx -fsycl, AOT bmg-g31, links oneMKL; registers as backend SYCL0)
 - **Phase**: migrate
-- **Updated**: 2026-09-06T16:43:21Z
+- **Updated**: 2026-09-06T16:49:22Z
 
-**Summary**: 75 kernels — 11 migrated, 0 optimized, 0 skipped, 0 needs-reference, 64 pending.
+**Summary**: 75 kernels — 12 migrated, 0 optimized, 0 skipped, 0 needs-reference, 63 pending.
 
 **Code migrated**: 15949 source code lines (76 files; attributed per kernel: cuda 16006) → 0 SYCL code lines (0 files)  ·  ratio 0.0×  ·  44.0% of the project's CUDA/Triton code lines  ·  measured 75/75 kernels
 
@@ -113,7 +113,7 @@
 | rope | ggml/src/ggml-cuda/rope.cu:rope_yarn,rope_vision,ggml_cuda_op_rope_impl,ggml_cuda_op_rope,ggml_cuda_op_rope_back,ggml_cuda_op_rope_fused | migrated | 282/282 passed (mode 0/2 all variants); mode 8/24/40 correctly report not-supported | - | 578→0 | - | - | Risk reason: several RoPE layouts, YaRN scaling, and fused view/set_rows behavior must all match the CPU backend. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated: NORMAL (mode=0) and NEOX (mode=2) only, with YaRN scaling and freq_factors, F32/F16, n_offs (partial rotary) supported. mrope/imrope/vision (mode=8/24/40) and rope_back not migrated - out of scope for Qwen3 dense text path, tracked as residual. |
 | scale | ggml/src/ggml-cuda/scale.cu:scale_f32,scale_f32_cuda,ggml_cuda_op_scale | migrated | pass | - | 0→0 | - | - | Risk reason: trivial pointwise multiply. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | set | ggml/src/ggml-cuda/set.cu:ggml_cuda_op_set | pending | - | - | 29→0 | - | - | Risk reason: mostly host-side view setup on top of existing copy helpers. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
-| set-rows | ggml/src/ggml-cuda/set-rows.cu:set_rows_cuda_quant,set_rows_cuda,ggml_cuda_op_set_rows | pending | - | - | 299→0 | - | - | Risk reason: indexed scatter into dense or quantized layouts needs careful addressing. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
+| set-rows | ggml/src/ggml-cuda/set-rows.cu:set_rows_cuda_quant,set_rows_cuda,ggml_cuda_op_set_rows | migrated | 66/66 passed (F32/F16 src0->F32/F16 dst, I32/I64 idx, all broadcast shapes); quantized dst types correctly reported not-supported | - | 299→0 | - | - | Risk reason: indexed scatter into dense or quantized layouts needs careful addressing. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated non-quantized dst (F32/F16) with F32/F16 src0 and I32/I64 indices, with batch broadcast. Quantized dst set_rows (Q4_0/Q4_1/Q5_0/Q5_1/Q8_0/IQ4_NL/etc) not migrated - needs the quantize helper functions from the quantize/dequantize kernel migration, tracked as residual. |
 | snake | ggml/src/ggml-cuda/snake.cu:snake_kernel,launch_snake,ggml_cuda_op_snake_fused | pending | - | - | 53→0 | - | - | Risk reason: elementwise nonlinear map. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | softcap | ggml/src/ggml-cuda/softcap.cu:softcap_f32,softcap_f32_cuda,ggml_cuda_op_softcap | pending | - | - | 27→0 | - | - | Risk reason: simple pointwise map. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | softmax | ggml/src/ggml-cuda/softmax.cu:t2f32,soft_max_f32,soft_max_f32_parallelize_cols_single_row,soft_max_back_f32,launch_soft_max_kernels,soft_max_f32_cuda,soft_max_back_f32_cuda,ggml_cuda_op_soft_max,ggml_cuda_op_soft_max_back | pending | - | - | 308→0 | - | - | Risk reason: numerically stable reductions, optional modifiers, and multi-CTA cooperative reduction all matter. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
@@ -133,8 +133,8 @@
 ## Agent efficiency & cost
 
 - **Elapsed**: 27m27s (whole run)  ·  **Active**: 13m14s (bracketed)  ·  **Cost**: $0.0  ·  **Tokens**: 0 (in 0 / out 0 / cache r 0 / cache w 0)  ·  **Premium requests**: 0  ·  **AI credits**: 0.0
-- **Observed (gen-progress heartbeat)**: span 58m50s  ·  working ≈ 58m50s (idle-capped 30m00s)  ·  8 snapshots — independent of metrics.sh
-  - ⚠️ bracketed active time (13m14s) is far below observed work (58m50s); phases were under-bracketed — trust elapsed/observed figures.
+- **Observed (gen-progress heartbeat)**: span 1h04m51s  ·  working ≈ 1h04m51s (idle-capped 30m00s)  ·  9 snapshots — independent of metrics.sh
+  - ⚠️ bracketed active time (13m14s) is far below observed work (1h04m51s); phases were under-bracketed — trust elapsed/observed figures.
 
 | phase | elapsed | active | tokens | requests | credits | USD |
 |-------|--------:|-------:|-------:|---------:|--------:|----:|
@@ -154,4 +154,5 @@
 | 2026-09-06T16:34:01Z | migrate | 5/75 | 0 | 0 | 70 |
 | 2026-09-06T16:38:34Z | migrate | 8/75 | 0 | 0 | 67 |
 | 2026-09-06T16:43:21Z | migrate | 11/75 | 0 | 0 | 64 |
+| 2026-09-06T16:49:22Z | migrate | 12/75 | 0 | 0 | 63 |
 

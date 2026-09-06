@@ -3,7 +3,7 @@
   "name": "set-rows",
   "source": "ggml/src/ggml-cuda/set-rows.cu:set_rows_cuda_quant,set_rows_cuda,ggml_cuda_op_set_rows",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "medium",
   "algorithm": "Scatter source rows into destination rows selected by integer indices, with dense and quantized destination variants.",
   "cuda_constructs": [
@@ -46,8 +46,8 @@
     "kind": "cpu",
     "crosscheck": "-"
   },
-  "notes": "Risk reason: indexed scatter into dense or quantized layouts needs careful addressing. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:37Z",
+  "notes": "Risk reason: indexed scatter into dense or quantized layouts needs careful addressing. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated non-quantized dst (F32/F16) with F32/F16 src0 and I32/I64 indices, with batch broadcast. Quantized dst set_rows (Q4_0/Q4_1/Q5_0/Q5_1/Q8_0/IQ4_NL/etc) not migrated - needs the quantize helper functions from the quantize/dequantize kernel migration, tracked as residual.",
+  "updated_at": "2026-09-06T16:49:17Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -91,5 +91,10 @@
       "ggml/src/ggml-cuda/set-rows.cu:7-71",
       "ggml/src/ggml-cuda/set-rows.cu:113-177"
     ]
+  },
+  "unit_test": {
+    "command": "build/bin/test-backend-ops test -b SYCL0 -o SET_ROWS",
+    "result": "66/66 passed (F32/F16 src0->F32/F16 dst, I32/I64 idx, all broadcast shapes); quantized dst types correctly reported not-supported",
+    "evidence": "test-set-rows-20260906T164852Z-04524f"
   }
 }

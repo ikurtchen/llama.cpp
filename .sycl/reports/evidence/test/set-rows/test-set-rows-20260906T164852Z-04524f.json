@@ -1,0 +1,33 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-set-rows-20260906T164852Z-04524f",
+  "class": "test",
+  "subject": "set-rows",
+  "phase": "migrate",
+  "ts": "2026-09-06T16:48:56Z",
+  "duration_s": 3.729,
+  "command": "build/bin/test-backend-ops test -b SYCL0 -o SET_ROWS",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "fce692804",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/set-rows/test-set-rows-20260906T164852Z-04524f.log",
+  "log_sha256": "b0f39ccfdf425373eeda3dbcfe57ed23404e345e292c4bc67c8f6f774406a64c",
+  "log_bytes": 79006,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "CPU backend result (test-backend-ops built-in oracle)",
+    "tolerance": {
+      "source": "test-backend-ops default"
+    }
+  },
+  "extracted": {}
+}

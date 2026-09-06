@@ -732,12 +732,12 @@
       "id": "set-rows",
       "source": "ggml/src/ggml-cuda/set-rows.cu:set_rows_cuda_quant,set_rows_cuda,ggml_cuda_op_set_rows",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "medium",
       "detail": ".sycl/state/kernels/set-rows.json",
       "loc": {
         "source_code": 299,
-        "sycl_code": 0
+        "sycl_code": 82
       }
     },
     {
