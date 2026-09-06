@@ -1,0 +1,31 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-regression-post-profiler-instrumentation-20260906T223408Z-708d81",
+  "class": "test",
+  "subject": "regression-post-profiler-instrumentation",
+  "label": "profile-e2e-regression",
+  "phase": "profile-e2e",
+  "ts": "2026-09-06T22:34:10Z",
+  "duration_s": 2.14,
+  "command": "./build/bin/test-backend-ops\\ -b\\ SYCL0",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "2f5db2bf4",
+  "dirty": true,
+  "exit_code": 127,
+  "verdict": "fail",
+  "log": "evidence/test/regression-post-profiler-instrumentation/test-regression-post-profiler-instrumentation-20260906T223408Z-708d81.log",
+  "log_sha256": "5eb4f939dfd7d206a4d5407c967b1cd4d6eed75162e0e849d0c4cf24639f4694",
+  "log_bytes": 830,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "test-backend-ops full suite (inherited harness)"
+  },
+  "extracted": {}
+}

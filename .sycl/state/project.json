@@ -41,7 +41,8 @@
     "platform": "b70",
     "arch": "xe2",
     "freq_pinned": true,
-    "evidence": "env-68d8b007"
+    "evidence": "env-68d8b007",
+    "gpu_freq_mhz": 2800
   },
   "reference": {
     "source": "CPU backend (ggml-cpu) via test-backend-ops for op-level unit tests; llama-cli -ngl 0 (CPU) greedy decode + llama-perplexity for e2e (per config.integration.workload_reference)",

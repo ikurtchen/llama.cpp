@@ -1,0 +1,102 @@
+{
+  "schema": "e2e-profile.schema.json",
+  "label": "current",
+  "basis": "e2e-workload",
+  "workload": "llama-cli -m Qwen3-0.6B-Q8_0.gguf -p 'The capital of France is' -n 128 --ignore-eos --temp 0 --seed 42 --reasoning off -ngl 99 --single-turn (decode-dominated: 6-token prompt + 128 generated tokens)",
+  "method": "in-app op-level SYCL device timers (GGML_SYCL_PROFILE=1): ctx->stream().wait() bracketed around each op's dispatch in ggml_backend_sycl_graph_compute, accumulated by ggml_op_desc() and dumped cumulatively at the end of every graph_compute call. This is a documented sycl-profiler SS5 fallback: unitrace (both overview and slice modes, with and without --call-logging) segfaults deterministically during model load on this runner, independent of workload size (confirmed on Qwen3-8B and Qwen3-0.6B alike; see .sycl/state/lessons.md). The per-op wait() forces serialization, so this is a ranking tool (relative op share), not an absolute-latency benchmark -- op overlap/pipelining possible on the real (unsynced) path is not reflected.",
+  "total_wallclock_ms": 2569.475,
+  "evidence": "e2e-profile-e2e-ranking-20260906T223902Z-a85478",
+  "ranking": [
+    {
+      "id": "mmvq",
+      "op": "MUL_MAT",
+      "kernel_ids": ["mmvq", "mmq"],
+      "notes": "Q8_0-weight x F32-activation matmul, dequantize-then-oneMKL-GEMM path (mmf.cpp/dequantize.cpp), deliberately correctness-first per the migrate-phase brief; quantized-native MMA was explicitly deferred to this optimize phase. Decode-dominated workload (batch=1 steps) routes through mmvq; mmq (batched/prefill) contributes a smaller share of the 6-token prompt pass. Top optimization target.",
+      "calls": 25610,
+      "wallclock_ms": 1280.0549,
+      "wallclock_pct": 49.82
+    },
+    {
+      "id": "flash-attn-vec",
+      "op": "FLASH_ATTN_EXT",
+      "kernel_ids": ["flash-attn-vec", "flash-attn-common"],
+      "notes": "Decode-dominated workload uses the single-query vec flash-attention kernel; F16-only KV cache per this model's config. Second-largest optimization target.",
+      "calls": 3640,
+      "wallclock_ms": 441.0556,
+      "wallclock_pct": 17.17
+    },
+    {
+      "id": "binbcast",
+      "op": "MUL",
+      "kernel_ids": ["binbcast"],
+      "notes": "Elementwise broadcast multiply (RMSNorm weight scale, SwiGLU gate, etc).",
+      "calls": 14690,
+      "wallclock_ms": 191.4476,
+      "wallclock_pct": 7.45
+    },
+    {
+      "id": "rms-norm",
+      "op": "RMS_NORM",
+      "kernel_ids": ["rms-norm"],
+      "notes": "Parallel row-reduction norm; runs once per layer per QKV/pre-MLP normalization point.",
+      "calls": 14690,
+      "wallclock_ms": 172.5961,
+      "wallclock_pct": 6.72
+    },
+    {
+      "id": "getrows",
+      "op": "GET_ROWS",
+      "kernel_ids": ["getrows"],
+      "notes": "Token embedding lookup; low call count (260) but comparatively expensive per call at this small batch size.",
+      "calls": 260,
+      "wallclock_ms": 170.494,
+      "wallclock_pct": 6.64
+    },
+    {
+      "id": "binbcast",
+      "op": "ADD",
+      "kernel_ids": ["binbcast"],
+      "notes": "Elementwise broadcast add (residual connections). Same implementation file as the MUL row above; kept as a separate ranking row because the two ops have different call-site shapes.",
+      "calls": 7280,
+      "wallclock_ms": 99.4094,
+      "wallclock_pct": 3.87
+    },
+    {
+      "id": "rope",
+      "op": "ROPE",
+      "kernel_ids": ["rope"],
+      "notes": "Rotary position embedding on Q/K, once per layer per token.",
+      "calls": 7280,
+      "wallclock_ms": 79.3541,
+      "wallclock_pct": 3.09
+    },
+    {
+      "id": "set-rows",
+      "op": "SET_ROWS",
+      "kernel_ids": ["set-rows"],
+      "notes": "KV-cache row scatter write, once per layer per token.",
+      "calls": 7280,
+      "wallclock_ms": 78.7848,
+      "wallclock_pct": 3.07
+    },
+    {
+      "id": "unary",
+      "op": "SWIGLU",
+      "kernel_ids": ["unary"],
+      "notes": "Gated SiLU activation in the MLP block.",
+      "calls": 3640,
+      "wallclock_ms": 41.8635,
+      "wallclock_pct": 1.63
+    },
+    {
+      "id": "view-reshape-permute",
+      "op": "VIEW+RESHAPE+PERMUTE",
+      "kernel_ids": [],
+      "notes": "Metadata-only view operations (no device kernel launch, near-zero cost). Combined for the ranking; excluded from the optimize phase's target list as not a real compute op.",
+      "calls": 43680,
+      "wallclock_ms": 14.415,
+      "wallclock_pct": 0.55
+    }
+  ],
+  "updated_at": "2026-09-06T22:39:02Z"
+}

@@ -79,8 +79,8 @@
       "notes": ""
     },
     "profile-e2e": {
-      "status": "pending",
-      "entered_at": "",
+      "status": "active",
+      "entered_at": "2026-09-06T22:06:43Z",
       "exited_at": "",
       "gate": {
         "result": "pending",

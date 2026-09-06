@@ -1,0 +1,31 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "e2e-profile-e2e-ranking-20260906T223902Z-a85478",
+  "class": "e2e",
+  "subject": "profile-e2e-ranking",
+  "label": "profile-e2e",
+  "phase": "profile-e2e",
+  "ts": "2026-09-06T22:39:08Z",
+  "duration_s": 6.081,
+  "command": "env GGML_SYCL_PROFILE=1 ./build/bin/llama-cli -m /workspace/models/Qwen3-0.6B-Q8_0.gguf -p The\\ capital\\ of\\ France\\ is -n 128 --ignore-eos --temp 0 --seed 42 --reasoning off -ngl 99 --single-turn",
+  "via": "run.sh exec",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "2f5db2bf4",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/e2e/profile-e2e-ranking/e2e-profile-e2e-ranking-20260906T223902Z-a85478.log",
+  "log_sha256": "c6ae863cf1f59262234096a84bc9d98d64f85f5a01eb4b39dd0db23ea336a054",
+  "log_bytes": 121078,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "in-app op-level device-time profiler (GGML_SYCL_PROFILE=1), fallback per sycl-profiler skill SS5 (unitrace crashes on this env during model load)"
+  },
+  "extracted": {}
+}

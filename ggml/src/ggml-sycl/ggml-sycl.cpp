@@ -9,6 +9,11 @@
 #include "ggml-backend-impl.h"
 #include "ggml-impl.h"
 
+#include <chrono>
+#include <cinttypes>
+#include <cstdlib>
+#include <unordered_map>
+
 #include "common.hpp"
 #include "cpy.hpp"
 #include "scale.hpp"
@@ -507,8 +512,57 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, ggml_tens
     }
 }
 
+// Lightweight in-app per-op device-time profiler, gated by GGML_SYCL_PROFILE=1.
+// unitrace crashes on this environment during model load, so this is the profile-e2e phase's
+// fallback ranking mechanism (see .github/skills/sycl-profiler/SKILL.md §5): force a queue.wait()
+// around each op's dispatch and accumulate wall-clock by op name. Dumped straight from
+// graph_compute (not atexit) because ggml's dynamic backend loading can create a second loaded
+// instance of this TU's statics, so an atexit hook may fire against an empty copy.
+namespace {
+struct sycl_op_profile_entry { uint64_t calls = 0; double total_us = 0.0; };
+
+bool sycl_profile_enabled() {
+    static const bool enabled = std::getenv("GGML_SYCL_PROFILE") != nullptr;
+    return enabled;
+}
+
+std::unordered_map<std::string, sycl_op_profile_entry> & sycl_profile_table() {
+    static std::unordered_map<std::string, sycl_op_profile_entry> t;
+    return t;
+}
+
+void sycl_profile_dump() {
+    auto & table = sycl_profile_table();
+    if (table.empty()) {
+        return;
+    }
+    std::vector<std::pair<std::string, sycl_op_profile_entry>> rows(table.begin(), table.end());
+    std::sort(rows.begin(), rows.end(),
+              [](const auto & a, const auto & b) { return a.second.total_us > b.second.total_us; });
+    double grand_total_us = 0.0;
+    for (const auto & r : rows) {
+        grand_total_us += r.second.total_us;
+    }
+    fprintf(stderr, "=== GGML_SYCL_PROFILE: per-op device time (op-forced sync, cumulative) ===\n");
+    fprintf(stderr, "%-24s %10s %14s %8s\n", "op", "calls", "total_us", "pct");
+    for (const auto & r : rows) {
+        double pct = grand_total_us > 0.0 ? 100.0 * r.second.total_us / grand_total_us : 0.0;
+        fprintf(stderr, "%-24s %10" PRIu64 " %14.1f %7.2f%%\n",
+                r.first.c_str(), r.second.calls, r.second.total_us, pct);
+    }
+    fprintf(stderr, "%-24s %10s %14.1f %7s\n", "TOTAL", "", grand_total_us, "100.00%");
+}
+
+void sycl_profile_record(const char * op_name, double us) {
+    auto & e = sycl_profile_table()[op_name];
+    e.calls++;
+    e.total_us += us;
+}
+}  // namespace
+
 static enum ggml_status ggml_backend_sycl_graph_compute(ggml_backend_t backend, ggml_cgraph * cgraph) {
     ggml_backend_sycl_context * ctx = (ggml_backend_sycl_context *) backend->context;
+    const bool profiling = sycl_profile_enabled();
 
     for (int i = 0; i < cgraph->n_nodes; i++) {
         ggml_tensor * node = cgraph->nodes[i];
@@ -545,11 +599,27 @@ static enum ggml_status ggml_backend_sycl_graph_compute(ggml_backend_t backend, 
             continue;
         }
 
-        bool ok = ggml_sycl_compute_forward(*ctx, node);
+        bool ok;
+        if (profiling) {
+            // Force the queue to drain before/after so the wall-clock delta attributes to this op
+            // alone; this serializes the pipeline, so it is a ranking tool only, never a benchmark.
+            ctx->stream().wait();
+            const auto t0 = std::chrono::steady_clock::now();
+            ok            = ggml_sycl_compute_forward(*ctx, node);
+            ctx->stream().wait();
+            const auto t1 = std::chrono::steady_clock::now();
+            sycl_profile_record(ggml_op_desc(node),
+                                 std::chrono::duration<double, std::micro>(t1 - t0).count());
+        } else {
+            ok = ggml_sycl_compute_forward(*ctx, node);
+        }
         if (!ok) {
             GGML_LOG_ERROR("%s: unsupported op %s\n", __func__, ggml_op_desc(node));
             return GGML_STATUS_FAILED;
         }
+    }
+    if (profiling) {
+        sycl_profile_dump();
     }
     return GGML_STATUS_SUCCESS;
 }
