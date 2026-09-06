@@ -3,7 +3,7 @@
   "name": "mul-mat-vec-f",
   "source": "ggml/src/ggml-cuda/mmvf.cu:mul_mat_vec_f,mul_mat_vec_f_switch_fusion,launch_mul_mat_vec_f_cuda,mul_mat_vec_f_cuda_switch_ncols_dst,mul_mat_vec_f_cuda,ggml_cuda_mul_mat_vec_f,ggml_cuda_op_mul_mat_vec_f,ggml_cuda_should_use_mmvf",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "high",
   "algorithm": "Multiply dense matrices by a very small number of vectors/columns, with fused unary epilogues and layout-specific kernels tuned for low batch counts.",
   "cuda_constructs": [
@@ -42,8 +42,8 @@
     "kind": "cpu",
     "crosscheck": "-"
   },
-  "notes": "Risk reason: many fusion and low-batch specialization paths are performance-critical and bespoke. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:35Z",
+  "notes": "Low-batch non-quantized plain GGML_OP_MUL_MAT is covered by the same oneMKL implementation in ggml/src/ggml-sycl/mmf.cpp rather than a separate bespoke mat-vec kernel. This covers the unfused F32/F16 src0 + F32 src1 -> F32 dst path exercised by test-backend-ops. CUDA-only fused epilogues, BF16 src0, and MUL_MAT_ID remain residual.",
+  "updated_at": "2026-09-06T19:34:01Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -54,11 +54,11 @@
       "files": 1
     },
     "sycl": {
-      "code": 0,
+      "code": 292,
       "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "blank": 46,
+      "raw": 338,
+      "files": 2
     },
     "source_files": [
       {
@@ -85,5 +85,16 @@
     "unresolved": [],
     "method": "span",
     "measured_at": "2026-09-06T16:21:35Z"
+  },
+  "target_style": "onemkl-gemm",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/mmf.hpp",
+    "ggml/src/ggml-sycl/mmf.cpp"
+  ],
+  "unit_test": {
+    "harness": "test-backend-ops",
+    "filter": "MUL_MAT",
+    "result": "pass",
+    "evidence": "test-mul-mat-f16-f32-20260906T193128Z-e3c27d"
   }
 }

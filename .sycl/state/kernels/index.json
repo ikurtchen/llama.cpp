@@ -524,12 +524,23 @@
       "id": "mmf",
       "source": "ggml/src/ggml-cuda/mmf.cu:mmf_get_rows_per_block,ggml_cuda_mul_mat_f,ggml_cuda_should_use_mmf",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "high",
       "detail": ".sycl/state/kernels/mmf.json",
       "loc": {
         "source_code": 603,
-        "sycl_code": 0
+        "sycl_code": 292
+      },
+      "target_style": "onemkl-gemm",
+      "sycl_files": [
+        "ggml/src/ggml-sycl/mmf.hpp",
+        "ggml/src/ggml-sycl/mmf.cpp"
+      ],
+      "unit_test": {
+        "harness": "test-backend-ops",
+        "filter": "MUL_MAT",
+        "result": "pass",
+        "evidence": "test-mul-mat-f16-f32-20260906T193128Z-e3c27d"
       }
     },
     {
@@ -560,12 +571,23 @@
       "id": "mmvf",
       "source": "ggml/src/ggml-cuda/mmvf.cu:mul_mat_vec_f,mul_mat_vec_f_switch_fusion,launch_mul_mat_vec_f_cuda,mul_mat_vec_f_cuda_switch_ncols_dst,mul_mat_vec_f_cuda,ggml_cuda_mul_mat_vec_f,ggml_cuda_op_mul_mat_vec_f,ggml_cuda_should_use_mmvf",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "high",
       "detail": ".sycl/state/kernels/mmvf.json",
       "loc": {
         "source_code": 783,
-        "sycl_code": 0
+        "sycl_code": 292
+      },
+      "target_style": "onemkl-gemm",
+      "sycl_files": [
+        "ggml/src/ggml-sycl/mmf.hpp",
+        "ggml/src/ggml-sycl/mmf.cpp"
+      ],
+      "unit_test": {
+        "harness": "test-backend-ops",
+        "filter": "MUL_MAT",
+        "result": "pass",
+        "evidence": "test-mul-mat-f16-f32-20260906T193128Z-e3c27d"
       }
     },
     {
