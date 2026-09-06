@@ -6,9 +6,9 @@
 - **Benchmark GPU freq pinned**: True
 - **Build system**: cmake → SYCL build: set-up (ggml/src/ggml-sycl/ builds via icpx -fsycl, AOT bmg-g31, links oneMKL; registers as backend SYCL0)
 - **Phase**: migrate
-- **Updated**: 2026-09-06T16:34:01Z
+- **Updated**: 2026-09-06T16:38:34Z
 
-**Summary**: 75 kernels — 5 migrated, 0 optimized, 0 skipped, 0 needs-reference, 70 pending.
+**Summary**: 75 kernels — 8 migrated, 0 optimized, 0 skipped, 0 needs-reference, 67 pending.
 
 **Code migrated**: 15949 source code lines (76 files; attributed per kernel: cuda 16006) → 0 SYCL code lines (0 files)  ·  ratio 0.0×  ·  44.0% of the project's CUDA/Triton code lines  ·  measured 75/75 kernels
 
@@ -57,13 +57,13 @@
 | acc | ggml/src/ggml-cuda/acc.cu:acc_f32,acc_f32_cuda,ggml_cuda_op_acc | pending | - | - | 47→0 | - | - | Risk reason: flat elementwise add with simple offset math. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | add-id | ggml/src/ggml-cuda/add-id.cu:add_id_kernel,ggml_cuda_op_add_id | pending | - | - | 45→0 | - | - | Risk reason: indexed row gather plus rowwise add. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | allreduce | ggml/src/ggml-cuda/allreduce.cu:ggml_cuda_ar_signal_set,ggml_cuda_ar_signal_get,ggml_cuda_ar_kernel,ggml_cuda_ar_add_kernel,ggml_cuda_ar_chunk_bytes,ggml_cuda_ar_wait_for_compute,ggml_cuda_ar_pipeline_free,ggml_cuda_ar_allreduce_copy_impl,ggml_cuda_ar_allreduce_copy_outer,ggml_cuda_ar_allreduce | pending | - | - | 404→0 | - | - | Risk reason: cross-GPU synchronization, host staging, and precision-roundtrip behavior need careful porting. Reference oracle: analytical sum semantics plus backend tests. |
-| arange | ggml/src/ggml-cuda/arange.cu:arange_f32,arange_f32_cuda,ggml_cuda_op_arange | pending | - | - | 25→0 | - | - | Risk reason: direct 1D map kernel. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
+| arange | ggml/src/ggml-cuda/arange.cu:arange_f32,arange_f32_cuda,ggml_cuda_op_arange | migrated | test-backend-ops ARANGE: all cases passed on SYCL0 | - | 25→0 | - | - | Risk reason: direct 1D map kernel. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated in full: single f32 fill kernel, no residual. |
 | argmax | ggml/src/ggml-cuda/argmax.cu:argmax_f32,ggml_cuda_argmax | pending | - | - | 69→0 | - | - | Risk reason: reduction ordering and tie handling come from warp/block reductions. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | argsort | ggml/src/ggml-cuda/argsort.cu:init_indices,init_offsets,argsort_f32_i32_cuda_cub_chunk_nrows,argsort_f32_i32_cuda_cub,ggml_cuda_swap,k_argsort_f32_i32,next_power_of_2,argsort_f32_i32_cuda_bitonic,ggml_cuda_op_argsort | pending | - | - | 223→0 | - | - | Risk reason: hybrid CUB plus custom bitonic sort with rowwise offsets. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | binbcast | ggml/src/ggml-cuda/binbcast.cu:launch_bin_bcast_pack,k_repeat_back,repeat_back_cuda,ggml_cuda_op_bin_bcast,ggml_cuda_op_repeat,ggml_cuda_op_add,ggml_cuda_op_sub,ggml_cuda_op_mul,ggml_cuda_op_div,ggml_cuda_op_fused_binbcast_impl,ggml_cuda_op_fused_add,ggml_cuda_op_fused_mul,ggml_cuda_op_repeat_back | pending | - | - | 439→0 | - | - | Risk reason: mostly indexing logic, but many broadcast and repeat layouts share the same implementation. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | clamp | ggml/src/ggml-cuda/clamp.cu:op_clamp,op_clamp_kernel,clamp_cuda,ggml_cuda_op_clamp | migrated | pass | - | 0→0 | - | - | Risk reason: simple pointwise map. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | col2im-1d | ggml/src/ggml-cuda/col2im-1d.cu:col2im_1d_kernel,ggml_cuda_op_col2im_1d | pending | - | - | 59→0 | - | - | Risk reason: inverse window indexing is more error-prone than pure elementwise code. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
-| concat | ggml/src/ggml-cuda/concat.cu:concat_cont,concat_cont_cuda,concat_cuda,ggml_cuda_op_concat | pending | - | - | 210→0 | - | - | Risk reason: direct copy/pack kernels with straightforward branching by concat dimension. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
+| concat | ggml/src/ggml-cuda/concat.cu:concat_cont,concat_cont_cuda,concat_cuda,ggml_cuda_op_concat | migrated | test-backend-ops CONCAT: 117/117 total passed (f32/f16 all dims); quantized (q8_0/q5_1) correctly reported not-supported | - | 210→0 | - | - | Risk reason: direct copy/pack kernels with straightforward branching by concat dimension. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated the general strided element-copy path (mirrors CUDA's non-contiguous kernel) for all dims 0-3, f32/f16/any blck_size==1 type. CUDA's fast contiguous-memcpy fast path not ported (perf-only, correctness unaffected); quantized concat (blck_size>1) not supported, tracked as residual. |
 | conv2d | ggml/src/ggml-cuda/conv2d.cu:calculate_input_coord,conv2d_kernel,conv2d_cuda,conv2d_cuda_f16,conv2d_cuda_f32,ggml_cuda_op_conv2d | pending | - | - | 80→0 | - | - | Risk reason: multidimensional indexing and convolution layout handling need care. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | conv2d-dw | ggml/src/ggml-cuda/conv2d-dw.cu:calculate_input_coord,conv2d_dw_kernel,ggml_cuda_op_conv2d_dw | pending | - | - | 68→0 | - | - | Risk reason: depthwise layout transforms and edge handling are moderately tricky. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | conv2d-transpose | ggml/src/ggml-cuda/conv2d-transpose.cu:conv2d_transpose_kernel,ggml_cuda_conv_2d_transpose_p0 | pending | - | - | 90→0 | - | - | Risk reason: inverse convolution geometry and type handling require validation. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
@@ -75,7 +75,7 @@
 | cumsum | ggml/src/ggml-cuda/cumsum.cu:cumsum_cub_kernel,cumsum_kernel,cumsum_cub,cumsum_cuda,ggml_cuda_op_cumsum | pending | - | - | 216→0 | - | - | Risk reason: scan carry propagation and fallback/shared-memory logic must be preserved. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | dequantize | ggml/src/ggml-cuda/convert.cu:dequantize_block,dequantize_block_q8_0_f16,dequantize_block_q4_0,dequantize_block_q4_1,dequantize_block_q2_K,dequantize_block_q3_K,dequantize_block_q4_K,dequantize_block_q5_K,dequantize_block_q6_K,dequantize_block_iq2_xxs,dequantize_block_iq2_xs,dequantize_block_iq2_s,dequantize_block_iq3_xxs,dequantize_block_iq3_s,dequantize_block_iq1_s,dequantize_block_iq1_m,dequantize_block_iq4_nl,dequantize_block_iq4_xs,dequantize_block_mxfp4,dequantize_block_nvfp4,dequantize_block_cuda,dequantize_block_cont_cuda,dequantize_block_q8_0_f16_cuda,dequantize_row_q2_K_cuda,dequantize_row_q3_K_cuda,dequantize_row_q4_0_cuda,dequantize_row_q4_1_cuda,dequantize_row_q4_K_cuda,dequantize_row_q5_K_cuda,dequantize_row_q6_K_cuda,dequantize_row_iq2_xxs_cuda,dequantize_row_iq2_xs_cuda,dequantize_row_iq2_s_cuda,dequantize_row_iq3_xxs_cuda,dequantize_row_iq3_s_cuda,dequantize_row_iq1_s_cuda,dequantize_row_iq1_m_cuda,dequantize_row_iq4_nl_cuda,dequantize_row_iq4_xs_cuda,dequantize_row_mxfp4_cuda,dequantize_row_nvfp4_cuda | pending | - | - | 316→0 | - | - | Risk reason: many quant formats, block layouts, and fp4 special cases make this a key precision-sensitive port. Reference oracle: analytical dequantization plus ggml-cpu backend tests of consumer ops. |
 | diag | ggml/src/ggml-cuda/diag.cu:diag_kernel,ggml_cuda_op_diag | pending | - | - | 60→0 | - | - | Risk reason: simple index mapping. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
-| diagmask | ggml/src/ggml-cuda/diagmask.cu:diag_mask_inf_f32,diag_mask_inf_f32_cuda,ggml_cuda_op_diag_mask_inf | pending | - | - | 28→0 | - | - | Risk reason: direct masked write per element. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
+| diagmask | ggml/src/ggml-cuda/diagmask.cu:diag_mask_inf_f32,diag_mask_inf_f32_cuda,ggml_cuda_op_diag_mask_inf | migrated | test-backend-ops DIAG_MASK_INF: all cases passed on SYCL0 | - | 28→0 | - | - | Risk reason: direct masked write per element. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated in full: f32 causal masking kernel, no residual. |
 | dsv4-hc | ggml/src/ggml-cuda/dsv4-hc.cu:dsv4_hc_comb_norm_cols,dsv4_hc_comb_norm_rows,dsv4_hc_comb_f32,dsv4_hc_pre_f32,ggml_cuda_op_dsv4_hc_comb,ggml_cuda_op_dsv4_hc_pre,ggml_cuda_op_dsv4_hc_post | pending | - | - | 242→0 | - | - | Risk reason: three custom kernels implement specialized model-specific algebra not reused elsewhere. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | fill | ggml/src/ggml-cuda/fill.cu:fill_kernel,ggml_cuda_op_fill | pending | - | - | 27→0 | - | - | Risk reason: uniform write kernel. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | flash-attn-common | ggml/src/ggml-cuda/fattn.cu:flash_attn_mask_to_sparse_indices,ggml_cuda_flash_attn_ext_compact_mask,ggml_cuda_fattn_kv_type_supported,ggml_cuda_flash_attn_ext_get_alloc_size,ggml_cuda_flash_attn_ext,ggml_cuda_flash_attn_ext_supported | pending | - | - | 376→0 | - | - | Risk reason: shared helpers encode sparse-mask compaction and streamed partial-result fixup semantics used by multiple flash-attention variants. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
@@ -133,8 +133,8 @@
 ## Agent efficiency & cost
 
 - **Elapsed**: 27m27s (whole run)  ·  **Active**: 13m14s (bracketed)  ·  **Cost**: $0.0  ·  **Tokens**: 0 (in 0 / out 0 / cache r 0 / cache w 0)  ·  **Premium requests**: 0  ·  **AI credits**: 0.0
-- **Observed (gen-progress heartbeat)**: span 49m30s  ·  working ≈ 49m30s (idle-capped 30m00s)  ·  6 snapshots — independent of metrics.sh
-  - ⚠️ bracketed active time (13m14s) is far below observed work (49m30s); phases were under-bracketed — trust elapsed/observed figures.
+- **Observed (gen-progress heartbeat)**: span 54m03s  ·  working ≈ 54m03s (idle-capped 30m00s)  ·  7 snapshots — independent of metrics.sh
+  - ⚠️ bracketed active time (13m14s) is far below observed work (54m03s); phases were under-bracketed — trust elapsed/observed figures.
 
 | phase | elapsed | active | tokens | requests | credits | USD |
 |-------|--------:|-------:|-------:|---------:|--------:|----:|
@@ -152,4 +152,5 @@
 | 2026-09-06T16:21:47Z | migrate | 0/75 | 0 | 0 | 75 |
 | 2026-09-06T16:27:05Z | migrate | 4/75 | 0 | 0 | 71 |
 | 2026-09-06T16:34:01Z | migrate | 5/75 | 0 | 0 | 70 |
+| 2026-09-06T16:38:34Z | migrate | 8/75 | 0 | 0 | 67 |
 

@@ -3,7 +3,7 @@
   "name": "diagmask-inf",
   "source": "ggml/src/ggml-cuda/diagmask.cu:diag_mask_inf_f32,diag_mask_inf_f32_cuda,ggml_cuda_op_diag_mask_inf",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "low",
   "algorithm": "Apply a causal-style diagonal mask by writing -inf to elements beyond the permitted diagonal offset.",
   "cuda_constructs": [
@@ -32,8 +32,8 @@
     "kind": "cpu",
     "crosscheck": "-"
   },
-  "notes": "Risk reason: direct masked write per element. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:35Z",
+  "notes": "Risk reason: direct masked write per element. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated in full: f32 causal masking kernel, no residual.",
+  "updated_at": "2026-09-06T16:38:25Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -70,5 +70,10 @@
     "unresolved": [],
     "method": "span",
     "measured_at": "2026-09-06T16:21:35Z"
+  },
+  "unit_test": {
+    "command": "build/bin/test-backend-ops test -b SYCL0 -o DIAG_MASK_INF",
+    "result": "test-backend-ops DIAG_MASK_INF: all cases passed on SYCL0",
+    "evidence": "test-diag-mask-inf-20260906T163727Z-ed99a8"
   }
 }

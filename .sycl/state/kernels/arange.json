@@ -3,7 +3,7 @@
   "name": "arange",
   "source": "ggml/src/ggml-cuda/arange.cu:arange_f32,arange_f32_cuda,ggml_cuda_op_arange",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "low",
   "algorithm": "Fill a 1D float tensor with an arithmetic progression derived from start, stop, and step op parameters.",
   "cuda_constructs": [
@@ -32,8 +32,8 @@
     "kind": "cpu",
     "crosscheck": "-"
   },
-  "notes": "Risk reason: direct 1D map kernel. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:34Z",
+  "notes": "Risk reason: direct 1D map kernel. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated in full: single f32 fill kernel, no residual.",
+  "updated_at": "2026-09-06T16:38:25Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -70,5 +70,10 @@
     "unresolved": [],
     "method": "span",
     "measured_at": "2026-09-06T16:21:34Z"
+  },
+  "unit_test": {
+    "command": "build/bin/test-backend-ops test -b SYCL0 -o ARANGE",
+    "result": "test-backend-ops ARANGE: all cases passed on SYCL0",
+    "evidence": "test-arange-20260906T163734Z-908b3e"
   }
 }

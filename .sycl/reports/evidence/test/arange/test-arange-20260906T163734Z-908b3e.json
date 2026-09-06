@@ -1,0 +1,33 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-arange-20260906T163734Z-908b3e",
+  "class": "test",
+  "subject": "arange",
+  "phase": "migrate",
+  "ts": "2026-09-06T16:37:37Z",
+  "duration_s": 2.653,
+  "command": "build/bin/test-backend-ops test -b SYCL0 -o ARANGE",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "dcaf0c2f4",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/arange/test-arange-20260906T163734Z-908b3e.log",
+  "log_sha256": "93d0bcdc17a8bbb523c6de82a93204435a6bf6e3d9b95e227c40ae2e51dd3050",
+  "log_bytes": 1165,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "CPU backend result (test-backend-ops built-in oracle)",
+    "tolerance": {
+      "source": "test-backend-ops default"
+    }
+  },
+  "extracted": {}
+}

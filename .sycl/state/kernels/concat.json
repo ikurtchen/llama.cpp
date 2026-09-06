@@ -3,7 +3,7 @@
   "name": "concat",
   "source": "ggml/src/ggml-cuda/concat.cu:concat_cont,concat_cont_cuda,concat_cuda,ggml_cuda_op_concat",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "low",
   "algorithm": "Concatenate two tensors along one dimension, using fast contiguous kernels for dim 0..2 and a slower arbitrary-stride path for non-contiguous layouts.",
   "cuda_constructs": [
@@ -34,8 +34,8 @@
     "kind": "cpu",
     "crosscheck": "-"
   },
-  "notes": "Risk reason: direct copy/pack kernels with straightforward branching by concat dimension. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:34Z",
+  "notes": "Risk reason: direct copy/pack kernels with straightforward branching by concat dimension. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated the general strided element-copy path (mirrors CUDA's non-contiguous kernel) for all dims 0-3, f32/f16/any blck_size==1 type. CUDA's fast contiguous-memcpy fast path not ported (perf-only, correctness unaffected); quantized concat (blck_size>1) not supported, tracked as residual.",
+  "updated_at": "2026-09-06T16:38:25Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -76,5 +76,10 @@
     "source_spec": [
       "ggml/src/ggml-cuda/concat.cu:84-141"
     ]
+  },
+  "unit_test": {
+    "command": "build/bin/test-backend-ops test -b SYCL0 -o CONCAT",
+    "result": "test-backend-ops CONCAT: 117/117 total passed (f32/f16 all dims); quantized (q8_0/q5_1) correctly reported not-supported",
+    "evidence": "test-concat-20260906T163730Z-6abe76"
   }
 }

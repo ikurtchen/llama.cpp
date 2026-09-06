@@ -1,0 +1,33 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-diag-mask-inf-20260906T163727Z-ed99a8",
+  "class": "test",
+  "subject": "diag-mask-inf",
+  "phase": "migrate",
+  "ts": "2026-09-06T16:37:30Z",
+  "duration_s": 2.631,
+  "command": "build/bin/test-backend-ops test -b SYCL0 -o DIAG_MASK_INF",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "dcaf0c2f4",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/diag-mask-inf/test-diag-mask-inf-20260906T163727Z-ed99a8.log",
+  "log_sha256": "7e6ce4a6b223ab423e1d86a8a47a753a42f6bade42be68a659ae1015b87f7103",
+  "log_bytes": 1206,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "CPU backend result (test-backend-ops built-in oracle)",
+    "tolerance": {
+      "source": "test-backend-ops default"
+    }
+  },
+  "extracted": {}
+}

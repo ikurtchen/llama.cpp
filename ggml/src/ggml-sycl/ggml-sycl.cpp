@@ -15,6 +15,9 @@
 #include "clamp.hpp"
 #include "unary.hpp"
 #include "rope.hpp"
+#include "diagmask.hpp"
+#include "concat.hpp"
+#include "arange.hpp"
 
 #include <sycl/sycl.hpp>
 
@@ -254,6 +257,15 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, ggml_tens
         case GGML_OP_ROPE:
             ggml_sycl_op_rope(ctx, dst);
             return true;
+        case GGML_OP_DIAG_MASK_INF:
+            ggml_sycl_op_diag_mask_inf(ctx, dst);
+            return true;
+        case GGML_OP_CONCAT:
+            ggml_sycl_op_concat(ctx, dst);
+            return true;
+        case GGML_OP_ARANGE:
+            ggml_sycl_op_arange(ctx, dst);
+            return true;
         default:
             return false;
     }
@@ -407,6 +419,12 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
             return ggml_sycl_supports_unary_f32f16(op);
         case GGML_OP_ROPE:
             return ggml_sycl_supports_rope(op);
+        case GGML_OP_DIAG_MASK_INF:
+            return ggml_sycl_supports_diag_mask_inf(op);
+        case GGML_OP_CONCAT:
+            return ggml_sycl_supports_concat(op);
+        case GGML_OP_ARANGE:
+            return ggml_sycl_supports_arange(op);
         default:
             return false;
     }

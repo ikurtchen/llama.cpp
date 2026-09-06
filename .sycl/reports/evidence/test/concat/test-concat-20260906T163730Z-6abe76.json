@@ -1,0 +1,33 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-concat-20260906T163730Z-6abe76",
+  "class": "test",
+  "subject": "concat",
+  "phase": "migrate",
+  "ts": "2026-09-06T16:37:34Z",
+  "duration_s": 4.639,
+  "command": "build/bin/test-backend-ops test -b SYCL0 -o CONCAT",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "dcaf0c2f4",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/concat/test-concat-20260906T163730Z-6abe76.log",
+  "log_sha256": "892d6e5a9937362cf3397dba42592873a77bd3ebdbb6c365afea23626037514d",
+  "log_bytes": 15772,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "CPU backend result (test-backend-ops built-in oracle)",
+    "tolerance": {
+      "source": "test-backend-ops default"
+    }
+  },
+  "extracted": {}
+}
