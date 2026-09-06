@@ -1,5 +1,7 @@
 #include "mmf.hpp"
+#include "dequantize.hpp"
 #include "fwht.hpp"
+#include "mmid.hpp"
 
 #ifdef GGML_SYCL_USE_ONEMKL
 #include <oneapi/mkl.hpp>
@@ -8,7 +10,9 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <cstring>
 #include <mutex>
+#include <vector>
 
 namespace {
 
@@ -17,10 +21,28 @@ struct ggml_sycl_mmf_src1_f16_scratch {
     size_t       capacity = 0;
 };
 
+struct ggml_sycl_mmf_f32_scratch {
+    float * ptr = nullptr;
+    size_t  capacity = 0;
+};
+
+enum ggml_sycl_mmf_f32_scratch_slot {
+    GGML_SYCL_MMF_SRC0_F32_SCRATCH = 0,
+    GGML_SYCL_MMF_SRC1_F32_SCRATCH = 1,
+    GGML_SYCL_MMF_DST_F32_SCRATCH  = 2,
+    GGML_SYCL_MMF_F32_SCRATCH_COUNT,
+};
+
 static ggml_sycl_mmf_src1_f16_scratch & ggml_sycl_mmf_get_src1_f16_scratch(int device) {
     static std::array<ggml_sycl_mmf_src1_f16_scratch, GGML_SYCL_MAX_DEVICES> scratch = {};
     GGML_ASSERT(device >= 0 && device < GGML_SYCL_MAX_DEVICES);
     return scratch[device];
+}
+
+static ggml_sycl_mmf_f32_scratch & ggml_sycl_mmf_get_f32_scratch(int device, ggml_sycl_mmf_f32_scratch_slot slot) {
+    static std::array<std::array<ggml_sycl_mmf_f32_scratch, GGML_SYCL_MMF_F32_SCRATCH_COUNT>, GGML_SYCL_MAX_DEVICES> scratch = {};
+    GGML_ASSERT(device >= 0 && device < GGML_SYCL_MAX_DEVICES);
+    return scratch[device][slot];
 }
 
 static sycl::half * ggml_sycl_mmf_reserve_src1_f16_scratch(ggml_backend_sycl_context & ctx, size_t nelements) {
@@ -40,6 +62,33 @@ static sycl::half * ggml_sycl_mmf_reserve_src1_f16_scratch(ggml_backend_sycl_con
     GGML_ASSERT(scratch.ptr != nullptr);
     scratch.capacity = nelements;
     return scratch.ptr;
+}
+
+static float * ggml_sycl_mmf_reserve_f32_scratch(
+        ggml_backend_sycl_context & ctx,
+        ggml_sycl_mmf_f32_scratch_slot slot,
+        size_t nelements) {
+    auto & scratch = ggml_sycl_mmf_get_f32_scratch(ctx.device, slot);
+    sycl::queue & q = ctx.stream();
+
+    if (scratch.capacity >= nelements) {
+        return scratch.ptr;
+    }
+
+    SYCL_CHECK(q.wait_and_throw());
+    if (scratch.ptr != nullptr) {
+        sycl::free(scratch.ptr, q);
+    }
+
+    scratch.ptr = sycl::malloc_device<float>(std::max<size_t>(nelements, 1), q);
+    GGML_ASSERT(scratch.ptr != nullptr);
+    scratch.capacity = nelements;
+    return scratch.ptr;
+}
+
+static bool ggml_sycl_mmf_has_packed_rows(const ggml_tensor * src0) {
+    return src0->nb[0] == ggml_type_size(src0->type) &&
+           src0->nb[1] == ggml_row_size(src0->type, src0->ne[0]);
 }
 
 static sycl::event ggml_sycl_convert_src1_f32_to_f16(
@@ -142,6 +191,175 @@ static sycl::event ggml_sycl_mmf_gemm_batch(
 
 static bool ggml_sycl_mmf_can_use_strided_batch(const ggml_tensor * src0, const ggml_tensor * src1, const ggml_tensor * dst) {
     return ggml_is_contiguous_2(src0) && ggml_is_contiguous_2(src1) && ggml_is_contiguous_2(dst);
+}
+
+static void ggml_sycl_op_mul_mat_q8_0(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
+#ifndef GGML_SYCL_USE_ONEMKL
+    GGML_UNUSED(ctx);
+    GGML_UNUSED(dst);
+    GGML_ABORT("GGML_SYCL q8 mul_mat requires oneMKL");
+#else
+    const ggml_tensor * src0 = dst->src[0];
+    const ggml_tensor * src1 = dst->src[1];
+
+    sycl::queue & q = ctx.stream();
+    const to_fp32_sycl_t dequantize = ggml_get_to_fp32_sycl(src0->type);
+    GGML_ASSERT(dequantize != nullptr);
+
+    const int64_t ne00 = src0->ne[0];
+    const int64_t ne01 = src0->ne[1];
+    const int64_t ne02 = src0->ne[2];
+    const int64_t ne03 = src0->ne[3];
+
+    const int64_t ne11 = src1->ne[1];
+    const int64_t ne12 = src1->ne[2];
+    const int64_t ne13 = src1->ne[3];
+
+    const int64_t r2 = ne12 / ne02;
+    const int64_t r3 = ne13 / ne03;
+
+    const int64_t s11 = src1->nb[1] / sizeof(float);
+    const int64_t s12 = src1->nb[2] / sizeof(float);
+    const int64_t s13 = src1->nb[3] / sizeof(float);
+
+    const int64_t d1 = dst->nb[1] / sizeof(float);
+    const int64_t d2 = dst->nb[2] / sizeof(float);
+    const int64_t d3 = dst->nb[3] / sizeof(float);
+
+    const char * src0_base = (const char *) src0->data;
+    const float * src1_base = (const float *) src1->data;
+    float * dst_base = (float *) dst->data;
+
+    float * src0_f32 = ggml_sycl_mmf_reserve_f32_scratch(ctx, GGML_SYCL_MMF_SRC0_F32_SCRATCH, (size_t) (ne00 * ne01));
+
+    int64_t cached_i02 = -1;
+    int64_t cached_i03 = -1;
+
+    for (int64_t i3 = 0; i3 < ne13; ++i3) {
+        for (int64_t i2 = 0; i2 < ne12; ++i2) {
+            const int64_t i03 = i3 / r3;
+            const int64_t i02 = i2 / r2;
+
+            if (i02 != cached_i02 || i03 != cached_i03) {
+                const void * src0_i = src0_base + (ptrdiff_t) i02 * src0->nb[2] + (ptrdiff_t) i03 * src0->nb[3];
+                dequantize(src0_i, src0_f32, ne00 * ne01, q);
+                cached_i02 = i02;
+                cached_i03 = i03;
+            }
+
+            const float * src1_i = src1_base + i2 * s12 + i3 * s13;
+            float * dst_i = dst_base + i2 * d2 + i3 * d3;
+
+            ggml_sycl_mmf_gemm(q, src0_f32, src1_i, dst_i, ne01, ne11, ne00, ne00, s11, d1);
+        }
+    }
+#endif
+}
+
+static void ggml_sycl_op_mul_mat_id_f32(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
+#ifndef GGML_SYCL_USE_ONEMKL
+    GGML_UNUSED(ctx);
+    GGML_UNUSED(dst);
+    GGML_ABORT("GGML_SYCL mul_mat_id requires oneMKL");
+#else
+    const ggml_tensor * src0 = dst->src[0];
+    const ggml_tensor * src1 = dst->src[1];
+    const ggml_tensor * ids  = dst->src[2];
+
+    sycl::queue & q = ctx.stream();
+    const to_fp32_sycl_t src0_to_f32 = ggml_get_to_fp32_sycl(src0->type);
+    GGML_ASSERT(src0_to_f32 != nullptr);
+
+    const int64_t k = src0->ne[0];
+    const int64_t m = src0->ne[1];
+    const int64_t n_experts = src0->ne[2];
+    const int64_t n_src1_cols = src1->ne[1];
+    const int64_t n_used = ids->ne[0];
+    const int64_t n_tokens = ids->ne[1];
+    const int64_t ne_get_rows = n_used * n_tokens;
+
+    std::vector<float> src1_host((size_t) ggml_nelements(src1));
+    SYCL_CHECK(q.memcpy(src1_host.data(), src1->data, ggml_nbytes(src1)).wait());
+
+    int32_t * ids_src1 = sycl::malloc_shared<int32_t>(std::max<int64_t>(ne_get_rows, 1), q);
+    int32_t * ids_dst = sycl::malloc_shared<int32_t>(std::max<int64_t>(ne_get_rows, 1), q);
+    int32_t * expert_bounds = sycl::malloc_shared<int32_t>(std::max<int64_t>(n_experts + 1, 1), q);
+    GGML_ASSERT(ids_src1 != nullptr);
+    GGML_ASSERT(ids_dst != nullptr);
+    GGML_ASSERT(expert_bounds != nullptr);
+
+    const int si1 = (int) (ids->nb[1] / sizeof(int32_t));
+    const int sis1 = (int) (src1->nb[2] / src1->nb[1]);
+    GGML_ASSERT(sis1 > 0);
+
+    ggml_sycl_launch_mm_ids_helper(
+            ctx,
+            (const int32_t *) ids->data,
+            ids_src1,
+            ids_dst,
+            expert_bounds,
+            (int) n_experts,
+            (int) n_tokens,
+            (int) n_used,
+            (int) n_src1_cols,
+            si1,
+            sis1,
+            false);
+
+    size_t max_group_cols = 0;
+    for (int64_t expert = 0; expert < n_experts; ++expert) {
+        const int64_t begin = expert_bounds[expert];
+        const int64_t end = expert_bounds[expert + 1];
+        GGML_ASSERT(end >= begin);
+        max_group_cols = std::max(max_group_cols, (size_t) (end - begin));
+    }
+
+    std::vector<float> dst_host((size_t) ggml_nelements(dst), 0.0f);
+    std::vector<float> src1_group((size_t) k * std::max<size_t>(max_group_cols, 1));
+    std::vector<float> dst_group((size_t) m * std::max<size_t>(max_group_cols, 1));
+
+    float * src0_f32 = ggml_sycl_mmf_reserve_f32_scratch(ctx, GGML_SYCL_MMF_SRC0_F32_SCRATCH, (size_t) (k * m));
+    float * src1_f32 = ggml_sycl_mmf_reserve_f32_scratch(ctx, GGML_SYCL_MMF_SRC1_F32_SCRATCH, (size_t) (k * std::max<size_t>(max_group_cols, 1)));
+    float * dst_f32  = ggml_sycl_mmf_reserve_f32_scratch(ctx, GGML_SYCL_MMF_DST_F32_SCRATCH,  (size_t) (m * std::max<size_t>(max_group_cols, 1)));
+
+    const int64_t dst_s1 = dst->nb[1] / sizeof(float);
+    const int64_t dst_s2 = dst->nb[2] / sizeof(float);
+
+    for (int64_t expert = 0; expert < n_experts; ++expert) {
+        const int64_t begin = expert_bounds[expert];
+        const int64_t end = expert_bounds[expert + 1];
+        const size_t group_size = (size_t) (end - begin);
+        if (group_size == 0) {
+            continue;
+        }
+
+        for (size_t col = 0; col < group_size; ++col) {
+            const int64_t src1_idx = ids_src1[begin + (int64_t) col];
+            const float * src1_col = src1_host.data() + src1_idx * k;
+            std::memcpy(src1_group.data() + col * k, src1_col, (size_t) k * sizeof(float));
+        }
+
+        SYCL_CHECK(q.memcpy(src1_f32, src1_group.data(), group_size * (size_t) k * sizeof(float)).wait());
+
+        const void * src0_expert = (const char *) src0->data + (ptrdiff_t) expert * src0->nb[2];
+        src0_to_f32(src0_expert, src0_f32, k * m, q);
+        SYCL_CHECK(ggml_sycl_mmf_gemm(q, src0_f32, src1_f32, dst_f32, m, (int64_t) group_size, k, k, k, m).wait_and_throw());
+        SYCL_CHECK(q.memcpy(dst_group.data(), dst_f32, group_size * (size_t) m * sizeof(float)).wait());
+
+        for (size_t col = 0; col < group_size; ++col) {
+            const int64_t dst_idx = ids_dst[begin + (int64_t) col];
+            const int64_t row = dst_idx / n_used;
+            const int64_t slot = dst_idx % n_used;
+            float * dst_col = dst_host.data() + slot * dst_s1 + row * dst_s2;
+            std::memcpy(dst_col, dst_group.data() + col * m, (size_t) m * sizeof(float));
+        }
+    }
+
+    SYCL_CHECK(q.memcpy(dst->data, dst_host.data(), ggml_nbytes(dst)).wait());
+    sycl::free(ids_src1, q);
+    sycl::free(ids_dst, q);
+    sycl::free(expert_bounds, q);
+#endif
 }
 
 template <typename src0_t, typename src1_t>
@@ -300,6 +518,33 @@ void ggml_sycl_op_mul_mat(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
                     s01, s02, s03,
                     s11, s12, s13);
         } break;
+        case GGML_TYPE_Q8_0:
+            ggml_sycl_op_mul_mat_q8_0(ctx, dst);
+            break;
+        default:
+            GGML_ABORT("%s: unsupported src0 type %s", __func__, ggml_type_name(src0->type));
+    }
+}
+
+void ggml_sycl_op_mul_mat_id(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
+    const ggml_tensor * src0 = dst->src[0];
+    GGML_ASSERT(src0 != nullptr);
+
+    switch (src0->type) {
+        case GGML_TYPE_F32:
+        case GGML_TYPE_F16:
+        case GGML_TYPE_Q4_0:
+        case GGML_TYPE_Q4_1:
+        case GGML_TYPE_Q5_0:
+        case GGML_TYPE_Q5_1:
+        case GGML_TYPE_Q8_0:
+        case GGML_TYPE_Q2_K:
+        case GGML_TYPE_Q3_K:
+        case GGML_TYPE_Q4_K:
+        case GGML_TYPE_Q5_K:
+        case GGML_TYPE_Q6_K:
+            ggml_sycl_op_mul_mat_id_f32(ctx, dst);
+            break;
         default:
             GGML_ABORT("%s: unsupported src0 type %s", __func__, ggml_type_name(src0->type));
     }
@@ -321,12 +566,53 @@ bool ggml_sycl_supports_mul_mat(const ggml_tensor * op) {
         return false;
     }
 
-    const bool src0_ok = src0->type == GGML_TYPE_F32 || src0->type == GGML_TYPE_F16;
-    return src0_ok &&
+    const bool dense_ok = (src0->type == GGML_TYPE_F32 || src0->type == GGML_TYPE_F16) &&
+                          src1->type == GGML_TYPE_F32 &&
+                          op->type == GGML_TYPE_F32 &&
+                          src1->ne[0] == src0->ne[0] &&
+                          src1->ne[2] % src0->ne[2] == 0 &&
+                          src1->ne[3] % src0->ne[3] == 0;
+    const bool q8_ok = src0->type == GGML_TYPE_Q8_0 &&
+                       src1->type == GGML_TYPE_F32 &&
+                       op->type == GGML_TYPE_F32 &&
+                       src1->ne[0] == src0->ne[0] &&
+                       src1->ne[2] % src0->ne[2] == 0 &&
+                       src1->ne[3] % src0->ne[3] == 0 &&
+                       ggml_sycl_mmf_has_packed_rows(src0);
+    return dense_ok || q8_ok;
+#endif
+}
+
+bool ggml_sycl_supports_mul_mat_id(const ggml_tensor * op) {
+#ifndef GGML_SYCL_USE_ONEMKL
+    GGML_UNUSED(op);
+    return false;
+#else
+    if (op == nullptr || op->op != GGML_OP_MUL_MAT_ID) {
+        return false;
+    }
+
+    const ggml_tensor * src0 = op->src[0];
+    const ggml_tensor * src1 = op->src[1];
+    const ggml_tensor * ids  = op->src[2];
+
+    if (src0 == nullptr || src1 == nullptr || ids == nullptr) {
+        return false;
+    }
+
+    return ggml_get_to_fp32_sycl(src0->type) != nullptr &&
            src1->type == GGML_TYPE_F32 &&
+           ids->type == GGML_TYPE_I32 &&
            op->type == GGML_TYPE_F32 &&
-           src1->ne[0] == src0->ne[0] &&
-           src1->ne[2] % src0->ne[2] == 0 &&
-           src1->ne[3] % src0->ne[3] == 0;
+           src0->ne[3] == 1 &&
+           src1->ne[3] == 1 &&
+           ids->ne[2] == 1 &&
+           ids->ne[3] == 1 &&
+           ids->ne[1] == src1->ne[2] &&
+           src0->ne[0] == src1->ne[0] &&
+           ids->ne[0] % src1->ne[1] == 0 &&
+           ggml_sycl_mmf_has_packed_rows(src0) &&
+           ggml_is_contiguous(src1) &&
+           ggml_is_contiguous(op);
 #endif
 }

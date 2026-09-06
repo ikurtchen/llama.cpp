@@ -1,0 +1,34 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-moe-weighted-reduction-20260906T214454Z-0b2c9c",
+  "class": "test",
+  "subject": "moe-weighted-reduction",
+  "label": "migrate",
+  "phase": "migrate",
+  "ts": "2026-09-06T21:45:12Z",
+  "duration_s": 18.03,
+  "command": "./build/bin/test-backend-ops -o MOE_WEIGHTED_REDUCTION",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "0e0daeb49",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/moe-weighted-reduction/test-moe-weighted-reduction-20260906T214454Z-0b2c9c.log",
+  "log_sha256": "c3e0c588c2d47c468fd4ba588e81bb2436b09f848beea682a61f493af5c9ca60",
+  "log_bytes": 2003,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "cpu",
+    "tolerance": {
+      "source": "cuda-parity"
+    }
+  },
+  "extracted": {}
+}

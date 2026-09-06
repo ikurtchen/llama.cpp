@@ -3,7 +3,7 @@
   "name": "mul-mat-id-helper",
   "source": "ggml/src/ggml-cuda/mmid.cu:mm_ids_helper,launch_mm_ids_helper,ggml_cuda_launch_mm_ids_helper",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "medium",
   "algorithm": "Compact token-to-expert routing ids into contiguous source/destination maps and expert bounds for MoE matmul kernels.",
   "cuda_constructs": [
@@ -34,23 +34,23 @@
     "kind": "analytical",
     "crosscheck": "-"
   },
-  "notes": "Risk reason: routing compaction and inverse-map options must match MoE matmul expectations exactly. Reference oracle: analytical routing semantics plus MoE backend tests.",
-  "updated_at": "2026-09-06T16:21:35Z",
+  "notes": "Risk reason: routing compaction and inverse-map options must match MoE matmul expectations exactly. Reference oracle: ggml-cpu backend via tests/test-backend-ops. SYCL ports the mmid helper in mmid.cpp and uses it to compact expert groups for the oneMKL-backed MUL_MAT_ID path in mmf.cpp.",
+  "updated_at": "2026-09-06T21:45:23Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 122,
+      "code": 126,
       "comment": 8,
-      "blank": 18,
-      "raw": 148,
-      "files": 1
+      "blank": 19,
+      "raw": 153,
+      "files": 2
     },
     "sycl": {
-      "code": 0,
+      "code": 91,
       "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "blank": 13,
+      "raw": 104,
+      "files": 2
     },
     "source_files": [
       {
@@ -65,12 +65,54 @@
         "comment": 8,
         "blank": 18,
         "raw": 148
+      },
+      {
+        "path": "ggml/src/ggml-cuda/mmid.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 4,
+        "comment": 0,
+        "blank": 1,
+        "raw": 5
       }
     ],
-    "sycl_files": [],
-    "mirrored_sources": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/mmid.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 76,
+        "comment": 0,
+        "blank": 11,
+        "raw": 87
+      },
+      {
+        "path": "ggml/src/ggml-sycl/mmid.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 15,
+        "comment": 0,
+        "blank": 2,
+        "raw": 17
+      }
+    ],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/mmid.cuh"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:35Z"
+    "measured_at": "2026-09-06T21:45:20Z"
+  },
+  "target_style": "plain-sycl",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/mmid.hpp",
+    "ggml/src/ggml-sycl/mmid.cpp",
+    "ggml/src/ggml-sycl/mmf.cpp"
+  ],
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "MUL_MAT_ID",
+    "result": "pass",
+    "evidence": "test-mmid-20260906T214453Z-ea8590"
   }
 }

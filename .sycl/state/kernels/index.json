@@ -568,12 +568,12 @@
       "id": "mmid",
       "source": "ggml/src/ggml-cuda/mmid.cu:mm_ids_helper,launch_mm_ids_helper,ggml_cuda_launch_mm_ids_helper",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "medium",
       "detail": ".sycl/state/kernels/mmid.json",
       "loc": {
-        "source_code": 122,
-        "sycl_code": 0
+        "source_code": 126,
+        "sycl_code": 91
       }
     },
     {
@@ -616,12 +616,12 @@
       "id": "moe-weighted-reduction",
       "source": "ggml/src/ggml-cuda/moe-weighted-reduction.cu:moe_weighted_reduction_f32,launch_moe_weighted_reduction,ggml_cuda_op_moe_weighted_reduction",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "medium",
       "detail": ".sycl/state/kernels/moe-weighted-reduction.json",
       "loc": {
-        "source_code": 57,
-        "sycl_code": 0
+        "source_code": 63,
+        "sycl_code": 190
       }
     },
     {
@@ -1038,5 +1038,5 @@
       }
     }
   ],
-  "updated_at": "2026-09-06T21:38:24Z"
+  "updated_at": "2026-09-06T21:45:20Z"
 }

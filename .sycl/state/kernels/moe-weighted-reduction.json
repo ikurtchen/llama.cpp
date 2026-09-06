@@ -3,7 +3,7 @@
   "name": "moe-weighted-reduction",
   "source": "ggml/src/ggml-cuda/moe-weighted-reduction.cu:moe_weighted_reduction_f32,launch_moe_weighted_reduction,ggml_cuda_op_moe_weighted_reduction",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "medium",
   "algorithm": "Combine MoE expert outputs by weighting and summing the selected expert rows for each token.",
   "cuda_constructs": [
@@ -38,23 +38,23 @@
     "kind": "cpu",
     "crosscheck": "-"
   },
-  "notes": "Risk reason: modest routing/index math but no unusual CUDA primitives. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:36Z",
+  "notes": "Risk reason: modest routing/index math but no unusual CUDA primitives. Reference oracle: ggml-cpu backend via tests/test-backend-ops. SYCL mirrors CUDA as a graph-fused path from ggml_backend_sycl_graph_compute() rather than a standalone GGML op switch case.",
+  "updated_at": "2026-09-06T21:45:23Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 57,
+      "code": 63,
       "comment": 0,
-      "blank": 4,
-      "raw": 61,
-      "files": 1
+      "blank": 5,
+      "raw": 68,
+      "files": 2
     },
     "sycl": {
-      "code": 0,
+      "code": 190,
       "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "blank": 36,
+      "raw": 226,
+      "files": 2
     },
     "source_files": [
       {
@@ -69,12 +69,54 @@
         "comment": 0,
         "blank": 4,
         "raw": 61
+      },
+      {
+        "path": "ggml/src/ggml-cuda/moe-weighted-reduction.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 6,
+        "comment": 0,
+        "blank": 1,
+        "raw": 7
       }
     ],
-    "sycl_files": [],
-    "mirrored_sources": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/moe-weighted-reduction.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 184,
+        "comment": 0,
+        "blank": 34,
+        "raw": 218
+      },
+      {
+        "path": "ggml/src/ggml-sycl/moe-weighted-reduction.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 6,
+        "comment": 0,
+        "blank": 2,
+        "raw": 8
+      }
+    ],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/moe-weighted-reduction.cuh"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:36Z"
+    "measured_at": "2026-09-06T21:45:20Z"
+  },
+  "target_style": "plain-sycl",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/moe-weighted-reduction.hpp",
+    "ggml/src/ggml-sycl/moe-weighted-reduction.cpp",
+    "ggml/src/ggml-sycl/ggml-sycl.cpp"
+  ],
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "MOE_WEIGHTED_REDUCTION",
+    "result": "pass",
+    "evidence": "test-moe-weighted-reduction-20260906T214454Z-0b2c9c"
   }
 }

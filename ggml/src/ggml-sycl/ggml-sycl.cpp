@@ -58,6 +58,7 @@
 #include "cumsum.hpp"
 #include "out-prod.hpp"
 #include "solve-tri.hpp"
+#include "moe-weighted-reduction.hpp"
 #include "dsv4-hc.hpp"
 #include "lightning-indexer.hpp"
 #include "gla.hpp"
@@ -359,6 +360,9 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, ggml_tens
         case GGML_OP_MUL_MAT:
             ggml_sycl_op_mul_mat(ctx, dst);
             return true;
+        case GGML_OP_MUL_MAT_ID:
+            ggml_sycl_op_mul_mat_id(ctx, dst);
+            return true;
         case GGML_OP_OUT_PROD:
             ggml_sycl_out_prod(ctx, dst);
             return true;
@@ -506,6 +510,14 @@ static enum ggml_status ggml_backend_sycl_graph_compute(ggml_backend_t backend, 
         ggml_tensor * node = cgraph->nodes[i];
         if (ggml_is_empty(node) || (node->flags & GGML_TENSOR_FLAG_COMPUTE) == 0) {
             continue;
+        }
+
+        if (node->op == GGML_OP_MUL) {
+            const int nodes_to_skip = ggml_sycl_try_moe_weighted_reduction(*ctx, cgraph, i);
+            if (nodes_to_skip > 0) {
+                i += nodes_to_skip;
+                continue;
+            }
         }
 
         if (node->op == GGML_OP_MUL && ggml_sycl_can_fuse_snake(cgraph, i)) {
@@ -698,6 +710,8 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
             return ggml_sycl_supports_argmax(op);
         case GGML_OP_MUL_MAT:
             return ggml_sycl_supports_mul_mat(op);
+        case GGML_OP_MUL_MAT_ID:
+            return ggml_sycl_supports_mul_mat_id(op);
         case GGML_OP_OUT_PROD:
             return ggml_sycl_supports_out_prod(op);
         case GGML_OP_FLASH_ATTN_EXT:
