@@ -4,39 +4,44 @@
 - **Runner**: remote (cripoc02 (10.239.98.41:2332))
 - **Toolchain**: Intel(R) oneAPI DPC++/C++ Compiler 2025.3.2 (2025.3.2.20260112)  ·  **GPU**: Intel(R) Graphics [0xe223] (Arc Pro B70, Battlemage) (xe2)  ·  **oneAPI**: /opt/intel/oneapi (2025.3.2)
 - **Benchmark GPU freq pinned**: True
-- **Build system**: cmake → SYCL build: not-set-up (option scaffolding exists: GGML_SYCL cmake options + ggml_add_backend(SYCL) + include/ggml-sycl.h present, ggml/src/ggml-sycl/ implementation dir missing)
-- **Phase**: inventory
-- **Updated**: 2026-09-06T15:59:07Z
+- **Build system**: cmake → SYCL build: set-up (ggml/src/ggml-sycl/ builds via icpx -fsycl, AOT bmg-g31, links oneMKL; registers as backend SYCL0)
+- **Phase**: migrate
+- **Updated**: 2026-09-06T16:12:08Z
 
 **Summary**: 0 kernels — 0 migrated, 0 optimized, 0 skipped, 0 needs-reference, 0 pending.
 
 ## Backend integration
 
-- **Readiness**: **L0** → target L3  ·  kernel-standalone — kernels pass their own tests; the project does NOT build or run with them
-- **Archetype**: A  ·  **Entrypoint**: ?  ·  **Backend switch**: ?
-- **Gates**: L0:pending  L1:pending  L2:pending  L3:pending  L4:pending
-- **Surfaces**: 0/7 closed
+- **Readiness**: **L1** → target L4  ·  build-through — the project's OWN build produces an artifact with the SYCL backend
+- **Archetype**: A  ·  **Entrypoint**: build/bin/llama-cli  ·  **Backend switch**: cmake -B build -DGGML_SYCL=ON -DGGML_SYCL_TARGET=INTEL -DGGML_SYCL_DEVICE_ARCH=bmg-g31 -DCMAKE_C_COMPILER=icx -DCMAKE_CXX_COMPILER=icpx
+- **Gates**: L0:pass  L1:pass  L2:pending  L3:pending  L4:pending
+- **Surfaces**: 2/7 closed
+- **Waivers**: 2  ·  **Residual work**: 2 items (≈3.5 engineer-weeks to finish)
 
 | surface | status | blocks | what | effort (wk) | risk |
 |---------|--------|--------|------|-------------|------|
-| build | pending | L1 | Add a SYCL/XPU backend option to the project's own build so its own artifact is produced with the backend enabled. | - | low |
-| runtime | pending | L1 | Implement the project's device abstraction over SYCL: device/context/queue(stream)/event/sync, error translation. | - | low |
-| memory | pending | L2 | Replace cudaMalloc / RMM / the caching allocator with a USM equivalent behind the project's own allocator interface. | - | low |
-| dispatch | pending | L2 | Make the project's own call path reach the migrated SYCL kernels (dispatch table, op registration, layer/graph factory). | - | medium |
+| build | done | L1 | Add a SYCL/XPU backend option to the project's own build so its own artifact is produced with the backend enabled. | - | low |
+| runtime | done | L1 | Implement the project's device abstraction over SYCL: device/context/queue(stream)/event/sync, error translation. | - | low |
+| memory | in-progress | L2 | Replace cudaMalloc / RMM / the caching allocator with a USM equivalent behind the project's own allocator interface. | - | low |
+| dispatch | in-progress | L2 | Make the project's own call path reach the migrated SYCL kernels (dispatch table, op registration, layer/graph factory). | - | medium |
 | hostlib | pending | L2 | Replace host-side Thrust/CUB/cuBLAS/cuFFT/cuRAND/NCCL with oneDPL/oneMKL/oneDNN/oneCCL. | - | medium |
 | package | pending | L3 | Make the user-facing entry work: `import <pkg>`, the extension build, find_package/CMake export. | - | medium |
-| nvonly | pending | L3 | Stub or disable NVIDIA-only paths (OptiX/DLSS/TensorRT/NVML/OpenXR) and record a waiver with its blast radius for each. | - | low |
+| nvonly | n/a | L3 | Stub or disable NVIDIA-only paths (OptiX/DLSS/TensorRT/NVML/OpenXR) and record a waiver with its blast radius for each. | - | low |
+
+**Waivers** (deliberately not done — a silent stub would be a defect):
+- ? — Target is a single Arc Pro B70 GPU (config.target.platform=b70); ggml_backend_sycl_split_buffer_type / comm_* are stubbed (return nullptr/false) rather than implemented.  ·  blast radius: Multi-GPU --split-mode tensor/layer across >1 SYCL device is unavailable. Does not affect the single-device qwen3 e2e workload this migration targets.
+- ? — ggml_backend_sycl_host_buffer_type falls back to the plain CPU buffer type instead of a USM host-pinned allocation.  ·  blast radius: H2D/D2H transfer bandwidth for pinned-buffer paths (e.g. some KV cache offload configs) is lower than an optimized pinned allocation would give; correctness is unaffected.
 
 ## Phase gates
 
-- **Closed**: 1/9  ·  a phase is exited only by `evidence.sh gate <phase>`; anything else is an ungated exit
+- **Closed**: 2/9  ·  a phase is exited only by `evidence.sh gate <phase>`; anything else is an ungated exit
 
 | phase | status | gate | attempts | unmet criteria |
 |-------|--------|------|----------|----------------|
 | detect | exited | pass | 1 | - |
 | inventory | in-progress | pending | 0 | - |
-| scaffold | pending | pending | 0 | - |
-| migrate | pending | pending | 0 | - |
+| scaffold | exited | pass | 2 | - |
+| migrate | in-progress | pending | 0 | - |
 | integrate | pending | pending | 0 | - |
 | profile-e2e | pending | pending | 0 | - |
 | optimize | pending | pending | 0 | - |
@@ -50,13 +55,14 @@
 
 ## Agent efficiency & cost
 
-- **Elapsed**: 14m36s (whole run)  ·  **Active**: 23s (bracketed)  ·  **Cost**: $0.0  ·  **Tokens**: 0 (in 0 / out 0 / cache r 0 / cache w 0)  ·  **Premium requests**: 0  ·  **AI credits**: 0.0
-- **Observed (gen-progress heartbeat)**: span 14m36s  ·  working ≈ 14m36s (idle-capped 30m00s)  ·  2 snapshots — independent of metrics.sh
-  - ⚠️ bracketed active time (23s) is far below observed work (14m36s); phases were under-bracketed — trust elapsed/observed figures.
+- **Elapsed**: 27m27s (whole run)  ·  **Active**: 13m14s (bracketed)  ·  **Cost**: $0.0  ·  **Tokens**: 0 (in 0 / out 0 / cache r 0 / cache w 0)  ·  **Premium requests**: 0  ·  **AI credits**: 0.0
+- **Observed (gen-progress heartbeat)**: span 27m37s  ·  working ≈ 27m37s (idle-capped 30m00s)  ·  3 snapshots — independent of metrics.sh
+  - ⚠️ bracketed active time (13m14s) is far below observed work (27m37s); phases were under-bracketed — trust elapsed/observed figures.
 
 | phase | elapsed | active | tokens | requests | credits | USD |
 |-------|--------:|-------:|-------:|---------:|--------:|----:|
 | detect | 23s | 23s | 0 | 0 | 0.0 | 0.0 |
+| inventory | 12m51s | 12m51s | 0 | 0 | 0.0 | 0.0 |
 
 ## Progress history
 
@@ -65,4 +71,5 @@
 |------------|-------|---------:|----------:|--------:|--------:|
 | 2026-09-06T15:44:31Z | detect | 0/0 | 0 | 0 | 0 |
 | 2026-09-06T15:59:07Z | inventory | 0/0 | 0 | 0 | 0 |
+| 2026-09-06T16:12:08Z | migrate | 0/0 | 0 | 0 | 0 |
 

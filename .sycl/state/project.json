@@ -1,11 +1,11 @@
 {
   "schema": "sycl-agent/project",
   "name": "llama.cpp",
-  "phase": "inventory",
+  "phase": "migrate",
   "runner_mode": "remote",
   "runner_host": "cripoc02 (10.239.98.41:2332)",
   "build_system": "cmake",
-  "sycl_build": "not-set-up (option scaffolding exists: GGML_SYCL cmake options + ggml_add_backend(SYCL) + include/ggml-sycl.h present, ggml/src/ggml-sycl/ implementation dir missing)",
+  "sycl_build": "set-up (ggml/src/ggml-sycl/ builds via icpx -fsycl, AOT bmg-g31, links oneMKL; registers as backend SYCL0)",
   "sources": [
     "cuda"
   ],
@@ -24,7 +24,7 @@
   "integration": {
     "archetype": "A",
     "target_level": "L4",
-    "achieved_level": "L0",
+    "achieved_level": "L1",
     "entrypoint": "build/bin/llama-cli (real user entrypoint); also build/bin/llama-perplexity for accuracy, build/bin/test-backend-ops for op-level correctness",
     "backend_switch": "cmake -B build -DGGML_SYCL=ON -DGGML_SYCL_TARGET=INTEL -DGGML_SYCL_DEVICE_ARCH=bmg-g31 -DCMAKE_C_COMPILER=icx -DCMAKE_CXX_COMPILER=icpx",
     "notes": "kind=application (llama-cli e2e driver exists). CUDA backend (ggml/src/ggml-cuda) is the reference source; 68 .cu kernel files. SYCL header/cmake options already stubbed by upstream llama.cpp scaffolding but ggml-sycl/ implementation directory does not exist -- must be created from scratch, mirroring ggml-cuda structure per project convention (upstream llama.cpp has a real ggml-sycl backend we do not copy from -- hand-written per sycl-migration skill)."
@@ -47,5 +47,5 @@
     "source": "CPU backend (ggml-cpu) via test-backend-ops for op-level unit tests; llama-cli -ngl 0 (CPU) greedy decode + llama-perplexity for e2e (per config.integration.workload_reference)",
     "notes": "How golden reference outputs are obtained for accuracy checks (CUDA capture / CPU / analytical)."
   },
-  "updated_at": "2026-09-06T15:58:58Z"
+  "updated_at": "2026-09-06T16:11:31Z"
 }

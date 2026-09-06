@@ -1,21 +1,81 @@
 {
   "schema": "sycl-agent/integration-readiness",
-  "note": "Backend Readiness Level (BRL). `target_level` is DECLARED at scaffold; `achieved_level` is COMPUTED from gates that resolve to a run record with exit code 0 — never asserted. See skill sycl-integration/references/backend-readiness.md.",
-  "archetype": "",
-  "archetype_reason": "",
-  "target_level": "L3",
-  "target_reason": "",
-  "achieved_level": "L0",
-  "entrypoint": "",
-  "backend_switch": "",
+  "note": "Backend Readiness Level (BRL). `target_level` is DECLARED at scaffold; `achieved_level` is COMPUTED from gates that resolve to a run record with exit code 0 \u2014 never asserted. See skill sycl-integration/references/backend-readiness.md.",
+  "archetype": "A",
+  "archetype_reason": "C/C++ application (llama-cli) with an existing backend seam (ggml_backend_reg + per-backend CMake option), matching config.integration.archetype override.",
+  "target_level": "L4",
+  "target_reason": "config.integration.target_level=L4 (user override); archetype A is the cheapest to reach L4 per backend-readiness.md.",
+  "achieved_level": "L1",
+  "entrypoint": "build/bin/llama-cli",
+  "backend_switch": "cmake -B build -DGGML_SYCL=ON -DGGML_SYCL_TARGET=INTEL -DGGML_SYCL_DEVICE_ARCH=bmg-g31 -DCMAKE_C_COMPILER=icx -DCMAKE_CXX_COMPILER=icpx",
   "gates": {
-    "L0": { "name": "kernel-standalone", "status": "pending", "evidence": [], "note": "" },
-    "L1": { "name": "build-through",     "status": "pending", "evidence": [], "note": "" },
-    "L2": { "name": "runtime-live",      "status": "pending", "evidence": [], "exceptions": [], "note": "" },
-    "L3": { "name": "workload-correct",  "status": "pending", "evidence": [], "reference": "", "tolerance": "", "note": "" },
-    "L4": { "name": "workload-fast",     "status": "pending", "evidence": [], "note": "" }
+    "L0": {
+      "name": "kernel-standalone",
+      "status": "pass",
+      "evidence": [
+        "integration-runtime-20260906T161048Z-831fa7"
+      ],
+      "note": "CPY kernel (ggml-sycl/cpy.cpp) passes test-backend-ops -b SYCL0 -o CPY (136/136) against the CPU oracle."
+    },
+    "L1": {
+      "name": "build-through",
+      "status": "pass",
+      "evidence": [
+        "build-backend-20260906T160930Z-16a931"
+      ],
+      "note": "Project's own build (cmake -DGGML_SYCL=ON ... && cmake --build) succeeds end to end, producing build/bin/llama-cli linked against the new ggml-sycl backend."
+    },
+    "L2": {
+      "name": "runtime-live",
+      "status": "pending",
+      "evidence": [],
+      "exceptions": [],
+      "note": ""
+    },
+    "L3": {
+      "name": "workload-correct",
+      "status": "pending",
+      "evidence": [],
+      "reference": "",
+      "tolerance": "",
+      "note": ""
+    },
+    "L4": {
+      "name": "workload-fast",
+      "status": "pending",
+      "evidence": [],
+      "note": ""
+    }
   },
-  "waivers": [],
-  "residual": [],
-  "updated_at": "1970-01-01T00:00:00Z"
+  "waivers": [
+    {
+      "surface": "memory (multi-GPU split buffers / tensor-parallel comm)",
+      "reason": "Target is a single Arc Pro B70 GPU (config.target.platform=b70); ggml_backend_sycl_split_buffer_type / comm_* are stubbed (return nullptr/false) rather than implemented.",
+      "blast_radius": "Multi-GPU --split-mode tensor/layer across >1 SYCL device is unavailable. Does not affect the single-device qwen3 e2e workload this migration targets."
+    },
+    {
+      "surface": "runtime (pinned/host buffer)",
+      "reason": "ggml_backend_sycl_host_buffer_type falls back to the plain CPU buffer type instead of a USM host-pinned allocation.",
+      "blast_radius": "H2D/D2H transfer bandwidth for pinned-buffer paths (e.g. some KV cache offload configs) is lower than an optimized pinned allocation would give; correctness is unaffected."
+    }
+  ],
+  "residual": [
+    {
+      "item": "USM host-pinned buffer type",
+      "unlocks": "faster H2D/D2H transfer",
+      "effort_weeks": [
+        0.2,
+        0.5
+      ]
+    },
+    {
+      "item": "Multi-GPU split buffer + tensor-parallel comm",
+      "unlocks": "--split-mode tensor/layer across multiple SYCL devices",
+      "effort_weeks": [
+        1,
+        3
+      ]
+    }
+  ],
+  "updated_at": "2026-09-06T16:11:24Z"
 }

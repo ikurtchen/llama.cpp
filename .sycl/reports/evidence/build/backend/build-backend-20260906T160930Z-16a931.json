@@ -1,0 +1,29 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "build-backend-20260906T160930Z-16a931",
+  "class": "build",
+  "subject": "backend",
+  "label": "scaffold-l1",
+  "phase": "inventory",
+  "ts": "2026-09-06T16:09:36Z",
+  "duration_s": 6.226,
+  "command": "bash -c cmake\\ -B\\ build\\ -DGGML_SYCL=ON\\ -DGGML_SYCL_TARGET=INTEL\\ -DGGML_SYCL_DEVICE_ARCH=bmg-g31\\ -DGGML_SYCL_F16=ON\\ -DCMAKE_C_COMPILER=icx\\ -DCMAKE_CXX_COMPILER=icpx\\ -DCMAKE_BUILD_TYPE=Release\\ -DLLAMA_CURL=OFF\\ \\&\\&\\ cmake\\ --build\\ build\\ --config\\ Release\\ -j\\ 32",
+  "via": "run.sh build",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "c27f9134b",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/build/backend/build-backend-20260906T160930Z-16a931.log",
+  "log_sha256": "45f64e31ce8f8c8f46ac10c76f57648547c3b9232b553ad7cac5e38f43cec937",
+  "log_bytes": 13852,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {},
+  "extracted": {}
+}

@@ -33,21 +33,21 @@
       "notes": ""
     },
     "scaffold": {
-      "status": "pending",
-      "entered_at": "",
-      "exited_at": "",
+      "status": "exited",
+      "entered_at": "2026-09-06T16:11:48Z",
+      "exited_at": "2026-09-06T16:11:58Z",
       "gate": {
-        "result": "pending",
-        "attempts": 0,
-        "checked_at": "",
+        "result": "pass",
+        "attempts": 2,
+        "checked_at": "2026-09-06T16:11:58Z",
         "unmet": []
       },
       "waivers": [],
       "notes": ""
     },
     "migrate": {
-      "status": "pending",
-      "entered_at": "",
+      "status": "in-progress",
+      "entered_at": "2026-09-06T16:11:58Z",
       "exited_at": "",
       "gate": {
         "result": "pending",
@@ -134,5 +134,5 @@
     },
     "changes": []
   },
-  "updated_at": "2026-09-06T15:59:07Z"
+  "updated_at": "2026-09-06T16:11:58Z"
 }

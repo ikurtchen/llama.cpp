@@ -1,0 +1,31 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "integration-runtime-20260906T161048Z-831fa7",
+  "class": "integration",
+  "subject": "runtime",
+  "label": "scaffold-smoke",
+  "phase": "inventory",
+  "ts": "2026-09-06T16:10:58Z",
+  "duration_s": 9.451,
+  "command": "build/bin/test-backend-ops test -b SYCL0",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "c27f9134b",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/integration/runtime/integration-runtime-20260906T161048Z-831fa7.log",
+  "log_sha256": "14237c3e42a2680428504efde9d85b5278f012d572efac343db46cf47724defd",
+  "log_bytes": 2000050,
+  "log_truncated": true,
+  "artifacts": [],
+  "measurements": {
+    "reference": "CPU backend result for the same CPY op (test-backend-ops built-in oracle)"
+  },
+  "extracted": {}
+}

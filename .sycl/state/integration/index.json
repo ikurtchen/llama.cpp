@@ -5,50 +5,66 @@
     {
       "id": "build",
       "title": "Build-system integration",
-      "status": "pending",
+      "status": "done",
       "blocks_level": "L1",
       "owner_archetype": "all",
       "what": "Add a SYCL/XPU backend option to the project's own build so its own artifact is produced with the backend enabled.",
-      "effort_weeks": [0, 0],
+      "effort_weeks": [
+        0,
+        0
+      ],
       "risk": "low",
-      "evidence": [],
-      "notes": ""
+      "evidence": [
+        "build-backend-20260906T160930Z-16a931"
+      ],
+      "notes": "ggml/src/ggml-sycl/CMakeLists.txt added; ggml_add_backend(SYCL) already existed in ggml/src/CMakeLists.txt (upstream scaffolding) and now finds a real subdirectory."
     },
     {
       "id": "runtime",
       "title": "Device runtime layer",
-      "status": "pending",
+      "status": "done",
       "blocks_level": "L1",
       "owner_archetype": "all",
       "what": "Implement the project's device abstraction over SYCL: device/context/queue(stream)/event/sync, error translation.",
-      "effort_weeks": [0, 0],
+      "effort_weeks": [
+        0,
+        0
+      ],
       "risk": "low",
-      "evidence": [],
-      "notes": ""
+      "evidence": [
+        "integration-runtime-20260906T161048Z-831fa7"
+      ],
+      "notes": "Device enumeration (level_zero:gpu), per-device in-order sycl::queue, USM device buffer type, backend/device/reg interfaces implemented in ggml-sycl.cpp + common.hpp."
     },
     {
       "id": "memory",
       "title": "Allocator / memory manager",
-      "status": "pending",
+      "status": "in-progress",
       "blocks_level": "L2",
       "owner_archetype": "all",
       "what": "Replace cudaMalloc / RMM / the caching allocator with a USM equivalent behind the project's own allocator interface.",
-      "effort_weeks": [0, 0],
+      "effort_weeks": [
+        0,
+        0
+      ],
       "risk": "low",
       "evidence": [],
-      "notes": ""
+      "notes": "Single-device USM device alloc/free/copy done (see 'runtime'). Multi-GPU split buffer waived (see readiness.json waivers). Host-pinned buffer deferred (residual)."
     },
     {
       "id": "dispatch",
       "title": "Registration & dispatch",
-      "status": "pending",
+      "status": "in-progress",
       "blocks_level": "L2",
       "owner_archetype": "all",
       "what": "Make the project's own call path reach the migrated SYCL kernels (dispatch table, op registration, layer/graph factory).",
-      "effort_weeks": [0, 0],
+      "effort_weeks": [
+        0,
+        0
+      ],
       "risk": "medium",
       "evidence": [],
-      "notes": ""
+      "notes": "ggml_sycl_compute_forward switch in ggml-sycl.cpp is the dispatch table; extended one op at a time during migrate. CPY/DUP/CONT + view-like ops registered so far."
     },
     {
       "id": "hostlib",
@@ -57,10 +73,13 @@
       "blocks_level": "L2",
       "owner_archetype": "all",
       "what": "Replace host-side Thrust/CUB/cuBLAS/cuFFT/cuRAND/NCCL with oneDPL/oneMKL/oneDNN/oneCCL.",
-      "effort_weeks": [0, 0],
+      "effort_weeks": [
+        0,
+        0
+      ],
       "risk": "medium",
       "evidence": [],
-      "notes": ""
+      "notes": "oneMKL (SYCL) will back mul_mat (cuBLAS replacement); CMakeLists.txt already wires find_package(MKL) + MKL::MKL_DPCPP. No host CUB/Thrust equivalents needed yet (SYCL backend has no host-side CUB/Thrust call sites of its own)."
     },
     {
       "id": "package",
@@ -69,23 +88,29 @@
       "blocks_level": "L3",
       "owner_archetype": "B,C,D",
       "what": "Make the user-facing entry work: `import <pkg>`, the extension build, find_package/CMake export.",
-      "effort_weeks": [0, 0],
+      "effort_weeks": [
+        0,
+        0
+      ],
       "risk": "medium",
       "evidence": [],
-      "notes": ""
+      "notes": "llama-cli/llama-perplexity/test-backend-ops already build and link the new backend via the existing ggml_add_backend(SYCL) hook -- no separate packaging surface for this C++ CLI application (archetype A); revisit if a Python binding is required."
     },
     {
       "id": "nvonly",
       "title": "NVIDIA-only feature paths",
-      "status": "pending",
+      "status": "n/a",
       "blocks_level": "L3",
       "owner_archetype": "all",
       "what": "Stub or disable NVIDIA-only paths (OptiX/DLSS/TensorRT/NVML/OpenXR) and record a waiver with its blast radius for each.",
-      "effort_weeks": [0, 0],
+      "effort_weeks": [
+        0,
+        0
+      ],
       "risk": "low",
       "evidence": [],
-      "notes": ""
+      "notes": "The SYCL backend is hand-written from scratch (no ported CUDA-only code paths within ggml-sycl itself); nothing to waive here. CUDA-only code lives entirely in ggml-cuda/ which is simply not compiled when GGML_SYCL is selected instead of GGML_CUDA."
     }
   ],
-  "updated_at": "1970-01-01T00:00:00Z"
+  "updated_at": "2026-09-06T16:11:24Z"
 }
