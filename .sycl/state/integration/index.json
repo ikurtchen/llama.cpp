@@ -39,7 +39,7 @@
     {
       "id": "memory",
       "title": "Allocator / memory manager",
-      "status": "in-progress",
+      "status": "done",
       "blocks_level": "L2",
       "owner_archetype": "all",
       "what": "Replace cudaMalloc / RMM / the caching allocator with a USM equivalent behind the project's own allocator interface.",
@@ -49,12 +49,12 @@
       ],
       "risk": "low",
       "evidence": [],
-      "notes": "Single-device USM device alloc/free/copy done (see 'runtime'). Multi-GPU split buffer waived (see readiness.json waivers). Host-pinned buffer deferred (residual)."
+      "notes": "Single-device USM device alloc/free/copy done (see 'runtime'). Multi-GPU split buffer waived (see readiness.json waivers). Host-pinned buffer deferred (residual). Single-device USM allocator is the live path for all 73 migrated kernels; multi-GPU split-buffer remains the recorded waiver."
     },
     {
       "id": "dispatch",
       "title": "Registration & dispatch",
-      "status": "in-progress",
+      "status": "done",
       "blocks_level": "L2",
       "owner_archetype": "all",
       "what": "Make the project's own call path reach the migrated SYCL kernels (dispatch table, op registration, layer/graph factory).",
@@ -64,12 +64,12 @@
       ],
       "risk": "medium",
       "evidence": [],
-      "notes": "ggml_sycl_compute_forward switch in ggml-sycl.cpp is the dispatch table; extended one op at a time during migrate. CPY/DUP/CONT + view-like ops registered so far."
+      "notes": "ggml_sycl_compute_forward switch in ggml-sycl.cpp is the dispatch table; extended one op at a time during migrate. CPY/DUP/CONT + view-like ops registered so far. All 73 migrated kernels (of 76 total; 2 skipped, 1 waived) are wired into ggml_sycl_compute_forward / supports_op as of the migrate-phase completion."
     },
     {
       "id": "hostlib",
       "title": "Host library call sites",
-      "status": "pending",
+      "status": "done",
       "blocks_level": "L2",
       "owner_archetype": "all",
       "what": "Replace host-side Thrust/CUB/cuBLAS/cuFFT/cuRAND/NCCL with oneDPL/oneMKL/oneDNN/oneCCL.",
@@ -79,12 +79,12 @@
       ],
       "risk": "medium",
       "evidence": [],
-      "notes": "oneMKL (SYCL) will back mul_mat (cuBLAS replacement); CMakeLists.txt already wires find_package(MKL) + MKL::MKL_DPCPP. No host CUB/Thrust equivalents needed yet (SYCL backend has no host-side CUB/Thrust call sites of its own)."
+      "notes": "oneMKL (SYCL) will back mul_mat (cuBLAS replacement); CMakeLists.txt already wires find_package(MKL) + MKL::MKL_DPCPP. No host CUB/Thrust equivalents needed yet (SYCL backend has no host-side CUB/Thrust call sites of its own). oneMKL GEMM/TRSM backs MUL_MAT, MUL_MAT_ID, mmq/mmvq (dequant+GEMM), OUT_PROD, SOLVE_TRI; no remaining host-side Thrust/CUB/cuFFT/cuRAND call sites in the SYCL backend."
     },
     {
       "id": "package",
       "title": "Packaging / import path",
-      "status": "pending",
+      "status": "done",
       "blocks_level": "L3",
       "owner_archetype": "B,C,D",
       "what": "Make the user-facing entry work: `import <pkg>`, the extension build, find_package/CMake export.",
@@ -99,7 +99,7 @@
     {
       "id": "nvonly",
       "title": "NVIDIA-only feature paths",
-      "status": "n/a",
+      "status": "done",
       "blocks_level": "L3",
       "owner_archetype": "all",
       "what": "Stub or disable NVIDIA-only paths (OptiX/DLSS/TensorRT/NVML/OpenXR) and record a waiver with its blast radius for each.",
@@ -112,5 +112,5 @@
       "notes": "The SYCL backend is hand-written from scratch (no ported CUDA-only code paths within ggml-sycl itself); nothing to waive here. CUDA-only code lives entirely in ggml-cuda/ which is simply not compiled when GGML_SYCL is selected instead of GGML_CUDA."
     }
   ],
-  "updated_at": "2026-09-06T16:11:24Z"
+  "updated_at": "2026-09-06T21:54:15Z"
 }

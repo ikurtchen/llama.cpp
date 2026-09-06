@@ -1,0 +1,34 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "e2e-qwen3-8b-sycl-20260906T220548Z-9257fa",
+  "class": "e2e",
+  "subject": "qwen3-8b-sycl",
+  "label": "l3-sycl-candidate",
+  "phase": "migrate",
+  "ts": "2026-09-06T22:05:58Z",
+  "duration_s": 9.882,
+  "command": "./build/bin/llama-cli -m /host/root/code/models/Qwen3-8B-GGUF/Qwen3-8B-Q8_0.gguf -p \\'The\\ capital\\ of\\ France\\ is\\' -n 32 --temp 0 --seed 42 --reasoning off -ngl 99 --single-turn",
+  "via": "run.sh exec",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "d83357778",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/e2e/qwen3-8b-sycl/e2e-qwen3-8b-sycl-20260906T220548Z-9257fa.log",
+  "log_sha256": "eb5f13ce4c1d5449eefc8b154028732ad4aca06fd64d2ae61065ed6f1ca8798a",
+  "log_bytes": 2020,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "CPU backend (ngl=0), greedy decode, seed 42 -- must match token-for-token",
+    "tolerance": {
+      "temp": "0)"
+    }
+  },
+  "extracted": {}
+}

@@ -1,0 +1,31 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "integration-suite-20260906T215845Z-10ef03",
+  "class": "integration",
+  "subject": "suite",
+  "label": "l2-suite",
+  "phase": "migrate",
+  "ts": "2026-09-06T22:02:25Z",
+  "duration_s": 220.415,
+  "command": "./build/bin/test-backend-ops -b SYCL0",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "d83357778",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/integration/suite/integration-suite-20260906T215845Z-10ef03.log",
+  "log_sha256": "2503f5af1bd96396ed4721ca10fb3ce3e81f5c8f43e90d81c0babbfa7870f1b9",
+  "log_bytes": 2000050,
+  "log_truncated": true,
+  "artifacts": [],
+  "measurements": {
+    "reference": "test-backend-ops CPU-oracle comparison, project's own harness, unmodified"
+  },
+  "extracted": {}
+}

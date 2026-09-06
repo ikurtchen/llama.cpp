@@ -224,6 +224,7 @@ cmd_record() {
       build) via="build" ;;
       profile) via="profile" ;;
       e2e)   via="exec" ;;
+      integration) via="exec" ;;
     esac
   fi
 

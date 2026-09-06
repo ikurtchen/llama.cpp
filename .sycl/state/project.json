@@ -1,7 +1,7 @@
 {
   "schema": "sycl-agent/project",
   "name": "llama.cpp",
-  "phase": "migrate",
+  "phase": "profile-e2e",
   "runner_mode": "remote",
   "runner_host": "cripoc02 (10.239.98.41:2332)",
   "build_system": "cmake",
@@ -12,12 +12,12 @@
   "e2e_cases": [
     {
       "name": "qwen3-0.6b-debug",
-      "cmd": "build/bin/llama-cli -m /workspace/models/Qwen3-0.6B-Q8_0.gguf -no-cnv -p 'The capital of France is' -n 32 --temp 0 --seed 42 -ngl 99",
+      "cmd": "build/bin/llama-cli -m /workspace/models/Qwen3-0.6B-Q8_0.gguf --reasoning off --single-turn -p 'The capital of France is' -n 32 --temp 0 --seed 42 -ngl 99",
       "weight": 0
     },
     {
       "name": "qwen3-8b-e2e",
-      "cmd": "build/bin/llama-cli -m /host/root/code/models/Qwen3-8B-GGUF/Qwen3-8B-Q8_0.gguf -no-cnv -p 'The capital of France is' -n 32 --temp 0 --seed 42 -ngl 99",
+      "cmd": "build/bin/llama-cli -m /host/root/code/models/Qwen3-8B-GGUF/Qwen3-8B-Q8_0.gguf --reasoning off --single-turn -p 'The capital of France is' -n 32 --temp 0 --seed 42 -ngl 99",
       "weight": 1
     }
   ],

@@ -5,7 +5,7 @@
   "archetype_reason": "C/C++ application (llama-cli) with an existing backend seam (ggml_backend_reg + per-backend CMake option), matching config.integration.archetype override.",
   "target_level": "L4",
   "target_reason": "config.integration.target_level=L4 (user override); archetype A is the cheapest to reach L4 per backend-readiness.md.",
-  "achieved_level": "L1",
+  "achieved_level": "L3",
   "entrypoint": "build/bin/llama-cli",
   "backend_switch": "cmake -B build -DGGML_SYCL=ON -DGGML_SYCL_TARGET=INTEL -DGGML_SYCL_DEVICE_ARCH=bmg-g31 -DCMAKE_C_COMPILER=icx -DCMAKE_CXX_COMPILER=icpx",
   "gates": {
@@ -27,18 +27,23 @@
     },
     "L2": {
       "name": "runtime-live",
-      "status": "pending",
-      "evidence": [],
+      "status": "pass",
+      "evidence": [
+        "integration-suite-20260906T215845Z-10ef03"
+      ],
       "exceptions": [],
-      "note": ""
+      "note": "Project's own test-backend-ops suite run against the SYCL0 backend: 8456/8456 tests passed, 2/2 backends passed. No exceptions."
     },
     "L3": {
       "name": "workload-correct",
-      "status": "pending",
-      "evidence": [],
-      "reference": "",
-      "tolerance": "",
-      "note": ""
+      "status": "pass",
+      "evidence": [
+        "e2e-qwen3-8b-cpu-ref-20260906T220507Z-1caa38",
+        "e2e-qwen3-8b-sycl-20260906T220548Z-9257fa"
+      ],
+      "reference": "CPU backend (ngl=0) greedy decode, seed 42, Qwen3-8B-Q8_0",
+      "tolerance": "exact token match (greedy, temp=0)",
+      "note": "llama-cli -m Qwen3-8B-Q8_0.gguf -p \"The capital of France is\" -n 32 --temp 0 --seed 42 -ngl 99 matches CPU backend (-ngl 0) token for token: \"The capital of France is Paris.\" Debug model Qwen3-0.6B-Q8_0 also verified matching. This licenses: llama.cpp runs on Intel B70, producing correct results on Qwen3-8B-Q8_0."
     },
     "L4": {
       "name": "workload-fast",

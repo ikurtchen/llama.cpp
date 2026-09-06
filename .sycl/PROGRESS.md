@@ -5,8 +5,8 @@
 - **Toolchain**: Intel(R) oneAPI DPC++/C++ Compiler 2025.3.2 (2025.3.2.20260112)  ·  **GPU**: Intel(R) Graphics [0xe223] (Arc Pro B70, Battlemage) (xe2)  ·  **oneAPI**: /opt/intel/oneapi (2025.3.2)
 - **Benchmark GPU freq pinned**: True
 - **Build system**: cmake → SYCL build: set-up (ggml/src/ggml-sycl/ builds via icpx -fsycl, AOT bmg-g31, links oneMKL; registers as backend SYCL0)
-- **Phase**: migrate
-- **Updated**: 2026-09-06T21:53:18Z
+- **Phase**: profile-e2e
+- **Updated**: 2026-09-06T22:07:18Z
 
 **Summary**: 76 kernels — 73 migrated, 0 optimized, 2 skipped, 0 needs-reference, 0 pending.
 
@@ -14,21 +14,21 @@
 
 ## Backend integration
 
-- **Readiness**: **L1** → target L4  ·  build-through — the project's OWN build produces an artifact with the SYCL backend
+- **Readiness**: **L3** → target L4  ·  workload-correct — the real entrypoint runs and matches a reference (licenses "runs on Intel GPU")
 - **Archetype**: A  ·  **Entrypoint**: build/bin/llama-cli  ·  **Backend switch**: cmake -B build -DGGML_SYCL=ON -DGGML_SYCL_TARGET=INTEL -DGGML_SYCL_DEVICE_ARCH=bmg-g31 -DCMAKE_C_COMPILER=icx -DCMAKE_CXX_COMPILER=icpx
-- **Gates**: L0:pass  L1:pass  L2:pending  L3:pending  L4:pending
-- **Surfaces**: 2/7 closed
+- **Gates**: L0:pass  L1:pass  L2:pass  L3:pass  L4:pending
+- **Surfaces**: 7/7 closed
 - **Waivers**: 3  ·  **Residual work**: 2 items (≈3.5 engineer-weeks to finish)
 
 | surface | status | blocks | what | effort (wk) | risk |
 |---------|--------|--------|------|-------------|------|
 | build | done | L1 | Add a SYCL/XPU backend option to the project's own build so its own artifact is produced with the backend enabled. | - | low |
 | runtime | done | L1 | Implement the project's device abstraction over SYCL: device/context/queue(stream)/event/sync, error translation. | - | low |
-| memory | in-progress | L2 | Replace cudaMalloc / RMM / the caching allocator with a USM equivalent behind the project's own allocator interface. | - | low |
-| dispatch | in-progress | L2 | Make the project's own call path reach the migrated SYCL kernels (dispatch table, op registration, layer/graph factory). | - | medium |
-| hostlib | pending | L2 | Replace host-side Thrust/CUB/cuBLAS/cuFFT/cuRAND/NCCL with oneDPL/oneMKL/oneDNN/oneCCL. | - | medium |
-| package | pending | L3 | Make the user-facing entry work: `import <pkg>`, the extension build, find_package/CMake export. | - | medium |
-| nvonly | n/a | L3 | Stub or disable NVIDIA-only paths (OptiX/DLSS/TensorRT/NVML/OpenXR) and record a waiver with its blast radius for each. | - | low |
+| memory | done | L2 | Replace cudaMalloc / RMM / the caching allocator with a USM equivalent behind the project's own allocator interface. | - | low |
+| dispatch | done | L2 | Make the project's own call path reach the migrated SYCL kernels (dispatch table, op registration, layer/graph factory). | - | medium |
+| hostlib | done | L2 | Replace host-side Thrust/CUB/cuBLAS/cuFFT/cuRAND/NCCL with oneDPL/oneMKL/oneDNN/oneCCL. | - | medium |
+| package | done | L3 | Make the user-facing entry work: `import <pkg>`, the extension build, find_package/CMake export. | - | medium |
+| nvonly | done | L3 | Stub or disable NVIDIA-only paths (OptiX/DLSS/TensorRT/NVML/OpenXR) and record a waiver with its blast radius for each. | - | low |
 
 **Waivers** (deliberately not done — a silent stub would be a defect):
 - ? — Target is a single Arc Pro B70 GPU (config.target.platform=b70); ggml_backend_sycl_split_buffer_type / comm_* are stubbed (return nullptr/false) rather than implemented.  ·  blast radius: Multi-GPU --split-mode tensor/layer across >1 SYCL device is unavailable. Does not affect the single-device qwen3 e2e workload this migration targets.
@@ -37,7 +37,7 @@
 
 ## Phase gates
 
-- **Closed**: 4/9  ·  a phase is exited only by `evidence.sh gate <phase>`; anything else is an ungated exit
+- **Closed**: 5/9  ·  a phase is exited only by `evidence.sh gate <phase>`; anything else is an ungated exit
 
 | phase | status | gate | attempts | unmet criteria |
 |-------|--------|------|----------|----------------|
@@ -45,7 +45,7 @@
 | inventory | exited | pass | 2 | - |
 | scaffold | exited | pass | 2 | - |
 | migrate | exited | pass | 3 | - |
-| integrate | pending | pending | 0 | - |
+| integrate | exited | pass | 2 | - |
 | profile-e2e | pending | pending | 0 | - |
 | optimize | pending | pending | 0 | - |
 | done | pending | pending | 0 | - |
@@ -138,7 +138,7 @@
 ## Agent efficiency & cost
 
 - **Elapsed**: 5h02m01s (whole run)  ·  **Active**: 4h30m37s (bracketed)  ·  **Cost**: $0.0  ·  **Tokens**: 256612832 (in 8803075 / out 1255396 / cache r 245376631 / cache w 1177730)  ·  **Premium requests**: 2017  ·  **AI credits**: 2011.0
-- **Observed (gen-progress heartbeat)**: span 6h08m47s  ·  working ≈ 5h11m06s (idle-capped 30m00s)  ·  37 snapshots — independent of metrics.sh
+- **Observed (gen-progress heartbeat)**: span 6h22m47s  ·  working ≈ 5h25m06s (idle-capped 30m00s)  ·  38 snapshots — independent of metrics.sh
 
 | phase | elapsed | active | tokens | requests | credits | USD |
 |-------|--------:|-------:|-------:|---------:|--------:|----:|
@@ -151,7 +151,6 @@
 <!-- append-only from logs/progress.jsonl — one row per gen-progress run -->
 | time (UTC) | phase | migrated | optimized | skipped | pending |
 |------------|-------|---------:|----------:|--------:|--------:|
-| 2026-09-06T19:32:17Z | migrate | 42/76 | 0 | 0 | 33 |
 | 2026-09-06T20:22:24Z | migrate | 44/76 | 0 | 0 | 31 |
 | 2026-09-06T21:29:58Z | migrate | 50/76 | 0 | 1 | 24 |
 | 2026-09-06T21:31:38Z | migrate | 51/76 | 0 | 1 | 23 |
@@ -163,4 +162,5 @@
 | 2026-09-06T21:46:43Z | migrate | 73/76 | 0 | 2 | 0 |
 | 2026-09-06T21:50:06Z | migrate | 73/76 | 0 | 2 | 0 |
 | 2026-09-06T21:53:18Z | migrate | 73/76 | 0 | 2 | 0 |
+| 2026-09-06T22:07:18Z | profile-e2e | 73/76 | 0 | 2 | 0 |
 

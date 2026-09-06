@@ -66,13 +66,13 @@
       "notes": ""
     },
     "integrate": {
-      "status": "pending",
-      "entered_at": "",
-      "exited_at": "",
+      "status": "exited",
+      "entered_at": "2026-09-06T21:53:14Z",
+      "exited_at": "2026-09-06T22:06:43Z",
       "gate": {
-        "result": "pending",
-        "attempts": 0,
-        "checked_at": "",
+        "result": "pass",
+        "attempts": 2,
+        "checked_at": "2026-09-06T22:06:43Z",
         "unmet": []
       },
       "waivers": [],
@@ -218,5 +218,5 @@
     },
     "changes": []
   },
-  "updated_at": "2026-09-06T21:53:13Z"
+  "updated_at": "2026-09-06T22:06:43Z"
 }
