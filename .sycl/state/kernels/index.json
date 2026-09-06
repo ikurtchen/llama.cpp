@@ -807,12 +807,12 @@
       "id": "softmax",
       "source": "ggml/src/ggml-cuda/softmax.cu:t2f32,soft_max_f32,soft_max_f32_parallelize_cols_single_row,soft_max_back_f32,launch_soft_max_kernels,soft_max_f32_cuda,soft_max_back_f32_cuda,ggml_cuda_op_soft_max,ggml_cuda_op_soft_max_back",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "high",
       "detail": ".sycl/state/kernels/softmax.json",
       "loc": {
         "source_code": 308,
-        "sycl_code": 0
+        "sycl_code": 306
       }
     },
     {

@@ -3,7 +3,7 @@
   "name": "softmax-family",
   "source": "ggml/src/ggml-cuda/softmax.cu:t2f32,soft_max_f32,soft_max_f32_parallelize_cols_single_row,soft_max_back_f32,launch_soft_max_kernels,soft_max_f32_cuda,soft_max_back_f32_cuda,ggml_cuda_op_soft_max,ggml_cuda_op_soft_max_back",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "high",
   "algorithm": "Compute softmax and softmax-backward over attention/logit rows, including ALiBi bias, optional sink tokens, and a cooperative-groups path that parallelizes very wide rows across CTAs.",
   "cuda_constructs": [
@@ -50,8 +50,8 @@
     "kind": "cpu",
     "crosscheck": "-"
   },
-  "notes": "Risk reason: numerically stable reductions, optional modifiers, and multi-CTA cooperative reduction all matter. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:37Z",
+  "notes": "Risk reason: numerically stable reductions, optional modifiers, and multi-CTA cooperative reduction all matter. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated forward softmax with optional F16/F32 mask, optional sinks, and ALiBi max_bias. Migrated softmax_back for the CUDA-supported max_bias == 0 path; max_bias != 0 remains not-supported, matching ggml-cuda.cu.",
+  "updated_at": "2026-09-06T19:02:22Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -62,11 +62,11 @@
       "files": 1
     },
     "sycl": {
-      "code": 0,
-      "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "code": 306,
+      "comment": 2,
+      "blank": 63,
+      "raw": 371,
+      "files": 2
     },
     "source_files": [
       {
@@ -89,10 +89,41 @@
         "raw": 404
       }
     ],
-    "sycl_files": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/softmax.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 6,
+        "comment": 0,
+        "blank": 2,
+        "raw": 8
+      },
+      {
+        "path": "ggml/src/ggml-sycl/softmax.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 300,
+        "comment": 2,
+        "blank": 61,
+        "raw": 363
+      }
+    ],
     "mirrored_sources": [],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:37Z"
-  }
+    "measured_at": "2026-09-06T19:02:22Z"
+  },
+  "target_style": "plain-sycl",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/softmax.hpp",
+    "ggml/src/ggml-sycl/softmax.cpp"
+  ],
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "SOFT_MAX,SOFT_MAX_BACK",
+    "result": "pass",
+    "evidence": "test-softmax-20260906T190214Z-e9e8d4"
+  },
+  "sycl_impl": "ggml/src/ggml-sycl/softmax.hpp,ggml/src/ggml-sycl/softmax.cpp"
 }

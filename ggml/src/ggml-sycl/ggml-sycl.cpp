@@ -15,6 +15,7 @@
 #include "clamp.hpp"
 #include "binbcast.hpp"
 #include "unary.hpp"
+#include "softmax.hpp"
 #include "rope.hpp"
 #include "diagmask.hpp"
 #include "concat.hpp"
@@ -282,6 +283,12 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, ggml_tens
         case GGML_OP_LOG:
             ggml_sycl_op_log(ctx, dst);
             return true;
+        case GGML_OP_SOFT_MAX:
+            ggml_sycl_op_soft_max(ctx, dst);
+            return true;
+        case GGML_OP_SOFT_MAX_BACK:
+            ggml_sycl_op_soft_max_back(ctx, dst);
+            return true;
         case GGML_OP_NORM:
             ggml_sycl_op_norm(ctx, dst);
             return true;
@@ -492,6 +499,10 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_COS:
         case GGML_OP_LOG:
             return ggml_sycl_supports_unary_f32f16(op);
+        case GGML_OP_SOFT_MAX:
+            return ggml_sycl_supports_soft_max(op);
+        case GGML_OP_SOFT_MAX_BACK:
+            return ggml_sycl_supports_soft_max_back(op);
         case GGML_OP_NORM:
         case GGML_OP_RMS_NORM:
         case GGML_OP_GROUP_NORM:
