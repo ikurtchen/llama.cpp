@@ -74,7 +74,8 @@
   },
   "unit_test": {
     "command": "build/bin/test-backend-ops test -b SYCL0 -o ARGMAX",
-    "result": "test-backend-ops ARGMAX: 7/7 passed on SYCL0",
-    "evidence": "test-argmax-20260906T164226Z-c01e39"
+    "result": "pass",
+    "evidence": "test-argmax-20260906T164226Z-c01e39",
+    "result_detail": "test-backend-ops ARGMAX: 7/7 passed on SYCL0"
   }
 }

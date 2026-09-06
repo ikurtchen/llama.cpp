@@ -52,8 +52,9 @@
   "notes": "Risk reason: several RoPE layouts, YaRN scaling, and fused view/set_rows behavior must all match the CPU backend. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated: NORMAL (mode=0) and NEOX (mode=2) only, with YaRN scaling and freq_factors, F32/F16, n_offs (partial rotary) supported. mrope/imrope/vision (mode=8/24/40) and rope_back not migrated - out of scope for Qwen3 dense text path, tracked as residual.",
   "unit_test": {
     "command": "build/bin/test-backend-ops test -b SYCL0 -o ROPE",
-    "result": "282/282 passed (mode 0/2 all variants); mode 8/24/40 correctly report not-supported",
-    "evidence": "test-rope-20260906T163301Z-de1386"
+    "result": "pass",
+    "evidence": "test-rope-20260906T163301Z-de1386",
+    "result_detail": "282/282 passed (mode 0/2 all variants); mode 8/24/40 correctly report not-supported"
   },
   "updated_at": "2026-09-06T16:33:01Z",
   "loc": {

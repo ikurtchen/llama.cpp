@@ -89,7 +89,8 @@
   },
   "unit_test": {
     "command": "build/bin/test-backend-ops test -b SYCL0 -o TOP_K",
-    "result": "test-backend-ops TOP_K: 224/224 passed on SYCL0 (ncols<=1024, same bitonic-sort cap as argsort)",
-    "evidence": "test-top-k-20260906T164229Z-083dba"
+    "result": "pass",
+    "evidence": "test-top-k-20260906T164229Z-083dba",
+    "result_detail": "test-backend-ops TOP_K: 224/224 passed on SYCL0 (ncols<=1024, same bitonic-sort cap as argsort)"
   }
 }

@@ -1,0 +1,33 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-gla-20260906T213031Z-d3ea5e",
+  "class": "test",
+  "subject": "gla",
+  "phase": "migrate",
+  "ts": "2026-09-06T21:30:33Z",
+  "duration_s": 2.799,
+  "command": "./build/bin/test-backend-ops test -b SYCL0 -o GATED_LINEAR_ATTN",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "83d85d665",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/gla/test-gla-20260906T213031Z-d3ea5e.log",
+  "log_sha256": "2ef879f619925696dd4b2edf02c5fbf9bd39f93ae30e0f6a94fb0f7b60aa6a92",
+  "log_bytes": 1405,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "cpu",
+    "tolerance": {
+      "source": "cuda-parity"
+    }
+  },
+  "extracted": {}
+}

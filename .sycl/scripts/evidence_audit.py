@@ -263,7 +263,7 @@ PHASE_ORDER = ["detect", "inventory", "scaffold", "migrate", "integrate",
 # producing a single run record means the work did not happen (E16).
 EXEC_PHASES = {"scaffold", "migrate", "integrate", "profile-e2e", "optimize"}
 
-TERMINAL_KERNEL = ("migrated", "skipped", "needs-reference")
+TERMINAL_KERNEL = ("migrated", "skipped", "needs-reference", "waived")
 TERMINAL_SURFACE = ("done", "waived", "deferred", "blocked")
 
 
@@ -364,7 +364,7 @@ def phase_criteria(ctx: Ctx, phase: str):
         c.append(Criterion("migrate.all_terminal", not pend,
                            f"{len(pend)} kernel(s) not in a terminal state: {', '.join(sorted(pend)[:8])}"))
         noreason = [kid for kid, k in ctx.kernels.items()
-                    if k.get("status") in ("skipped", "needs-reference")
+                    if k.get("status") in ("skipped", "needs-reference", "waived")
                     and not (k.get("notes") or "").strip()]
         c.append(Criterion("migrate.skips_justified", not noreason,
                            f"skipped with no reason: {', '.join(sorted(noreason)[:8])}"))

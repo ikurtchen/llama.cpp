@@ -1,0 +1,33 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-mul-mat-f16-f32-20260906T193128Z-e3c27d",
+  "class": "test",
+  "subject": "mul-mat-f16-f32",
+  "phase": "migrate",
+  "ts": "2026-09-06T19:31:41Z",
+  "duration_s": 13.141,
+  "command": "./build/bin/test-backend-ops -o MUL_MAT",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "6f0f87888",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/mul-mat-f16-f32/test-mul-mat-f16-f32-20260906T193128Z-e3c27d.log",
+  "log_sha256": "af2598a275d9c80f4fc148b7deb0dbca52c77539679951705261c9ef0725a7e4",
+  "log_bytes": 214936,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "cpu",
+    "tolerance": {
+      "source": "cuda-parity"
+    }
+  },
+  "extracted": {}
+}

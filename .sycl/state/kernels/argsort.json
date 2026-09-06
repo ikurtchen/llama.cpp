@@ -81,7 +81,8 @@
   },
   "unit_test": {
     "command": "build/bin/test-backend-ops test -b SYCL0 -o ARGSORT",
-    "result": "test-backend-ops ARGSORT: 46/46 passed on SYCL0 (ncols<=1024, bitonic-sort work-group cap)",
-    "evidence": "test-argsort-20260906T164222Z-b13501"
+    "result": "pass",
+    "evidence": "test-argsort-20260906T164222Z-b13501",
+    "result_detail": "test-backend-ops ARGSORT: 46/46 passed on SYCL0 (ncols<=1024, bitonic-sort work-group cap)"
   }
 }

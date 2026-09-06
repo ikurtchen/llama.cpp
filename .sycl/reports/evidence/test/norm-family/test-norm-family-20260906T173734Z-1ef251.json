@@ -1,0 +1,33 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-norm-family-20260906T173734Z-1ef251",
+  "class": "test",
+  "subject": "norm-family",
+  "phase": "migrate",
+  "ts": "2026-09-06T17:37:53Z",
+  "duration_s": 19.066,
+  "command": "./build/bin/test-backend-ops -o NORM,RMS_NORM,GROUP_NORM,L2_NORM",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "bc400cc89",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/norm-family/test-norm-family-20260906T173734Z-1ef251.log",
+  "log_sha256": "08bafe4b7258e76a8827ebd1d286339ca43d6a89b4300771494aedb387294adb",
+  "log_bytes": 12848,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "cpu",
+    "tolerance": {
+      "source": "cuda-parity"
+    }
+  },
+  "extracted": {}
+}

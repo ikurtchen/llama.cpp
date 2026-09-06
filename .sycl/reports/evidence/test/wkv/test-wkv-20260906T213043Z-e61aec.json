@@ -1,0 +1,33 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-wkv-20260906T213043Z-e61aec",
+  "class": "test",
+  "subject": "wkv",
+  "phase": "migrate",
+  "ts": "2026-09-06T21:30:51Z",
+  "duration_s": 8.137,
+  "command": "./build/bin/test-backend-ops test -b SYCL0 -o RWKV_WKV6,RWKV_WKV7",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "83d85d665",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/wkv/test-wkv-20260906T213043Z-e61aec.log",
+  "log_sha256": "c38e1365ab7cf442f27ff059c74d128bb6023778547b898b49d6fd7b86063d53",
+  "log_bytes": 1925,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "cpu",
+    "tolerance": {
+      "source": "cuda-parity"
+    }
+  },
+  "extracted": {}
+}

@@ -73,7 +73,8 @@
   },
   "unit_test": {
     "command": "build/bin/test-backend-ops test -b SYCL0 -o ARANGE",
-    "result": "test-backend-ops ARANGE: all cases passed on SYCL0",
-    "evidence": "test-arange-20260906T163734Z-908b3e"
+    "result": "pass",
+    "evidence": "test-arange-20260906T163734Z-908b3e",
+    "result_detail": "test-backend-ops ARANGE: all cases passed on SYCL0"
   }
 }

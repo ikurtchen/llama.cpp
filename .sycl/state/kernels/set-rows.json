@@ -94,7 +94,8 @@
   },
   "unit_test": {
     "command": "build/bin/test-backend-ops test -b SYCL0 -o SET_ROWS",
-    "result": "66/66 passed (F32/F16 src0->F32/F16 dst, I32/I64 idx, all broadcast shapes); quantized dst types correctly reported not-supported",
-    "evidence": "test-set-rows-20260906T164852Z-04524f"
+    "result": "pass",
+    "evidence": "test-set-rows-20260906T164852Z-04524f",
+    "result_detail": "66/66 passed (F32/F16 src0->F32/F16 dst, I32/I64 idx, all broadcast shapes); quantized dst types correctly reported not-supported"
   }
 }

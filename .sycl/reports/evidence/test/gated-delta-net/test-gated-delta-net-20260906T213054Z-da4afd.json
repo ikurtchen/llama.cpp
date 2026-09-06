@@ -1,0 +1,33 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-gated-delta-net-20260906T213054Z-da4afd",
+  "class": "test",
+  "subject": "gated-delta-net",
+  "phase": "migrate",
+  "ts": "2026-09-06T21:30:58Z",
+  "duration_s": 3.923,
+  "command": "./build/bin/test-backend-ops test -b SYCL0 -o GATED_DELTA_NET",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "83d85d665",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/gated-delta-net/test-gated-delta-net-20260906T213054Z-da4afd.log",
+  "log_sha256": "f25d974f4c9ca4680bc508ead07b43f3b60fb14a5043b0918cb9a6c78de2ca4c",
+  "log_bytes": 5541,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "cpu",
+    "tolerance": {
+      "source": "cuda-parity"
+    }
+  },
+  "extracted": {}
+}

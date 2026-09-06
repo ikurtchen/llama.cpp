@@ -1,0 +1,33 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-ssm-scan-20260906T213100Z-5cb239",
+  "class": "test",
+  "subject": "ssm-scan",
+  "phase": "migrate",
+  "ts": "2026-09-06T21:31:19Z",
+  "duration_s": 18.589,
+  "command": "./build/bin/test-backend-ops test -b SYCL0 -o SSM_SCAN,SSM_SCAN_ROLLBACK",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "9efaa0ed4",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/ssm-scan/test-ssm-scan-20260906T213100Z-5cb239.log",
+  "log_sha256": "4d88bb02d5308ee98ea633907c403bc4089c211463937ffb4fc5062f4c5d9d14",
+  "log_bytes": 3023,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "cpu",
+    "tolerance": {
+      "source": "cuda-parity"
+    }
+  },
+  "extracted": {}
+}

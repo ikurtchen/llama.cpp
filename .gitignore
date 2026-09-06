@@ -153,3 +153,7 @@ a.out.*
 
 AGENTS.local.md
 .pi/SYSTEM.md
+
+# sycl-agent runtime artifacts (not part of the audit trail)
+.sycl/.gpu-run.lock
+.sycl/scratch/

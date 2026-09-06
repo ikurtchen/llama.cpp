@@ -79,7 +79,8 @@
   },
   "unit_test": {
     "command": "build/bin/test-backend-ops test -b SYCL0 -o CONCAT",
-    "result": "test-backend-ops CONCAT: 117/117 total passed (f32/f16 all dims); quantized (q8_0/q5_1) correctly reported not-supported",
-    "evidence": "test-concat-20260906T163730Z-6abe76"
+    "result": "pass",
+    "evidence": "test-concat-20260906T163730Z-6abe76",
+    "result_detail": "test-backend-ops CONCAT: 117/117 total passed (f32/f16 all dims); quantized (q8_0/q5_1) correctly reported not-supported"
   }
 }

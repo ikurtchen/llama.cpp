@@ -5,49 +5,49 @@
     "cost": "USD (if reported) and/or tokens (uncached + cached) and/or GitHub AI credits / premium requests"
   },
   "session": {
-    "elapsed_wall_seconds": 1647,
-    "active_wall_seconds": 794,
-    "observed_span_seconds": 876,
-    "observed_work_seconds": 876,
-    "observed_snapshots": 2,
+    "elapsed_wall_seconds": 18121,
+    "active_wall_seconds": 16237,
+    "observed_span_seconds": 16673,
+    "observed_work_seconds": 15466,
+    "observed_snapshots": 27,
     "started_at": "2026-09-06T15:44:31Z",
-    "ended_at": "2026-09-06T16:11:58Z"
+    "ended_at": "2026-09-06T20:46:32Z"
   },
   "totals": {
-    "wall_clock_seconds": 794,
-    "elapsed_wall_seconds": 794,
-    "tokens_in": 0,
-    "tokens_out": 0,
-    "cache_read": 0,
-    "cache_write": 0,
-    "tokens_total": 0,
-    "requests": 0,
-    "credits": 0.0,
+    "wall_clock_seconds": 16237,
+    "elapsed_wall_seconds": 17268,
+    "tokens_in": 8803075,
+    "tokens_out": 1255396,
+    "cache_read": 245376631,
+    "cache_write": 1177730,
+    "tokens_total": 256612832,
+    "requests": 2017,
+    "credits": 2011.0,
     "cost_usd": 0.0
   },
   "phases": {
     "detect": {
       "wall_clock_seconds": 23,
       "elapsed_wall_seconds": 23,
-      "tokens_in": 0,
-      "tokens_out": 0,
-      "cache_read": 0,
-      "cache_write": 0,
-      "tokens_total": 0,
-      "requests": 0,
-      "credits": 0.0,
+      "tokens_in": 60,
+      "tokens_out": 9367,
+      "cache_read": 1889287,
+      "cache_write": 122197,
+      "tokens_total": 2020911,
+      "requests": 30,
+      "credits": 30.0,
       "cost_usd": 0.0
     },
     "inventory": {
       "wall_clock_seconds": 771,
       "elapsed_wall_seconds": 771,
-      "tokens_in": 0,
-      "tokens_out": 0,
-      "cache_read": 0,
-      "cache_write": 0,
-      "tokens_total": 0,
-      "requests": 0,
-      "credits": 0.0,
+      "tokens_in": 208,
+      "tokens_out": 119059,
+      "cache_read": 17084094,
+      "cache_write": 194662,
+      "tokens_total": 17398023,
+      "requests": 104,
+      "credits": 103.0,
       "cost_usd": 0.0
     },
     "scaffold": {
@@ -63,15 +63,15 @@
       "cost_usd": 0.0
     },
     "migrate": {
-      "wall_clock_seconds": 0,
-      "elapsed_wall_seconds": 0,
-      "tokens_in": 0,
-      "tokens_out": 0,
-      "cache_read": 0,
-      "cache_write": 0,
-      "tokens_total": 0,
-      "requests": 0,
-      "credits": 0.0,
+      "wall_clock_seconds": 15443,
+      "elapsed_wall_seconds": 16474,
+      "tokens_in": 8802807,
+      "tokens_out": 1126970,
+      "cache_read": 226403250,
+      "cache_write": 860871,
+      "tokens_total": 237193898,
+      "requests": 1883,
+      "credits": 1878.0,
       "cost_usd": 0.0
     },
     "integrate": {
@@ -135,5 +135,5 @@
       "cost_usd": 0.0
     }
   },
-  "updated_at": "2026-09-06T16:11:58Z"
+  "updated_at": "2026-09-06T20:46:33Z"
 }

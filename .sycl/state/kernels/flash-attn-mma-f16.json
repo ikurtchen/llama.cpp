@@ -107,7 +107,8 @@
   ],
   "unit_test": {
     "command": "./build/bin/test-backend-ops -o FLASH_ATTN_EXT",
-    "result": "test-backend-ops FLASH_ATTN_EXT: 324/324 supported cases passed on SYCL0, 0 failed, unsupported cases fell back per supports_op",
-    "evidence": "test-flash-attn-20260906T190258Z-822237"
+    "result": "pass",
+    "evidence": "test-flash-attn-20260906T190258Z-822237",
+    "result_detail": "test-backend-ops FLASH_ATTN_EXT: 324/324 supported cases passed on SYCL0, 0 failed, unsupported cases fell back per supports_op"
   }
 }
