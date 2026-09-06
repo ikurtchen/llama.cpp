@@ -57,6 +57,11 @@
       "surface": "runtime (pinned/host buffer)",
       "reason": "ggml_backend_sycl_host_buffer_type falls back to the plain CPU buffer type instead of a USM host-pinned allocation.",
       "blast_radius": "H2D/D2H transfer bandwidth for pinned-buffer paths (e.g. some KV cache offload configs) is lower than an optimized pinned allocation would give; correctness is unaffected."
+    },
+    {
+      "surface": "dispatch/runtime (FLASH_ATTN_EXT Q8_0 KV-cache variants)",
+      "reason": "FLASH_ATTN_EXT SYCL migration in this pass implements only the F16 KV-cache path. Q8_0 KV-cache instances (f16-q8_0, q8_0-f16, q8_0-q8_0) are deferred.",
+      "blast_radius": "Q8_0 KV-cache flash-attention falls back to CPU; only F16 KV-cache FLASH_ATTN_EXT is SYCL-accelerated. Dense Qwen3-class inference with default F16 KV cache is covered."
     }
   ],
   "residual": [
@@ -77,5 +82,5 @@
       ]
     }
   ],
-  "updated_at": "2026-09-06T16:11:24Z"
+  "updated_at": "2026-09-06T18:30:48Z"
 }

@@ -6,9 +6,9 @@
 - **Benchmark GPU freq pinned**: True
 - **Build system**: cmake → SYCL build: set-up (ggml/src/ggml-sycl/ builds via icpx -fsycl, AOT bmg-g31, links oneMKL; registers as backend SYCL0)
 - **Phase**: migrate
-- **Updated**: 2026-09-06T18:38:48Z
+- **Updated**: 2026-09-06T19:04:02Z
 
-**Summary**: 76 kernels — 25 migrated, 0 optimized, 0 skipped, 0 needs-reference, 50 pending.
+**Summary**: 76 kernels — 30 migrated, 0 optimized, 0 skipped, 0 needs-reference, 45 pending.
 
 **Code migrated**: 15949 source code lines (76 files; attributed per kernel: cuda 16006) → 0 SYCL code lines (0 files)  ·  ratio 0.0×  ·  44.0% of the project's CUDA/Triton code lines  ·  measured 75/75 kernels
 
@@ -18,7 +18,7 @@
 - **Archetype**: A  ·  **Entrypoint**: build/bin/llama-cli  ·  **Backend switch**: cmake -B build -DGGML_SYCL=ON -DGGML_SYCL_TARGET=INTEL -DGGML_SYCL_DEVICE_ARCH=bmg-g31 -DCMAKE_C_COMPILER=icx -DCMAKE_CXX_COMPILER=icpx
 - **Gates**: L0:pass  L1:pass  L2:pending  L3:pending  L4:pending
 - **Surfaces**: 2/7 closed
-- **Waivers**: 2  ·  **Residual work**: 2 items (≈3.5 engineer-weeks to finish)
+- **Waivers**: 3  ·  **Residual work**: 2 items (≈3.5 engineer-weeks to finish)
 
 | surface | status | blocks | what | effort (wk) | risk |
 |---------|--------|--------|------|-------------|------|
@@ -33,6 +33,7 @@
 **Waivers** (deliberately not done — a silent stub would be a defect):
 - ? — Target is a single Arc Pro B70 GPU (config.target.platform=b70); ggml_backend_sycl_split_buffer_type / comm_* are stubbed (return nullptr/false) rather than implemented.  ·  blast radius: Multi-GPU --split-mode tensor/layer across >1 SYCL device is unavailable. Does not affect the single-device qwen3 e2e workload this migration targets.
 - ? — ggml_backend_sycl_host_buffer_type falls back to the plain CPU buffer type instead of a USM host-pinned allocation.  ·  blast radius: H2D/D2H transfer bandwidth for pinned-buffer paths (e.g. some KV cache offload configs) is lower than an optimized pinned allocation would give; correctness is unaffected.
+- ? — FLASH_ATTN_EXT SYCL migration in this pass implements only the F16 KV-cache path. Q8_0 KV-cache instances (f16-q8_0, q8_0-f16, q8_0-q8_0) are deferred.  ·  blast radius: Q8_0 KV-cache flash-attention falls back to CPU; only F16 KV-cache FLASH_ATTN_EXT is SYCL-accelerated. Dense Qwen3-class inference with default F16 KV cache is covered.
 
 ## Phase gates
 
@@ -78,10 +79,10 @@
 | diagmask | ggml/src/ggml-cuda/diagmask.cu:diag_mask_inf_f32,diag_mask_inf_f32_cuda,ggml_cuda_op_diag_mask_inf | migrated | test-backend-ops DIAG_MASK_INF: all cases passed on SYCL0 | - | 28→0 | - | - | Risk reason: direct masked write per element. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated in full: f32 causal masking kernel, no residual. |
 | dsv4-hc | ggml/src/ggml-cuda/dsv4-hc.cu:dsv4_hc_comb_norm_cols,dsv4_hc_comb_norm_rows,dsv4_hc_comb_f32,dsv4_hc_pre_f32,ggml_cuda_op_dsv4_hc_comb,ggml_cuda_op_dsv4_hc_pre,ggml_cuda_op_dsv4_hc_post | pending | - | - | 242→0 | - | - | Risk reason: three custom kernels implement specialized model-specific algebra not reused elsewhere. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | fill | ggml/src/ggml-cuda/fill.cu:fill_kernel,ggml_cuda_op_fill | pending | - | - | 27→0 | - | - | Risk reason: uniform write kernel. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
-| flash-attn-common | ggml/src/ggml-cuda/fattn.cu:flash_attn_mask_to_sparse_indices,ggml_cuda_flash_attn_ext_compact_mask,ggml_cuda_fattn_kv_type_supported,ggml_cuda_flash_attn_ext_get_alloc_size,ggml_cuda_flash_attn_ext,ggml_cuda_flash_attn_ext_supported | pending | - | - | 376→0 | - | - | Risk reason: shared helpers encode sparse-mask compaction and streamed partial-result fixup semantics used by multiple flash-attention variants. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
-| flash-attn-vec | ggml/src/ggml-cuda/fattn.cu:ggml_cuda_flash_attn_ext_vec | pending | - | - | 500→0 | - | - | Risk reason: warp-level softmax, quantized K/V handling, and head-size templating make this a complex direct-attention port. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
-| flash-attn-tile | ggml/src/ggml-cuda/fattn-tile.cu:ggml_cuda_flash_attn_ext_tile | pending | - | - | 354→0 | - | - | Risk reason: tiled online softmax with shared-memory staging has non-trivial dataflow. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
-| flash-attn-mma-f16 | ggml/src/ggml-cuda/fattn.cu:ggml_cuda_flash_attn_ext_mma_f16_shall_use_sparse,ggml_cuda_flash_attn_ext_mma_f16_switch_ncols1,ggml_cuda_flash_attn_ext_mma_f16_switch_ncols2,ggml_cuda_flash_attn_ext_mma_f16 | pending | - | - | 394→0 | - | - | Risk reason: tensor-core MMA pipelines, sparse path selection, and streamed partial-result handling make this the hardest attention variant. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
+| flash-attn-common | ggml/src/ggml-cuda/fattn.cu:flash_attn_mask_to_sparse_indices,ggml_cuda_flash_attn_ext_compact_mask,ggml_cuda_fattn_kv_type_supported,ggml_cuda_flash_attn_ext_get_alloc_size,ggml_cuda_flash_attn_ext,ggml_cuda_flash_attn_ext_supported | migrated | test-backend-ops FLASH_ATTN_EXT: 324/324 supported cases passed on SYCL0, 0 failed, unsupported cases fell back per supports_op | - | 376→0 | - | - | Risk reason: shared helpers encode sparse-mask compaction and streamed partial-result fixup semantics used by multiple flash-attention variants. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated as one unified plain-SYCL online-softmax kernel in ggml/src/ggml-sycl/fattn.cpp with the public declaration in fattn.hpp, instead of mirroring CUDA's separate vec/tile/mma/common dispatch split. This SYCL path permanently registers GGML_OP_FLASH_ATTN_EXT in ggml/src/ggml-sycl/ggml-sycl.cpp. Scope is the dense decoder path only: Q=f32/f16, K/V=f16, dst=f32, additive mask, ALiBi, and GQA for head dims 64/80/128. Residual/waiver: Q8_0 KV-cache variants (f16-q8_0, q8_0-f16, q8_0-q8_0), sinks, logit softcap, sparse n_kv_max mask compaction/streamed fixup, and the full CUDA MMA feature matrix are not implemented; those configurations fall back. |
+| flash-attn-vec | ggml/src/ggml-cuda/fattn.cu:ggml_cuda_flash_attn_ext_vec | migrated | test-backend-ops FLASH_ATTN_EXT: 324/324 supported cases passed on SYCL0, 0 failed, unsupported cases fell back per supports_op | - | 500→0 | - | - | Risk reason: warp-level softmax, quantized K/V handling, and head-size templating make this a complex direct-attention port. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated as one unified plain-SYCL online-softmax kernel in ggml/src/ggml-sycl/fattn.cpp with the public declaration in fattn.hpp, instead of mirroring CUDA's separate vec/tile/mma/common dispatch split. This SYCL path permanently registers GGML_OP_FLASH_ATTN_EXT in ggml/src/ggml-sycl/ggml-sycl.cpp. Scope is the dense decoder path only: Q=f32/f16, K/V=f16, dst=f32, additive mask, ALiBi, and GQA for head dims 64/80/128. Residual/waiver: Q8_0 KV-cache variants (f16-q8_0, q8_0-f16, q8_0-q8_0), sinks, logit softcap, sparse n_kv_max mask compaction/streamed fixup, and the full CUDA MMA feature matrix are not implemented; those configurations fall back. |
+| flash-attn-tile | ggml/src/ggml-cuda/fattn-tile.cu:ggml_cuda_flash_attn_ext_tile | migrated | test-backend-ops FLASH_ATTN_EXT: 324/324 supported cases passed on SYCL0, 0 failed, unsupported cases fell back per supports_op | - | 354→0 | - | - | Risk reason: tiled online softmax with shared-memory staging has non-trivial dataflow. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated as one unified plain-SYCL online-softmax kernel in ggml/src/ggml-sycl/fattn.cpp with the public declaration in fattn.hpp, instead of mirroring CUDA's separate vec/tile/mma/common dispatch split. This SYCL path permanently registers GGML_OP_FLASH_ATTN_EXT in ggml/src/ggml-sycl/ggml-sycl.cpp. Scope is the dense decoder path only: Q=f32/f16, K/V=f16, dst=f32, additive mask, ALiBi, and GQA for head dims 64/80/128. Residual/waiver: Q8_0 KV-cache variants (f16-q8_0, q8_0-f16, q8_0-q8_0), sinks, logit softcap, sparse n_kv_max mask compaction/streamed fixup, and the full CUDA MMA feature matrix are not implemented; those configurations fall back. |
+| flash-attn-mma-f16 | ggml/src/ggml-cuda/fattn.cu:ggml_cuda_flash_attn_ext_mma_f16_shall_use_sparse,ggml_cuda_flash_attn_ext_mma_f16_switch_ncols1,ggml_cuda_flash_attn_ext_mma_f16_switch_ncols2,ggml_cuda_flash_attn_ext_mma_f16 | migrated | test-backend-ops FLASH_ATTN_EXT: 324/324 supported cases passed on SYCL0, 0 failed, unsupported cases fell back per supports_op | - | 394→0 | - | - | Risk reason: tensor-core MMA pipelines, sparse path selection, and streamed partial-result handling make this the hardest attention variant. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated as one unified plain-SYCL online-softmax kernel in ggml/src/ggml-sycl/fattn.cpp with the public declaration in fattn.hpp, instead of mirroring CUDA's separate vec/tile/mma/common dispatch split. This SYCL path permanently registers GGML_OP_FLASH_ATTN_EXT in ggml/src/ggml-sycl/ggml-sycl.cpp. Scope is the dense decoder path only: Q=f32/f16, K/V=f16, dst=f32, additive mask, ALiBi, and GQA for head dims 64/80/128. Residual/waiver: Q8_0 KV-cache variants (f16-q8_0, q8_0-f16, q8_0-q8_0), sinks, logit softcap, sparse n_kv_max mask compaction/streamed fixup, and the full CUDA MMA feature matrix are not implemented; those configurations fall back. |
 | fwht | ggml/src/ggml-cuda/fwht.cu:fwht_cuda,ggml_cuda_op_fwht | pending | - | - | 81→0 | - | - | Risk reason: butterfly transform ordering matters, but the kernel structure is regular. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | gated-delta-net | ggml/src/ggml-cuda/gated_delta_net.cu:launch_gated_delta_net,ggml_cuda_op_gated_delta_net_impl,ggml_cuda_op_gated_delta_net,ggml_cuda_op_gated_delta_net_fused_cache | pending | - | - | 262→0 | - | - | Risk reason: recurrent stateful update with warp reductions and rollback-slot semantics is complex. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | getrows | ggml/src/ggml-cuda/getrows.cu:k_get_rows,k_get_rows_kq,k_get_rows_float,k_get_rows_float_vec,k_get_rows_back_float,get_rows_cuda_q,get_rows_cuda_kq,get_rows_cuda_float,ggml_cuda_get_rows_switch_src0_type,get_rows_cuda,ggml_cuda_op_get_rows,ggml_cuda_op_get_rows_back | migrated | pass | - | 408→0 | - | - | Risk reason: forward uses many type/layout cases and backward performs index-based reductions. Reference oracle: ggml-cpu backend via tests/test-backend-ops. This SYCL port adds the forward op file and dispatch wiring, but currently narrows support to the Q8_0 path only per instructions.md sec 2.2; non-Q8_0 types and GET_ROWS_BACK remain fallback residuals. Current evidence run for test-backend-ops -o GET_ROWS passed with the backend reporting the op unsupported on this branch, so no backend-executed GET_ROWS case was validated yet. |
@@ -116,7 +117,7 @@
 | set-rows | ggml/src/ggml-cuda/set-rows.cu:set_rows_cuda_quant,set_rows_cuda,ggml_cuda_op_set_rows | migrated | 66/66 passed (F32/F16 src0->F32/F16 dst, I32/I64 idx, all broadcast shapes); quantized dst types correctly reported not-supported | - | 299→0 | - | - | Risk reason: indexed scatter into dense or quantized layouts needs careful addressing. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated non-quantized dst (F32/F16) with F32/F16 src0 and I32/I64 indices, with batch broadcast. Quantized dst set_rows (Q4_0/Q4_1/Q5_0/Q5_1/Q8_0/IQ4_NL/etc) not migrated - needs the quantize helper functions from the quantize/dequantize kernel migration, tracked as residual. |
 | snake | ggml/src/ggml-cuda/snake.cu:snake_kernel,launch_snake,ggml_cuda_op_snake_fused | pending | - | - | 53→0 | - | - | Risk reason: elementwise nonlinear map. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | softcap | ggml/src/ggml-cuda/softcap.cu:softcap_f32,softcap_f32_cuda,ggml_cuda_op_softcap | pending | - | - | 27→0 | - | - | Risk reason: simple pointwise map. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
-| softmax | ggml/src/ggml-cuda/softmax.cu:t2f32,soft_max_f32,soft_max_f32_parallelize_cols_single_row,soft_max_back_f32,launch_soft_max_kernels,soft_max_f32_cuda,soft_max_back_f32_cuda,ggml_cuda_op_soft_max,ggml_cuda_op_soft_max_back | pending | - | - | 308→0 | - | - | Risk reason: numerically stable reductions, optional modifiers, and multi-CTA cooperative reduction all matter. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
+| softmax | ggml/src/ggml-cuda/softmax.cu:t2f32,soft_max_f32,soft_max_f32_parallelize_cols_single_row,soft_max_back_f32,launch_soft_max_kernels,soft_max_f32_cuda,soft_max_back_f32_cuda,ggml_cuda_op_soft_max,ggml_cuda_op_soft_max_back | migrated | pass | - | 308→306 | - | - | Risk reason: numerically stable reductions, optional modifiers, and multi-CTA cooperative reduction all matter. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated forward softmax with optional F16/F32 mask, optional sinks, and ALiBi max_bias. Migrated softmax_back for the CUDA-supported max_bias == 0 path; max_bias != 0 remains not-supported, matching ggml-cuda.cu. |
 | solve-tri | ggml/src/ggml-cuda/solve_tri.cu:get_batch_pointers,solve_tri_f32_cublas,solve_tri_f32_fast,solve_tri_f32_cuda,ggml_cuda_op_solve_tri | pending | - | - | 222→0 | - | - | Risk reason: mixed custom solver plus cuBLAS path, with reduction order affecting numerical behavior. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | ssm-conv | ggml/src/ggml-cuda/ssm-conv.cu:ssm_conv_f32,ssm_conv_long_token_f32,ssm_conv_f32_cuda,ggml_cuda_op_ssm_conv | pending | - | - | 167→0 | - | - | Risk reason: model-specific cached-state convolution behavior must match exactly. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | ssm-scan | ggml/src/ggml-cuda/ssm-scan.cu:ssm_scan_f32,ssm_scan_f32_group,ssm_scan_f32_cuda,ssm_ssd_prepare_dt_kernel,ssm_ssd_pre_matmul_kernel,ssm_ssd_scale_state_kernel,ssm_ssd_init_state_kernel,ssm_scan_ssd_f32_cuda,ggml_cuda_op_ssm_scan | pending | - | - | 669→0 | - | - | Risk reason: direct scan, grouped scan, and SSD decomposition all coexist and are numerically/state sensitive. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
@@ -133,22 +134,20 @@
 
 ## Agent efficiency & cost
 
-- **Elapsed**: 2h02m23s (whole run)  ·  **Active**: 1h48m10s (bracketed)  ·  **Cost**: $0.0  ·  **Tokens**: 0 (in 0 / out 0 / cache r 0 / cache w 0)  ·  **Premium requests**: 0  ·  **AI credits**: 0.0
-- **Observed (gen-progress heartbeat)**: span 2h54m17s  ·  working ≈ 2h54m17s (idle-capped 30m00s)  ·  18 snapshots — independent of metrics.sh
+- **Elapsed**: 3h05m14s (whole run)  ·  **Active**: 2h51m01s (bracketed)  ·  **Cost**: $0.0  ·  **Tokens**: 0 (in 0 / out 0 / cache r 0 / cache w 0)  ·  **Premium requests**: 0  ·  **AI credits**: 0.0
+- **Observed (gen-progress heartbeat)**: span 3h19m31s  ·  working ≈ 3h19m31s (idle-capped 30m00s)  ·  20 snapshots — independent of metrics.sh
 
 | phase | elapsed | active | tokens | requests | credits | USD |
 |-------|--------:|-------:|-------:|---------:|--------:|----:|
 | detect | 23s | 23s | 0 | 0 | 0.0 | 0.0 |
 | inventory | 12m51s | 12m51s | 0 | 0 | 0.0 | 0.0 |
-| migrate | 1h34m56s | 1h34m56s | 0 | 0 | 0.0 | 0.0 |
+| migrate | 2h37m47s | 2h37m47s | 0 | 0 | 0.0 | 0.0 |
 
 ## Progress history
 
 <!-- append-only from logs/progress.jsonl — one row per gen-progress run -->
 | time (UTC) | phase | migrated | optimized | skipped | pending |
 |------------|-------|---------:|----------:|--------:|--------:|
-| 2026-09-06T16:38:34Z | migrate | 8/75 | 0 | 0 | 67 |
-| 2026-09-06T16:43:21Z | migrate | 11/75 | 0 | 0 | 64 |
 | 2026-09-06T16:49:22Z | migrate | 12/75 | 0 | 0 | 63 |
 | 2026-09-06T17:12:47Z | migrate | 16/75 | 0 | 0 | 59 |
 | 2026-09-06T17:12:56Z | migrate | 16/75 | 0 | 1 | 58 |
@@ -159,4 +158,6 @@
 | 2026-09-06T18:11:06Z | migrate | 22/76 | 0 | 0 | 53 |
 | 2026-09-06T18:36:58Z | migrate | 25/76 | 0 | 0 | 50 |
 | 2026-09-06T18:38:48Z | migrate | 25/76 | 0 | 0 | 50 |
+| 2026-09-06T19:03:06Z | migrate | 30/76 | 0 | 0 | 45 |
+| 2026-09-06T19:04:02Z | migrate | 30/76 | 0 | 0 | 45 |
 

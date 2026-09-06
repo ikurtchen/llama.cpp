@@ -334,7 +334,7 @@
       "id": "flash-attn-common",
       "source": "ggml/src/ggml-cuda/fattn.cu:flash_attn_mask_to_sparse_indices,ggml_cuda_flash_attn_ext_compact_mask,ggml_cuda_fattn_kv_type_supported,ggml_cuda_flash_attn_ext_get_alloc_size,ggml_cuda_flash_attn_ext,ggml_cuda_flash_attn_ext_supported",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "high",
       "detail": ".sycl/state/kernels/flash-attn-common.json",
       "loc": {
@@ -346,7 +346,7 @@
       "id": "flash-attn-vec",
       "source": "ggml/src/ggml-cuda/fattn.cu:ggml_cuda_flash_attn_ext_vec",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "high",
       "detail": ".sycl/state/kernels/flash-attn-vec.json",
       "loc": {
@@ -358,7 +358,7 @@
       "id": "flash-attn-tile",
       "source": "ggml/src/ggml-cuda/fattn-tile.cu:ggml_cuda_flash_attn_ext_tile",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "high",
       "detail": ".sycl/state/kernels/flash-attn-tile.json",
       "loc": {
@@ -370,7 +370,7 @@
       "id": "flash-attn-mma-f16",
       "source": "ggml/src/ggml-cuda/fattn.cu:ggml_cuda_flash_attn_ext_mma_f16_shall_use_sparse,ggml_cuda_flash_attn_ext_mma_f16_switch_ncols1,ggml_cuda_flash_attn_ext_mma_f16_switch_ncols2,ggml_cuda_flash_attn_ext_mma_f16",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "high",
       "detail": ".sycl/state/kernels/flash-attn-mma-f16.json",
       "loc": {

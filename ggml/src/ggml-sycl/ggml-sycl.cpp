@@ -21,6 +21,7 @@
 #include "concat.hpp"
 #include "arange.hpp"
 #include "argsort.hpp"
+#include "fattn.hpp"
 #include "argmax.hpp"
 #include "norm.hpp"
 #include "top-k.hpp"
@@ -319,6 +320,9 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, ggml_tens
         case GGML_OP_ARGMAX:
             ggml_sycl_op_argmax(ctx, dst);
             return true;
+        case GGML_OP_FLASH_ATTN_EXT:
+            ggml_sycl_op_flash_attn_ext(ctx, dst);
+            return true;
         case GGML_OP_TOP_K:
             ggml_sycl_op_top_k(ctx, dst);
             return true;
@@ -520,6 +524,8 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
             return ggml_sycl_supports_argsort(op);
         case GGML_OP_ARGMAX:
             return ggml_sycl_supports_argmax(op);
+        case GGML_OP_FLASH_ATTN_EXT:
+            return ggml_sycl_supports_flash_attn_ext(op);
         case GGML_OP_TOP_K:
             return ggml_sycl_supports_top_k(op);
         case GGML_OP_GET_ROWS:

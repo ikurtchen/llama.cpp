@@ -3,7 +3,7 @@
   "name": "flash-attn-vectorized",
   "source": "ggml/src/ggml-cuda/fattn.cu:ggml_cuda_flash_attn_ext_vec",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "high",
   "algorithm": "Compute flash attention by vectorizing Q/K dot products and value accumulation directly in CUDA cores, with optional quantized K/V dequantization and logit softcap handling.",
   "cuda_constructs": [
@@ -57,8 +57,8 @@
     "kind": "cpu",
     "crosscheck": "-"
   },
-  "notes": "Risk reason: warp-level softmax, quantized K/V handling, and head-size templating make this a complex direct-attention port. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:35Z",
+  "notes": "Risk reason: warp-level softmax, quantized K/V handling, and head-size templating make this a complex direct-attention port. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated as one unified plain-SYCL online-softmax kernel in ggml/src/ggml-sycl/fattn.cpp with the public declaration in fattn.hpp, instead of mirroring CUDA's separate vec/tile/mma/common dispatch split. This SYCL path permanently registers GGML_OP_FLASH_ATTN_EXT in ggml/src/ggml-sycl/ggml-sycl.cpp. Scope is the dense decoder path only: Q=f32/f16, K/V=f16, dst=f32, additive mask, ALiBi, and GQA for head dims 64/80/128. Residual/waiver: Q8_0 KV-cache variants (f16-q8_0, q8_0-f16, q8_0-q8_0), sinks, logit softcap, sparse n_kv_max mask compaction/streamed fixup, and the full CUDA MMA feature matrix are not implemented; those configurations fall back.",
+  "updated_at": "2026-09-06T19:02:58Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -107,5 +107,15 @@
     "source_spec": [
       "ggml/src/ggml-cuda/fattn-vec.cuh:19-528"
     ]
+  },
+  "target_style": "plain-sycl",
+  "sycl_impl": [
+    "ggml/src/ggml-sycl/fattn.cpp",
+    "ggml/src/ggml-sycl/fattn.hpp"
+  ],
+  "unit_test": {
+    "command": "./build/bin/test-backend-ops -o FLASH_ATTN_EXT",
+    "result": "test-backend-ops FLASH_ATTN_EXT: 324/324 supported cases passed on SYCL0, 0 failed, unsupported cases fell back per supports_op",
+    "evidence": "test-flash-attn-20260906T190258Z-822237"
   }
 }

@@ -3,7 +3,7 @@
   "name": "flash-attn-common",
   "source": "ggml/src/ggml-cuda/fattn.cu:flash_attn_mask_to_sparse_indices,ggml_cuda_flash_attn_ext_compact_mask,ggml_cuda_fattn_kv_type_supported,ggml_cuda_flash_attn_ext_get_alloc_size,ggml_cuda_flash_attn_ext,ggml_cuda_flash_attn_ext_supported",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "high",
   "algorithm": "Support flash attention execution by compacting sparse masks into KV index lists and by combining or fixing up partial attention results across streamed K/V tiles.",
   "cuda_constructs": [
@@ -50,8 +50,8 @@
     "kind": "cpu",
     "crosscheck": "-"
   },
-  "notes": "Risk reason: shared helpers encode sparse-mask compaction and streamed partial-result fixup semantics used by multiple flash-attention variants. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:35Z",
+  "notes": "Risk reason: shared helpers encode sparse-mask compaction and streamed partial-result fixup semantics used by multiple flash-attention variants. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated as one unified plain-SYCL online-softmax kernel in ggml/src/ggml-sycl/fattn.cpp with the public declaration in fattn.hpp, instead of mirroring CUDA's separate vec/tile/mma/common dispatch split. This SYCL path permanently registers GGML_OP_FLASH_ATTN_EXT in ggml/src/ggml-sycl/ggml-sycl.cpp. Scope is the dense decoder path only: Q=f32/f16, K/V=f16, dst=f32, additive mask, ALiBi, and GQA for head dims 64/80/128. Residual/waiver: Q8_0 KV-cache variants (f16-q8_0, q8_0-f16, q8_0-q8_0), sinks, logit softcap, sparse n_kv_max mask compaction/streamed fixup, and the full CUDA MMA feature matrix are not implemented; those configurations fall back.",
+  "updated_at": "2026-09-06T19:02:58Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -109,5 +109,15 @@
     "source_spec": [
       "ggml/src/ggml-cuda/fattn-common.cuh:flash_attn_combine_results,flash_attn_mask_to_KV_max,flash_attn_stream_k_fixup_general,flash_attn_stream_k_fixup_uniform"
     ]
+  },
+  "target_style": "plain-sycl",
+  "sycl_impl": [
+    "ggml/src/ggml-sycl/fattn.cpp",
+    "ggml/src/ggml-sycl/fattn.hpp"
+  ],
+  "unit_test": {
+    "command": "./build/bin/test-backend-ops -o FLASH_ATTN_EXT",
+    "result": "test-backend-ops FLASH_ATTN_EXT: 324/324 supported cases passed on SYCL0, 0 failed, unsupported cases fell back per supports_op",
+    "evidence": "test-flash-attn-20260906T190258Z-822237"
   }
 }

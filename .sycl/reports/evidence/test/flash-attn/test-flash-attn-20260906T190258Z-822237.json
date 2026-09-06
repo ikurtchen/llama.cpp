@@ -1,0 +1,33 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-flash-attn-20260906T190258Z-822237",
+  "class": "test",
+  "subject": "flash-attn",
+  "phase": "migrate",
+  "ts": "2026-09-06T19:03:41Z",
+  "duration_s": 43.138,
+  "command": "./build/bin/test-backend-ops -o FLASH_ATTN_EXT",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "8a0bcdb99",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/flash-attn/test-flash-attn-20260906T190258Z-822237.log",
+  "log_sha256": "3a65448a243329cab56d76156452d682cd806b0962a7817c544d8201e4bd1562",
+  "log_bytes": 1188045,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "cpu",
+    "tolerance": {
+      "source": "cuda-parity"
+    }
+  },
+  "extracted": {}
+}
