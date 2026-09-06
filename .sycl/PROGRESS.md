@@ -6,9 +6,9 @@
 - **Benchmark GPU freq pinned**: True
 - **Build system**: cmake → SYCL build: set-up (ggml/src/ggml-sycl/ builds via icpx -fsycl, AOT bmg-g31, links oneMKL; registers as backend SYCL0)
 - **Phase**: migrate
-- **Updated**: 2026-09-06T19:32:17Z
+- **Updated**: 2026-09-06T20:22:24Z
 
-**Summary**: 76 kernels — 42 migrated, 0 optimized, 0 skipped, 0 needs-reference, 33 pending.
+**Summary**: 76 kernels — 44 migrated, 0 optimized, 0 skipped, 0 needs-reference, 31 pending.
 
 **Code migrated**: 15949 source code lines (76 files; attributed per kernel: cuda 16006) → 0 SYCL code lines (0 files)  ·  ratio 0.0×  ·  44.0% of the project's CUDA/Triton code lines  ·  measured 75/75 kernels
 
@@ -94,10 +94,10 @@
 | group-norm | ggml/src/ggml-cuda/norm.cu:group_norm_f32,group_norm_f32_cuda,ggml_cuda_op_group_norm | migrated | pass | - | 49→0 | - | - | Risk reason: grouped reduction boundaries and shared-memory reductions need validation. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | lightning-indexer | ggml/src/ggml-cuda/lightning-indexer.cu:lightning_indexer_kernel_wmma,lightning_indexer_kernel_vec,ggml_cuda_lightning_indexer_supported | pending | - | - | 417→0 | - | - | Risk reason: custom WMMA sparse-index scoring is highly specialized and architecture-sensitive. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | mean | ggml/src/ggml-cuda/mean.cu:divide_by_count | migrated | pass | - | 85→0 | - | - | Risk reason: reduction path switches between CUB and custom row reduction. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Scope matches CUDA: requires ggml_is_contiguous(src0). |
-| mmf | ggml/src/ggml-cuda/mmf.cu:mmf_get_rows_per_block,ggml_cuda_mul_mat_f,ggml_cuda_should_use_mmf | pending | - | - | 603→0 | - | - | Risk reason: tensor-core tile layouts and optional expert-routing path make this a high-care dense matmul port. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
+| mmf | ggml/src/ggml-cuda/mmf.cu:mmf_get_rows_per_block,ggml_cuda_mul_mat_f,ggml_cuda_should_use_mmf | migrated | pass | - | 603→292 | - | - | oneMKL-backed dense GGML_OP_MUL_MAT for src0 in F32/F16, src1 in F32, dst in F32. Handles batched and broadcast cases with GEMM/GEMM_BATCH. Reference oracle: ggml-cpu backend via tests/test-backend-ops. BF16 src0, quantized src0, MUL_MAT_ID, and CUDA-only fused epilogues remain residual. |
 | mmid | ggml/src/ggml-cuda/mmid.cu:mm_ids_helper,launch_mm_ids_helper,ggml_cuda_launch_mm_ids_helper | pending | - | - | 122→0 | - | - | Risk reason: routing compaction and inverse-map options must match MoE matmul expectations exactly. Reference oracle: analytical routing semantics plus MoE backend tests. |
 | mmq | ggml/src/ggml-cuda/mmq.cu:ggml_cuda_mul_mat_q_switch_type,ggml_cuda_mul_mat_q,ggml_cuda_should_use_mmq | pending | - | - | 638→0 | - | - | Risk reason: custom quantized GEMM data layouts, activation requantization, and stream-k fixup make this one of the core hard ports. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
-| mmvf | ggml/src/ggml-cuda/mmvf.cu:mul_mat_vec_f,mul_mat_vec_f_switch_fusion,launch_mul_mat_vec_f_cuda,mul_mat_vec_f_cuda_switch_ncols_dst,mul_mat_vec_f_cuda,ggml_cuda_mul_mat_vec_f,ggml_cuda_op_mul_mat_vec_f,ggml_cuda_should_use_mmvf | pending | - | - | 783→0 | - | - | Risk reason: many fusion and low-batch specialization paths are performance-critical and bespoke. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
+| mmvf | ggml/src/ggml-cuda/mmvf.cu:mul_mat_vec_f,mul_mat_vec_f_switch_fusion,launch_mul_mat_vec_f_cuda,mul_mat_vec_f_cuda_switch_ncols_dst,mul_mat_vec_f_cuda,ggml_cuda_mul_mat_vec_f,ggml_cuda_op_mul_mat_vec_f,ggml_cuda_should_use_mmvf | migrated | pass | - | 783→292 | - | - | Low-batch non-quantized plain GGML_OP_MUL_MAT is covered by the same oneMKL implementation in ggml/src/ggml-sycl/mmf.cpp rather than a separate bespoke mat-vec kernel. This covers the unfused F32/F16 src0 + F32 src1 -> F32 dst path exercised by test-backend-ops. CUDA-only fused epilogues, BF16 src0, and MUL_MAT_ID remain residual. |
 | mmvq | ggml/src/ggml-cuda/mmvq.cu:get_vdr_mmvq,get_mmvq_mmid_max_batch_pascal_older,get_mmvq_mmid_max_batch_turing_plus,get_mmvq_mmid_max_batch_gcn,get_mmvq_mmid_max_batch_cdna,get_mmvq_mmid_max_batch_rdna1_rdna2,get_mmvq_mmid_max_batch_rdna3,get_mmvq_mmid_max_batch_rdna4,get_mmvq_mmid_max_batch,ggml_cuda_should_use_mmvq,get_mmvq_mmid_max_batch_for_device,calc_nwarps,calc_rows_per_block,mul_mat_vec_q,mul_mat_vec_q_moe,mul_mat_vec_q_switch_fusion,mul_mat_vec_q_moe_launch,mul_mat_vec_q_switch_ncols_dst,mul_mat_vec_q_switch_type,ggml_cuda_mul_mat_vec_q,ggml_cuda_op_mul_mat_vec_q | pending | - | - | 1247→0 | - | - | Risk reason: custom quantized vec-dot kernels and MoE-specific launch logic are complex and hot-path relevant. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | moe-weighted-reduction | ggml/src/ggml-cuda/moe-weighted-reduction.cu:moe_weighted_reduction_f32,launch_moe_weighted_reduction,ggml_cuda_op_moe_weighted_reduction | pending | - | - | 57→0 | - | - | Risk reason: modest routing/index math but no unusual CUDA primitives. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | opt-step-adamw | ggml/src/ggml-cuda/opt-step-adamw.cu:opt_step_adamw_f32,opt_step_adamw_f32_cuda,ggml_cuda_opt_step_adamw | pending | - | - | 58→0 | - | - | Risk reason: fused optimizer math must preserve update order but is otherwise elementwise. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
@@ -135,7 +135,7 @@
 ## Agent efficiency & cost
 
 - **Elapsed**: 3h21m49s (whole run)  ·  **Active**: 2h51m01s (bracketed)  ·  **Cost**: $0.0  ·  **Tokens**: 0 (in 0 / out 0 / cache r 0 / cache w 0)  ·  **Premium requests**: 0  ·  **AI credits**: 0.0
-- **Observed (gen-progress heartbeat)**: span 3h47m46s  ·  working ≈ 3h47m46s (idle-capped 30m00s)  ·  26 snapshots — independent of metrics.sh
+- **Observed (gen-progress heartbeat)**: span 4h37m53s  ·  working ≈ 4h17m46s (idle-capped 30m00s)  ·  27 snapshots — independent of metrics.sh
 
 | phase | elapsed | active | tokens | requests | credits | USD |
 |-------|--------:|-------:|-------:|---------:|--------:|----:|
@@ -148,7 +148,6 @@
 <!-- append-only from logs/progress.jsonl — one row per gen-progress run -->
 | time (UTC) | phase | migrated | optimized | skipped | pending |
 |------------|-------|---------:|----------:|--------:|--------:|
-| 2026-09-06T17:45:10Z | migrate | 21/76 | 0 | 0 | 54 |
 | 2026-09-06T18:11:06Z | migrate | 22/76 | 0 | 0 | 53 |
 | 2026-09-06T18:36:58Z | migrate | 25/76 | 0 | 0 | 50 |
 | 2026-09-06T18:38:48Z | migrate | 25/76 | 0 | 0 | 50 |
@@ -160,4 +159,5 @@
 | 2026-09-06T19:31:45Z | migrate | 42/76 | 0 | 2 | 31 |
 | 2026-09-06T19:31:56Z | migrate | 44/76 | 0 | 2 | 29 |
 | 2026-09-06T19:32:17Z | migrate | 42/76 | 0 | 0 | 33 |
+| 2026-09-06T20:22:24Z | migrate | 44/76 | 0 | 0 | 31 |
 
