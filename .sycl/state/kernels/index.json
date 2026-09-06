@@ -53,24 +53,24 @@
       "id": "argmax",
       "source": "ggml/src/ggml-cuda/argmax.cu:argmax_f32,ggml_cuda_argmax",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "medium",
       "detail": ".sycl/state/kernels/argmax.json",
       "loc": {
         "source_code": 69,
-        "sycl_code": 0
+        "sycl_code": 70
       }
     },
     {
       "id": "argsort",
       "source": "ggml/src/ggml-cuda/argsort.cu:init_indices,init_offsets,argsort_f32_i32_cuda_cub_chunk_nrows,argsort_f32_i32_cuda_cub,ggml_cuda_swap,k_argsort_f32_i32,next_power_of_2,argsort_f32_i32_cuda_bitonic,ggml_cuda_op_argsort",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "high",
       "detail": ".sycl/state/kernels/argsort.json",
       "loc": {
         "source_code": 223,
-        "sycl_code": 0
+        "sycl_code": 94
       }
     },
     {
@@ -840,12 +840,12 @@
       "id": "top-k",
       "source": "ggml/src/ggml-cuda/top-k.cu:top_k_cub,next_power_of_2,top_k_radix_init,top_k_radix_histogram,top_k_radix_select,top_k_radix_reset_counters,top_k_radix_gather,top_k_radix_cuda,ggml_cuda_op_top_k",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "high",
       "detail": ".sycl/state/kernels/top-k.json",
       "loc": {
         "source_code": 204,
-        "sycl_code": 0
+        "sycl_code": 45
       }
     },
     {

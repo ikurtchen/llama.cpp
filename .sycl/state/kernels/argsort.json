@@ -3,7 +3,7 @@
   "name": "argsort",
   "source": "ggml/src/ggml-cuda/argsort.cu:init_indices,init_offsets,argsort_f32_i32_cuda_cub_chunk_nrows,argsort_f32_i32_cuda_cub,ggml_cuda_swap,k_argsort_f32_i32,next_power_of_2,argsort_f32_i32_cuda_bitonic,ggml_cuda_op_argsort",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "high",
   "algorithm": "Sort each row of float scores into an index permutation, choosing CUB radix sort for larger cases and a custom bitonic kernel for small cases.",
   "cuda_constructs": [
@@ -34,8 +34,8 @@
     "kind": "cpu",
     "crosscheck": "-"
   },
-  "notes": "Risk reason: hybrid CUB plus custom bitonic sort with rowwise offsets. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:34Z",
+  "notes": "Risk reason: hybrid CUB plus custom bitonic sort with rowwise offsets. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated the portable bitonic-sort path (one work-group per row, local-memory index array) matching CUDA's non-CUB fallback. CUDA's CUB-based radix/segmented-sort fast path for large ncols (>1024) is not ported - tracked as residual, out of scope for the Qwen3 dense text path (used by top-k selection, not full-vocab sort).",
+  "updated_at": "2026-09-06T16:43:12Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -78,5 +78,10 @@
     "unresolved": [],
     "method": "span",
     "measured_at": "2026-09-06T16:21:34Z"
+  },
+  "unit_test": {
+    "command": "build/bin/test-backend-ops test -b SYCL0 -o ARGSORT",
+    "result": "test-backend-ops ARGSORT: 46/46 passed on SYCL0 (ncols<=1024, bitonic-sort work-group cap)",
+    "evidence": "test-argsort-20260906T164222Z-b13501"
   }
 }

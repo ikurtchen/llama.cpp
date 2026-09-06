@@ -1,0 +1,33 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-argsort-20260906T164222Z-b13501",
+  "class": "test",
+  "subject": "argsort",
+  "phase": "migrate",
+  "ts": "2026-09-06T16:42:26Z",
+  "duration_s": 3.797,
+  "command": "build/bin/test-backend-ops test -b SYCL0 -o ARGSORT",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "988b39e95",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/argsort/test-argsort-20260906T164222Z-b13501.log",
+  "log_sha256": "038592359d2eaa9f71ad7208c062acf8ce0da3f8b0464cc49838dfe21f7a1a6b",
+  "log_bytes": 7257,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "CPU backend result (test-backend-ops built-in oracle)",
+    "tolerance": {
+      "source": "test-backend-ops default"
+    }
+  },
+  "extracted": {}
+}

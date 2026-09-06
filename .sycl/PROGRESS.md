@@ -6,9 +6,9 @@
 - **Benchmark GPU freq pinned**: True
 - **Build system**: cmake → SYCL build: set-up (ggml/src/ggml-sycl/ builds via icpx -fsycl, AOT bmg-g31, links oneMKL; registers as backend SYCL0)
 - **Phase**: migrate
-- **Updated**: 2026-09-06T16:38:34Z
+- **Updated**: 2026-09-06T16:43:21Z
 
-**Summary**: 75 kernels — 8 migrated, 0 optimized, 0 skipped, 0 needs-reference, 67 pending.
+**Summary**: 75 kernels — 11 migrated, 0 optimized, 0 skipped, 0 needs-reference, 64 pending.
 
 **Code migrated**: 15949 source code lines (76 files; attributed per kernel: cuda 16006) → 0 SYCL code lines (0 files)  ·  ratio 0.0×  ·  44.0% of the project's CUDA/Triton code lines  ·  measured 75/75 kernels
 
@@ -58,8 +58,8 @@
 | add-id | ggml/src/ggml-cuda/add-id.cu:add_id_kernel,ggml_cuda_op_add_id | pending | - | - | 45→0 | - | - | Risk reason: indexed row gather plus rowwise add. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | allreduce | ggml/src/ggml-cuda/allreduce.cu:ggml_cuda_ar_signal_set,ggml_cuda_ar_signal_get,ggml_cuda_ar_kernel,ggml_cuda_ar_add_kernel,ggml_cuda_ar_chunk_bytes,ggml_cuda_ar_wait_for_compute,ggml_cuda_ar_pipeline_free,ggml_cuda_ar_allreduce_copy_impl,ggml_cuda_ar_allreduce_copy_outer,ggml_cuda_ar_allreduce | pending | - | - | 404→0 | - | - | Risk reason: cross-GPU synchronization, host staging, and precision-roundtrip behavior need careful porting. Reference oracle: analytical sum semantics plus backend tests. |
 | arange | ggml/src/ggml-cuda/arange.cu:arange_f32,arange_f32_cuda,ggml_cuda_op_arange | migrated | test-backend-ops ARANGE: all cases passed on SYCL0 | - | 25→0 | - | - | Risk reason: direct 1D map kernel. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated in full: single f32 fill kernel, no residual. |
-| argmax | ggml/src/ggml-cuda/argmax.cu:argmax_f32,ggml_cuda_argmax | pending | - | - | 69→0 | - | - | Risk reason: reduction ordering and tie handling come from warp/block reductions. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
-| argsort | ggml/src/ggml-cuda/argsort.cu:init_indices,init_offsets,argsort_f32_i32_cuda_cub_chunk_nrows,argsort_f32_i32_cuda_cub,ggml_cuda_swap,k_argsort_f32_i32,next_power_of_2,argsort_f32_i32_cuda_bitonic,ggml_cuda_op_argsort | pending | - | - | 223→0 | - | - | Risk reason: hybrid CUB plus custom bitonic sort with rowwise offsets. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
+| argmax | ggml/src/ggml-cuda/argmax.cu:argmax_f32,ggml_cuda_argmax | migrated | test-backend-ops ARGMAX: 7/7 passed on SYCL0 | - | 69→0 | - | - | Risk reason: reduction ordering and tie handling come from warp/block reductions. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated in full: f32->i32 per-row argmax via work-group reduction (sycl::reduce_over_group with a packed sortable 64-bit key), no residual. |
+| argsort | ggml/src/ggml-cuda/argsort.cu:init_indices,init_offsets,argsort_f32_i32_cuda_cub_chunk_nrows,argsort_f32_i32_cuda_cub,ggml_cuda_swap,k_argsort_f32_i32,next_power_of_2,argsort_f32_i32_cuda_bitonic,ggml_cuda_op_argsort | migrated | test-backend-ops ARGSORT: 46/46 passed on SYCL0 (ncols<=1024, bitonic-sort work-group cap) | - | 223→0 | - | - | Risk reason: hybrid CUB plus custom bitonic sort with rowwise offsets. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated the portable bitonic-sort path (one work-group per row, local-memory index array) matching CUDA's non-CUB fallback. CUDA's CUB-based radix/segmented-sort fast path for large ncols (>1024) is not ported - tracked as residual, out of scope for the Qwen3 dense text path (used by top-k selection, not full-vocab sort). |
 | binbcast | ggml/src/ggml-cuda/binbcast.cu:launch_bin_bcast_pack,k_repeat_back,repeat_back_cuda,ggml_cuda_op_bin_bcast,ggml_cuda_op_repeat,ggml_cuda_op_add,ggml_cuda_op_sub,ggml_cuda_op_mul,ggml_cuda_op_div,ggml_cuda_op_fused_binbcast_impl,ggml_cuda_op_fused_add,ggml_cuda_op_fused_mul,ggml_cuda_op_repeat_back | pending | - | - | 439→0 | - | - | Risk reason: mostly indexing logic, but many broadcast and repeat layouts share the same implementation. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | clamp | ggml/src/ggml-cuda/clamp.cu:op_clamp,op_clamp_kernel,clamp_cuda,ggml_cuda_op_clamp | migrated | pass | - | 0→0 | - | - | Risk reason: simple pointwise map. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | col2im-1d | ggml/src/ggml-cuda/col2im-1d.cu:col2im_1d_kernel,ggml_cuda_op_col2im_1d | pending | - | - | 59→0 | - | - | Risk reason: inverse window indexing is more error-prone than pure elementwise code. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
@@ -122,7 +122,7 @@
 | ssm-scan | ggml/src/ggml-cuda/ssm-scan.cu:ssm_scan_f32,ssm_scan_f32_group,ssm_scan_f32_cuda,ssm_ssd_prepare_dt_kernel,ssm_ssd_pre_matmul_kernel,ssm_ssd_scale_state_kernel,ssm_ssd_init_state_kernel,ssm_scan_ssd_f32_cuda,ggml_cuda_op_ssm_scan | pending | - | - | 669→0 | - | - | Risk reason: direct scan, grouped scan, and SSD decomposition all coexist and are numerically/state sensitive. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | sum | ggml/src/ggml-cuda/sum.cu:sum_f32_cuda,ggml_cuda_op_sum | pending | - | - | 23→0 | - | - | Risk reason: reduction path switches between library and fallback implementation. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | sumrows | ggml/src/ggml-cuda/sumrows.cu:sum_rows_f32_cuda,ggml_cuda_op_sum_rows | pending | - | - | 71→0 | - | - | Risk reason: custom row reduction kernel. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
-| top-k | ggml/src/ggml-cuda/top-k.cu:top_k_cub,next_power_of_2,top_k_radix_init,top_k_radix_histogram,top_k_radix_select,top_k_radix_reset_counters,top_k_radix_gather,top_k_radix_cuda,ggml_cuda_op_top_k | pending | - | - | 204→0 | - | - | Risk reason: custom radix select with atomics plus optional CUB fallback is algorithmically complex. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
+| top-k | ggml/src/ggml-cuda/top-k.cu:top_k_cub,next_power_of_2,top_k_radix_init,top_k_radix_histogram,top_k_radix_select,top_k_radix_reset_counters,top_k_radix_gather,top_k_radix_cuda,ggml_cuda_op_top_k | migrated | test-backend-ops TOP_K: 224/224 passed on SYCL0 (ncols<=1024, same bitonic-sort cap as argsort) | - | 204→0 | - | - | Risk reason: custom radix select with atomics plus optional CUB fallback is algorithmically complex. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated via full-row descending bitonic sort (reusing argsort's kernel) + take-first-k copy, matching CUDA's non-CUB/non-HIP fallback contract (unordered ties within the k slots). CUDA's CUB DeviceTopK fast path and the HIP radix-select path (no full sort, larger ncols) not ported - tracked as residual. |
 | topk-moe | ggml/src/ggml-cuda/topk-moe.cu:softmax_warp_inplace,sigmoid_warp_inplace,sqrt_softplus_warp_inplace,topk_moe_cuda,launch_topk_moe_cuda,ggml_cuda_op_topk_moe,ggml_cuda_should_use_topk_moe | pending | - | - | 344→0 | - | - | Risk reason: fused gating modes plus iterative warp-level selection are non-trivial and MoE-hot. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | tri | ggml/src/ggml-cuda/tri.cu:tri_kernel,tri_cuda,ggml_cuda_op_tri | pending | - | - | 119→0 | - | - | Risk reason: direct matrix masking. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | tsembd | ggml/src/ggml-cuda/tsembd.cu:timestep_embedding_f32,timestep_embedding_f32_cuda,ggml_cuda_op_timestep_embedding | pending | - | - | 35→0 | - | - | Risk reason: simple analytical embedding map. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
@@ -133,8 +133,8 @@
 ## Agent efficiency & cost
 
 - **Elapsed**: 27m27s (whole run)  ·  **Active**: 13m14s (bracketed)  ·  **Cost**: $0.0  ·  **Tokens**: 0 (in 0 / out 0 / cache r 0 / cache w 0)  ·  **Premium requests**: 0  ·  **AI credits**: 0.0
-- **Observed (gen-progress heartbeat)**: span 54m03s  ·  working ≈ 54m03s (idle-capped 30m00s)  ·  7 snapshots — independent of metrics.sh
-  - ⚠️ bracketed active time (13m14s) is far below observed work (54m03s); phases were under-bracketed — trust elapsed/observed figures.
+- **Observed (gen-progress heartbeat)**: span 58m50s  ·  working ≈ 58m50s (idle-capped 30m00s)  ·  8 snapshots — independent of metrics.sh
+  - ⚠️ bracketed active time (13m14s) is far below observed work (58m50s); phases were under-bracketed — trust elapsed/observed figures.
 
 | phase | elapsed | active | tokens | requests | credits | USD |
 |-------|--------:|-------:|-------:|---------:|--------:|----:|
@@ -153,4 +153,5 @@
 | 2026-09-06T16:27:05Z | migrate | 4/75 | 0 | 0 | 71 |
 | 2026-09-06T16:34:01Z | migrate | 5/75 | 0 | 0 | 70 |
 | 2026-09-06T16:38:34Z | migrate | 8/75 | 0 | 0 | 67 |
+| 2026-09-06T16:43:21Z | migrate | 11/75 | 0 | 0 | 64 |
 

@@ -3,7 +3,7 @@
   "name": "argmax",
   "source": "ggml/src/ggml-cuda/argmax.cu:argmax_f32,ggml_cuda_argmax",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "medium",
   "algorithm": "Reduce each row to the column index of the maximum value, using block and warp reductions to combine local winners.",
   "cuda_constructs": [
@@ -34,8 +34,8 @@
     "kind": "cpu",
     "crosscheck": "-"
   },
-  "notes": "Risk reason: reduction ordering and tie handling come from warp/block reductions. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:34Z",
+  "notes": "Risk reason: reduction ordering and tie handling come from warp/block reductions. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated in full: f32->i32 per-row argmax via work-group reduction (sycl::reduce_over_group with a packed sortable 64-bit key), no residual.",
+  "updated_at": "2026-09-06T16:43:12Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -71,5 +71,10 @@
     "unresolved": [],
     "method": "span",
     "measured_at": "2026-09-06T16:21:34Z"
+  },
+  "unit_test": {
+    "command": "build/bin/test-backend-ops test -b SYCL0 -o ARGMAX",
+    "result": "test-backend-ops ARGMAX: 7/7 passed on SYCL0",
+    "evidence": "test-argmax-20260906T164226Z-c01e39"
   }
 }

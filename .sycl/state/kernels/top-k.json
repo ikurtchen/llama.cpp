@@ -3,7 +3,7 @@
   "name": "top-k",
   "source": "ggml/src/ggml-cuda/top-k.cu:top_k_cub,next_power_of_2,top_k_radix_init,top_k_radix_histogram,top_k_radix_select,top_k_radix_reset_counters,top_k_radix_gather,top_k_radix_cuda,ggml_cuda_op_top_k",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "high",
   "algorithm": "Select the top-k items per row using either CUB sort for broad cases or a custom radix-selection pipeline with histograms, counters, and gather passes.",
   "cuda_constructs": [
@@ -42,8 +42,8 @@
     "kind": "cpu",
     "crosscheck": "-"
   },
-  "notes": "Risk reason: custom radix select with atomics plus optional CUB fallback is algorithmically complex. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:38Z",
+  "notes": "Risk reason: custom radix select with atomics plus optional CUB fallback is algorithmically complex. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated via full-row descending bitonic sort (reusing argsort's kernel) + take-first-k copy, matching CUDA's non-CUB/non-HIP fallback contract (unordered ties within the k slots). CUDA's CUB DeviceTopK fast path and the HIP radix-select path (no full sort, larger ncols) not ported - tracked as residual.",
+  "updated_at": "2026-09-06T16:43:12Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -86,5 +86,10 @@
     "unresolved": [],
     "method": "span",
     "measured_at": "2026-09-06T16:21:38Z"
+  },
+  "unit_test": {
+    "command": "build/bin/test-backend-ops test -b SYCL0 -o TOP_K",
+    "result": "test-backend-ops TOP_K: 224/224 passed on SYCL0 (ncols<=1024, same bitonic-sort cap as argsort)",
+    "evidence": "test-top-k-20260906T164229Z-083dba"
   }
 }
