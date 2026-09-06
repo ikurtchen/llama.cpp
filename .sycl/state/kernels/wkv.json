@@ -3,7 +3,7 @@
   "name": "rwkv-wkv-family",
   "source": "ggml/src/ggml-cuda/wkv.cu:rwkv_wkv_f32,rwkv_wkv7_f32,rwkv_wkv7_f32_t1_warp_row,ggml_cuda_op_rwkv_wkv6,ggml_cuda_op_rwkv_wkv7",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "high",
   "algorithm": "Run RWKV v6/v7 recurrent WKV kernels that update per-head state matrices and emit token outputs from key/value/receptance and decay terms.",
   "cuda_constructs": [
@@ -35,22 +35,22 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: recurrent state update order and warp-specialized fast path are model-specific and sensitive. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:38Z",
+  "updated_at": "2026-09-06T21:32:50Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 207,
+      "code": 211,
       "comment": 0,
-      "blank": 39,
-      "raw": 246,
-      "files": 1
+      "blank": 42,
+      "raw": 253,
+      "files": 2
     },
     "sycl": {
-      "code": 0,
+      "code": 200,
       "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "blank": 30,
+      "raw": 230,
+      "files": 2
     },
     "source_files": [
       {
@@ -67,12 +67,54 @@
         "comment": 0,
         "blank": 39,
         "raw": 246
+      },
+      {
+        "path": "ggml/src/ggml-cuda/wkv.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 4,
+        "comment": 0,
+        "blank": 3,
+        "raw": 7
       }
     ],
-    "sycl_files": [],
-    "mirrored_sources": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/wkv.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 192,
+        "comment": 0,
+        "blank": 27,
+        "raw": 219
+      },
+      {
+        "path": "ggml/src/ggml-sycl/wkv.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 8,
+        "comment": 0,
+        "blank": 3,
+        "raw": 11
+      }
+    ],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/wkv.cuh"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:38Z"
+    "measured_at": "2026-09-06T21:32:05Z"
+  },
+  "target_style": "plain-sycl",
+  "sycl_impl": "ggml/src/ggml-sycl/wkv.hpp,ggml/src/ggml-sycl/wkv.cpp",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/wkv.hpp",
+    "ggml/src/ggml-sycl/wkv.cpp"
+  ],
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "RWKV_WKV6,RWKV_WKV7",
+    "result": "pass",
+    "evidence": "test-wkv-20260906T213043Z-e61aec"
   }
 }

@@ -3,7 +3,7 @@
   "name": "ssm-conv",
   "source": "ggml/src/ggml-cuda/ssm-conv.cu:ssm_conv_f32,ssm_conv_long_token_f32,ssm_conv_f32_cuda,ggml_cuda_op_ssm_conv",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "high",
   "algorithm": "Run the 1D convolution stage used by SSM/Mamba-style blocks, including a long-token path and fused activation handling.",
   "cuda_constructs": [
@@ -33,22 +33,22 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: model-specific cached-state convolution behavior must match exactly. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:37Z",
+  "updated_at": "2026-09-06T21:32:50Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 167,
+      "code": 169,
       "comment": 5,
-      "blank": 27,
-      "raw": 199,
-      "files": 1
+      "blank": 28,
+      "raw": 202,
+      "files": 2
     },
     "sycl": {
-      "code": 0,
+      "code": 95,
       "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "blank": 17,
+      "raw": 112,
+      "files": 2
     },
     "source_files": [
       {
@@ -64,12 +64,54 @@
         "comment": 5,
         "blank": 27,
         "raw": 199
+      },
+      {
+        "path": "ggml/src/ggml-cuda/ssm-conv.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 2,
+        "comment": 0,
+        "blank": 1,
+        "raw": 3
       }
     ],
-    "sycl_files": [],
-    "mirrored_sources": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/ssm-conv.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 89,
+        "comment": 0,
+        "blank": 14,
+        "raw": 103
+      },
+      {
+        "path": "ggml/src/ggml-sycl/ssm-conv.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 6,
+        "comment": 0,
+        "blank": 3,
+        "raw": 9
+      }
+    ],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/ssm-conv.cuh"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:37Z"
+    "measured_at": "2026-09-06T21:32:05Z"
+  },
+  "target_style": "plain-sycl",
+  "sycl_impl": "ggml/src/ggml-sycl/ssm-conv.hpp,ggml/src/ggml-sycl/ssm-conv.cpp",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/ssm-conv.hpp",
+    "ggml/src/ggml-sycl/ssm-conv.cpp"
+  ],
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "SSM_CONV,SSM_CONV_BIAS_SILU",
+    "result": "pass",
+    "evidence": "test-ssm-conv-20260906T213036Z-fe6456"
   }
 }

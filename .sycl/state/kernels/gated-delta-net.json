@@ -3,7 +3,7 @@
   "name": "gated-delta-net",
   "source": "ggml/src/ggml-cuda/gated_delta_net.cu:launch_gated_delta_net,ggml_cuda_op_gated_delta_net_impl,ggml_cuda_op_gated_delta_net,ggml_cuda_op_gated_delta_net_fused_cache",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "high",
   "algorithm": "Run the recurrent gated-delta-net state update across tokens: form state-projected key/value interactions, apply learned decay gates, emit attention-like outputs, and optionally snapshot rollback states.",
   "cuda_constructs": [
@@ -42,22 +42,22 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: recurrent stateful update with warp reductions and rollback-slot semantics is complex. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:35Z",
+  "updated_at": "2026-09-06T21:32:50Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 262,
-      "comment": 19,
-      "blank": 39,
-      "raw": 320,
-      "files": 1
+      "code": 271,
+      "comment": 21,
+      "blank": 42,
+      "raw": 334,
+      "files": 2
     },
     "sycl": {
-      "code": 0,
+      "code": 197,
       "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "blank": 29,
+      "raw": 226,
+      "files": 2
     },
     "source_files": [
       {
@@ -74,15 +74,57 @@
         "comment": 19,
         "blank": 39,
         "raw": 320
+      },
+      {
+        "path": "ggml/src/ggml-cuda/gated_delta_net.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 9,
+        "comment": 2,
+        "blank": 3,
+        "raw": 14
       }
     ],
-    "sycl_files": [],
-    "mirrored_sources": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/gated_delta_net.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 191,
+        "comment": 0,
+        "blank": 26,
+        "raw": 217
+      },
+      {
+        "path": "ggml/src/ggml-sycl/gated_delta_net.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 6,
+        "comment": 0,
+        "blank": 3,
+        "raw": 9
+      }
+    ],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/gated_delta_net.cuh"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:35Z",
+    "measured_at": "2026-09-06T21:32:05Z",
     "source_spec": [
       "ggml/src/ggml-cuda/gated_delta_net.cu:4-167"
     ]
+  },
+  "target_style": "plain-sycl",
+  "sycl_impl": "ggml/src/ggml-sycl/gated_delta_net.hpp,ggml/src/ggml-sycl/gated_delta_net.cpp",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/gated_delta_net.hpp",
+    "ggml/src/ggml-sycl/gated_delta_net.cpp"
+  ],
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "GATED_DELTA_NET",
+    "result": "pass",
+    "evidence": "test-gated-delta-net-20260906T213054Z-da4afd"
   }
 }

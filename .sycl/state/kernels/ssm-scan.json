@@ -3,7 +3,7 @@
   "name": "ssm-scan-family",
   "source": "ggml/src/ggml-cuda/ssm-scan.cu:ssm_scan_f32,ssm_scan_f32_group,ssm_scan_f32_cuda,ssm_ssd_prepare_dt_kernel,ssm_ssd_pre_matmul_kernel,ssm_ssd_scale_state_kernel,ssm_ssd_init_state_kernel,ssm_scan_ssd_f32_cuda,ggml_cuda_op_ssm_scan",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "high",
   "algorithm": "Run the selective state-space scan used by SSM/Mamba blocks, choosing between direct scan kernels and an SSD matmul-based decomposition with state prepare/scale/init helpers.",
   "cuda_constructs": [
@@ -44,22 +44,22 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: direct scan, grouped scan, and SSD decomposition all coexist and are numerically/state sensitive. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:38Z",
+  "updated_at": "2026-09-06T21:32:50Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 669,
+      "code": 671,
       "comment": 41,
-      "blank": 79,
-      "raw": 789,
-      "files": 1
+      "blank": 80,
+      "raw": 792,
+      "files": 2
     },
     "sycl": {
-      "code": 0,
+      "code": 162,
       "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "blank": 27,
+      "raw": 189,
+      "files": 2
     },
     "source_files": [
       {
@@ -80,12 +80,54 @@
         "comment": 41,
         "blank": 79,
         "raw": 789
+      },
+      {
+        "path": "ggml/src/ggml-cuda/ssm-scan.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 2,
+        "comment": 0,
+        "blank": 1,
+        "raw": 3
       }
     ],
-    "sycl_files": [],
-    "mirrored_sources": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/ssm-scan.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 156,
+        "comment": 0,
+        "blank": 24,
+        "raw": 180
+      },
+      {
+        "path": "ggml/src/ggml-sycl/ssm-scan.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 6,
+        "comment": 0,
+        "blank": 3,
+        "raw": 9
+      }
+    ],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/ssm-scan.cuh"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:38Z"
+    "measured_at": "2026-09-06T21:32:05Z"
+  },
+  "target_style": "plain-sycl",
+  "sycl_impl": "ggml/src/ggml-sycl/ssm-scan.hpp,ggml/src/ggml-sycl/ssm-scan.cpp",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/ssm-scan.hpp",
+    "ggml/src/ggml-sycl/ssm-scan.cpp"
+  ],
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "SSM_SCAN,SSM_SCAN_ROLLBACK",
+    "result": "pass",
+    "evidence": "test-ssm-scan-20260906T213100Z-5cb239"
   }
 }

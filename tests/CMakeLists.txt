@@ -298,6 +298,7 @@ if (NOT LLAMA_SANITIZE_ADDRESS AND NOT GGML_SCHED_NO_REALLOC)
   llama_build_and_test(test-opt.cpp)
 endif()
 llama_build_and_test(test-backend-ops.cpp)
+target_link_libraries(test-backend-ops PRIVATE llama)
 
 # the tensor API kernels come from a separate metallib - check they produce correct results
 # ref: https://github.com/ggml-org/llama.cpp/issues/27473

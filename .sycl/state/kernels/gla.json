@@ -3,7 +3,7 @@
   "name": "gated-linear-attention",
   "source": "ggml/src/ggml-cuda/gla.cu:gated_linear_attn_f32,ggml_cuda_op_gated_linear_attn",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "high",
   "algorithm": "Run gated linear attention over token blocks, combining recurrent accumulation with shared-memory staging for per-head state.",
   "cuda_constructs": [
@@ -33,22 +33,22 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: recurrent attention update with custom memory layout is specialized and stateful. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:35Z",
+  "updated_at": "2026-09-06T21:32:50Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 73,
+      "code": 75,
       "comment": 0,
-      "blank": 16,
-      "raw": 89,
-      "files": 1
+      "blank": 17,
+      "raw": 92,
+      "files": 2
     },
     "sycl": {
-      "code": 0,
+      "code": 117,
       "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "blank": 20,
+      "raw": 137,
+      "files": 2
     },
     "source_files": [
       {
@@ -62,12 +62,54 @@
         "comment": 0,
         "blank": 16,
         "raw": 89
+      },
+      {
+        "path": "ggml/src/ggml-cuda/gla.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 2,
+        "comment": 0,
+        "blank": 1,
+        "raw": 3
       }
     ],
-    "sycl_files": [],
-    "mirrored_sources": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/gla.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 111,
+        "comment": 0,
+        "blank": 17,
+        "raw": 128
+      },
+      {
+        "path": "ggml/src/ggml-sycl/gla.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 6,
+        "comment": 0,
+        "blank": 3,
+        "raw": 9
+      }
+    ],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/gla.cuh"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:35Z"
+    "measured_at": "2026-09-06T21:32:05Z"
+  },
+  "target_style": "plain-sycl",
+  "sycl_impl": "ggml/src/ggml-sycl/gla.hpp,ggml/src/ggml-sycl/gla.cpp",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/gla.hpp",
+    "ggml/src/ggml-sycl/gla.cpp"
+  ],
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "GATED_LINEAR_ATTN",
+    "result": "pass",
+    "evidence": "test-gla-20260906T213031Z-d3ea5e"
   }
 }
