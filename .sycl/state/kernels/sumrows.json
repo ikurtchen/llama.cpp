@@ -3,7 +3,7 @@
   "name": "sum-rows",
   "source": "ggml/src/ggml-cuda/sumrows.cu:sum_rows_f32_cuda,ggml_cuda_op_sum_rows",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "medium",
   "algorithm": "Reduce each row to its sum with a custom shared-memory row reduction kernel.",
   "cuda_constructs": [
@@ -32,8 +32,8 @@
     "kind": "cpu",
     "crosscheck": "-"
   },
-  "notes": "Risk reason: custom row reduction kernel. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:38Z",
+  "notes": "Risk reason: custom row reduction kernel. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Scope matches CUDA: requires ggml_is_contiguous(src0); non-contiguous permute/slice cases correctly report not-supported.",
+  "updated_at": "2026-09-06T17:12:35Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -83,5 +83,16 @@
     "source_spec": [
       "ggml/src/ggml-cuda/reduce_rows.cuh:reduce_rows_f32"
     ]
+  },
+  "target_style": "plain-sycl",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/reduce_rows.hpp",
+    "ggml/src/ggml-sycl/reduce_rows.cpp"
+  ],
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "SUM,SUM_ROWS,MEAN,ACC",
+    "result": "pass",
+    "evidence": "test-sum-sumrows-mean-acc-20260906T171219Z-270766"
   }
 }

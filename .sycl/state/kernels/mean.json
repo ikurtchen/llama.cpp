@@ -3,7 +3,7 @@
   "name": "mean",
   "source": "ggml/src/ggml-cuda/mean.cu:divide_by_count",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "medium",
   "algorithm": "Reduce rows or full vectors to their arithmetic mean, using CUB device reduction for large vectors and a custom row-reduction kernel otherwise.",
   "cuda_constructs": [
@@ -32,8 +32,8 @@
     "kind": "cpu",
     "crosscheck": "-"
   },
-  "notes": "Risk reason: reduction path switches between CUB and custom row reduction. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:35Z",
+  "notes": "Risk reason: reduction path switches between CUB and custom row reduction. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Scope matches CUDA: requires ggml_is_contiguous(src0).",
+  "updated_at": "2026-09-06T17:12:35Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -84,5 +84,16 @@
       "ggml/src/ggml-cuda/reduce_rows.cuh:reduce_rows_f32",
       "ggml/src/ggml-cuda/mean.cu:13-77"
     ]
+  },
+  "target_style": "plain-sycl",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/reduce_rows.hpp",
+    "ggml/src/ggml-sycl/reduce_rows.cpp"
+  ],
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "SUM,SUM_ROWS,MEAN,ACC",
+    "result": "pass",
+    "evidence": "test-sum-sumrows-mean-acc-20260906T171219Z-270766"
   }
 }

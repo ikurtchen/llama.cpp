@@ -1,0 +1,33 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-sum-sumrows-mean-acc-20260906T171219Z-270766",
+  "class": "test",
+  "subject": "sum-sumrows-mean-acc",
+  "phase": "migrate",
+  "ts": "2026-09-06T17:12:22Z",
+  "duration_s": 2.859,
+  "command": "./build/bin/test-backend-ops -o SUM,SUM_ROWS,MEAN,ACC",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "716530c29",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/sum-sumrows-mean-acc/test-sum-sumrows-mean-acc-20260906T171219Z-270766.log",
+  "log_sha256": "cb206658dbfa0356a938fcfbe9668bcf0ea92cd7e559691b39d1d4d1dbd9d562",
+  "log_bytes": 3040,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "cpu",
+    "tolerance": {
+      "source": "cuda-parity"
+    }
+  },
+  "extracted": {}
+}

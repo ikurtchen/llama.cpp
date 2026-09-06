@@ -3,7 +3,7 @@
   "name": "accumulate-with-offset",
   "source": "ggml/src/ggml-cuda/acc.cu:acc_f32,acc_f32_cuda,ggml_cuda_op_acc",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "low",
   "algorithm": "Add a contiguous source tensor into a destination view with a flat offset and per-dimension bounds checks, leaving out-of-range destination elements unchanged except for the base src0 value.",
   "cuda_constructs": [
@@ -47,8 +47,8 @@
     "kind": "cpu",
     "crosscheck": "-"
   },
-  "notes": "Risk reason: flat elementwise add with simple offset math. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:34Z",
+  "notes": "Risk reason: flat elementwise add with simple offset math. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Scope matches CUDA: requires ggml_is_contiguous(src0) && ggml_is_contiguous(src1) (fixes a crash on non-contiguous stride_dim test cases).",
+  "updated_at": "2026-09-06T17:12:35Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -85,5 +85,16 @@
     "unresolved": [],
     "method": "span",
     "measured_at": "2026-09-06T16:21:34Z"
+  },
+  "target_style": "plain-sycl",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/acc.hpp",
+    "ggml/src/ggml-sycl/acc.cpp"
+  ],
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "SUM,SUM_ROWS,MEAN,ACC",
+    "result": "pass",
+    "evidence": "test-sum-sumrows-mean-acc-20260906T171219Z-270766"
   }
 }

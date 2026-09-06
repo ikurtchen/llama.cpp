@@ -5,7 +5,7 @@
       "id": "acc",
       "source": "ggml/src/ggml-cuda/acc.cu:acc_f32,acc_f32_cuda,ggml_cuda_op_acc",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "low",
       "detail": ".sycl/state/kernels/acc.json",
       "loc": {
@@ -191,7 +191,7 @@
       "id": "count-equal",
       "source": "ggml/src/ggml-cuda/count-equal.cu:count_equal,ggml_cuda_count_equal",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "skipped",
       "risk": "medium",
       "detail": ".sycl/state/kernels/count-equal.json",
       "loc": {
@@ -474,7 +474,7 @@
       "id": "mean",
       "source": "ggml/src/ggml-cuda/mean.cu:divide_by_count",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "medium",
       "detail": ".sycl/state/kernels/mean.json",
       "loc": {
@@ -816,7 +816,7 @@
       "id": "sum",
       "source": "ggml/src/ggml-cuda/sum.cu:sum_f32_cuda,ggml_cuda_op_sum",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "medium",
       "detail": ".sycl/state/kernels/sum.json",
       "loc": {
@@ -828,7 +828,7 @@
       "id": "sumrows",
       "source": "ggml/src/ggml-cuda/sumrows.cu:sum_rows_f32_cuda,ggml_cuda_op_sum_rows",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "medium",
       "detail": ".sycl/state/kernels/sumrows.json",
       "loc": {
@@ -928,5 +928,5 @@
       }
     }
   ],
-  "updated_at": "2026-09-06T16:26:59Z"
+  "updated_at": "2026-09-06T17:12:56Z"
 }

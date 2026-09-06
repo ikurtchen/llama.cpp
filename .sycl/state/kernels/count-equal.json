@@ -3,7 +3,7 @@
   "name": "count-equal",
   "source": "ggml/src/ggml-cuda/count-equal.cu:count_equal,ggml_cuda_count_equal",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "skipped",
   "risk": "medium",
   "algorithm": "Count how many positions are equal across two tensors by comparing elements and atomically accumulating the result.",
   "cuda_constructs": [
@@ -34,8 +34,8 @@
     "kind": "cpu",
     "crosscheck": "-"
   },
-  "notes": "Risk reason: atomic accumulation and type-specialized comparisons need care. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:34Z",
+  "notes": "Risk reason: atomic accumulation and type-specialized comparisons need care. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Skipped: training/accuracy-metric op (used for evaluating discrete-token prediction accuracy), not on the Qwen3 dense-inference hot path. Excluded per user's explicit scope decision, not for difficulty.",
+  "updated_at": "2026-09-06T17:12:56Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
