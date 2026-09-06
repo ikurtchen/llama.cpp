@@ -3,7 +3,7 @@
   "name": "dsv4-hc-family",
   "source": "ggml/src/ggml-cuda/dsv4-hc.cu:dsv4_hc_comb_norm_cols,dsv4_hc_comb_norm_rows,dsv4_hc_comb_f32,dsv4_hc_pre_f32,ggml_cuda_op_dsv4_hc_comb,ggml_cuda_op_dsv4_hc_pre,ggml_cuda_op_dsv4_hc_post",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "high",
   "algorithm": "Implement the DSV4 hidden-channel helper kernels: build a normalized 4x4 combination matrix, apply weighted pre-mixing, and apply post-mixing with residual channels.",
   "cuda_constructs": [
@@ -40,22 +40,22 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: three custom kernels implement specialized model-specific algebra not reused elsewhere. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:35Z",
+  "updated_at": "2026-09-06T21:31:38Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 242,
+      "code": 247,
       "comment": 0,
-      "blank": 38,
-      "raw": 280,
-      "files": 1
+      "blank": 39,
+      "raw": 286,
+      "files": 2
     },
     "sycl": {
-      "code": 0,
+      "code": 227,
       "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "blank": 49,
+      "raw": 276,
+      "files": 2
     },
     "source_files": [
       {
@@ -75,15 +75,57 @@
         "comment": 0,
         "blank": 38,
         "raw": 280
+      },
+      {
+        "path": "ggml/src/ggml-cuda/dsv4-hc.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 5,
+        "comment": 0,
+        "blank": 1,
+        "raw": 6
       }
     ],
-    "sycl_files": [],
-    "mirrored_sources": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/dsv4-hc.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 217,
+        "comment": 0,
+        "blank": 45,
+        "raw": 262
+      },
+      {
+        "path": "ggml/src/ggml-sycl/dsv4-hc.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 10,
+        "comment": 0,
+        "blank": 4,
+        "raw": 14
+      }
+    ],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/dsv4-hc.cuh"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:35Z",
+    "measured_at": "2026-09-06T21:31:38Z",
     "source_spec": [
       "ggml/src/ggml-cuda/dsv4-hc.cu:140-182"
     ]
-  }
+  },
+  "target_style": "plain-sycl",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/dsv4-hc.hpp",
+    "ggml/src/ggml-sycl/dsv4-hc.cpp"
+  ],
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "DSV4_HC_COMB,DSV4_HC_PRE,DSV4_HC_POST",
+    "result": "pass",
+    "evidence": "test-dsv4-hc-20260906T213038Z-4a3323"
+  },
+  "sycl_impl": "ggml/src/ggml-sycl/dsv4-hc.hpp,ggml/src/ggml-sycl/dsv4-hc.cpp"
 }

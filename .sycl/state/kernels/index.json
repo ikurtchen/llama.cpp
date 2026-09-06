@@ -310,12 +310,22 @@
       "id": "dsv4-hc",
       "source": "ggml/src/ggml-cuda/dsv4-hc.cu:dsv4_hc_comb_norm_cols,dsv4_hc_comb_norm_rows,dsv4_hc_comb_f32,dsv4_hc_pre_f32,ggml_cuda_op_dsv4_hc_comb,ggml_cuda_op_dsv4_hc_pre,ggml_cuda_op_dsv4_hc_post",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "high",
       "detail": ".sycl/state/kernels/dsv4-hc.json",
       "loc": {
-        "source_code": 242,
-        "sycl_code": 0
+        "source_code": 247,
+        "sycl_code": 227
+      },
+      "target_style": "plain-sycl",
+      "sycl_file": "ggml/src/ggml-sycl/dsv4-hc.cpp",
+      "sycl_files": [
+        "ggml/src/ggml-sycl/dsv4-hc.hpp",
+        "ggml/src/ggml-sycl/dsv4-hc.cpp"
+      ],
+      "unit_test": {
+        "result": "pass",
+        "evidence": "test-dsv4-hc-20260906T213038Z-4a3323"
       }
     },
     {
@@ -398,8 +408,8 @@
       "risk": "high",
       "detail": ".sycl/state/kernels/gated-delta-net.json",
       "loc": {
-        "source_code": 262,
-        "sycl_code": 0
+        "source_code": 271,
+        "sycl_code": 197
       }
     },
     {
@@ -444,8 +454,8 @@
       "risk": "high",
       "detail": ".sycl/state/kernels/gla.json",
       "loc": {
-        "source_code": 73,
-        "sycl_code": 0
+        "source_code": 75,
+        "sycl_code": 117
       }
     },
     {
@@ -845,8 +855,8 @@
       "risk": "high",
       "detail": ".sycl/state/kernels/ssm-conv.json",
       "loc": {
-        "source_code": 167,
-        "sycl_code": 0
+        "source_code": 169,
+        "sycl_code": 95
       }
     },
     {
@@ -857,8 +867,8 @@
       "risk": "high",
       "detail": ".sycl/state/kernels/ssm-scan.json",
       "loc": {
-        "source_code": 669,
-        "sycl_code": 0
+        "source_code": 671,
+        "sycl_code": 162
       }
     },
     {
@@ -972,8 +982,8 @@
       "risk": "high",
       "detail": ".sycl/state/kernels/wkv.json",
       "loc": {
-        "source_code": 207,
-        "sycl_code": 0
+        "source_code": 211,
+        "sycl_code": 200
       }
     },
     {
@@ -984,5 +994,5 @@
       "risk": "high"
     }
   ],
-  "updated_at": "2026-09-06T20:54:10Z"
+  "updated_at": "2026-09-06T21:32:05Z"
 }

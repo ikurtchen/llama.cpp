@@ -1,0 +1,33 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-dsv4-hc-20260906T213038Z-4a3323",
+  "class": "test",
+  "subject": "dsv4-hc",
+  "phase": "migrate",
+  "ts": "2026-09-06T21:30:56Z",
+  "duration_s": 17.798,
+  "command": "./build/bin/test-backend-ops test -b SYCL0 -o DSV4_HC_COMB,DSV4_HC_PRE,DSV4_HC_POST",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "83d85d665",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/dsv4-hc/test-dsv4-hc-20260906T213038Z-4a3323.log",
+  "log_sha256": "b575c62a746ce2f048288bbb517cf346c28b1aca7b5c39d4252d3606c7f1cd46",
+  "log_bytes": 1830,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "cpu",
+    "tolerance": {
+      "source": "cuda-parity"
+    }
+  },
+  "extracted": {}
+}
