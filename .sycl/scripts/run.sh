@@ -261,7 +261,10 @@ deps_ensure_snippet() {
 # locally-stale copy of those would fight with `run.sh pull` — and the pull backup vault, which is
 # purely local safety history. Golden reference tensors are also held back from the main pass: they
 # are runner-generated, so they get their own --ignore-existing seeding pass (see do_sync) instead
-# of being overwritten by whatever copy this machine happens to hold.
+# of being overwritten by whatever copy this machine happens to hold. The GPU lock file is excluded
+# too: do_sync runs on every run_cmd call, and rsync's default temp-file+rename write replaces the
+# destination inode, which would silently drop any flock a concurrent job holds on the old inode
+# and hand the next job a fresh, unlocked file - defeating serialization entirely.
 PUSH_EXCLUDES=(
   --exclude '.git/'
   --exclude 'build/'
@@ -270,6 +273,7 @@ PUSH_EXCLUDES=(
   --exclude '.sycl/reports/'
   --exclude '.sycl/.pull-backups/'
   --exclude '.sycl/state/kernels/*/ref/'
+  --exclude '.sycl/.gpu-run.lock'
 )
 
 # Filter selecting exactly the golden-reference trees under .sycl/state/ (relative to .sycl/state/
