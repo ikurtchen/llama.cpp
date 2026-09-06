@@ -14,6 +14,7 @@
 #include "scale.hpp"
 #include "clamp.hpp"
 #include "unary.hpp"
+#include "rope.hpp"
 
 #include <sycl/sycl.hpp>
 
@@ -250,6 +251,9 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, ggml_tens
         case GGML_OP_LOG:
             ggml_sycl_op_log(ctx, dst);
             return true;
+        case GGML_OP_ROPE:
+            ggml_sycl_op_rope(ctx, dst);
+            return true;
         default:
             return false;
     }
@@ -401,6 +405,8 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_COS:
         case GGML_OP_LOG:
             return ggml_sycl_supports_unary_f32f16(op);
+        case GGML_OP_ROPE:
+            return ggml_sycl_supports_rope(op);
         default:
             return false;
     }

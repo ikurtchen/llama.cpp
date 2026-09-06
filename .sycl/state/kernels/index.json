@@ -690,12 +690,12 @@
       "id": "rope",
       "source": "ggml/src/ggml-cuda/rope.cu:rope_yarn,rope_vision,ggml_cuda_op_rope_impl,ggml_cuda_op_rope,ggml_cuda_op_rope_back,ggml_cuda_op_rope_fused",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "medium",
       "detail": ".sycl/state/kernels/rope.json",
       "loc": {
         "source_code": 578,
-        "sycl_code": 0
+        "sycl_code": 175
       }
     },
     {

@@ -6,9 +6,9 @@
 - **Benchmark GPU freq pinned**: True
 - **Build system**: cmake → SYCL build: set-up (ggml/src/ggml-sycl/ builds via icpx -fsycl, AOT bmg-g31, links oneMKL; registers as backend SYCL0)
 - **Phase**: migrate
-- **Updated**: 2026-09-06T16:27:05Z
+- **Updated**: 2026-09-06T16:34:01Z
 
-**Summary**: 75 kernels — 4 migrated, 0 optimized, 0 skipped, 0 needs-reference, 71 pending.
+**Summary**: 75 kernels — 5 migrated, 0 optimized, 0 skipped, 0 needs-reference, 70 pending.
 
 **Code migrated**: 15949 source code lines (76 files; attributed per kernel: cuda 16006) → 0 SYCL code lines (0 files)  ·  ratio 0.0×  ·  44.0% of the project's CUDA/Triton code lines  ·  measured 75/75 kernels
 
@@ -110,7 +110,7 @@
 | rms-norm | ggml/src/ggml-cuda/norm.cu:rms_norm_f32,rms_norm_back_f32,rms_norm_f32_cuda,rms_norm_back_f32_cuda,ggml_cuda_op_rms_norm,ggml_cuda_op_rms_norm_fused,ggml_cuda_op_rms_norm_fused_add,ggml_cuda_op_rms_norm_back | pending | - | - | 344→0 | - | - | Risk reason: reduction numerics plus fused broadcast epilogues need exact matching. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | rms-norm-rope | ggml/src/ggml-cuda/rope.cu:rms_norm_mul_rope_f32,rms_norm_mul_rope_cuda,ggml_cuda_op_rms_norm_mul_rope_fused | pending | - | - | 197→0 | - | - | Risk reason: fused norm + RoPE changes operation order and is hot-path relevant. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | roll | ggml/src/ggml-cuda/roll.cu:roll_f32_cuda,ggml_cuda_op_roll | pending | - | - | 43→0 | - | - | Risk reason: pure index remap. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
-| rope | ggml/src/ggml-cuda/rope.cu:rope_yarn,rope_vision,ggml_cuda_op_rope_impl,ggml_cuda_op_rope,ggml_cuda_op_rope_back,ggml_cuda_op_rope_fused | pending | - | - | 578→0 | - | - | Risk reason: several RoPE layouts, YaRN scaling, and fused view/set_rows behavior must all match the CPU backend. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
+| rope | ggml/src/ggml-cuda/rope.cu:rope_yarn,rope_vision,ggml_cuda_op_rope_impl,ggml_cuda_op_rope,ggml_cuda_op_rope_back,ggml_cuda_op_rope_fused | migrated | 282/282 passed (mode 0/2 all variants); mode 8/24/40 correctly report not-supported | - | 578→0 | - | - | Risk reason: several RoPE layouts, YaRN scaling, and fused view/set_rows behavior must all match the CPU backend. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated: NORMAL (mode=0) and NEOX (mode=2) only, with YaRN scaling and freq_factors, F32/F16, n_offs (partial rotary) supported. mrope/imrope/vision (mode=8/24/40) and rope_back not migrated - out of scope for Qwen3 dense text path, tracked as residual. |
 | scale | ggml/src/ggml-cuda/scale.cu:scale_f32,scale_f32_cuda,ggml_cuda_op_scale | migrated | pass | - | 0→0 | - | - | Risk reason: trivial pointwise multiply. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | set | ggml/src/ggml-cuda/set.cu:ggml_cuda_op_set | pending | - | - | 29→0 | - | - | Risk reason: mostly host-side view setup on top of existing copy helpers. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | set-rows | ggml/src/ggml-cuda/set-rows.cu:set_rows_cuda_quant,set_rows_cuda,ggml_cuda_op_set_rows | pending | - | - | 299→0 | - | - | Risk reason: indexed scatter into dense or quantized layouts needs careful addressing. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
@@ -133,8 +133,8 @@
 ## Agent efficiency & cost
 
 - **Elapsed**: 27m27s (whole run)  ·  **Active**: 13m14s (bracketed)  ·  **Cost**: $0.0  ·  **Tokens**: 0 (in 0 / out 0 / cache r 0 / cache w 0)  ·  **Premium requests**: 0  ·  **AI credits**: 0.0
-- **Observed (gen-progress heartbeat)**: span 42m34s  ·  working ≈ 42m34s (idle-capped 30m00s)  ·  5 snapshots — independent of metrics.sh
-  - ⚠️ bracketed active time (13m14s) is far below observed work (42m34s); phases were under-bracketed — trust elapsed/observed figures.
+- **Observed (gen-progress heartbeat)**: span 49m30s  ·  working ≈ 49m30s (idle-capped 30m00s)  ·  6 snapshots — independent of metrics.sh
+  - ⚠️ bracketed active time (13m14s) is far below observed work (49m30s); phases were under-bracketed — trust elapsed/observed figures.
 
 | phase | elapsed | active | tokens | requests | credits | USD |
 |-------|--------:|-------:|-------:|---------:|--------:|----:|
@@ -151,4 +151,5 @@
 | 2026-09-06T16:12:08Z | migrate | 0/0 | 0 | 0 | 0 |
 | 2026-09-06T16:21:47Z | migrate | 0/75 | 0 | 0 | 75 |
 | 2026-09-06T16:27:05Z | migrate | 4/75 | 0 | 0 | 71 |
+| 2026-09-06T16:34:01Z | migrate | 5/75 | 0 | 0 | 70 |
 

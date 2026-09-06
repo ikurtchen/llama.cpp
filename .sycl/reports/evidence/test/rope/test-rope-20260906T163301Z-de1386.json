@@ -1,0 +1,33 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-rope-20260906T163301Z-de1386",
+  "class": "test",
+  "subject": "rope",
+  "phase": "migrate",
+  "ts": "2026-09-06T16:33:18Z",
+  "duration_s": 16.778,
+  "command": "build/bin/test-backend-ops test -b SYCL0 -o ROPE",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "3e8986c07",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/rope/test-rope-20260906T163301Z-de1386.log",
+  "log_sha256": "32725387690ede4afae57a5df27e4c0cc9e6b35f8e1e18621974834d8e1704c8",
+  "log_bytes": 68958,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "CPU backend result (test-backend-ops built-in oracle)",
+    "tolerance": {
+      "source": "test-backend-ops default"
+    }
+  },
+  "extracted": {}
+}
