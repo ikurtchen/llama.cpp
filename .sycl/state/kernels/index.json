@@ -17,18 +17,12 @@
       "id": "add-id",
       "source": "ggml/src/ggml-cuda/add-id.cu:add_id_kernel,ggml_cuda_op_add_id",
       "source_lang": "cuda",
-      "status": "migrated",
+      "status": "pending",
       "risk": "low",
       "detail": ".sycl/state/kernels/add-id.json",
       "loc": {
         "source_code": 45,
         "sycl_code": 0
-      },
-      "target_style": "plain-sycl",
-      "sycl_file": "ggml/src/ggml-sycl/add-id.cpp",
-      "unit_test": {
-        "result": "pass",
-        "evidence": "test-add-id-20260906T193126Z-13fbbf"
       }
     },
     {
@@ -292,18 +286,12 @@
       "id": "diag",
       "source": "ggml/src/ggml-cuda/diag.cu:diag_kernel,ggml_cuda_op_diag",
       "source_lang": "cuda",
-      "status": "migrated",
+      "status": "pending",
       "risk": "low",
       "detail": ".sycl/state/kernels/diag.json",
       "loc": {
         "source_code": 60,
         "sycl_code": 0
-      },
-      "target_style": "plain-sycl",
-      "sycl_file": "ggml/src/ggml-sycl/diag.cpp",
-      "unit_test": {
-        "result": "pass",
-        "evidence": "test-diag-20260906T193056Z-fc25e8"
       }
     },
     {
@@ -334,18 +322,12 @@
       "id": "fill",
       "source": "ggml/src/ggml-cuda/fill.cu:fill_kernel,ggml_cuda_op_fill",
       "source_lang": "cuda",
-      "status": "migrated",
+      "status": "pending",
       "risk": "low",
       "detail": ".sycl/state/kernels/fill.json",
       "loc": {
         "source_code": 27,
         "sycl_code": 0
-      },
-      "target_style": "plain-sycl",
-      "sycl_file": "ggml/src/ggml-sycl/fill.cpp",
-      "unit_test": {
-        "result": "pass",
-        "evidence": "test-fill-20260906T193053Z-d567d4"
       }
     },
     {
@@ -626,18 +608,12 @@
       "id": "opt-step-sgd",
       "source": "ggml/src/ggml-cuda/opt-step-sgd.cu:opt_step_sgd_f32,opt_step_sgd_f32_cuda,ggml_cuda_opt_step_sgd",
       "source_lang": "cuda",
-      "status": "migrated",
+      "status": "pending",
       "risk": "low",
       "detail": ".sycl/state/kernels/opt-step-sgd.json",
       "loc": {
         "source_code": 34,
         "sycl_code": 0
-      },
-      "target_style": "plain-sycl",
-      "sycl_file": "ggml/src/ggml-sycl/opt-step-sgd.cpp",
-      "unit_test": {
-        "result": "pass",
-        "evidence": "test-opt-step-sgd-20260906T193123Z-bead5d"
       }
     },
     {
@@ -656,36 +632,24 @@
       "id": "pad",
       "source": "ggml/src/ggml-cuda/pad.cu:pad_f32,pad_f32_cuda,ggml_cuda_op_pad",
       "source_lang": "cuda",
-      "status": "migrated",
+      "status": "pending",
       "risk": "low",
       "detail": ".sycl/state/kernels/pad.json",
       "loc": {
         "source_code": 76,
         "sycl_code": 0
-      },
-      "target_style": "plain-sycl",
-      "sycl_file": "ggml/src/ggml-sycl/pad.cpp",
-      "unit_test": {
-        "result": "pass",
-        "evidence": "test-pad-20260906T193059Z-61f32b"
       }
     },
     {
       "id": "pad-reflect-1d",
       "source": "ggml/src/ggml-cuda/pad_reflect_1d.cu:ggml_cuda_op_pad_reflect_1d",
       "source_lang": "cuda",
-      "status": "migrated",
+      "status": "pending",
       "risk": "low",
       "detail": ".sycl/state/kernels/pad-reflect-1d.json",
       "loc": {
         "source_code": 23,
         "sycl_code": 0
-      },
-      "target_style": "plain-sycl",
-      "sycl_file": "ggml/src/ggml-sycl/pad_reflect_1d.cpp",
-      "unit_test": {
-        "result": "pass",
-        "evidence": "test-pad-reflect-1d-20260906T193103Z-4e54c5"
       }
     },
     {
@@ -763,18 +727,12 @@
       "id": "roll",
       "source": "ggml/src/ggml-cuda/roll.cu:roll_f32_cuda,ggml_cuda_op_roll",
       "source_lang": "cuda",
-      "status": "migrated",
+      "status": "pending",
       "risk": "low",
       "detail": ".sycl/state/kernels/roll.json",
       "loc": {
         "source_code": 43,
         "sycl_code": 0
-      },
-      "target_style": "plain-sycl",
-      "sycl_file": "ggml/src/ggml-sycl/roll.cpp",
-      "unit_test": {
-        "result": "pass",
-        "evidence": "test-roll-20260906T193105Z-7a21a1"
       }
     },
     {
@@ -811,18 +769,12 @@
       "id": "set",
       "source": "ggml/src/ggml-cuda/set.cu:ggml_cuda_op_set",
       "source_lang": "cuda",
-      "status": "migrated",
+      "status": "pending",
       "risk": "low",
       "detail": ".sycl/state/kernels/set.json",
       "loc": {
         "source_code": 29,
         "sycl_code": 0
-      },
-      "target_style": "plain-sycl",
-      "sycl_file": "ggml/src/ggml-sycl/set.cpp",
-      "unit_test": {
-        "result": "pass",
-        "evidence": "test-set-20260906T193108Z-b33110"
       }
     },
     {
@@ -841,36 +793,24 @@
       "id": "snake",
       "source": "ggml/src/ggml-cuda/snake.cu:snake_kernel,launch_snake,ggml_cuda_op_snake_fused",
       "source_lang": "cuda",
-      "status": "migrated",
+      "status": "pending",
       "risk": "low",
       "detail": ".sycl/state/kernels/snake.json",
       "loc": {
         "source_code": 53,
         "sycl_code": 0
-      },
-      "target_style": "plain-sycl",
-      "sycl_file": "ggml/src/ggml-sycl/snake.cpp",
-      "unit_test": {
-        "result": "pass",
-        "evidence": "test-snake-20260906T193117Z-174763"
       }
     },
     {
       "id": "softcap",
       "source": "ggml/src/ggml-cuda/softcap.cu:softcap_f32,softcap_f32_cuda,ggml_cuda_op_softcap",
       "source_lang": "cuda",
-      "status": "migrated",
+      "status": "pending",
       "risk": "low",
       "detail": ".sycl/state/kernels/softcap.json",
       "loc": {
         "source_code": 27,
         "sycl_code": 0
-      },
-      "target_style": "plain-sycl",
-      "sycl_file": "ggml/src/ggml-sycl/softcap.cpp",
-      "unit_test": {
-        "result": "pass",
-        "evidence": "test-softcap-20260906T193120Z-756068"
       }
     },
     {
@@ -973,36 +913,24 @@
       "id": "tri",
       "source": "ggml/src/ggml-cuda/tri.cu:tri_kernel,tri_cuda,ggml_cuda_op_tri",
       "source_lang": "cuda",
-      "status": "migrated",
+      "status": "pending",
       "risk": "low",
       "detail": ".sycl/state/kernels/tri.json",
       "loc": {
         "source_code": 119,
         "sycl_code": 0
-      },
-      "target_style": "plain-sycl",
-      "sycl_file": "ggml/src/ggml-sycl/tri.cpp",
-      "unit_test": {
-        "result": "pass",
-        "evidence": "test-tri-20260906T193111Z-2d23cd"
       }
     },
     {
       "id": "tsembd",
       "source": "ggml/src/ggml-cuda/tsembd.cu:timestep_embedding_f32,timestep_embedding_f32_cuda,ggml_cuda_op_timestep_embedding",
       "source_lang": "cuda",
-      "status": "migrated",
+      "status": "pending",
       "risk": "low",
       "detail": ".sycl/state/kernels/tsembd.json",
       "loc": {
         "source_code": 35,
         "sycl_code": 0
-      },
-      "target_style": "plain-sycl",
-      "sycl_file": "ggml/src/ggml-sycl/tsembd.cpp",
-      "unit_test": {
-        "result": "pass",
-        "evidence": "test-tsembd-20260906T193114Z-79c7f3"
       }
     },
     {
