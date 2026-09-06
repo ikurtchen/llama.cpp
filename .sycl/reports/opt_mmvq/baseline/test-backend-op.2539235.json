@@ -1,0 +1,2 @@
+{ "traceEvents":[
+{"ph": "M", "name": "process_name", "pid": 2539235, "ts": 1788777853660805.750000, "args": {"name": "HOST<cripoc02>"}}

@@ -6,7 +6,7 @@
 - **Benchmark GPU freq pinned**: True
 - **Build system**: cmake → SYCL build: set-up (ggml/src/ggml-sycl/ builds via icpx -fsycl, AOT bmg-g31, links oneMKL; registers as backend SYCL0)
 - **Phase**: optimize
-- **Updated**: 2026-09-06T22:41:28Z
+- **Updated**: 2026-09-06T23:06:36Z
 
 **Summary**: 76 kernels — 73 migrated, 0 optimized, 2 skipped, 0 needs-reference, 0 pending.
 
@@ -58,7 +58,7 @@
 
 | id | source | status | unit test | impact % | LOC (src→sycl) | baseline | optimized | notes |
 |----|--------|--------|-----------|----------|----------------|----------|-----------|-------|
-| mmvq | ggml/src/ggml-cuda/mmvq.cu:get_vdr_mmvq,get_mmvq_mmid_max_batch_pascal_older,get_mmvq_mmid_max_batch_turing_plus,get_mmvq_mmid_max_batch_gcn,get_mmvq_mmid_max_batch_cdna,get_mmvq_mmid_max_batch_rdna1_rdna2,get_mmvq_mmid_max_batch_rdna3,get_mmvq_mmid_max_batch_rdna4,get_mmvq_mmid_max_batch,ggml_cuda_should_use_mmvq,get_mmvq_mmid_max_batch_for_device,calc_nwarps,calc_rows_per_block,mul_mat_vec_q,mul_mat_vec_q_moe,mul_mat_vec_q_switch_fusion,mul_mat_vec_q_moe_launch,mul_mat_vec_q_switch_ncols_dst,mul_mat_vec_q_switch_type,ggml_cuda_mul_mat_vec_q,ggml_cuda_op_mul_mat_vec_q | migrated | pass | 49.8 | 2542→898 | - | - | Q8_0 low-batch GGML_OP_MUL_MAT reuses the same dequantize-to-F32 plus oneMKL GEMM path in ggml/src/ggml-sycl/mmf.cpp. This covers the decode-style n=1 matrix-vector path that CUDA routes through mmvq.cu. Other quantized src0 types remain residual by scope. |
+| mmvq | ggml/src/ggml-cuda/mmvq.cu:get_vdr_mmvq,get_mmvq_mmid_max_batch_pascal_older,get_mmvq_mmid_max_batch_turing_plus,get_mmvq_mmid_max_batch_gcn,get_mmvq_mmid_max_batch_cdna,get_mmvq_mmid_max_batch_rdna1_rdna2,get_mmvq_mmid_max_batch_rdna3,get_mmvq_mmid_max_batch_rdna4,get_mmvq_mmid_max_batch,ggml_cuda_should_use_mmvq,get_mmvq_mmid_max_batch_for_device,calc_nwarps,calc_rows_per_block,mul_mat_vec_q,mul_mat_vec_q_moe,mul_mat_vec_q_switch_fusion,mul_mat_vec_q_moe_launch,mul_mat_vec_q_switch_ncols_dst,mul_mat_vec_q_switch_type,ggml_cuda_mul_mat_vec_q,ggml_cuda_op_mul_mat_vec_q | migrated | pass | 49.8 | 2542→898 | {'metric': 'us/run (MUL_MAT q8_0 m=4096,n=1,k=14336 decode)', 'value': 1140.18, 'evidence': 'bench-mmvq-20260906T225238Z-d327b0'} | {'metric': 'us/run (MUL_MAT q8_0 m=4096,n=1,k=14336 decode)', 'value': 441.77, 'evidence': 'bench-mmvq-20260906T225331Z-401bed'} | Q8_0 low-batch GGML_OP_MUL_MAT reuses the same dequantize-to-F32 plus oneMKL GEMM path in ggml/src/ggml-sycl/mmf.cpp. This covers the decode-style n=1 matrix-vector path that CUDA routes through mmvq.cu. Other quantized src0 types remain residual by scope. |
 | flash-attn-vec | ggml/src/ggml-cuda/fattn.cu:ggml_cuda_flash_attn_ext_vec | migrated | pass | 17.2 | 500→0 | - | - | Risk reason: warp-level softmax, quantized K/V handling, and head-size templating make this a complex direct-attention port. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated as one unified plain-SYCL online-softmax kernel in ggml/src/ggml-sycl/fattn.cpp with the public declaration in fattn.hpp, instead of mirroring CUDA's separate vec/tile/mma/common dispatch split. This SYCL path permanently registers GGML_OP_FLASH_ATTN_EXT in ggml/src/ggml-sycl/ggml-sycl.cpp. Scope is the dense decoder path only: Q=f32/f16, K/V=f16, dst=f32, additive mask, ALiBi, and GQA for head dims 64/80/128. Residual/waiver: Q8_0 KV-cache variants (f16-q8_0, q8_0-f16, q8_0-q8_0), sinks, logit softcap, sparse n_kv_max mask compaction/streamed fixup, and the full CUDA MMA feature matrix are not implemented; those configurations fall back. |
 | rms-norm | ggml/src/ggml-cuda/norm.cu:rms_norm_f32,rms_norm_back_f32,rms_norm_f32_cuda,rms_norm_back_f32_cuda,ggml_cuda_op_rms_norm,ggml_cuda_op_rms_norm_fused,ggml_cuda_op_rms_norm_fused_add,ggml_cuda_op_rms_norm_back | migrated | pass | 6.7 | 344→0 | - | - | Risk reason: reduction numerics plus fused broadcast epilogues need exact matching. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | getrows | ggml/src/ggml-cuda/getrows.cu:k_get_rows,k_get_rows_kq,k_get_rows_float,k_get_rows_float_vec,k_get_rows_back_float,get_rows_cuda_q,get_rows_cuda_kq,get_rows_cuda_float,ggml_cuda_get_rows_switch_src0_type,get_rows_cuda,ggml_cuda_op_get_rows,ggml_cuda_op_get_rows_back | migrated | pass | 6.6 | 419→224 | - | - | Risk reason: forward uses many type/layout cases and backward performs index-based reductions. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated the forward GET_ROWS path for dense F32/F16 and quantized Q8_0 src0 tensors, including the batched/broadcast cases exercised by the inherited test-backend-ops harness. Current evidence run executed 13/13 supported GET_ROWS cases on SYCL0 with no ERR lines and no DEVICE_LOST crash. Residuals: BF16, I32, non-Q8_0 quantized src0 types, GET_ROWS_BACK, and non-contiguous src1 layouts that fail the current ggml_is_contiguous(src1) gate (for example v=1 cases with be1=7). |
@@ -104,7 +104,7 @@
 | mean | ggml/src/ggml-cuda/mean.cu:divide_by_count | migrated | pass | - | 85→0 | - | - | Risk reason: reduction path switches between CUB and custom row reduction. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Scope matches CUDA: requires ggml_is_contiguous(src0). |
 | mmf | ggml/src/ggml-cuda/mmf.cu:mmf_get_rows_per_block,ggml_cuda_mul_mat_f,ggml_cuda_should_use_mmf | migrated | pass | - | 603→292 | - | - | oneMKL-backed dense GGML_OP_MUL_MAT for src0 in F32/F16, src1 in F32, dst in F32. Handles batched and broadcast cases with GEMM/GEMM_BATCH. Reference oracle: ggml-cpu backend via tests/test-backend-ops. BF16 src0, quantized src0, MUL_MAT_ID, and CUDA-only fused epilogues remain residual. |
 | mmid | ggml/src/ggml-cuda/mmid.cu:mm_ids_helper,launch_mm_ids_helper,ggml_cuda_launch_mm_ids_helper | migrated | pass | - | 126→91 | - | - | Risk reason: routing compaction and inverse-map options must match MoE matmul expectations exactly. Reference oracle: ggml-cpu backend via tests/test-backend-ops. SYCL ports the mmid helper in mmid.cpp and uses it to compact expert groups for the oneMKL-backed MUL_MAT_ID path in mmf.cpp. |
-| mmq | ggml/src/ggml-cuda/mmq.cu:ggml_cuda_mul_mat_q_switch_type,ggml_cuda_mul_mat_q,ggml_cuda_should_use_mmq | migrated | pass | - | 1933→898 | - | - | Q8_0 quantized GGML_OP_MUL_MAT is migrated in ggml/src/ggml-sycl/mmf.cpp by dequantizing src0 to F32 with the shared SYCL dequantize helpers and then calling oneMKL GEMM. This is the correctness-first migrate-phase implementation for quantized weights; a quantized-native MMA kernel is deferred to optimize phase. Q8_0 GGML_OP_MUL_MAT_ID uses the same backend file and was also validated separately with build/bin/test-backend-ops -b SYCL0 -o MUL_MAT_ID -p 'type_a=q8_0' (75/75 passed). Other quantized src0 types remain residual by scope. |
+| mmq | ggml/src/ggml-cuda/mmq.cu:ggml_cuda_mul_mat_q_switch_type,ggml_cuda_mul_mat_q,ggml_cuda_should_use_mmq | migrated | pass | - | 1933→898 | - | - | Q8_0 quantized GGML_OP_MUL_MAT is migrated in ggml/src/ggml-sycl/mmf.cpp by dequantizing src0 to F32 with the shared SYCL dequantize helpers and then calling oneMKL GEMM. This is the correctness-first migrate-phase implementation for quantized weights; a quantized-native MMA kernel is deferred to optimize phase. Q8_0 GGML_OP_MUL_MAT_ID uses the same backend file and was also validated separately with build/bin/test-backend-ops -b SYCL0 -o MUL_MAT_ID -p 'type_a=q8_0' (75/75 passed). Other quantized src0 types remain residual by scope. [optimize phase update] The decode-dominated small-n (n<=8) case now uses a fused quantized mat-vec kernel instead of dequant+GEMM (see kernels/mmvq.json performance block, optimization/mmvq.json) -- 2.58x speedup on the e2e-dominant n=1 shape. The large-n/prefill path (n=512 benchmarked) is unchanged and still uses dequantize+oneMKL GEMM; a quantized-native GEMM (e.g. int8 MMA/XMX) for that batched case remains residual/deferred. |
 | mmvf | ggml/src/ggml-cuda/mmvf.cu:mul_mat_vec_f,mul_mat_vec_f_switch_fusion,launch_mul_mat_vec_f_cuda,mul_mat_vec_f_cuda_switch_ncols_dst,mul_mat_vec_f_cuda,ggml_cuda_mul_mat_vec_f,ggml_cuda_op_mul_mat_vec_f,ggml_cuda_should_use_mmvf | migrated | pass | - | 783→292 | - | - | Low-batch non-quantized plain GGML_OP_MUL_MAT is covered by the same oneMKL implementation in ggml/src/ggml-sycl/mmf.cpp rather than a separate bespoke mat-vec kernel. This covers the unfused F32/F16 src0 + F32 src1 -> F32 dst path exercised by test-backend-ops. CUDA-only fused epilogues, BF16 src0, and MUL_MAT_ID remain residual. |
 | moe-weighted-reduction | ggml/src/ggml-cuda/moe-weighted-reduction.cu:moe_weighted_reduction_f32,launch_moe_weighted_reduction,ggml_cuda_op_moe_weighted_reduction | migrated | pass | - | 63→190 | - | - | Risk reason: modest routing/index math but no unusual CUDA primitives. Reference oracle: ggml-cpu backend via tests/test-backend-ops. SYCL mirrors CUDA as a graph-fused path from ggml_backend_sycl_graph_compute() rather than a standalone GGML op switch case. |
 | opt-step-adamw | ggml/src/ggml-cuda/opt-step-adamw.cu:opt_step_adamw_f32,opt_step_adamw_f32_cuda,ggml_cuda_opt_step_adamw | migrated | pass | - | 61→83 | - | - | Risk reason: fused optimizer math must preserve update order but is otherwise elementwise. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
@@ -138,7 +138,7 @@
 ## Agent efficiency & cost
 
 - **Elapsed**: 5h02m01s (whole run)  ·  **Active**: 4h30m37s (bracketed)  ·  **Cost**: $0.0  ·  **Tokens**: 256612832 (in 8803075 / out 1255396 / cache r 245376631 / cache w 1177730)  ·  **Premium requests**: 2017  ·  **AI credits**: 2011.0
-- **Observed (gen-progress heartbeat)**: span 6h56m57s  ·  working ≈ 5h55m44s (idle-capped 30m00s)  ·  40 snapshots — independent of metrics.sh
+- **Observed (gen-progress heartbeat)**: span 7h22m05s  ·  working ≈ 6h20m52s (idle-capped 30m00s)  ·  41 snapshots — independent of metrics.sh
 
 | phase | elapsed | active | tokens | requests | credits | USD |
 |-------|--------:|-------:|-------:|---------:|--------:|----:|
@@ -151,7 +151,6 @@
 <!-- append-only from logs/progress.jsonl — one row per gen-progress run -->
 | time (UTC) | phase | migrated | optimized | skipped | pending |
 |------------|-------|---------:|----------:|--------:|--------:|
-| 2026-09-06T21:31:38Z | migrate | 51/76 | 0 | 1 | 23 |
 | 2026-09-06T21:32:17Z | migrate | 52/76 | 0 | 1 | 22 |
 | 2026-09-06T21:32:28Z | migrate | 57/76 | 0 | 1 | 17 |
 | 2026-09-06T21:36:27Z | migrate | 57/76 | 0 | 1 | 17 |
@@ -163,6 +162,7 @@
 | 2026-09-06T22:07:18Z | profile-e2e | 73/76 | 0 | 2 | 0 |
 | 2026-09-06T22:40:50Z | profile-e2e | 73/76 | 0 | 2 | 0 |
 | 2026-09-06T22:41:28Z | optimize | 73/76 | 0 | 2 | 0 |
+| 2026-09-06T23:06:36Z | optimize | 73/76 | 0 | 2 | 0 |
 
 ## Lessons
 
@@ -198,4 +198,30 @@ at push time), so `make`/`ninja` saw the source as "not modified" and skipped re
 -- the stale binary kept running with no error. Symptom: a code change appears to have zero effect.
 Fix: `touch` the source file on the remote host (or otherwise force its mtime past the existing
 object's) immediately before every build when local/remote clocks might disagree.
+
+## optimize/mmvq: unitrace segfaults specifically on oneMKL-calling kernels
+
+Building on the earlier unitrace finding (segfaults during e2e model load): the crash reproduces on
+a **single-kernel** `test-backend-ops perf` driver too, but only for the kernel that calls into
+oneMKL's GEMM dispatch (the old dequant+GEMM MUL_MAT q8_0 path). The exact same driver, same
+`--metric-query` flags, profiling the new oneMKL-free fused kernel instead, completes cleanly with
+real HW counters. This narrows the earlier "unitrace crashes on this runner" finding to something
+that fires specifically when the profiled binary calls oneMKL -- worth checking first if unitrace
+crashes on a new kernel: does it call oneMKL/oneDNN?
+
+## optimize/mmvq: mul_mat q8_0 decode fast path (fused mat-vec kernel)
+
+For Q8_0 MUL_MAT with a small number of RHS columns (n<=8, i.e. decode/n=1 and speculative-decode-
+sized batches), the existing dequantize-to-F32-scratch + oneMKL GEMM path forces ~2x(ne00*ne01)
+bytes of pure F32 scratch traffic (write the dequantized matrix, then read it back for the GEMM) for
+a single output vector -- e.g. ~470 MB moved for m=4096,k=14336. Replacing it with a fused kernel
+that reads the quantized `block_q8_0` bytes directly and accumulates the dot product in registers
+(one work-group per output row, `sycl::reduce_over_group` for the final reduction) cuts this to
+O(ne00*ne01) quantized bytes only, no scratch buffer, no extra kernel launch, no GEMM call.
+Measured: 2.58x on the n=1 shape (1140us -> 442us), unaffected n=512/prefill shape (unchanged code
+path). Deep-profile of the fused kernel (unitrace --metric-query, VectorEngineStalls group) shows
+XVE_STALL ~87% dominated by SBID (~77%) and SendWr (~54%) stalls despite only ~131+41 GB/s achieved
+(well under B70's ~456 GB/s peak) -- i.e. still latency-bound on scattered per-lane scalar loads
+(`blk.qs[l]`, `yv[l]`), not bandwidth-saturated. A vectorized-load rewrite is a plausible next step
+(residual work), not pursued here due to time-boxing.
 

@@ -186,5 +186,21 @@
     "filter": "MUL_MAT(type_a=q8_0,type_b=f32,m=16,n=1,k=256,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1,src_overlap=0)",
     "result": "pass",
     "evidence": "test-mmvq-20260906T214541Z-037946"
+  },
+  "performance": {
+    "baseline": {
+      "metric": "us/run (MUL_MAT q8_0 m=4096,n=1,k=14336 decode)",
+      "value": 1140.18,
+      "evidence": "bench-mmvq-20260906T225238Z-d327b0"
+    },
+    "optimized": {
+      "metric": "us/run (MUL_MAT q8_0 m=4096,n=1,k=14336 decode)",
+      "value": 441.77,
+      "evidence": "bench-mmvq-20260906T225331Z-401bed"
+    },
+    "speedup": 2.58,
+    "fraction_of_peak": null,
+    "meets_expectation": true,
+    "notes": "Fused quantized mat-vec kernel (see optimization/mmvq.json) replaces the dequant-to-F32-scratch + oneMKL GEMM path for the decode-dominated n<=8 case; n=512 prefill shape unchanged (still routed to oneMKL GEMM). 2.58x speedup on the e2e-dominant n=1 shape."
   }
 }

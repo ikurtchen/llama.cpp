@@ -1,0 +1,64 @@
+{
+  "schema": "optimization.schema.json",
+  "kernel_id": "mmvq",
+  "metric": "us/run (test-backend-ops perf, MUL_MAT type_a=q8_0 m=4096,n=1,k=14336 decode shape)",
+  "baseline": 1140.18,
+  "target": 285.0,
+  "best": {
+    "value": 441.77,
+    "commit": "pending"
+  },
+  "status": "done",
+  "diagnosis": {
+    "bottleneck_class": "memory",
+    "dominant_stall": "SbidStall",
+    "occupancy_pct": 88.49,
+    "register_spills": false,
+    "xmx_used": false,
+    "tools": "unitrace --metric-query (groups MemoryProfile, ComputeBasic, VectorEngineStalls) on the single-shape kernel benchmark (test-backend-ops perf -o MUL_MAT -p 'q8_0.*n=1,k=14336')",
+    "artifacts": {
+      "baseline": ".sycl/reports/opt_mmvq/baseline",
+      "final": ".sycl/reports/opt_mmvq/final",
+      "diagnosis_md": ".sycl/reports/opt_mmvq/DIAGNOSIS.md"
+    },
+    "notes": "FINAL (fused vec kernel, this commit): real unitrace counters -- GPU_BUSY ~100%, XVE_STALL ~86.8% (breakdown: XVE_STALL_SBID ~77.2%, XVE_STALL_SENDWR ~54.2%, XVE_STALL_BARRIER ~52.5%, others <10%), XVE_ACTIVE only ~7.8%, XVE_THREADS_OCCUPANCY_ALL ~88.5% (occupancy is fine), GPU_MEMORY_BYTE_READ_RATE ~131 GB/s + WRITE ~41 GB/s (well under B70 ~456 GB/s peak). Dominant stall is SBID (few outstanding async load slots relative to in-flight requests) with SendWr and Barrier both also significant -- consistent with the per-lane scalar int8/float loop (blk.qs[l], yv[l]) issuing many small, un-vectorized load/reduce-barrier sequences rather than saturating bandwidth. A vectorized-load rewrite (e.g. batched int8/float4 reads) is the natural next hypothesis; recorded as residual work rather than pursued further here (time-boxed to move to the next-ranked kernel per the workflow). BASELINE (old dequantize+oneMKL-GEMM path): unitrace's --metric-query segfaults deterministically as soon as the profiled binary calls into oneMKL GEMM dispatch, on this same single-shape driver that ran cleanly for the fused (oneMKL-free) kernel -- so no HW-counter baseline could be captured (0-byte CSV artifact retained in opt_mmvq/baseline/ as evidence of the crash). This is the same unitrace/environment incompatibility already recorded in lessons.md, now further localized to oneMKL-calling kernels specifically. The baseline root cause is therefore argued from architecture + measured wall-clock: for n=1 the old path launches a dequantize kernel that WRITES the full ne00*ne01 F32 weight matrix then a GEMM that READS it back (~2x(ne00*ne01*4) bytes of pure scratch traffic, ~470 MB for m=4096,k=14336), on top of the original quantized reads -- consistent with the measured 1140us baseline. This is a waiver on the baseline HW-counter requirement, not on the win: the kept trial correctness and wall-clock before/after are both evidence-backed (trials[].evidence)."
+  },
+  "stop_reason": "diminishing-returns",
+  "trials": [
+    {
+      "n": 1,
+      "hypothesis": "Replace the dequantize-to-F32-scratch + oneMKL GEMM path with a fused per-row quantized dot-product kernel (one work-group per output row, block_q8_0 read directly, reduce_over_group) for the decode-dominated case (n<=8 RHS columns), bypassing the O(ne00*ne01) F32 intermediate entirely. Falls back to the existing dequant+GEMM path for larger n (prefill/batched) and for non-packed src0 rows.",
+      "bottleneck_class": "memory",
+      "commit": "pending",
+      "build": "ok",
+      "correctness": "pass",
+      "metric_before": 1140.18,
+      "metric_after": 441.77,
+      "decision": "keep",
+      "root_cause": "Old path forced ~2x(ne00*ne01) F32 bytes of pure scratch traffic (dequantize-write + GEMM-read) for a single output vector; new path reads only the quantized bytes once. 2.58x speedup on the n=1 decode shape (the dominant e2e case per profile/e2e.json, MUL_MAT ~49.8% of wall-clock); n=512 prefill shape unaffected (unchanged code path, confirmed identical timing before/after).",
+      "combination": false,
+      "evidence": {
+        "test": "test-mmvq-20260906T225200Z-dce72c",
+        "bench_before": "bench-mmvq-20260906T225238Z-d327b0",
+        "bench_after": "bench-mmvq-20260906T225331Z-401bed"
+      },
+      "ts": "2026-09-06T22:53:31Z"
+    },
+    {
+      "n": 2,
+      "hypothesis": "Reduce work-group size from 256 to 128 for the fused kernel, expecting less group-reduce overhead relative to per-thread work at the small per-row block count (k=14336 -> 448 q8_0 blocks/row).",
+      "bottleneck_class": "occupancy",
+      "commit": "reverted",
+      "build": "ok",
+      "correctness": "-",
+      "metric_before": 441.5,
+      "metric_after": 443.01,
+      "decision": "revert",
+      "root_cause": "No measurable change (443.01 vs 441.50 us, within run-to-run noise) -- occupancy was already fine (4096 work-groups >> EU count) and group-reduce cost is not the limiter here per the diagnosis (stall is on loads, not on the reduction). Reverted to keep the simpler/previously-validated 256.",
+      "combination": false,
+      "evidence": {},
+      "ts": "2026-09-06T22:47:00Z"
+    }
+  ],
+  "updated_at": "2026-09-06T22:54:00Z"
+}

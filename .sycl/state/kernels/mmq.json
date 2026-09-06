@@ -70,7 +70,7 @@
     "kind": "cpu",
     "crosscheck": "-"
   },
-  "notes": "Q8_0 quantized GGML_OP_MUL_MAT is migrated in ggml/src/ggml-sycl/mmf.cpp by dequantizing src0 to F32 with the shared SYCL dequantize helpers and then calling oneMKL GEMM. This is the correctness-first migrate-phase implementation for quantized weights; a quantized-native MMA kernel is deferred to optimize phase. Q8_0 GGML_OP_MUL_MAT_ID uses the same backend file and was also validated separately with build/bin/test-backend-ops -b SYCL0 -o MUL_MAT_ID -p 'type_a=q8_0' (75/75 passed). Other quantized src0 types remain residual by scope.",
+  "notes": "Q8_0 quantized GGML_OP_MUL_MAT is migrated in ggml/src/ggml-sycl/mmf.cpp by dequantizing src0 to F32 with the shared SYCL dequantize helpers and then calling oneMKL GEMM. This is the correctness-first migrate-phase implementation for quantized weights; a quantized-native MMA kernel is deferred to optimize phase. Q8_0 GGML_OP_MUL_MAT_ID uses the same backend file and was also validated separately with build/bin/test-backend-ops -b SYCL0 -o MUL_MAT_ID -p 'type_a=q8_0' (75/75 passed). Other quantized src0 types remain residual by scope. [optimize phase update] The decode-dominated small-n (n<=8) case now uses a fused quantized mat-vec kernel instead of dequant+GEMM (see kernels/mmvq.json performance block, optimization/mmvq.json) -- 2.58x speedup on the e2e-dominant n=1 shape. The large-n/prefill path (n=512 benchmarked) is unchanged and still uses dequantize+oneMKL GEMM; a quantized-native GEMM (e.g. int8 MMA/XMX) for that batched case remains residual/deferred.",
   "updated_at": "2026-09-06T21:46:32Z",
   "loc": {
     "source_lang": "cuda",

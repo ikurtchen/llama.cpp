@@ -1,0 +1,34 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-mmvq-20260906T225348Z-f82d4b",
+  "class": "test",
+  "subject": "mmvq",
+  "label": "final",
+  "phase": "optimize",
+  "ts": "2026-09-06T22:57:28Z",
+  "duration_s": 219.866,
+  "command": "./build/bin/test-backend-ops -b SYCL0",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "3aacda67e",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/mmvq/test-mmvq-20260906T225348Z-f82d4b.log",
+  "log_sha256": "2503f5af1bd96396ed4721ca10fb3ce3e81f5c8f43e90d81c0babbfa7870f1b9",
+  "log_bytes": 2000050,
+  "log_truncated": true,
+  "artifacts": [],
+  "measurements": {
+    "reference": "test-backend-ops built-in CPU reference",
+    "tolerance": {
+      "source": "tests/test-backend-ops.cpp"
+    }
+  },
+  "extracted": {}
+}

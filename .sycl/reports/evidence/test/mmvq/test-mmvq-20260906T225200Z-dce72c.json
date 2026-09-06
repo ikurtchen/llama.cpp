@@ -1,0 +1,37 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-mmvq-20260906T225200Z-dce72c",
+  "class": "test",
+  "subject": "mmvq",
+  "label": "trial-1-fused-vec-kernel",
+  "phase": "optimize",
+  "ts": "2026-09-06T22:52:03Z",
+  "duration_s": 3.512,
+  "command": "./build/bin/test-backend-ops -b SYCL0 -o MUL_MAT -p type_a=q8_0",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "3aacda67e",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/mmvq/test-mmvq-20260906T225200Z-dce72c.log",
+  "log_sha256": "b040c346b7925924a74438a4fa88eac1734c72cef5add44f83206e56f205a260",
+  "log_bytes": 11430,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "test-backend-ops built-in CPU reference (ggml_backend_compare_graph_backend)",
+    "tolerance": {
+      "source": "tests/test-backend-ops.cpp"
+    },
+    "shape": "m=4096..8192,n=1..512,k=5120..14336,bs=q8_0",
+    "dtype": "q8_0",
+    "seed": 0
+  },
+  "extracted": {}
+}

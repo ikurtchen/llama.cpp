@@ -1,0 +1,32 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "bench-mmvq-20260906T225331Z-401bed",
+  "class": "bench",
+  "subject": "mmvq",
+  "label": "trial-1-after",
+  "phase": "optimize",
+  "ts": "2026-09-06T22:53:42Z",
+  "duration_s": 11.086,
+  "command": "./build/bin/test-backend-ops perf -b SYCL0 -o MUL_MAT -p type_a=q8_0",
+  "via": "run.sh bench",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "3aacda67e",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "recorded",
+  "log": "evidence/bench/mmvq/bench-mmvq-20260906T225331Z-401bed.log",
+  "log_sha256": "489a71de278b1fc081e63e2a17f25361f51f9b0c7334b6486a6129d38d5ac469",
+  "log_bytes": 2417,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "tflops": 18.11,
+    "shape": "m=4096,n=1,k=14336,bs=q8_0-decode"
+  },
+  "extracted": {}
+}

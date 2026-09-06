@@ -30,3 +30,29 @@ at push time), so `make`/`ninja` saw the source as "not modified" and skipped re
 -- the stale binary kept running with no error. Symptom: a code change appears to have zero effect.
 Fix: `touch` the source file on the remote host (or otherwise force its mtime past the existing
 object's) immediately before every build when local/remote clocks might disagree.
+
+## optimize/mmvq: unitrace segfaults specifically on oneMKL-calling kernels
+
+Building on the earlier unitrace finding (segfaults during e2e model load): the crash reproduces on
+a **single-kernel** `test-backend-ops perf` driver too, but only for the kernel that calls into
+oneMKL's GEMM dispatch (the old dequant+GEMM MUL_MAT q8_0 path). The exact same driver, same
+`--metric-query` flags, profiling the new oneMKL-free fused kernel instead, completes cleanly with
+real HW counters. This narrows the earlier "unitrace crashes on this runner" finding to something
+that fires specifically when the profiled binary calls oneMKL -- worth checking first if unitrace
+crashes on a new kernel: does it call oneMKL/oneDNN?
+
+## optimize/mmvq: mul_mat q8_0 decode fast path (fused mat-vec kernel)
+
+For Q8_0 MUL_MAT with a small number of RHS columns (n<=8, i.e. decode/n=1 and speculative-decode-
+sized batches), the existing dequantize-to-F32-scratch + oneMKL GEMM path forces ~2x(ne00*ne01)
+bytes of pure F32 scratch traffic (write the dequantized matrix, then read it back for the GEMM) for
+a single output vector -- e.g. ~470 MB moved for m=4096,k=14336. Replacing it with a fused kernel
+that reads the quantized `block_q8_0` bytes directly and accumulates the dot product in registers
+(one work-group per output row, `sycl::reduce_over_group` for the final reduction) cuts this to
+O(ne00*ne01) quantized bytes only, no scratch buffer, no extra kernel launch, no GEMM call.
+Measured: 2.58x on the n=1 shape (1140us -> 442us), unaffected n=512/prefill shape (unchanged code
+path). Deep-profile of the fused kernel (unitrace --metric-query, VectorEngineStalls group) shows
+XVE_STALL ~87% dominated by SBID (~77%) and SendWr (~54%) stalls despite only ~131+41 GB/s achieved
+(well under B70's ~456 GB/s peak) -- i.e. still latency-bound on scattered per-lane scalar loads
+(`blk.qs[l]`, `yv[l]`), not bandwidth-saturated. A vectorized-load rewrite is a plausible next step
+(residual work), not pursued here due to time-boxing.
