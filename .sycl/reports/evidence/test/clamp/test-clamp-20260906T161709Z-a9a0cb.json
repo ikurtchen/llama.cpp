@@ -1,0 +1,34 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-clamp-20260906T161709Z-a9a0cb",
+  "class": "test",
+  "subject": "clamp",
+  "phase": "migrate",
+  "ts": "2026-09-06T16:17:12Z",
+  "duration_s": 2.726,
+  "command": "build/bin/test-backend-ops test -b SYCL0 -o CLAMP",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "f6a043132",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/clamp/test-clamp-20260906T161709Z-a9a0cb.log",
+  "log_sha256": "9568e80734cabaa28c297a3371073585504da07bf7e7eeb99e20c6fd96d47b60",
+  "log_bytes": 1455,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "min_ms": -0.5,
+    "reference": "CPU backend result (test-backend-ops built-in oracle)",
+    "tolerance": {
+      "source": "test-backend-ops default"
+    }
+  },
+  "extracted": {}
+}

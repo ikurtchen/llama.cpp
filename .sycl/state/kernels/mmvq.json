@@ -1,0 +1,107 @@
+{
+  "id": "mmvq",
+  "name": "mul-mat-vec-q",
+  "source": "ggml/src/ggml-cuda/mmvq.cu:get_vdr_mmvq,get_mmvq_mmid_max_batch_pascal_older,get_mmvq_mmid_max_batch_turing_plus,get_mmvq_mmid_max_batch_gcn,get_mmvq_mmid_max_batch_cdna,get_mmvq_mmid_max_batch_rdna1_rdna2,get_mmvq_mmid_max_batch_rdna3,get_mmvq_mmid_max_batch_rdna4,get_mmvq_mmid_max_batch,ggml_cuda_should_use_mmvq,get_mmvq_mmid_max_batch_for_device,calc_nwarps,calc_rows_per_block,mul_mat_vec_q,mul_mat_vec_q_moe,mul_mat_vec_q_switch_fusion,mul_mat_vec_q_moe_launch,mul_mat_vec_q_switch_ncols_dst,mul_mat_vec_q_switch_type,ggml_cuda_mul_mat_vec_q,ggml_cuda_op_mul_mat_vec_q",
+  "source_lang": "cuda",
+  "status": "pending",
+  "risk": "high",
+  "algorithm": "Multiply quantized matrices by one or a few vectors, using per-quant-format vector dot kernels and MoE-aware variants for routed experts.",
+  "cuda_constructs": [
+    "launch-config",
+    "shared-memory",
+    "fast-math intrinsics",
+    "launch-bounds"
+  ],
+  "io_spec": {
+    "inputs": [
+      {
+        "name": "src0",
+        "dtypes": [
+          "quantized GGML block types"
+        ],
+        "shape": "quantized matrix/expert weights"
+      },
+      {
+        "name": "src1",
+        "dtypes": [
+          "f32"
+        ],
+        "shape": "one or few activation vectors"
+      },
+      {
+        "name": "ids",
+        "dtypes": [
+          "i32"
+        ],
+        "shape": "optional MoE routing ids"
+      }
+    ],
+    "output": {
+      "name": "dst",
+      "dtypes": [
+        "f32"
+      ],
+      "shape": "matrix-vector result"
+    }
+  },
+  "reference": {
+    "kind": "cpu",
+    "crosscheck": "-"
+  },
+  "notes": "Risk reason: custom quantized vec-dot kernels and MoE-specific launch logic are complex and hot-path relevant. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
+  "updated_at": "2026-09-06T16:21:36Z",
+  "loc": {
+    "source_lang": "cuda",
+    "source": {
+      "code": 1247,
+      "comment": 36,
+      "blank": 91,
+      "raw": 1374,
+      "files": 1
+    },
+    "sycl": {
+      "code": 0,
+      "comment": 0,
+      "blank": 0,
+      "raw": 0,
+      "files": 0
+    },
+    "source_files": [
+      {
+        "path": "ggml/src/ggml-cuda/mmvq.cu",
+        "lang": "c",
+        "spans": [
+          "40-65",
+          "121-146",
+          "148-159",
+          "161-182",
+          "184-193",
+          "195-209",
+          "211-227",
+          "229-253",
+          "256-287",
+          "289-385",
+          "388-407",
+          "409-534",
+          "536-554",
+          "556-782",
+          "788-933",
+          "947-977",
+          "979-1010",
+          "1012-1356",
+          "1358-1473",
+          "1475-1504"
+        ],
+        "code": 1247,
+        "comment": 36,
+        "blank": 91,
+        "raw": 1374
+      }
+    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
+    "unresolved": [],
+    "method": "span",
+    "measured_at": "2026-09-06T16:21:36Z"
+  }
+}

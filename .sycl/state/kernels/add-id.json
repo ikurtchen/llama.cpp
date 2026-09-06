@@ -1,0 +1,86 @@
+{
+  "id": "add-id",
+  "name": "add-by-id",
+  "source": "ggml/src/ggml-cuda/add-id.cu:add_id_kernel,ggml_cuda_op_add_id",
+  "source_lang": "cuda",
+  "status": "pending",
+  "risk": "low",
+  "algorithm": "For each token/expert-used slot, gather one expert row from src1 using integer ids and add it to the matching row from src0.",
+  "cuda_constructs": [
+    "launch-config"
+  ],
+  "io_spec": {
+    "inputs": [
+      {
+        "name": "src0",
+        "dtypes": [
+          "f32"
+        ],
+        "shape": "[n_cols, n_expert_used, n_tokens] base activations"
+      },
+      {
+        "name": "src1",
+        "dtypes": [
+          "f32"
+        ],
+        "shape": "[n_cols, n_experts] expert rows"
+      },
+      {
+        "name": "src2",
+        "dtypes": [
+          "i32"
+        ],
+        "shape": "[n_expert_used, n_tokens] expert ids"
+      }
+    ],
+    "output": {
+      "name": "dst",
+      "dtypes": [
+        "f32"
+      ],
+      "shape": "same as src0"
+    }
+  },
+  "reference": {
+    "kind": "cpu",
+    "crosscheck": "-"
+  },
+  "notes": "Risk reason: indexed row gather plus rowwise add. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
+  "updated_at": "2026-09-06T16:21:34Z",
+  "loc": {
+    "source_lang": "cuda",
+    "source": {
+      "code": 45,
+      "comment": 0,
+      "blank": 10,
+      "raw": 55,
+      "files": 1
+    },
+    "sycl": {
+      "code": 0,
+      "comment": 0,
+      "blank": 0,
+      "raw": 0,
+      "files": 0
+    },
+    "source_files": [
+      {
+        "path": "ggml/src/ggml-cuda/add-id.cu",
+        "lang": "c",
+        "spans": [
+          "3-26",
+          "28-58"
+        ],
+        "code": 45,
+        "comment": 0,
+        "blank": 10,
+        "raw": 55
+      }
+    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
+    "unresolved": [],
+    "method": "span",
+    "measured_at": "2026-09-06T16:21:34Z"
+  }
+}

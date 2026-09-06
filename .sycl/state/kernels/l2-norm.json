@@ -1,0 +1,75 @@
+{
+  "id": "l2-norm",
+  "name": "l2-norm",
+  "source": "ggml/src/ggml-cuda/norm.cu:l2_norm_f32,l2_norm_f32_cuda,ggml_cuda_op_l2_norm",
+  "source_lang": "cuda",
+  "status": "pending",
+  "risk": "medium",
+  "algorithm": "Normalize each row/vector by its L2 norm.",
+  "cuda_constructs": [
+    "launch-config",
+    "shared-memory"
+  ],
+  "io_spec": {
+    "inputs": [
+      {
+        "name": "src0",
+        "dtypes": [
+          "f32"
+        ],
+        "shape": "rows of f32"
+      }
+    ],
+    "output": {
+      "name": "dst",
+      "shape": "same shape as src0",
+      "dtypes": [
+        "f32"
+      ]
+    },
+    "notes": "Outputs normalized rows in-place shape."
+  },
+  "reference": {
+    "kind": "cpu",
+    "crosscheck": "-"
+  },
+  "notes": "Risk reason: per-row reduction plus rescaling. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
+  "updated_at": "2026-09-06T16:21:35Z",
+  "loc": {
+    "source_lang": "cuda",
+    "source": {
+      "code": 58,
+      "comment": 2,
+      "blank": 12,
+      "raw": 72,
+      "files": 1
+    },
+    "sycl": {
+      "code": 0,
+      "comment": 0,
+      "blank": 0,
+      "raw": 0,
+      "files": 0
+    },
+    "source_files": [
+      {
+        "path": "ggml/src/ggml-cuda/norm.cu",
+        "lang": "c",
+        "spans": [
+          "244-278",
+          "420-433",
+          "676-698"
+        ],
+        "code": 58,
+        "comment": 2,
+        "blank": 12,
+        "raw": 72
+      }
+    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
+    "unresolved": [],
+    "method": "span",
+    "measured_at": "2026-09-06T16:21:35Z"
+  }
+}

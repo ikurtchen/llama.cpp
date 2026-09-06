@@ -1,0 +1,75 @@
+{
+  "id": "ssm-conv",
+  "name": "ssm-conv",
+  "source": "ggml/src/ggml-cuda/ssm-conv.cu:ssm_conv_f32,ssm_conv_long_token_f32,ssm_conv_f32_cuda,ggml_cuda_op_ssm_conv",
+  "source_lang": "cuda",
+  "status": "pending",
+  "risk": "high",
+  "algorithm": "Run the 1D convolution stage used by SSM/Mamba-style blocks, including a long-token path and fused activation handling.",
+  "cuda_constructs": [
+    "launch-config",
+    "shared-memory"
+  ],
+  "io_spec": {
+    "inputs": [
+      {
+        "name": "src0/src1/state",
+        "dtypes": [
+          "f32"
+        ],
+        "shape": "SSM convolution activations, weights, and cached state"
+      }
+    ],
+    "output": {
+      "name": "dst",
+      "dtypes": [
+        "f32"
+      ],
+      "shape": "SSM convolution output/state"
+    }
+  },
+  "reference": {
+    "kind": "cpu",
+    "crosscheck": "-"
+  },
+  "notes": "Risk reason: model-specific cached-state convolution behavior must match exactly. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
+  "updated_at": "2026-09-06T16:21:37Z",
+  "loc": {
+    "source_lang": "cuda",
+    "source": {
+      "code": 167,
+      "comment": 5,
+      "blank": 27,
+      "raw": 199,
+      "files": 1
+    },
+    "sycl": {
+      "code": 0,
+      "comment": 0,
+      "blank": 0,
+      "raw": 0,
+      "files": 0
+    },
+    "source_files": [
+      {
+        "path": "ggml/src/ggml-cuda/ssm-conv.cu",
+        "lang": "c",
+        "spans": [
+          "5-58",
+          "60-124",
+          "126-158",
+          "160-206"
+        ],
+        "code": 167,
+        "comment": 5,
+        "blank": 27,
+        "raw": 199
+      }
+    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
+    "unresolved": [],
+    "method": "span",
+    "measured_at": "2026-09-06T16:21:37Z"
+  }
+}

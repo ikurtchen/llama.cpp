@@ -1,0 +1,33 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-cpy-20260906T161718Z-dd8211",
+  "class": "test",
+  "subject": "cpy",
+  "phase": "migrate",
+  "ts": "2026-09-06T16:17:23Z",
+  "duration_s": 5.019,
+  "command": "build/bin/test-backend-ops test -b SYCL0 -o CPY",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "f6a043132",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/cpy/test-cpy-20260906T161718Z-dd8211.log",
+  "log_sha256": "40b6b456d785a69ee925b0a0fe074bd265671f3d1616c0e235e172debf913792",
+  "log_bytes": 82749,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "CPU backend result (test-backend-ops built-in oracle)",
+    "tolerance": {
+      "source": "test-backend-ops default"
+    }
+  },
+  "extracted": {}
+}

@@ -1,0 +1,89 @@
+{
+  "id": "conv2d-dw",
+  "name": "conv2d-depthwise",
+  "source": "ggml/src/ggml-cuda/conv2d-dw.cu:calculate_input_coord,conv2d_dw_kernel,ggml_cuda_op_conv2d_dw",
+  "source_lang": "cuda",
+  "status": "pending",
+  "risk": "medium",
+  "algorithm": "Compute depthwise 2D convolution where each channel is convolved independently, with layout-specific specializations.",
+  "cuda_constructs": [
+    "launch-config"
+  ],
+  "io_spec": {
+    "inputs": [
+      {
+        "name": "src0",
+        "dtypes": [
+          "f32"
+        ],
+        "shape": "per-channel kernels"
+      },
+      {
+        "name": "src1",
+        "dtypes": [
+          "f32"
+        ],
+        "shape": "input feature map"
+      },
+      {
+        "name": "op_params",
+        "fields": [
+          "stride",
+          "padding",
+          "dilation",
+          "layout"
+        ]
+      }
+    ],
+    "output": {
+      "name": "dst",
+      "dtypes": [
+        "f32"
+      ],
+      "shape": "depthwise-convolved output"
+    }
+  },
+  "reference": {
+    "kind": "cpu",
+    "crosscheck": "-"
+  },
+  "notes": "Risk reason: depthwise layout transforms and edge handling are moderately tricky. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
+  "updated_at": "2026-09-06T16:21:34Z",
+  "loc": {
+    "source_lang": "cuda",
+    "source": {
+      "code": 68,
+      "comment": 0,
+      "blank": 15,
+      "raw": 83,
+      "files": 1
+    },
+    "sycl": {
+      "code": 0,
+      "comment": 0,
+      "blank": 0,
+      "raw": 0,
+      "files": 0
+    },
+    "source_files": [
+      {
+        "path": "ggml/src/ggml-cuda/conv2d-dw.cu",
+        "lang": "c",
+        "spans": [
+          "31-33",
+          "81-117",
+          "119-161"
+        ],
+        "code": 68,
+        "comment": 0,
+        "blank": 15,
+        "raw": 83
+      }
+    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
+    "unresolved": [],
+    "method": "span",
+    "measured_at": "2026-09-06T16:21:34Z"
+  }
+}

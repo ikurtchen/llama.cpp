@@ -1,0 +1,88 @@
+{
+  "id": "gated-delta-net",
+  "name": "gated-delta-net",
+  "source": "ggml/src/ggml-cuda/gated_delta_net.cu:launch_gated_delta_net,ggml_cuda_op_gated_delta_net_impl,ggml_cuda_op_gated_delta_net,ggml_cuda_op_gated_delta_net_fused_cache",
+  "source_lang": "cuda",
+  "status": "pending",
+  "risk": "high",
+  "algorithm": "Run the recurrent gated-delta-net state update across tokens: form state-projected key/value interactions, apply learned decay gates, emit attention-like outputs, and optionally snapshot rollback states.",
+  "cuda_constructs": [
+    "launch-config",
+    "warp-shuffle",
+    "launch-bounds",
+    "fast-math intrinsics"
+  ],
+  "io_spec": {
+    "inputs": [
+      {
+        "name": "q/k/v",
+        "dtypes": [
+          "f32"
+        ],
+        "shape": "[state_dim, heads, tokens, seqs]"
+      },
+      {
+        "name": "g/beta/state",
+        "dtypes": [
+          "f32"
+        ],
+        "shape": "gates, step sizes, and recurrent state"
+      }
+    ],
+    "output": {
+      "name": "dst/state",
+      "dtypes": [
+        "f32"
+      ],
+      "shape": "token outputs plus updated state slots"
+    }
+  },
+  "reference": {
+    "kind": "cpu",
+    "crosscheck": "-"
+  },
+  "notes": "Risk reason: recurrent stateful update with warp reductions and rollback-slot semantics is complex. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
+  "updated_at": "2026-09-06T16:21:35Z",
+  "loc": {
+    "source_lang": "cuda",
+    "source": {
+      "code": 262,
+      "comment": 19,
+      "blank": 39,
+      "raw": 320,
+      "files": 1
+    },
+    "sycl": {
+      "code": 0,
+      "comment": 0,
+      "blank": 0,
+      "raw": 0,
+      "files": 0
+    },
+    "source_files": [
+      {
+        "path": "ggml/src/ggml-cuda/gated_delta_net.cu",
+        "lang": "c",
+        "spans": [
+          "4-167",
+          "169-221",
+          "223-318",
+          "320-322",
+          "324-327"
+        ],
+        "code": 262,
+        "comment": 19,
+        "blank": 39,
+        "raw": 320
+      }
+    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
+    "unresolved": [],
+    "method": "span",
+    "measured_at": "2026-09-06T16:21:35Z",
+    "source_spec": [
+      "ggml/src/ggml-cuda/gated_delta_net.cu:4-167"
+    ]
+  }
+}

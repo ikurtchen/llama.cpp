@@ -1,5 +1,932 @@
 {
   "schema": "sycl-agent/kernel-index",
-  "kernels": [],
-  "updated_at": "1970-01-01T00:00:00Z"
+  "kernels": [
+    {
+      "id": "acc",
+      "source": "ggml/src/ggml-cuda/acc.cu:acc_f32,acc_f32_cuda,ggml_cuda_op_acc",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "low",
+      "detail": ".sycl/state/kernels/acc.json",
+      "loc": {
+        "source_code": 47,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "add-id",
+      "source": "ggml/src/ggml-cuda/add-id.cu:add_id_kernel,ggml_cuda_op_add_id",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "low",
+      "detail": ".sycl/state/kernels/add-id.json",
+      "loc": {
+        "source_code": 45,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "allreduce",
+      "source": "ggml/src/ggml-cuda/allreduce.cu:ggml_cuda_ar_signal_set,ggml_cuda_ar_signal_get,ggml_cuda_ar_kernel,ggml_cuda_ar_add_kernel,ggml_cuda_ar_chunk_bytes,ggml_cuda_ar_wait_for_compute,ggml_cuda_ar_pipeline_free,ggml_cuda_ar_allreduce_copy_impl,ggml_cuda_ar_allreduce_copy_outer,ggml_cuda_ar_allreduce",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "high",
+      "detail": ".sycl/state/kernels/allreduce.json",
+      "loc": {
+        "source_code": 404,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "arange",
+      "source": "ggml/src/ggml-cuda/arange.cu:arange_f32,arange_f32_cuda,ggml_cuda_op_arange",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "low",
+      "detail": ".sycl/state/kernels/arange.json",
+      "loc": {
+        "source_code": 25,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "argmax",
+      "source": "ggml/src/ggml-cuda/argmax.cu:argmax_f32,ggml_cuda_argmax",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "medium",
+      "detail": ".sycl/state/kernels/argmax.json",
+      "loc": {
+        "source_code": 69,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "argsort",
+      "source": "ggml/src/ggml-cuda/argsort.cu:init_indices,init_offsets,argsort_f32_i32_cuda_cub_chunk_nrows,argsort_f32_i32_cuda_cub,ggml_cuda_swap,k_argsort_f32_i32,next_power_of_2,argsort_f32_i32_cuda_bitonic,ggml_cuda_op_argsort",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "high",
+      "detail": ".sycl/state/kernels/argsort.json",
+      "loc": {
+        "source_code": 223,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "binbcast",
+      "source": "ggml/src/ggml-cuda/binbcast.cu:launch_bin_bcast_pack,k_repeat_back,repeat_back_cuda,ggml_cuda_op_bin_bcast,ggml_cuda_op_repeat,ggml_cuda_op_add,ggml_cuda_op_sub,ggml_cuda_op_mul,ggml_cuda_op_div,ggml_cuda_op_fused_binbcast_impl,ggml_cuda_op_fused_add,ggml_cuda_op_fused_mul,ggml_cuda_op_repeat_back",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "medium",
+      "detail": ".sycl/state/kernels/binbcast.json",
+      "loc": {
+        "source_code": 439,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "clamp",
+      "source": "ggml/src/ggml-cuda/clamp.cu:op_clamp,op_clamp_kernel,clamp_cuda,ggml_cuda_op_clamp",
+      "source_lang": "cuda",
+      "status": "migrated",
+      "risk": "low",
+      "detail": ".sycl/state/kernels/clamp.json",
+      "loc": {
+        "source_code": 34,
+        "sycl_code": 44
+      },
+      "sycl_file": "ggml/src/ggml-sycl/clamp.cpp",
+      "target_style": "plain-sycl",
+      "unit_test": {
+        "result": "pass",
+        "evidence": "test-clamp-20260906T161709Z-a9a0cb"
+      }
+    },
+    {
+      "id": "col2im-1d",
+      "source": "ggml/src/ggml-cuda/col2im-1d.cu:col2im_1d_kernel,ggml_cuda_op_col2im_1d",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "medium",
+      "detail": ".sycl/state/kernels/col2im-1d.json",
+      "loc": {
+        "source_code": 59,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "concat",
+      "source": "ggml/src/ggml-cuda/concat.cu:concat_cont,concat_cont_cuda,concat_cuda,ggml_cuda_op_concat",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "low",
+      "detail": ".sycl/state/kernels/concat.json",
+      "loc": {
+        "source_code": 210,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "conv2d",
+      "source": "ggml/src/ggml-cuda/conv2d.cu:calculate_input_coord,conv2d_kernel,conv2d_cuda,conv2d_cuda_f16,conv2d_cuda_f32,ggml_cuda_op_conv2d",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "medium",
+      "detail": ".sycl/state/kernels/conv2d.json",
+      "loc": {
+        "source_code": 80,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "conv2d-dw",
+      "source": "ggml/src/ggml-cuda/conv2d-dw.cu:calculate_input_coord,conv2d_dw_kernel,ggml_cuda_op_conv2d_dw",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "medium",
+      "detail": ".sycl/state/kernels/conv2d-dw.json",
+      "loc": {
+        "source_code": 68,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "conv2d-transpose",
+      "source": "ggml/src/ggml-cuda/conv2d-transpose.cu:conv2d_transpose_kernel,ggml_cuda_conv_2d_transpose_p0",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "medium",
+      "detail": ".sycl/state/kernels/conv2d-transpose.json",
+      "loc": {
+        "source_code": 90,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "conv-transpose-1d",
+      "source": "ggml/src/ggml-cuda/conv-transpose-1d.cu:conv_transpose_1d_kernel,conv_transpose_1d_f32_f32_cuda,ggml_cuda_op_conv_transpose_1d",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "medium",
+      "detail": ".sycl/state/kernels/conv-transpose-1d.json",
+      "loc": {
+        "source_code": 69,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "convert",
+      "source": "ggml/src/ggml-cuda/convert.cu:convert_unary,convert_unary_cuda,convert_unary_cont_cuda",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "low",
+      "detail": ".sycl/state/kernels/convert.json",
+      "loc": {
+        "source_code": 35,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "count-equal",
+      "source": "ggml/src/ggml-cuda/count-equal.cu:count_equal,ggml_cuda_count_equal",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "medium",
+      "detail": ".sycl/state/kernels/count-equal.json",
+      "loc": {
+        "source_code": 45,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "cpy",
+      "source": "ggml/src/ggml-cuda/cpy.cu:cpy_scalar,cpy_scalar_transpose,cpy_blck_q8_0_f32,cpy_blck_q_f32,cpy_f32_q,cpy_q_f32,cpy_scalar_contiguous,ggml_cpy_scalar_contiguous_cuda,ggml_cpy_scalar_cuda,ggml_cpy_f32_q8_0_cuda,ggml_cpy_q8_0_f32_cuda,ggml_cpy_f32_q4_0_cuda,ggml_cpy_q4_0_f32_cuda,ggml_cpy_f32_q4_1_cuda,ggml_cpy_q4_1_f32_cuda,ggml_cpy_f32_q5_0_cuda,ggml_cpy_q5_0_f32_cuda,ggml_cpy_f32_q5_1_cuda,ggml_cpy_q5_1_f32_cuda,ggml_cpy_f32_iq4_nl_cuda,ggml_cuda_cpy_as_memcpy_2d,ggml_cuda_cpy,ggml_cuda_dup",
+      "source_lang": "cuda",
+      "status": "migrated",
+      "risk": "medium",
+      "detail": ".sycl/state/kernels/cpy.json",
+      "loc": {
+        "source_code": 516,
+        "sycl_code": 89
+      },
+      "sycl_file": "ggml/src/ggml-sycl/cpy.cpp",
+      "target_style": "plain-sycl",
+      "unit_test": {
+        "result": "pass",
+        "evidence": "test-cpy-20260906T161718Z-dd8211"
+      },
+      "notes": "Partial coverage vs CUDA: F32/F16 CPY/DUP/CONT only. CUDA's cpy.cu additionally quantizes/dequantizes during copy for Q8_0/Q4_0/Q4_1/Q5_0/Q5_1/IQ4_NL (used for direct-to-quantized KV cache writes). Quantized cpy variants are not yet ported; tracked as residual work, not silently dropped."
+    },
+    {
+      "id": "cross-entropy-loss",
+      "source": "ggml/src/ggml-cuda/cross-entropy-loss.cu:cross_entropy_loss_f32,cross_entropy_loss_back_f32,ggml_cuda_cross_entropy_loss,ggml_cuda_cross_entropy_loss_back",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "medium",
+      "detail": ".sycl/state/kernels/cross-entropy-loss.json",
+      "loc": {
+        "source_code": 132,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "cumsum",
+      "source": "ggml/src/ggml-cuda/cumsum.cu:cumsum_cub_kernel,cumsum_kernel,cumsum_cub,cumsum_cuda,ggml_cuda_op_cumsum",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "medium",
+      "detail": ".sycl/state/kernels/cumsum.json",
+      "loc": {
+        "source_code": 216,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "dequantize",
+      "source": "ggml/src/ggml-cuda/convert.cu:dequantize_block,dequantize_block_q8_0_f16,dequantize_block_q4_0,dequantize_block_q4_1,dequantize_block_q2_K,dequantize_block_q3_K,dequantize_block_q4_K,dequantize_block_q5_K,dequantize_block_q6_K,dequantize_block_iq2_xxs,dequantize_block_iq2_xs,dequantize_block_iq2_s,dequantize_block_iq3_xxs,dequantize_block_iq3_s,dequantize_block_iq1_s,dequantize_block_iq1_m,dequantize_block_iq4_nl,dequantize_block_iq4_xs,dequantize_block_mxfp4,dequantize_block_nvfp4,dequantize_block_cuda,dequantize_block_cont_cuda,dequantize_block_q8_0_f16_cuda,dequantize_row_q2_K_cuda,dequantize_row_q3_K_cuda,dequantize_row_q4_0_cuda,dequantize_row_q4_1_cuda,dequantize_row_q4_K_cuda,dequantize_row_q5_K_cuda,dequantize_row_q6_K_cuda,dequantize_row_iq2_xxs_cuda,dequantize_row_iq2_xs_cuda,dequantize_row_iq2_s_cuda,dequantize_row_iq3_xxs_cuda,dequantize_row_iq3_s_cuda,dequantize_row_iq1_s_cuda,dequantize_row_iq1_m_cuda,dequantize_row_iq4_nl_cuda,dequantize_row_iq4_xs_cuda,dequantize_row_mxfp4_cuda,dequantize_row_nvfp4_cuda",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "high",
+      "detail": ".sycl/state/kernels/dequantize.json",
+      "loc": {
+        "source_code": 316,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "diag",
+      "source": "ggml/src/ggml-cuda/diag.cu:diag_kernel,ggml_cuda_op_diag",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "low",
+      "detail": ".sycl/state/kernels/diag.json",
+      "loc": {
+        "source_code": 60,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "diagmask",
+      "source": "ggml/src/ggml-cuda/diagmask.cu:diag_mask_inf_f32,diag_mask_inf_f32_cuda,ggml_cuda_op_diag_mask_inf",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "low",
+      "detail": ".sycl/state/kernels/diagmask.json",
+      "loc": {
+        "source_code": 28,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "dsv4-hc",
+      "source": "ggml/src/ggml-cuda/dsv4-hc.cu:dsv4_hc_comb_norm_cols,dsv4_hc_comb_norm_rows,dsv4_hc_comb_f32,dsv4_hc_pre_f32,ggml_cuda_op_dsv4_hc_comb,ggml_cuda_op_dsv4_hc_pre,ggml_cuda_op_dsv4_hc_post",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "high",
+      "detail": ".sycl/state/kernels/dsv4-hc.json",
+      "loc": {
+        "source_code": 242,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "fill",
+      "source": "ggml/src/ggml-cuda/fill.cu:fill_kernel,ggml_cuda_op_fill",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "low",
+      "detail": ".sycl/state/kernels/fill.json",
+      "loc": {
+        "source_code": 27,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "flash-attn-common",
+      "source": "ggml/src/ggml-cuda/fattn.cu:flash_attn_mask_to_sparse_indices,ggml_cuda_flash_attn_ext_compact_mask,ggml_cuda_fattn_kv_type_supported,ggml_cuda_flash_attn_ext_get_alloc_size,ggml_cuda_flash_attn_ext,ggml_cuda_flash_attn_ext_supported",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "high",
+      "detail": ".sycl/state/kernels/flash-attn-common.json",
+      "loc": {
+        "source_code": 376,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "flash-attn-vec",
+      "source": "ggml/src/ggml-cuda/fattn.cu:ggml_cuda_flash_attn_ext_vec",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "high",
+      "detail": ".sycl/state/kernels/flash-attn-vec.json",
+      "loc": {
+        "source_code": 500,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "flash-attn-tile",
+      "source": "ggml/src/ggml-cuda/fattn-tile.cu:ggml_cuda_flash_attn_ext_tile",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "high",
+      "detail": ".sycl/state/kernels/flash-attn-tile.json",
+      "loc": {
+        "source_code": 354,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "flash-attn-mma-f16",
+      "source": "ggml/src/ggml-cuda/fattn.cu:ggml_cuda_flash_attn_ext_mma_f16_shall_use_sparse,ggml_cuda_flash_attn_ext_mma_f16_switch_ncols1,ggml_cuda_flash_attn_ext_mma_f16_switch_ncols2,ggml_cuda_flash_attn_ext_mma_f16",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "high",
+      "detail": ".sycl/state/kernels/flash-attn-mma-f16.json",
+      "loc": {
+        "source_code": 394,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "fwht",
+      "source": "ggml/src/ggml-cuda/fwht.cu:fwht_cuda,ggml_cuda_op_fwht",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "medium",
+      "detail": ".sycl/state/kernels/fwht.json",
+      "loc": {
+        "source_code": 81,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "gated-delta-net",
+      "source": "ggml/src/ggml-cuda/gated_delta_net.cu:launch_gated_delta_net,ggml_cuda_op_gated_delta_net_impl,ggml_cuda_op_gated_delta_net,ggml_cuda_op_gated_delta_net_fused_cache",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "high",
+      "detail": ".sycl/state/kernels/gated-delta-net.json",
+      "loc": {
+        "source_code": 262,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "getrows",
+      "source": "ggml/src/ggml-cuda/getrows.cu:k_get_rows,k_get_rows_kq,k_get_rows_float,k_get_rows_float_vec,k_get_rows_back_float,get_rows_cuda_q,get_rows_cuda_kq,get_rows_cuda_float,ggml_cuda_get_rows_switch_src0_type,get_rows_cuda,ggml_cuda_op_get_rows,ggml_cuda_op_get_rows_back",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "medium",
+      "detail": ".sycl/state/kernels/getrows.json",
+      "loc": {
+        "source_code": 408,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "batched-ptrs",
+      "source": "ggml/src/ggml-cuda/ggml-cuda.cu:k_compute_batched_ptrs",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "low",
+      "detail": ".sycl/state/kernels/batched-ptrs.json",
+      "loc": {
+        "source_code": 20,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "gla",
+      "source": "ggml/src/ggml-cuda/gla.cu:gated_linear_attn_f32,ggml_cuda_op_gated_linear_attn",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "high",
+      "detail": ".sycl/state/kernels/gla.json",
+      "loc": {
+        "source_code": 73,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "im2col",
+      "source": "ggml/src/ggml-cuda/im2col.cu:im2col_kernel,im2col_cuda,im2col_cuda_f16,im2col_cuda_f32,ggml_cuda_op_im2col,im2col_3d_kernel,im2col_3d_cuda,im2col_3d_cuda_f16,im2col_3d_cuda_f32,ggml_cuda_op_im2col_3d",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "medium",
+      "detail": ".sycl/state/kernels/im2col.json",
+      "loc": {
+        "source_code": 219,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "l2-norm",
+      "source": "ggml/src/ggml-cuda/norm.cu:l2_norm_f32,l2_norm_f32_cuda,ggml_cuda_op_l2_norm",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "medium",
+      "detail": ".sycl/state/kernels/l2-norm.json",
+      "loc": {
+        "source_code": 58,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "layer-norm",
+      "source": "ggml/src/ggml-cuda/norm.cu:norm_f32,norm_f32_cuda,ggml_cuda_op_norm",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "medium",
+      "detail": ".sycl/state/kernels/layer-norm.json",
+      "loc": {
+        "source_code": 58,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "group-norm",
+      "source": "ggml/src/ggml-cuda/norm.cu:group_norm_f32,group_norm_f32_cuda,ggml_cuda_op_group_norm",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "medium",
+      "detail": ".sycl/state/kernels/group-norm.json",
+      "loc": {
+        "source_code": 49,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "lightning-indexer",
+      "source": "ggml/src/ggml-cuda/lightning-indexer.cu:lightning_indexer_kernel_wmma,lightning_indexer_kernel_vec,ggml_cuda_lightning_indexer_supported",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "high",
+      "detail": ".sycl/state/kernels/lightning-indexer.json",
+      "loc": {
+        "source_code": 417,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "mean",
+      "source": "ggml/src/ggml-cuda/mean.cu:divide_by_count",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "medium",
+      "detail": ".sycl/state/kernels/mean.json",
+      "loc": {
+        "source_code": 85,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "mmf",
+      "source": "ggml/src/ggml-cuda/mmf.cu:mmf_get_rows_per_block,ggml_cuda_mul_mat_f,ggml_cuda_should_use_mmf",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "high",
+      "detail": ".sycl/state/kernels/mmf.json",
+      "loc": {
+        "source_code": 603,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "mmid",
+      "source": "ggml/src/ggml-cuda/mmid.cu:mm_ids_helper,launch_mm_ids_helper,ggml_cuda_launch_mm_ids_helper",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "medium",
+      "detail": ".sycl/state/kernels/mmid.json",
+      "loc": {
+        "source_code": 122,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "mmq",
+      "source": "ggml/src/ggml-cuda/mmq.cu:ggml_cuda_mul_mat_q_switch_type,ggml_cuda_mul_mat_q,ggml_cuda_should_use_mmq",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "high",
+      "detail": ".sycl/state/kernels/mmq.json",
+      "loc": {
+        "source_code": 638,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "mmvf",
+      "source": "ggml/src/ggml-cuda/mmvf.cu:mul_mat_vec_f,mul_mat_vec_f_switch_fusion,launch_mul_mat_vec_f_cuda,mul_mat_vec_f_cuda_switch_ncols_dst,mul_mat_vec_f_cuda,ggml_cuda_mul_mat_vec_f,ggml_cuda_op_mul_mat_vec_f,ggml_cuda_should_use_mmvf",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "high",
+      "detail": ".sycl/state/kernels/mmvf.json",
+      "loc": {
+        "source_code": 783,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "mmvq",
+      "source": "ggml/src/ggml-cuda/mmvq.cu:get_vdr_mmvq,get_mmvq_mmid_max_batch_pascal_older,get_mmvq_mmid_max_batch_turing_plus,get_mmvq_mmid_max_batch_gcn,get_mmvq_mmid_max_batch_cdna,get_mmvq_mmid_max_batch_rdna1_rdna2,get_mmvq_mmid_max_batch_rdna3,get_mmvq_mmid_max_batch_rdna4,get_mmvq_mmid_max_batch,ggml_cuda_should_use_mmvq,get_mmvq_mmid_max_batch_for_device,calc_nwarps,calc_rows_per_block,mul_mat_vec_q,mul_mat_vec_q_moe,mul_mat_vec_q_switch_fusion,mul_mat_vec_q_moe_launch,mul_mat_vec_q_switch_ncols_dst,mul_mat_vec_q_switch_type,ggml_cuda_mul_mat_vec_q,ggml_cuda_op_mul_mat_vec_q",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "high",
+      "detail": ".sycl/state/kernels/mmvq.json",
+      "loc": {
+        "source_code": 1247,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "moe-weighted-reduction",
+      "source": "ggml/src/ggml-cuda/moe-weighted-reduction.cu:moe_weighted_reduction_f32,launch_moe_weighted_reduction,ggml_cuda_op_moe_weighted_reduction",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "medium",
+      "detail": ".sycl/state/kernels/moe-weighted-reduction.json",
+      "loc": {
+        "source_code": 57,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "opt-step-adamw",
+      "source": "ggml/src/ggml-cuda/opt-step-adamw.cu:opt_step_adamw_f32,opt_step_adamw_f32_cuda,ggml_cuda_opt_step_adamw",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "medium",
+      "detail": ".sycl/state/kernels/opt-step-adamw.json",
+      "loc": {
+        "source_code": 58,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "opt-step-sgd",
+      "source": "ggml/src/ggml-cuda/opt-step-sgd.cu:opt_step_sgd_f32,opt_step_sgd_f32_cuda,ggml_cuda_opt_step_sgd",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "low",
+      "detail": ".sycl/state/kernels/opt-step-sgd.json",
+      "loc": {
+        "source_code": 34,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "out-prod",
+      "source": "ggml/src/ggml-cuda/out-prod.cu:k_compute_out_prod_ptrs,ggml_cuda_out_prod",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "medium",
+      "detail": ".sycl/state/kernels/out-prod.json",
+      "loc": {
+        "source_code": 95,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "pad",
+      "source": "ggml/src/ggml-cuda/pad.cu:pad_f32,pad_f32_cuda,ggml_cuda_op_pad",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "low",
+      "detail": ".sycl/state/kernels/pad.json",
+      "loc": {
+        "source_code": 76,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "pad-reflect-1d",
+      "source": "ggml/src/ggml-cuda/pad_reflect_1d.cu:ggml_cuda_op_pad_reflect_1d",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "low",
+      "detail": ".sycl/state/kernels/pad-reflect-1d.json",
+      "loc": {
+        "source_code": 23,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "pool1d",
+      "source": "ggml/src/ggml-cuda/pool1d.cu:pool1d_nchw_kernel,pool1d_nchw_kernel_f32_f32_cuda,ggml_cuda_op_pool1d",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "medium",
+      "detail": ".sycl/state/kernels/pool1d.json",
+      "loc": {
+        "source_code": 69,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "pool2d",
+      "source": "ggml/src/ggml-cuda/pool2d.cu:pool2d_nchw_kernel,pool2d_nchw_kernel_f32_f32_cuda,ggml_cuda_op_pool2d",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "medium",
+      "detail": ".sycl/state/kernels/pool2d.json",
+      "loc": {
+        "source_code": 80,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "quantize",
+      "source": "ggml/src/ggml-cuda/quantize.cu:nvfp4_native_scale_error,quantize_q8_1,quantize_mmq_nvfp4,quantize_mmq_mxfp4,quantize_mmq_q8_1,quantize_row_q8_1_cuda,quantize_mmq_q8_1_cuda,quantize_scatter_mmq_q8_1_cuda,quantize_scatter_mmq_fp4_cuda,quantize_mmq_fp4_cuda",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "high",
+      "detail": ".sycl/state/kernels/quantize.json",
+      "loc": {
+        "source_code": 557,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "rms-norm",
+      "source": "ggml/src/ggml-cuda/norm.cu:rms_norm_f32,rms_norm_back_f32,rms_norm_f32_cuda,rms_norm_back_f32_cuda,ggml_cuda_op_rms_norm,ggml_cuda_op_rms_norm_fused,ggml_cuda_op_rms_norm_fused_add,ggml_cuda_op_rms_norm_back",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "medium",
+      "detail": ".sycl/state/kernels/rms-norm.json",
+      "loc": {
+        "source_code": 344,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "rms-norm-rope",
+      "source": "ggml/src/ggml-cuda/rope.cu:rms_norm_mul_rope_f32,rms_norm_mul_rope_cuda,ggml_cuda_op_rms_norm_mul_rope_fused",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "high",
+      "detail": ".sycl/state/kernels/rms-norm-rope.json",
+      "loc": {
+        "source_code": 197,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "roll",
+      "source": "ggml/src/ggml-cuda/roll.cu:roll_f32_cuda,ggml_cuda_op_roll",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "low",
+      "detail": ".sycl/state/kernels/roll.json",
+      "loc": {
+        "source_code": 43,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "rope",
+      "source": "ggml/src/ggml-cuda/rope.cu:rope_yarn,rope_vision,ggml_cuda_op_rope_impl,ggml_cuda_op_rope,ggml_cuda_op_rope_back,ggml_cuda_op_rope_fused",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "medium",
+      "detail": ".sycl/state/kernels/rope.json",
+      "loc": {
+        "source_code": 578,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "scale",
+      "source": "ggml/src/ggml-cuda/scale.cu:scale_f32,scale_f32_cuda,ggml_cuda_op_scale",
+      "source_lang": "cuda",
+      "status": "migrated",
+      "risk": "low",
+      "detail": ".sycl/state/kernels/scale.json",
+      "loc": {
+        "source_code": 27,
+        "sycl_code": 37
+      },
+      "sycl_file": "ggml/src/ggml-sycl/scale.cpp",
+      "target_style": "plain-sycl",
+      "unit_test": {
+        "result": "pass",
+        "evidence": "test-scale-20260906T161706Z-440eea"
+      }
+    },
+    {
+      "id": "set",
+      "source": "ggml/src/ggml-cuda/set.cu:ggml_cuda_op_set",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "low",
+      "detail": ".sycl/state/kernels/set.json",
+      "loc": {
+        "source_code": 29,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "set-rows",
+      "source": "ggml/src/ggml-cuda/set-rows.cu:set_rows_cuda_quant,set_rows_cuda,ggml_cuda_op_set_rows",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "medium",
+      "detail": ".sycl/state/kernels/set-rows.json",
+      "loc": {
+        "source_code": 299,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "snake",
+      "source": "ggml/src/ggml-cuda/snake.cu:snake_kernel,launch_snake,ggml_cuda_op_snake_fused",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "low",
+      "detail": ".sycl/state/kernels/snake.json",
+      "loc": {
+        "source_code": 53,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "softcap",
+      "source": "ggml/src/ggml-cuda/softcap.cu:softcap_f32,softcap_f32_cuda,ggml_cuda_op_softcap",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "low",
+      "detail": ".sycl/state/kernels/softcap.json",
+      "loc": {
+        "source_code": 27,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "softmax",
+      "source": "ggml/src/ggml-cuda/softmax.cu:t2f32,soft_max_f32,soft_max_f32_parallelize_cols_single_row,soft_max_back_f32,launch_soft_max_kernels,soft_max_f32_cuda,soft_max_back_f32_cuda,ggml_cuda_op_soft_max,ggml_cuda_op_soft_max_back",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "high",
+      "detail": ".sycl/state/kernels/softmax.json",
+      "loc": {
+        "source_code": 308,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "solve-tri",
+      "source": "ggml/src/ggml-cuda/solve_tri.cu:get_batch_pointers,solve_tri_f32_cublas,solve_tri_f32_fast,solve_tri_f32_cuda,ggml_cuda_op_solve_tri",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "high",
+      "detail": ".sycl/state/kernels/solve-tri.json",
+      "loc": {
+        "source_code": 222,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "ssm-conv",
+      "source": "ggml/src/ggml-cuda/ssm-conv.cu:ssm_conv_f32,ssm_conv_long_token_f32,ssm_conv_f32_cuda,ggml_cuda_op_ssm_conv",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "high",
+      "detail": ".sycl/state/kernels/ssm-conv.json",
+      "loc": {
+        "source_code": 167,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "ssm-scan",
+      "source": "ggml/src/ggml-cuda/ssm-scan.cu:ssm_scan_f32,ssm_scan_f32_group,ssm_scan_f32_cuda,ssm_ssd_prepare_dt_kernel,ssm_ssd_pre_matmul_kernel,ssm_ssd_scale_state_kernel,ssm_ssd_init_state_kernel,ssm_scan_ssd_f32_cuda,ggml_cuda_op_ssm_scan",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "high",
+      "detail": ".sycl/state/kernels/ssm-scan.json",
+      "loc": {
+        "source_code": 669,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "sum",
+      "source": "ggml/src/ggml-cuda/sum.cu:sum_f32_cuda,ggml_cuda_op_sum",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "medium",
+      "detail": ".sycl/state/kernels/sum.json",
+      "loc": {
+        "source_code": 23,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "sumrows",
+      "source": "ggml/src/ggml-cuda/sumrows.cu:sum_rows_f32_cuda,ggml_cuda_op_sum_rows",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "medium",
+      "detail": ".sycl/state/kernels/sumrows.json",
+      "loc": {
+        "source_code": 71,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "top-k",
+      "source": "ggml/src/ggml-cuda/top-k.cu:top_k_cub,next_power_of_2,top_k_radix_init,top_k_radix_histogram,top_k_radix_select,top_k_radix_reset_counters,top_k_radix_gather,top_k_radix_cuda,ggml_cuda_op_top_k",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "high",
+      "detail": ".sycl/state/kernels/top-k.json",
+      "loc": {
+        "source_code": 204,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "topk-moe",
+      "source": "ggml/src/ggml-cuda/topk-moe.cu:softmax_warp_inplace,sigmoid_warp_inplace,sqrt_softplus_warp_inplace,topk_moe_cuda,launch_topk_moe_cuda,ggml_cuda_op_topk_moe,ggml_cuda_should_use_topk_moe",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "high",
+      "detail": ".sycl/state/kernels/topk-moe.json",
+      "loc": {
+        "source_code": 344,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "tri",
+      "source": "ggml/src/ggml-cuda/tri.cu:tri_kernel,tri_cuda,ggml_cuda_op_tri",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "low",
+      "detail": ".sycl/state/kernels/tri.json",
+      "loc": {
+        "source_code": 119,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "tsembd",
+      "source": "ggml/src/ggml-cuda/tsembd.cu:timestep_embedding_f32,timestep_embedding_f32_cuda,ggml_cuda_op_timestep_embedding",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "low",
+      "detail": ".sycl/state/kernels/tsembd.json",
+      "loc": {
+        "source_code": 35,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "unary",
+      "source": "ggml/src/ggml-cuda/unary.cu:op_abs,op_sgn,op_neg,op_step,op_gelu,op_gelu_erf,op_gelu_quick,op_silu,op_tanh,op_relu,op_sigmoid,op_hardsigmoid,op_hardswish,op_exp,op_sqr,op_relu_sqr,op_sqrt,op_sin,op_cos,op_log,op_expm1,op_softplus,op_elu,op_floor,op_ceil,op_round,op_trunc,unary_op_kernel,unary_cuda,ggml_cuda_op_unary,ggml_cuda_op_abs,ggml_cuda_op_sgn,ggml_cuda_op_neg,ggml_cuda_op_step,ggml_cuda_op_gelu,ggml_cuda_op_gelu_erf,ggml_cuda_op_gelu_quick,ggml_cuda_op_silu,ggml_cuda_op_tanh,ggml_cuda_op_relu,ggml_cuda_op_sigmoid,ggml_cuda_op_hardsigmoid,ggml_cuda_op_hardswish,ggml_cuda_op_exp,ggml_cuda_op_sqr,ggml_cuda_op_sqrt,ggml_cuda_op_sin,ggml_cuda_op_cos,ggml_cuda_op_log,ggml_cuda_op_elu,ggml_cuda_op_floor,ggml_cuda_op_ceil,ggml_cuda_op_round,ggml_cuda_op_trunc,ggml_cuda_op_expm1,ggml_cuda_op_softplus,unary_gated_op_kernel,unary_gated_cuda,ggml_cuda_op_unary_gated,ggml_cuda_op_reglu,ggml_cuda_op_geglu,ggml_cuda_op_swiglu,ggml_cuda_op_geglu_erf,ggml_cuda_op_geglu_quick,swiglu_oai_kernel,swiglu_oai_cuda,ggml_cuda_op_swiglu_oai,swiglu_clamp_kernel,swiglu_clamp_cuda,ggml_cuda_op_swiglu_clamp,xielu_kernel,xielu_cuda,ggml_cuda_op_xielu,op_silu_back,silu_back_kernel,silu_back_cuda,ggml_cuda_op_silu_back,op_leaky_relu,leaky_relu_kernel,leaky_relu_cuda,ggml_cuda_op_leaky_relu,ggml_cuda_op_unary_mul_impl,ggml_cuda_op_unary_mul,ggml_cuda_op_relu_sqr",
+      "source_lang": "cuda",
+      "status": "migrated",
+      "risk": "low",
+      "detail": ".sycl/state/kernels/unary.json",
+      "loc": {
+        "source_code": 541,
+        "sycl_code": 260
+      },
+      "sycl_file": "ggml/src/ggml-sycl/unary.cpp",
+      "target_style": "plain-sycl",
+      "unit_test": {
+        "result": "pass",
+        "evidence": "test-unary-20260906T162643Z-7f429f"
+      },
+      "notes": "Covers plain unary ops (GGML_OP_UNARY sub-ops), GLU gated ops (REGLU/GEGLU/SWIGLU/GEGLU_ERF/GEGLU_QUICK/SWIGLU_OAI), and the standalone SQR/SQRT/SIN/COS/LOG ops. XIELU and SWIGLU_CLAMP (newer ops) not yet ported -- tracked as residual."
+    },
+    {
+      "id": "upscale",
+      "source": "ggml/src/ggml-cuda/upscale.cu:upscale_f32,upscale_f32_bilinear,upscale_f32_bilinear_antialias,weight1,weight2,bicubic,upscale_f32_bicubic,upscale_f32_cuda,upscale_f32_bilinear_cuda,upscale_f32_bicubic_cuda,ggml_cuda_op_upscale",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "medium",
+      "detail": ".sycl/state/kernels/upscale.json",
+      "loc": {
+        "source_code": 224,
+        "sycl_code": 0
+      }
+    },
+    {
+      "id": "wkv",
+      "source": "ggml/src/ggml-cuda/wkv.cu:rwkv_wkv_f32,rwkv_wkv7_f32,rwkv_wkv7_f32_t1_warp_row,ggml_cuda_op_rwkv_wkv6,ggml_cuda_op_rwkv_wkv7",
+      "source_lang": "cuda",
+      "status": "pending",
+      "risk": "high",
+      "detail": ".sycl/state/kernels/wkv.json",
+      "loc": {
+        "source_code": 207,
+        "sycl_code": 0
+      }
+    }
+  ],
+  "updated_at": "2026-09-06T16:26:59Z"
 }

@@ -1,0 +1,879 @@
+{
+  "schema": "sycl-agent/loc",
+  "generated_at": "2026-09-06T16:21:39Z",
+  "totals": {
+    "source_migrated": {
+      "code": 15949,
+      "raw": 18838,
+      "files": 76
+    },
+    "sycl_written": {
+      "code": 0,
+      "raw": 0,
+      "files": 0
+    },
+    "by_source_lang": {
+      "cuda": {
+        "code": 16006,
+        "raw": 18904,
+        "kernels": 75
+      }
+    },
+    "kernels_measured": 75,
+    "kernels_total": 75,
+    "sycl_per_source_ratio": 0.0,
+    "coverage_pct_of_project": 44.0
+  },
+  "project": {
+    "cuda": {
+      "code": 36282,
+      "raw": 44894,
+      "files": 279
+    },
+    "triton": {
+      "code": 0,
+      "raw": 0,
+      "files": 0
+    },
+    "sycl": {
+      "code": 621,
+      "raw": 790,
+      "files": 5
+    }
+  },
+  "unattributed_sycl_files": [
+    "ggml/src/ggml-sycl/clamp.cpp",
+    "ggml/src/ggml-sycl/common.hpp",
+    "ggml/src/ggml-sycl/cpy.cpp",
+    "ggml/src/ggml-sycl/ggml-sycl.cpp",
+    "ggml/src/ggml-sycl/scale.cpp"
+  ],
+  "kernels": [
+    {
+      "id": "acc",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 47,
+      "source_raw": 57,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "add-id",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 45,
+      "source_raw": 55,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "allreduce",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 404,
+      "source_raw": 526,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "arange",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 25,
+      "source_raw": 30,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "argmax",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 69,
+      "source_raw": 83,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "argsort",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 223,
+      "source_raw": 267,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "binbcast",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 439,
+      "source_raw": 516,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "clamp",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 34,
+      "source_raw": 39,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "col2im-1d",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 59,
+      "source_raw": 73,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "concat",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 210,
+      "source_raw": 232,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "conv2d",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 80,
+      "source_raw": 99,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "conv2d-dw",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 68,
+      "source_raw": 83,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "conv2d-transpose",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 90,
+      "source_raw": 110,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "conv-transpose-1d",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 69,
+      "source_raw": 84,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "convert",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 35,
+      "source_raw": 39,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "count-equal",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 45,
+      "source_raw": 58,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "cpy",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 516,
+      "source_raw": 580,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "cross-entropy-loss",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 132,
+      "source_raw": 167,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "cumsum",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 216,
+      "source_raw": 291,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "dequantize",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 316,
+      "source_raw": 366,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "diag",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 60,
+      "source_raw": 72,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "diagmask",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 28,
+      "source_raw": 36,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "dsv4-hc",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 242,
+      "source_raw": 280,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "fill",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 27,
+      "source_raw": 31,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "flash-attn-common",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 376,
+      "source_raw": 474,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "flash-attn-vec",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 500,
+      "source_raw": 580,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "flash-attn-tile",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 354,
+      "source_raw": 413,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "flash-attn-mma-f16",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 394,
+      "source_raw": 461,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "fwht",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 81,
+      "source_raw": 97,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "gated-delta-net",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 262,
+      "source_raw": 320,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "getrows",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 408,
+      "source_raw": 475,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "batched-ptrs",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 20,
+      "source_raw": 23,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "gla",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 73,
+      "source_raw": 89,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "im2col",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 219,
+      "source_raw": 250,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "l2-norm",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 58,
+      "source_raw": 72,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "layer-norm",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 58,
+      "source_raw": 71,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "group-norm",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 49,
+      "source_raw": 62,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "lightning-indexer",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 417,
+      "source_raw": 544,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "mean",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 85,
+      "source_raw": 108,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "mmf",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 603,
+      "source_raw": 706,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "mmid",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 122,
+      "source_raw": 148,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "mmq",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 638,
+      "source_raw": 800,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "mmvf",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 783,
+      "source_raw": 862,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "mmvq",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 1247,
+      "source_raw": 1374,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "moe-weighted-reduction",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 57,
+      "source_raw": 61,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "opt-step-adamw",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 58,
+      "source_raw": 71,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "opt-step-sgd",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 34,
+      "source_raw": 42,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "out-prod",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 95,
+      "source_raw": 120,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "pad",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 76,
+      "source_raw": 94,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "pad-reflect-1d",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 23,
+      "source_raw": 34,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "pool1d",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 69,
+      "source_raw": 81,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "pool2d",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 80,
+      "source_raw": 90,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "quantize",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 557,
+      "source_raw": 645,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "rms-norm",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 344,
+      "source_raw": 403,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "rms-norm-rope",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 197,
+      "source_raw": 230,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "roll",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 43,
+      "source_raw": 53,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "rope",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 578,
+      "source_raw": 673,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "scale",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 27,
+      "source_raw": 31,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "set",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 29,
+      "source_raw": 36,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "set-rows",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 299,
+      "source_raw": 335,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "snake",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 53,
+      "source_raw": 59,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "softcap",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 27,
+      "source_raw": 32,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "softmax",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 308,
+      "source_raw": 404,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "solve-tri",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 222,
+      "source_raw": 253,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "ssm-conv",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 167,
+      "source_raw": 199,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "ssm-scan",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 669,
+      "source_raw": 789,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "sum",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 23,
+      "source_raw": 30,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "sumrows",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 71,
+      "source_raw": 83,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "top-k",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 204,
+      "source_raw": 231,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "topk-moe",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 344,
+      "source_raw": 411,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "tri",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 119,
+      "source_raw": 129,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "tsembd",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 35,
+      "source_raw": 43,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "unary",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 541,
+      "source_raw": 618,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "upscale",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 224,
+      "source_raw": 275,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    },
+    {
+      "id": "wkv",
+      "measured": true,
+      "source_lang": "cuda",
+      "status": "pending",
+      "source_code": 207,
+      "source_raw": 246,
+      "sycl_code": 0,
+      "sycl_raw": 0,
+      "unresolved": []
+    }
+  ],
+  "note": "code = lines excluding comments and blanks; source_migrated merges overlapping kernel spans per file so shared headers are counted once. unattributed_sycl_files are SYCL sources in the tree that no kernel's sycl_impl claims \u2014 fix the state rather than the number."
+}

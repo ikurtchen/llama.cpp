@@ -1,0 +1,95 @@
+{
+  "id": "set-rows",
+  "name": "set-rows",
+  "source": "ggml/src/ggml-cuda/set-rows.cu:set_rows_cuda_quant,set_rows_cuda,ggml_cuda_op_set_rows",
+  "source_lang": "cuda",
+  "status": "pending",
+  "risk": "medium",
+  "algorithm": "Scatter source rows into destination rows selected by integer indices, with dense and quantized destination variants.",
+  "cuda_constructs": [
+    "launch-config"
+  ],
+  "io_spec": {
+    "inputs": [
+      {
+        "name": "src0",
+        "dtypes": [
+          "f32"
+        ],
+        "shape": "rows to write"
+      },
+      {
+        "name": "rows",
+        "dtypes": [
+          "i32"
+        ],
+        "shape": "destination row indices"
+      },
+      {
+        "name": "dst",
+        "dtypes": [
+          "f32",
+          "quantized"
+        ],
+        "shape": "target tensor"
+      }
+    ],
+    "output": {
+      "name": "dst",
+      "dtypes": [
+        "same as destination"
+      ],
+      "shape": "destination tensor after indexed row writes"
+    }
+  },
+  "reference": {
+    "kind": "cpu",
+    "crosscheck": "-"
+  },
+  "notes": "Risk reason: indexed scatter into dense or quantized layouts needs careful addressing. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
+  "updated_at": "2026-09-06T16:21:37Z",
+  "loc": {
+    "source_lang": "cuda",
+    "source": {
+      "code": 299,
+      "comment": 0,
+      "blank": 36,
+      "raw": 335,
+      "files": 1
+    },
+    "sycl": {
+      "code": 0,
+      "comment": 0,
+      "blank": 0,
+      "raw": 0,
+      "files": 0
+    },
+    "source_files": [
+      {
+        "path": "ggml/src/ggml-cuda/set-rows.cu",
+        "lang": "c",
+        "spans": [
+          "7-71",
+          "74-111",
+          "113-177",
+          "179-218",
+          "220-323",
+          "376-398"
+        ],
+        "code": 299,
+        "comment": 0,
+        "blank": 36,
+        "raw": 335
+      }
+    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
+    "unresolved": [],
+    "method": "span",
+    "measured_at": "2026-09-06T16:21:37Z",
+    "source_spec": [
+      "ggml/src/ggml-cuda/set-rows.cu:7-71",
+      "ggml/src/ggml-cuda/set-rows.cu:113-177"
+    ]
+  }
+}

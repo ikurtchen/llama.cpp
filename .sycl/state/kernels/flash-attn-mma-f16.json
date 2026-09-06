@@ -1,0 +1,103 @@
+{
+  "id": "flash-attn-mma-f16",
+  "name": "flash-attn-mma-f16",
+  "source": "ggml/src/ggml-cuda/fattn.cu:ggml_cuda_flash_attn_ext_mma_f16_shall_use_sparse,ggml_cuda_flash_attn_ext_mma_f16_switch_ncols1,ggml_cuda_flash_attn_ext_mma_f16_switch_ncols2,ggml_cuda_flash_attn_ext_mma_f16",
+  "source_lang": "cuda",
+  "status": "pending",
+  "risk": "high",
+  "algorithm": "Compute flash attention with half-precision matrix-multiply-accumulate pipelines, optionally using sparse mask compaction and architecture-specific staging/pipeline parameters.",
+  "cuda_constructs": [
+    "launch-config",
+    "warp-shuffle",
+    "shared-memory",
+    "tensor-cores",
+    "cp-async",
+    "fast-math intrinsics",
+    "launch-bounds"
+  ],
+  "io_spec": {
+    "inputs": [
+      {
+        "name": "Q/K/V",
+        "dtypes": [
+          "f16",
+          "bf16"
+        ],
+        "shape": "attention tensors sized for MMA kernels"
+      },
+      {
+        "name": "mask/KV_max",
+        "dtypes": [
+          "f16",
+          "i32"
+        ],
+        "shape": "optional sparse attention metadata"
+      }
+    ],
+    "output": {
+      "name": "dst",
+      "dtypes": [
+        "f32"
+      ],
+      "shape": "attention output tensor"
+    }
+  },
+  "reference": {
+    "kind": "cpu",
+    "crosscheck": "-"
+  },
+  "notes": "Risk reason: tensor-core MMA pipelines, sparse path selection, and streamed partial-result handling make this the hardest attention variant. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
+  "updated_at": "2026-09-06T16:21:35Z",
+  "loc": {
+    "source_lang": "cuda",
+    "source": {
+      "code": 394,
+      "comment": 15,
+      "blank": 52,
+      "raw": 461,
+      "files": 2
+    },
+    "sycl": {
+      "code": 0,
+      "comment": 0,
+      "blank": 0,
+      "raw": 0,
+      "files": 0
+    },
+    "source_files": [
+      {
+        "path": "ggml/src/ggml-cuda/fattn-mma-f16.cuh",
+        "lang": "c",
+        "spans": [
+          "1766-1962"
+        ],
+        "code": 160,
+        "comment": 8,
+        "blank": 29,
+        "raw": 197
+      },
+      {
+        "path": "ggml/src/ggml-cuda/fattn.cu",
+        "lang": "c",
+        "spans": [
+          "109-130",
+          "132-167",
+          "169-244",
+          "246-375"
+        ],
+        "code": 234,
+        "comment": 7,
+        "blank": 23,
+        "raw": 264
+      }
+    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
+    "unresolved": [],
+    "method": "span",
+    "measured_at": "2026-09-06T16:21:35Z",
+    "source_spec": [
+      "ggml/src/ggml-cuda/fattn-mma-f16.cuh:1766-1962"
+    ]
+  }
+}

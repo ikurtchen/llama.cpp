@@ -1,0 +1,93 @@
+{
+  "id": "quantize",
+  "name": "quantize-family",
+  "source": "ggml/src/ggml-cuda/quantize.cu:nvfp4_native_scale_error,quantize_q8_1,quantize_mmq_nvfp4,quantize_mmq_mxfp4,quantize_mmq_q8_1,quantize_row_q8_1_cuda,quantize_mmq_q8_1_cuda,quantize_scatter_mmq_q8_1_cuda,quantize_scatter_mmq_fp4_cuda,quantize_mmq_fp4_cuda",
+  "source_lang": "cuda",
+  "status": "pending",
+  "risk": "high",
+  "algorithm": "Quantize F32 activations into q8_1 and fp4/MMQ helper formats, including scatter variants used by expert-routed MMQ kernels.",
+  "cuda_constructs": [
+    "launch-config",
+    "warp-shuffle",
+    "shared-memory",
+    "fast-math intrinsics",
+    "launch-bounds"
+  ],
+  "io_spec": {
+    "inputs": [
+      {
+        "name": "src0",
+        "dtypes": [
+          "f32"
+        ],
+        "shape": "dense activation rows"
+      },
+      {
+        "name": "ids",
+        "dtypes": [
+          "i32"
+        ],
+        "shape": "optional scatter map for MoE"
+      }
+    ],
+    "output": {
+      "name": "dst",
+      "dtypes": [
+        "q8_1 helper layout",
+        "mxfp4 helper layout",
+        "nvfp4 helper layout"
+      ],
+      "shape": "quantized helper rows plus optional scale tensor"
+    }
+  },
+  "reference": {
+    "kind": "analytical",
+    "crosscheck": "-"
+  },
+  "notes": "Risk reason: quantization error behavior, fp4 packing, and MoE scatter paths are precision-sensitive. Reference oracle: analytical quantization semantics plus downstream ggml-cpu op tests.",
+  "updated_at": "2026-09-06T16:21:36Z",
+  "loc": {
+    "source_lang": "cuda",
+    "source": {
+      "code": 557,
+      "comment": 7,
+      "blank": 81,
+      "raw": 645,
+      "files": 1
+    },
+    "sycl": {
+      "code": 0,
+      "comment": 0,
+      "blank": 0,
+      "raw": 0,
+      "files": 0
+    },
+    "source_files": [
+      {
+        "path": "ggml/src/ggml-cuda/quantize.cu",
+        "lang": "c",
+        "spans": [
+          "12-49",
+          "53-101",
+          "127-332",
+          "337-454",
+          "457-556",
+          "558-573",
+          "575-603",
+          "606-633",
+          "636-663",
+          "665-697"
+        ],
+        "code": 557,
+        "comment": 7,
+        "blank": 81,
+        "raw": 645
+      }
+    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
+    "unresolved": [],
+    "method": "span",
+    "measured_at": "2026-09-06T16:21:36Z"
+  }
+}

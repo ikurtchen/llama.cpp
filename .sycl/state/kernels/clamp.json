@@ -1,0 +1,47 @@
+{
+  "id": "clamp",
+  "name": "clamp",
+  "source": "ggml/src/ggml-cuda/clamp.cu:op_clamp,op_clamp_kernel,clamp_cuda,ggml_cuda_op_clamp",
+  "source_lang": "cuda",
+  "status": "migrated",
+  "risk": "low",
+  "algorithm": "Clamp each float element to a min/max interval.",
+  "cuda_constructs": [
+    "launch-config"
+  ],
+  "io_spec": {
+    "inputs": [
+      {
+        "name": "src0",
+        "dtypes": [
+          "f32"
+        ],
+        "shape": "same shape as src0"
+      }
+    ],
+    "output": {
+      "name": "dst",
+      "shape": "same shape as src0",
+      "dtypes": [
+        "f32"
+      ]
+    },
+    "notes": "Uses min/max bounds from op params."
+  },
+  "reference": {
+    "kind": "cpu",
+    "crosscheck": "-"
+  },
+  "notes": "Risk reason: simple pointwise map. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
+  "updated_at": "2026-09-06T16:23:05Z",
+  "loc": {
+    "source_code": 34,
+    "sycl_code": 44
+  },
+  "sycl_file": "ggml/src/ggml-sycl/clamp.cpp",
+  "target_style": "plain-sycl",
+  "unit_test": {
+    "result": "pass",
+    "evidence": "test-clamp-20260906T161709Z-a9a0cb"
+  }
+}

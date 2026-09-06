@@ -1,0 +1,97 @@
+{
+  "id": "binbcast",
+  "name": "binary-broadcast-family",
+  "source": "ggml/src/ggml-cuda/binbcast.cu:launch_bin_bcast_pack,k_repeat_back,repeat_back_cuda,ggml_cuda_op_bin_bcast,ggml_cuda_op_repeat,ggml_cuda_op_add,ggml_cuda_op_sub,ggml_cuda_op_mul,ggml_cuda_op_div,ggml_cuda_op_fused_binbcast_impl,ggml_cuda_op_fused_add,ggml_cuda_op_fused_mul,ggml_cuda_op_repeat_back",
+  "source_lang": "cuda",
+  "status": "pending",
+  "risk": "medium",
+  "algorithm": "Apply broadcasted binary elementwise ops (add, sub, mul, div), fused binary forms, repeat, and repeat_back across ggml tensor views with arbitrary strides.",
+  "cuda_constructs": [
+    "launch-config"
+  ],
+  "io_spec": {
+    "inputs": [
+      {
+        "name": "src0/src1",
+        "dtypes": [
+          "f32",
+          "f16"
+        ],
+        "shape": "broadcast-compatible tensor views"
+      },
+      {
+        "name": "op_params",
+        "fields": [
+          "broadcast metadata or repeat metadata"
+        ]
+      }
+    ],
+    "output": {
+      "name": "dst",
+      "dtypes": [
+        "f32",
+        "f16"
+      ],
+      "shape": "broadcasted destination"
+    },
+    "notes": "Covers repeat and repeat_back helpers used by several elementwise ops."
+  },
+  "reference": {
+    "kind": "cpu",
+    "crosscheck": "-"
+  },
+  "notes": "Risk reason: mostly indexing logic, but many broadcast and repeat layouts share the same implementation. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
+  "updated_at": "2026-09-06T16:21:34Z",
+  "loc": {
+    "source_lang": "cuda",
+    "source": {
+      "code": 439,
+      "comment": 9,
+      "blank": 68,
+      "raw": 516,
+      "files": 1
+    },
+    "sycl": {
+      "code": 0,
+      "comment": 0,
+      "blank": 0,
+      "raw": 0,
+      "files": 0
+    },
+    "source_files": [
+      {
+        "path": "ggml/src/ggml-cuda/binbcast.cu",
+        "lang": "c",
+        "spans": [
+          "29-99",
+          "106-356",
+          "358-386",
+          "399-409",
+          "411-431",
+          "433-435",
+          "437-439",
+          "441-443",
+          "445-447",
+          "449-451",
+          "453-482",
+          "485-513",
+          "515-543",
+          "545-574"
+        ],
+        "code": 439,
+        "comment": 9,
+        "blank": 68,
+        "raw": 516
+      }
+    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
+    "unresolved": [],
+    "method": "span",
+    "measured_at": "2026-09-06T16:21:34Z",
+    "source_spec": [
+      "ggml/src/ggml-cuda/binbcast.cu:29-99",
+      "ggml/src/ggml-cuda/binbcast.cu:106-174"
+    ]
+  }
+}

@@ -11,6 +11,9 @@
 
 #include "common.hpp"
 #include "cpy.hpp"
+#include "scale.hpp"
+#include "clamp.hpp"
+#include "unary.hpp"
 
 #include <sycl/sycl.hpp>
 
@@ -220,6 +223,33 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, ggml_tens
         case GGML_OP_CONT:
             ggml_sycl_cpy(ctx, dst->src[0], dst);
             return true;
+        case GGML_OP_SCALE:
+            ggml_sycl_op_scale(ctx, dst);
+            return true;
+        case GGML_OP_CLAMP:
+            ggml_sycl_op_clamp(ctx, dst);
+            return true;
+        case GGML_OP_UNARY:
+            ggml_sycl_op_unary(ctx, dst);
+            return true;
+        case GGML_OP_GLU:
+            ggml_sycl_op_glu(ctx, dst);
+            return true;
+        case GGML_OP_SQR:
+            ggml_sycl_op_sqr(ctx, dst);
+            return true;
+        case GGML_OP_SQRT:
+            ggml_sycl_op_sqrt(ctx, dst);
+            return true;
+        case GGML_OP_SIN:
+            ggml_sycl_op_sin(ctx, dst);
+            return true;
+        case GGML_OP_COS:
+            ggml_sycl_op_cos(ctx, dst);
+            return true;
+        case GGML_OP_LOG:
+            ggml_sycl_op_log(ctx, dst);
+            return true;
         default:
             return false;
     }
@@ -357,6 +387,20 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_CPY:
         case GGML_OP_CONT:
             return ggml_sycl_supports_cpy(op);
+        case GGML_OP_SCALE:
+            return ggml_sycl_supports_scale(op);
+        case GGML_OP_CLAMP:
+            return ggml_sycl_supports_clamp(op);
+        case GGML_OP_UNARY:
+            return ggml_sycl_supports_unary(op);
+        case GGML_OP_GLU:
+            return ggml_sycl_supports_glu(op);
+        case GGML_OP_SQR:
+        case GGML_OP_SQRT:
+        case GGML_OP_SIN:
+        case GGML_OP_COS:
+        case GGML_OP_LOG:
+            return ggml_sycl_supports_unary_f32f16(op);
         default:
             return false;
     }

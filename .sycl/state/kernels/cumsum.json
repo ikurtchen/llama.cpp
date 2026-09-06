@@ -1,0 +1,79 @@
+{
+  "id": "cumsum",
+  "name": "cumsum",
+  "source": "ggml/src/ggml-cuda/cumsum.cu:cumsum_cub_kernel,cumsum_kernel,cumsum_cub,cumsum_cuda,ggml_cuda_op_cumsum",
+  "source_lang": "cuda",
+  "status": "pending",
+  "risk": "medium",
+  "algorithm": "Compute inclusive cumulative sums along the innermost dimension, using a CUB scan when available and a tiled warp/block scan fallback otherwise.",
+  "cuda_constructs": [
+    "launch-config",
+    "shared-memory",
+    "warp-shuffle",
+    "CUB"
+  ],
+  "io_spec": {
+    "inputs": [
+      {
+        "name": "src0",
+        "dtypes": [
+          "f32",
+          "f16"
+        ],
+        "shape": "tensor reduced along dim0"
+      }
+    ],
+    "output": {
+      "name": "dst",
+      "dtypes": [
+        "same as src0"
+      ],
+      "shape": "same shape as src0"
+    }
+  },
+  "reference": {
+    "kind": "cpu",
+    "crosscheck": "-"
+  },
+  "notes": "Risk reason: scan carry propagation and fallback/shared-memory logic must be preserved. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
+  "updated_at": "2026-09-06T16:21:34Z",
+  "loc": {
+    "source_lang": "cuda",
+    "source": {
+      "code": 216,
+      "comment": 39,
+      "blank": 36,
+      "raw": 291,
+      "files": 1
+    },
+    "sycl": {
+      "code": 0,
+      "comment": 0,
+      "blank": 0,
+      "raw": 0,
+      "files": 0
+    },
+    "source_files": [
+      {
+        "path": "ggml/src/ggml-cuda/cumsum.cu",
+        "lang": "c",
+        "spans": [
+          "11-82",
+          "85-186",
+          "188-210",
+          "213-265",
+          "267-307"
+        ],
+        "code": 216,
+        "comment": 39,
+        "blank": 36,
+        "raw": 291
+      }
+    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
+    "unresolved": [],
+    "method": "span",
+    "measured_at": "2026-09-06T16:21:34Z"
+  }
+}

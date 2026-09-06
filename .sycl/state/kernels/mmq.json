@@ -1,0 +1,127 @@
+{
+  "id": "mmq",
+  "name": "mul-mat-q",
+  "source": "ggml/src/ggml-cuda/mmq.cu:ggml_cuda_mul_mat_q_switch_type,ggml_cuda_mul_mat_q,ggml_cuda_should_use_mmq",
+  "source_lang": "cuda",
+  "status": "pending",
+  "risk": "high",
+  "algorithm": "Multiply quantized weight matrices by F32 activations, first re-quantizing activations into q8_1/fp4 helper layouts and then running architecture-specific shared-memory MMA or stream-k kernels.",
+  "cuda_constructs": [
+    "launch-config",
+    "shared-memory",
+    "tensor-cores",
+    "fast-math intrinsics",
+    "launch-bounds"
+  ],
+  "io_spec": {
+    "inputs": [
+      {
+        "name": "src0",
+        "dtypes": [
+          "q1_0",
+          "q2_0",
+          "q4_0",
+          "q4_1",
+          "q5_0",
+          "q5_1",
+          "q8_0",
+          "q2_K",
+          "q3_K",
+          "q4_K",
+          "q5_K",
+          "q6_K",
+          "iq1_s",
+          "iq2_xxs",
+          "iq2_xs",
+          "iq2_s",
+          "iq3_xxs",
+          "iq3_s",
+          "iq4_xs",
+          "iq4_nl",
+          "mxfp4",
+          "nvfp4"
+        ],
+        "shape": "[k, rows, experts?, batches?] quantized weights"
+      },
+      {
+        "name": "src1",
+        "dtypes": [
+          "f32"
+        ],
+        "shape": "[k, cols, channels, samples] activations"
+      },
+      {
+        "name": "ids",
+        "dtypes": [
+          "i32"
+        ],
+        "shape": "optional expert ids"
+      }
+    ],
+    "output": {
+      "name": "dst",
+      "dtypes": [
+        "f32"
+      ],
+      "shape": "matrix product output"
+    }
+  },
+  "reference": {
+    "kind": "cpu",
+    "crosscheck": "-"
+  },
+  "notes": "Risk reason: custom quantized GEMM data layouts, activation requantization, and stream-k fixup make this one of the core hard ports. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
+  "updated_at": "2026-09-06T16:21:35Z",
+  "loc": {
+    "source_lang": "cuda",
+    "source": {
+      "code": 638,
+      "comment": 42,
+      "blank": 120,
+      "raw": 800,
+      "files": 2
+    },
+    "sycl": {
+      "code": 0,
+      "comment": 0,
+      "blank": 0,
+      "raw": 0,
+      "files": 0
+    },
+    "source_files": [
+      {
+        "path": "ggml/src/ggml-cuda/mmq.cu",
+        "lang": "c",
+        "spans": [
+          "8-83",
+          "85-257",
+          "259-386"
+        ],
+        "code": 308,
+        "comment": 27,
+        "blank": 42,
+        "raw": 377
+      },
+      {
+        "path": "ggml/src/ggml-cuda/mmq.cuh",
+        "lang": "c",
+        "spans": [
+          "947-1232",
+          "1234-1370"
+        ],
+        "code": 330,
+        "comment": 15,
+        "blank": 78,
+        "raw": 423
+      }
+    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
+    "unresolved": [],
+    "method": "span",
+    "measured_at": "2026-09-06T16:21:35Z",
+    "source_spec": [
+      "ggml/src/ggml-cuda/mmq.cuh:mul_mat_q,mul_mat_q_stream_k_fixup"
+    ]
+  }
+}

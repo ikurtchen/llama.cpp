@@ -1,0 +1,111 @@
+{
+  "id": "flash-attn-vec",
+  "name": "flash-attn-vectorized",
+  "source": "ggml/src/ggml-cuda/fattn.cu:ggml_cuda_flash_attn_ext_vec",
+  "source_lang": "cuda",
+  "status": "pending",
+  "risk": "high",
+  "algorithm": "Compute flash attention by vectorizing Q/K dot products and value accumulation directly in CUDA cores, with optional quantized K/V dequantization and logit softcap handling.",
+  "cuda_constructs": [
+    "launch-config",
+    "warp-shuffle",
+    "shared-memory",
+    "fast-math intrinsics",
+    "launch-bounds"
+  ],
+  "io_spec": {
+    "inputs": [
+      {
+        "name": "Q",
+        "dtypes": [
+          "f32"
+        ],
+        "shape": "[head_dim, q_rows, n_heads, n_seq]"
+      },
+      {
+        "name": "K/V",
+        "dtypes": [
+          "f16",
+          "bf16",
+          "q4_0",
+          "q4_1",
+          "q5_0",
+          "q5_1",
+          "q8_0"
+        ],
+        "shape": "[head_dim, kv_rows, kv_heads, n_seq]"
+      },
+      {
+        "name": "mask/sinks/KV_max",
+        "dtypes": [
+          "f16",
+          "f32",
+          "i32"
+        ],
+        "shape": "optional attention modifiers"
+      }
+    ],
+    "output": {
+      "name": "dst",
+      "dtypes": [
+        "f32"
+      ],
+      "shape": "[value_dim, q_rows, n_heads, n_seq]"
+    }
+  },
+  "reference": {
+    "kind": "cpu",
+    "crosscheck": "-"
+  },
+  "notes": "Risk reason: warp-level softmax, quantized K/V handling, and head-size templating make this a complex direct-attention port. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
+  "updated_at": "2026-09-06T16:21:35Z",
+  "loc": {
+    "source_lang": "cuda",
+    "source": {
+      "code": 500,
+      "comment": 7,
+      "blank": 73,
+      "raw": 580,
+      "files": 2
+    },
+    "sycl": {
+      "code": 0,
+      "comment": 0,
+      "blank": 0,
+      "raw": 0,
+      "files": 0
+    },
+    "source_files": [
+      {
+        "path": "ggml/src/ggml-cuda/fattn-vec.cuh",
+        "lang": "c",
+        "spans": [
+          "19-528"
+        ],
+        "code": 438,
+        "comment": 7,
+        "blank": 65,
+        "raw": 510
+      },
+      {
+        "path": "ggml/src/ggml-cuda/fattn.cu",
+        "lang": "c",
+        "spans": [
+          "392-461"
+        ],
+        "code": 62,
+        "comment": 0,
+        "blank": 8,
+        "raw": 70
+      }
+    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
+    "unresolved": [],
+    "method": "span",
+    "measured_at": "2026-09-06T16:21:35Z",
+    "source_spec": [
+      "ggml/src/ggml-cuda/fattn-vec.cuh:19-528"
+    ]
+  }
+}

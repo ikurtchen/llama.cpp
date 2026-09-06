@@ -1,0 +1,53 @@
+{
+  "id": "scale",
+  "name": "scale",
+  "source": "ggml/src/ggml-cuda/scale.cu:scale_f32,scale_f32_cuda,ggml_cuda_op_scale",
+  "source_lang": "cuda",
+  "status": "migrated",
+  "risk": "low",
+  "algorithm": "Multiply every element by a scalar.",
+  "cuda_constructs": [
+    "launch-config"
+  ],
+  "io_spec": {
+    "inputs": [
+      {
+        "name": "src0",
+        "dtypes": [
+          "f32"
+        ],
+        "shape": "same shape as src0"
+      },
+      {
+        "name": "scale",
+        "dtypes": [
+          "f32"
+        ],
+        "shape": "scalar"
+      }
+    ],
+    "output": {
+      "name": "dst",
+      "shape": "same shape as src0",
+      "dtypes": [
+        "f32"
+      ]
+    }
+  },
+  "reference": {
+    "kind": "cpu",
+    "crosscheck": "-"
+  },
+  "notes": "Risk reason: trivial pointwise multiply. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
+  "updated_at": "2026-09-06T16:23:05Z",
+  "loc": {
+    "source_code": 27,
+    "sycl_code": 37
+  },
+  "sycl_file": "ggml/src/ggml-sycl/scale.cpp",
+  "target_style": "plain-sycl",
+  "unit_test": {
+    "result": "pass",
+    "evidence": "test-scale-20260906T161706Z-440eea"
+  }
+}

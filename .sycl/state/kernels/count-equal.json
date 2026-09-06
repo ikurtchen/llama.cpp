@@ -1,0 +1,75 @@
+{
+  "id": "count-equal",
+  "name": "count-equal",
+  "source": "ggml/src/ggml-cuda/count-equal.cu:count_equal,ggml_cuda_count_equal",
+  "source_lang": "cuda",
+  "status": "pending",
+  "risk": "medium",
+  "algorithm": "Count how many positions are equal across two tensors by comparing elements and atomically accumulating the result.",
+  "cuda_constructs": [
+    "launch-config",
+    "atomics"
+  ],
+  "io_spec": {
+    "inputs": [
+      {
+        "name": "src0/src1",
+        "dtypes": [
+          "i32",
+          "f32"
+        ],
+        "shape": "same shape"
+      }
+    ],
+    "output": {
+      "name": "dst",
+      "dtypes": [
+        "i64",
+        "i32"
+      ],
+      "shape": "scalar count"
+    }
+  },
+  "reference": {
+    "kind": "cpu",
+    "crosscheck": "-"
+  },
+  "notes": "Risk reason: atomic accumulation and type-specialized comparisons need care. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
+  "updated_at": "2026-09-06T16:21:34Z",
+  "loc": {
+    "source_lang": "cuda",
+    "source": {
+      "code": 45,
+      "comment": 0,
+      "blank": 13,
+      "raw": 58,
+      "files": 1
+    },
+    "sycl": {
+      "code": 0,
+      "comment": 0,
+      "blank": 0,
+      "raw": 0,
+      "files": 0
+    },
+    "source_files": [
+      {
+        "path": "ggml/src/ggml-cuda/count-equal.cu",
+        "lang": "c",
+        "spans": [
+          "6-26",
+          "28-64"
+        ],
+        "code": 45,
+        "comment": 0,
+        "blank": 13,
+        "raw": 58
+      }
+    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
+    "unresolved": [],
+    "method": "span",
+    "measured_at": "2026-09-06T16:21:34Z"
+  }
+}

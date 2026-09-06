@@ -1,0 +1,83 @@
+{
+  "id": "col2im-1d",
+  "name": "col2im-1d",
+  "source": "ggml/src/ggml-cuda/col2im-1d.cu:col2im_1d_kernel,ggml_cuda_op_col2im_1d",
+  "source_lang": "cuda",
+  "status": "pending",
+  "risk": "medium",
+  "algorithm": "Scatter a 1D im2col-style matrix back into the output signal layout, reconstructing overlapped windows into their image positions.",
+  "cuda_constructs": [
+    "launch-config"
+  ],
+  "io_spec": {
+    "inputs": [
+      {
+        "name": "src0",
+        "dtypes": [
+          "f32",
+          "f16"
+        ],
+        "shape": "columnized sliding-window tensor"
+      },
+      {
+        "name": "op_params",
+        "fields": [
+          "kernel size",
+          "stride",
+          "padding",
+          "dilation"
+        ]
+      }
+    ],
+    "output": {
+      "name": "dst",
+      "dtypes": [
+        "f32",
+        "f16"
+      ],
+      "shape": "reconstructed 1D signal"
+    }
+  },
+  "reference": {
+    "kind": "cpu",
+    "crosscheck": "-"
+  },
+  "notes": "Risk reason: inverse window indexing is more error-prone than pure elementwise code. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
+  "updated_at": "2026-09-06T16:21:34Z",
+  "loc": {
+    "source_lang": "cuda",
+    "source": {
+      "code": 59,
+      "comment": 3,
+      "blank": 11,
+      "raw": 73,
+      "files": 1
+    },
+    "sycl": {
+      "code": 0,
+      "comment": 0,
+      "blank": 0,
+      "raw": 0,
+      "files": 0
+    },
+    "source_files": [
+      {
+        "path": "ggml/src/ggml-cuda/col2im-1d.cu",
+        "lang": "c",
+        "spans": [
+          "8-39",
+          "41-81"
+        ],
+        "code": 59,
+        "comment": 3,
+        "blank": 11,
+        "raw": 73
+      }
+    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
+    "unresolved": [],
+    "method": "span",
+    "measured_at": "2026-09-06T16:21:34Z"
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-unary-20260906T162643Z-7f429f",
+  "class": "test",
+  "subject": "unary",
+  "phase": "migrate",
+  "ts": "2026-09-06T16:26:50Z",
+  "duration_s": 6.536,
+  "command": "build/bin/test-backend-ops test -b SYCL0 -o SILU,GELU,GELU_ERF,GELU_QUICK,RELU,TANH,SIGMOID,HARDSIGMOID,HARDSWISH,EXP,ELU,ABS,SGN,NEG,STEP,SQR,SQRT,SIN,COS,LOG,FLOOR,CEIL,ROUND,TRUNC,EXPM1,SOFTPLUS,REGLU,GEGLU,SWIGLU,GEGLU_ERF,GEGLU_QUICK,SWIGLU_OAI",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "f6a043132",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/unary/test-unary-20260906T162643Z-7f429f.log",
+  "log_sha256": "ffaab2f6d70f99fab8e692d2f36cee85356f2cbf4576b685a4f487ee1d3d23be",
+  "log_bytes": 22137,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "CPU backend result (test-backend-ops built-in oracle)",
+    "tolerance": {
+      "source": "test-backend-ops default"
+    }
+  },
+  "extracted": {}
+}

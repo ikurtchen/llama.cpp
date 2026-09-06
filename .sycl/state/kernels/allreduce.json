@@ -1,0 +1,102 @@
+{
+  "id": "allreduce",
+  "name": "two-gpu-allreduce",
+  "source": "ggml/src/ggml-cuda/allreduce.cu:ggml_cuda_ar_signal_set,ggml_cuda_ar_signal_get,ggml_cuda_ar_kernel,ggml_cuda_ar_add_kernel,ggml_cuda_ar_chunk_bytes,ggml_cuda_ar_wait_for_compute,ggml_cuda_ar_pipeline_free,ggml_cuda_ar_allreduce_copy_impl,ggml_cuda_ar_allreduce_copy_outer,ggml_cuda_ar_allreduce",
+  "source_lang": "cuda",
+  "status": "pending",
+  "risk": "high",
+  "algorithm": "Perform an in-place sum reduction across matching tensors on two GPUs, using either a chunked device kernel that stages through pinned host memory or a copy-engine path plus device-side accumulation for larger tensors.",
+  "cuda_constructs": [
+    "launch-config",
+    "atomics",
+    "device-side busy-wait",
+    "pinned-host-memory"
+  ],
+  "io_spec": {
+    "inputs": [
+      {
+        "name": "sendbuf/recvbuf",
+        "dtypes": [
+          "f16",
+          "bf16",
+          "f32"
+        ],
+        "shape": "matching flat tensor on each GPU"
+      },
+      {
+        "name": "peer staging buffers",
+        "dtypes": [
+          "wire type"
+        ],
+        "shape": "count elements"
+      },
+      {
+        "name": "arrival flags",
+        "dtypes": [
+          "i32"
+        ],
+        "shape": "per-block synchronization slots"
+      }
+    ],
+    "output": {
+      "name": "recvbuf",
+      "shape": "same as input tensor",
+      "dtypes": [
+        "f16",
+        "bf16",
+        "f32"
+      ]
+    },
+    "notes": "Backend communication utility, not a ggml op; correctness is analytical (peerwise sum)."
+  },
+  "reference": {
+    "kind": "analytical",
+    "crosscheck": "-"
+  },
+  "notes": "Risk reason: cross-GPU synchronization, host staging, and precision-roundtrip behavior need careful porting. Reference oracle: analytical sum semantics plus backend tests.",
+  "updated_at": "2026-09-06T16:21:34Z",
+  "loc": {
+    "source_lang": "cuda",
+    "source": {
+      "code": 404,
+      "comment": 67,
+      "blank": 55,
+      "raw": 526,
+      "files": 1
+    },
+    "sycl": {
+      "code": 0,
+      "comment": 0,
+      "blank": 0,
+      "raw": 0,
+      "files": 0
+    },
+    "source_files": [
+      {
+        "path": "ggml/src/ggml-cuda/allreduce.cu",
+        "lang": "c",
+        "spans": [
+          "61-66",
+          "108-198",
+          "206-218",
+          "377-383",
+          "385-390",
+          "537-581",
+          "593-707",
+          "715-741",
+          "743-953",
+          "965-969"
+        ],
+        "code": 404,
+        "comment": 67,
+        "blank": 55,
+        "raw": 526
+      }
+    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
+    "unresolved": [],
+    "method": "span",
+    "measured_at": "2026-09-06T16:21:34Z"
+  }
+}

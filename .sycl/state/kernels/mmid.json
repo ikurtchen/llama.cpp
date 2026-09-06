@@ -1,0 +1,76 @@
+{
+  "id": "mmid",
+  "name": "mul-mat-id-helper",
+  "source": "ggml/src/ggml-cuda/mmid.cu:mm_ids_helper,launch_mm_ids_helper,ggml_cuda_launch_mm_ids_helper",
+  "source_lang": "cuda",
+  "status": "pending",
+  "risk": "medium",
+  "algorithm": "Compact token-to-expert routing ids into contiguous source/destination maps and expert bounds for MoE matmul kernels.",
+  "cuda_constructs": [
+    "launch-config",
+    "warp-shuffle",
+    "shared-memory",
+    "launch-bounds"
+  ],
+  "io_spec": {
+    "inputs": [
+      {
+        "name": "ids",
+        "dtypes": [
+          "i32"
+        ],
+        "shape": "[n_expert_used, n_tokens] routing ids"
+      }
+    ],
+    "output": {
+      "name": "compact maps/bounds",
+      "dtypes": [
+        "i32"
+      ],
+      "shape": "compacted row maps plus expert prefix bounds"
+    }
+  },
+  "reference": {
+    "kind": "analytical",
+    "crosscheck": "-"
+  },
+  "notes": "Risk reason: routing compaction and inverse-map options must match MoE matmul expectations exactly. Reference oracle: analytical routing semantics plus MoE backend tests.",
+  "updated_at": "2026-09-06T16:21:35Z",
+  "loc": {
+    "source_lang": "cuda",
+    "source": {
+      "code": 122,
+      "comment": 8,
+      "blank": 18,
+      "raw": 148,
+      "files": 1
+    },
+    "sycl": {
+      "code": 0,
+      "comment": 0,
+      "blank": 0,
+      "raw": 0,
+      "files": 0
+    },
+    "source_files": [
+      {
+        "path": "ggml/src/ggml-cuda/mmid.cu",
+        "lang": "c",
+        "spans": [
+          "31-129",
+          "131-149",
+          "151-180"
+        ],
+        "code": 122,
+        "comment": 8,
+        "blank": 18,
+        "raw": 148
+      }
+    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
+    "unresolved": [],
+    "method": "span",
+    "measured_at": "2026-09-06T16:21:35Z"
+  }
+}

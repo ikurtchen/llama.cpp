@@ -1,0 +1,89 @@
+{
+  "id": "rms-norm-rope",
+  "name": "rms-norm-mul-rope-fused",
+  "source": "ggml/src/ggml-cuda/rope.cu:rms_norm_mul_rope_f32,rms_norm_mul_rope_cuda,ggml_cuda_op_rms_norm_mul_rope_fused",
+  "source_lang": "cuda",
+  "status": "pending",
+  "risk": "high",
+  "algorithm": "Fuse RMS normalization, optional multiplicative scale, and rotary position embedding into one pass over attention inputs.",
+  "cuda_constructs": [
+    "launch-config",
+    "shared-memory"
+  ],
+  "io_spec": {
+    "inputs": [
+      {
+        "name": "src0",
+        "dtypes": [
+          "f32"
+        ],
+        "shape": "attention input tensor"
+      },
+      {
+        "name": "mul",
+        "dtypes": [
+          "f32"
+        ],
+        "shape": "broadcasted scale tensor"
+      },
+      {
+        "name": "pos/freq params",
+        "dtypes": [
+          "i32",
+          "f32"
+        ],
+        "shape": "RoPE metadata"
+      }
+    ],
+    "output": {
+      "name": "dst",
+      "dtypes": [
+        "f32"
+      ],
+      "shape": "same logical tensor as src0"
+    }
+  },
+  "reference": {
+    "kind": "cpu",
+    "crosscheck": "-"
+  },
+  "notes": "Risk reason: fused norm + RoPE changes operation order and is hot-path relevant. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
+  "updated_at": "2026-09-06T16:21:37Z",
+  "loc": {
+    "source_lang": "cuda",
+    "source": {
+      "code": 197,
+      "comment": 0,
+      "blank": 33,
+      "raw": 230,
+      "files": 1
+    },
+    "sycl": {
+      "code": 0,
+      "comment": 0,
+      "blank": 0,
+      "raw": 0,
+      "files": 0
+    },
+    "source_files": [
+      {
+        "path": "ggml/src/ggml-cuda/rope.cu",
+        "lang": "c",
+        "spans": [
+          "710-788",
+          "790-851",
+          "853-941"
+        ],
+        "code": 197,
+        "comment": 0,
+        "blank": 33,
+        "raw": 230
+      }
+    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
+    "unresolved": [],
+    "method": "span",
+    "measured_at": "2026-09-06T16:21:37Z"
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "id": "softcap",
+  "name": "softcap",
+  "source": "ggml/src/ggml-cuda/softcap.cu:softcap_f32,softcap_f32_cuda,ggml_cuda_op_softcap",
+  "source_lang": "cuda",
+  "status": "pending",
+  "risk": "low",
+  "algorithm": "Apply the softcap nonlinearity elementwise to clamp large magnitudes smoothly.",
+  "cuda_constructs": [
+    "launch-config"
+  ],
+  "io_spec": {
+    "inputs": [
+      {
+        "name": "src0",
+        "dtypes": [
+          "f32"
+        ],
+        "shape": "same shape as src0"
+      }
+    ],
+    "output": {
+      "name": "dst",
+      "shape": "same shape as src0",
+      "dtypes": [
+        "f32"
+      ]
+    },
+    "notes": "Scalar cap parameter comes from op params."
+  },
+  "reference": {
+    "kind": "cpu",
+    "crosscheck": "-"
+  },
+  "notes": "Risk reason: simple pointwise map. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
+  "updated_at": "2026-09-06T16:21:37Z",
+  "loc": {
+    "source_lang": "cuda",
+    "source": {
+      "code": 27,
+      "comment": 0,
+      "blank": 5,
+      "raw": 32,
+      "files": 1
+    },
+    "sycl": {
+      "code": 0,
+      "comment": 0,
+      "blank": 0,
+      "raw": 0,
+      "files": 0
+    },
+    "source_files": [
+      {
+        "path": "ggml/src/ggml-cuda/softcap.cu",
+        "lang": "c",
+        "spans": [
+          "3-13",
+          "15-19",
+          "22-37"
+        ],
+        "code": 27,
+        "comment": 0,
+        "blank": 5,
+        "raw": 32
+      }
+    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
+    "unresolved": [],
+    "method": "span",
+    "measured_at": "2026-09-06T16:21:37Z"
+  }
+}

@@ -1,0 +1,87 @@
+{
+  "id": "sumrows",
+  "name": "sum-rows",
+  "source": "ggml/src/ggml-cuda/sumrows.cu:sum_rows_f32_cuda,ggml_cuda_op_sum_rows",
+  "source_lang": "cuda",
+  "status": "pending",
+  "risk": "medium",
+  "algorithm": "Reduce each row to its sum with a custom shared-memory row reduction kernel.",
+  "cuda_constructs": [
+    "launch-config",
+    "shared-memory"
+  ],
+  "io_spec": {
+    "inputs": [
+      {
+        "name": "src0",
+        "dtypes": [
+          "f32"
+        ],
+        "shape": "[cols, rows] f32"
+      }
+    ],
+    "output": {
+      "name": "dst",
+      "shape": "[rows] f32",
+      "dtypes": [
+        "f32"
+      ]
+    }
+  },
+  "reference": {
+    "kind": "cpu",
+    "crosscheck": "-"
+  },
+  "notes": "Risk reason: custom row reduction kernel. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
+  "updated_at": "2026-09-06T16:21:38Z",
+  "loc": {
+    "source_lang": "cuda",
+    "source": {
+      "code": 71,
+      "comment": 3,
+      "blank": 9,
+      "raw": 83,
+      "files": 2
+    },
+    "sycl": {
+      "code": 0,
+      "comment": 0,
+      "blank": 0,
+      "raw": 0,
+      "files": 0
+    },
+    "source_files": [
+      {
+        "path": "ggml/src/ggml-cuda/reduce_rows.cuh",
+        "lang": "c",
+        "spans": [
+          "4-43"
+        ],
+        "code": 34,
+        "comment": 1,
+        "blank": 5,
+        "raw": 40
+      },
+      {
+        "path": "ggml/src/ggml-cuda/sumrows.cu",
+        "lang": "c",
+        "spans": [
+          "4-17",
+          "19-47"
+        ],
+        "code": 37,
+        "comment": 2,
+        "blank": 4,
+        "raw": 43
+      }
+    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
+    "unresolved": [],
+    "method": "span",
+    "measured_at": "2026-09-06T16:21:38Z",
+    "source_spec": [
+      "ggml/src/ggml-cuda/reduce_rows.cuh:reduce_rows_f32"
+    ]
+  }
+}

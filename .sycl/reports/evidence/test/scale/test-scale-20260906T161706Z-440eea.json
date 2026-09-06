@@ -1,0 +1,33 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-scale-20260906T161706Z-440eea",
+  "class": "test",
+  "subject": "scale",
+  "phase": "migrate",
+  "ts": "2026-09-06T16:17:09Z",
+  "duration_s": 2.647,
+  "command": "build/bin/test-backend-ops test -b SYCL0 -o SCALE",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "f6a043132",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/scale/test-scale-20260906T161706Z-440eea.log",
+  "log_sha256": "23bd361639e65bae50a18a2aa7f5bc67df27e55c8641cedc972442578751ce3d",
+  "log_bytes": 1360,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "CPU backend result (test-backend-ops built-in oracle)",
+    "tolerance": {
+      "source": "test-backend-ops default"
+    }
+  },
+  "extracted": {}
+}

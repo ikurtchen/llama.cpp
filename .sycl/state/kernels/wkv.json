@@ -1,0 +1,78 @@
+{
+  "id": "wkv",
+  "name": "rwkv-wkv-family",
+  "source": "ggml/src/ggml-cuda/wkv.cu:rwkv_wkv_f32,rwkv_wkv7_f32,rwkv_wkv7_f32_t1_warp_row,ggml_cuda_op_rwkv_wkv6,ggml_cuda_op_rwkv_wkv7",
+  "source_lang": "cuda",
+  "status": "pending",
+  "risk": "high",
+  "algorithm": "Run RWKV v6/v7 recurrent WKV kernels that update per-head state matrices and emit token outputs from key/value/receptance and decay terms.",
+  "cuda_constructs": [
+    "launch-config",
+    "shared-memory",
+    "warp-shuffle",
+    "launch-bounds"
+  ],
+  "io_spec": {
+    "inputs": [
+      {
+        "name": "k/v/r/(tf,td or w,a,b)/state",
+        "dtypes": [
+          "f32"
+        ],
+        "shape": "RWKV recurrent tensors and cached state"
+      }
+    ],
+    "output": {
+      "name": "dst",
+      "dtypes": [
+        "f32"
+      ],
+      "shape": "token outputs followed by updated state buffer"
+    }
+  },
+  "reference": {
+    "kind": "cpu",
+    "crosscheck": "-"
+  },
+  "notes": "Risk reason: recurrent state update order and warp-specialized fast path are model-specific and sensitive. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
+  "updated_at": "2026-09-06T16:21:38Z",
+  "loc": {
+    "source_lang": "cuda",
+    "source": {
+      "code": 207,
+      "comment": 0,
+      "blank": 39,
+      "raw": 246,
+      "files": 1
+    },
+    "sycl": {
+      "code": 0,
+      "comment": 0,
+      "blank": 0,
+      "raw": 0,
+      "files": 0
+    },
+    "source_files": [
+      {
+        "path": "ggml/src/ggml-cuda/wkv.cu",
+        "lang": "c",
+        "spans": [
+          "4-66",
+          "68-142",
+          "144-193",
+          "195-221",
+          "223-253"
+        ],
+        "code": 207,
+        "comment": 0,
+        "blank": 39,
+        "raw": 246
+      }
+    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
+    "unresolved": [],
+    "method": "span",
+    "measured_at": "2026-09-06T16:21:38Z"
+  }
+}

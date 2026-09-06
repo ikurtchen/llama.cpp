@@ -1,0 +1,108 @@
+{
+  "id": "mmf",
+  "name": "mul-mat-f",
+  "source": "ggml/src/ggml-cuda/mmf.cu:mmf_get_rows_per_block,ggml_cuda_mul_mat_f,ggml_cuda_should_use_mmf",
+  "source_lang": "cuda",
+  "status": "pending",
+  "risk": "high",
+  "algorithm": "Multiply a dense F32/F16/BF16 weight matrix by F32 activations, including MUL_MAT_ID expert selection, using architecture-specific MMA kernels from the header implementation.",
+  "cuda_constructs": [
+    "launch-config",
+    "shared-memory",
+    "tensor-cores",
+    "launch-bounds"
+  ],
+  "io_spec": {
+    "inputs": [
+      {
+        "name": "src0",
+        "dtypes": [
+          "f32",
+          "f16",
+          "bf16"
+        ],
+        "shape": "[k, rows, experts?, batches?] weights"
+      },
+      {
+        "name": "src1",
+        "dtypes": [
+          "f32"
+        ],
+        "shape": "[k, cols, channels, samples] activations"
+      },
+      {
+        "name": "ids",
+        "dtypes": [
+          "i32"
+        ],
+        "shape": "optional expert ids for MUL_MAT_ID"
+      }
+    ],
+    "output": {
+      "name": "dst",
+      "dtypes": [
+        "f32"
+      ],
+      "shape": "matrix product output"
+    }
+  },
+  "reference": {
+    "kind": "cpu",
+    "crosscheck": "-"
+  },
+  "notes": "Risk reason: tensor-core tile layouts and optional expert-routing path make this a high-care dense matmul port. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
+  "updated_at": "2026-09-06T16:21:35Z",
+  "loc": {
+    "source_lang": "cuda",
+    "source": {
+      "code": 603,
+      "comment": 8,
+      "blank": 95,
+      "raw": 706,
+      "files": 2
+    },
+    "sycl": {
+      "code": 0,
+      "comment": 0,
+      "blank": 0,
+      "raw": 0,
+      "files": 0
+    },
+    "source_files": [
+      {
+        "path": "ggml/src/ggml-cuda/mmf.cu",
+        "lang": "c",
+        "spans": [
+          "5-11",
+          "13-131",
+          "133-191"
+        ],
+        "code": 154,
+        "comment": 4,
+        "blank": 27,
+        "raw": 185
+      },
+      {
+        "path": "ggml/src/ggml-cuda/mmf.cuh",
+        "lang": "c",
+        "spans": [
+          "48-294",
+          "297-570"
+        ],
+        "code": 449,
+        "comment": 4,
+        "blank": 68,
+        "raw": 521
+      }
+    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
+    "unresolved": [],
+    "method": "span",
+    "measured_at": "2026-09-06T16:21:35Z",
+    "source_spec": [
+      "ggml/src/ggml-cuda/mmf.cuh:48-294",
+      "ggml/src/ggml-cuda/mmf.cuh:297-570"
+    ]
+  }
+}

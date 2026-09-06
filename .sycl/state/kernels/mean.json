@@ -1,0 +1,88 @@
+{
+  "id": "mean",
+  "name": "mean",
+  "source": "ggml/src/ggml-cuda/mean.cu:divide_by_count",
+  "source_lang": "cuda",
+  "status": "pending",
+  "risk": "medium",
+  "algorithm": "Reduce rows or full vectors to their arithmetic mean, using CUB device reduction for large vectors and a custom row-reduction kernel otherwise.",
+  "cuda_constructs": [
+    "launch-config",
+    "CUB"
+  ],
+  "io_spec": {
+    "inputs": [
+      {
+        "name": "src0",
+        "dtypes": [
+          "f32"
+        ],
+        "shape": "[cols, rows] f32"
+      }
+    ],
+    "output": {
+      "name": "dst",
+      "shape": "[rows] or scalar",
+      "dtypes": [
+        "f32"
+      ]
+    }
+  },
+  "reference": {
+    "kind": "cpu",
+    "crosscheck": "-"
+  },
+  "notes": "Risk reason: reduction path switches between CUB and custom row reduction. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
+  "updated_at": "2026-09-06T16:21:35Z",
+  "loc": {
+    "source_lang": "cuda",
+    "source": {
+      "code": 85,
+      "comment": 9,
+      "blank": 14,
+      "raw": 108,
+      "files": 2
+    },
+    "sycl": {
+      "code": 0,
+      "comment": 0,
+      "blank": 0,
+      "raw": 0,
+      "files": 0
+    },
+    "source_files": [
+      {
+        "path": "ggml/src/ggml-cuda/mean.cu",
+        "lang": "c",
+        "spans": [
+          "9-11",
+          "13-77"
+        ],
+        "code": 51,
+        "comment": 8,
+        "blank": 9,
+        "raw": 68
+      },
+      {
+        "path": "ggml/src/ggml-cuda/reduce_rows.cuh",
+        "lang": "c",
+        "spans": [
+          "4-43"
+        ],
+        "code": 34,
+        "comment": 1,
+        "blank": 5,
+        "raw": 40
+      }
+    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
+    "unresolved": [],
+    "method": "span",
+    "measured_at": "2026-09-06T16:21:35Z",
+    "source_spec": [
+      "ggml/src/ggml-cuda/reduce_rows.cuh:reduce_rows_f32",
+      "ggml/src/ggml-cuda/mean.cu:13-77"
+    ]
+  }
+}

@@ -1,0 +1,82 @@
+{
+  "id": "argsort",
+  "name": "argsort",
+  "source": "ggml/src/ggml-cuda/argsort.cu:init_indices,init_offsets,argsort_f32_i32_cuda_cub_chunk_nrows,argsort_f32_i32_cuda_cub,ggml_cuda_swap,k_argsort_f32_i32,next_power_of_2,argsort_f32_i32_cuda_bitonic,ggml_cuda_op_argsort",
+  "source_lang": "cuda",
+  "status": "pending",
+  "risk": "high",
+  "algorithm": "Sort each row of float scores into an index permutation, choosing CUB radix sort for larger cases and a custom bitonic kernel for small cases.",
+  "cuda_constructs": [
+    "launch-config",
+    "shared-memory",
+    "CUB"
+  ],
+  "io_spec": {
+    "inputs": [
+      {
+        "name": "src0",
+        "dtypes": [
+          "f32"
+        ],
+        "shape": "[cols, rows, ...] score tensor"
+      }
+    ],
+    "output": {
+      "name": "dst",
+      "dtypes": [
+        "i32"
+      ],
+      "shape": "same logical rows, storing sorted indices"
+    },
+    "notes": "Ascending and descending orders are both supported."
+  },
+  "reference": {
+    "kind": "cpu",
+    "crosscheck": "-"
+  },
+  "notes": "Risk reason: hybrid CUB plus custom bitonic sort with rowwise offsets. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
+  "updated_at": "2026-09-06T16:21:34Z",
+  "loc": {
+    "source_lang": "cuda",
+    "source": {
+      "code": 223,
+      "comment": 14,
+      "blank": 30,
+      "raw": 267,
+      "files": 1
+    },
+    "sycl": {
+      "code": 0,
+      "comment": 0,
+      "blank": 0,
+      "raw": 0,
+      "files": 0
+    },
+    "source_files": [
+      {
+        "path": "ggml/src/ggml-cuda/argsort.cu",
+        "lang": "c",
+        "spans": [
+          "12-19",
+          "21-27",
+          "33-43",
+          "45-155",
+          "159-164",
+          "166-214",
+          "216-222",
+          "224-249",
+          "251-292"
+        ],
+        "code": 223,
+        "comment": 14,
+        "blank": 30,
+        "raw": 267
+      }
+    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
+    "unresolved": [],
+    "method": "span",
+    "measured_at": "2026-09-06T16:21:34Z"
+  }
+}

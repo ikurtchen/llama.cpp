@@ -1,0 +1,77 @@
+{
+  "id": "convert",
+  "name": "type-convert",
+  "source": "ggml/src/ggml-cuda/convert.cu:convert_unary,convert_unary_cuda,convert_unary_cont_cuda",
+  "source_lang": "cuda",
+  "status": "pending",
+  "risk": "low",
+  "algorithm": "Convert dense tensor elements between supported scalar formats without changing tensor shape.",
+  "cuda_constructs": [
+    "launch-config"
+  ],
+  "io_spec": {
+    "inputs": [
+      {
+        "name": "src0",
+        "dtypes": [
+          "f32",
+          "f16",
+          "bf16"
+        ],
+        "shape": "dense tensor"
+      }
+    ],
+    "output": {
+      "name": "dst",
+      "dtypes": [
+        "f32",
+        "f16",
+        "bf16"
+      ],
+      "shape": "same shape as src0"
+    }
+  },
+  "reference": {
+    "kind": "analytical",
+    "crosscheck": "-"
+  },
+  "notes": "Risk reason: direct per-element casts only. Reference oracle: analytical type conversion plus callers validated by ggml-cpu backend.",
+  "updated_at": "2026-09-06T16:21:34Z",
+  "loc": {
+    "source_lang": "cuda",
+    "source": {
+      "code": 35,
+      "comment": 0,
+      "blank": 4,
+      "raw": 39,
+      "files": 1
+    },
+    "sycl": {
+      "code": 0,
+      "comment": 0,
+      "blank": 0,
+      "raw": 0,
+      "files": 0
+    },
+    "source_files": [
+      {
+        "path": "ggml/src/ggml-cuda/convert.cu",
+        "lang": "c",
+        "spans": [
+          "416-440",
+          "442-451",
+          "453-456"
+        ],
+        "code": 35,
+        "comment": 0,
+        "blank": 4,
+        "raw": 39
+      }
+    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
+    "unresolved": [],
+    "method": "span",
+    "measured_at": "2026-09-06T16:21:34Z"
+  }
+}

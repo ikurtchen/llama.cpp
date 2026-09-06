@@ -1,0 +1,113 @@
+{
+  "id": "flash-attn-common",
+  "name": "flash-attn-common",
+  "source": "ggml/src/ggml-cuda/fattn.cu:flash_attn_mask_to_sparse_indices,ggml_cuda_flash_attn_ext_compact_mask,ggml_cuda_fattn_kv_type_supported,ggml_cuda_flash_attn_ext_get_alloc_size,ggml_cuda_flash_attn_ext,ggml_cuda_flash_attn_ext_supported",
+  "source_lang": "cuda",
+  "status": "pending",
+  "risk": "high",
+  "algorithm": "Support flash attention execution by compacting sparse masks into KV index lists and by combining or fixing up partial attention results across streamed K/V tiles.",
+  "cuda_constructs": [
+    "launch-config",
+    "warp-shuffle",
+    "shared-memory",
+    "tensor-cores",
+    "fast-math intrinsics"
+  ],
+  "io_spec": {
+    "inputs": [
+      {
+        "name": "Q/K/V/mask metadata",
+        "dtypes": [
+          "f16",
+          "bf16",
+          "q4_0",
+          "q4_1",
+          "q5_0",
+          "q5_1",
+          "q8_0"
+        ],
+        "shape": "attention tensors and optional sparse mask"
+      },
+      {
+        "name": "temporary score/value accumulators",
+        "dtypes": [
+          "f32",
+          "f16"
+        ],
+        "shape": "per-block partial outputs"
+      }
+    ],
+    "output": {
+      "name": "dst/meta",
+      "dtypes": [
+        "f32",
+        "i32"
+      ],
+      "shape": "sparse mask indices or combined attention results"
+    }
+  },
+  "reference": {
+    "kind": "cpu",
+    "crosscheck": "-"
+  },
+  "notes": "Risk reason: shared helpers encode sparse-mask compaction and streamed partial-result fixup semantics used by multiple flash-attention variants. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
+  "updated_at": "2026-09-06T16:21:35Z",
+  "loc": {
+    "source_lang": "cuda",
+    "source": {
+      "code": 376,
+      "comment": 21,
+      "blank": 77,
+      "raw": 474,
+      "files": 2
+    },
+    "sycl": {
+      "code": 0,
+      "comment": 0,
+      "blank": 0,
+      "raw": 0,
+      "files": 0
+    },
+    "source_files": [
+      {
+        "path": "ggml/src/ggml-cuda/fattn-common.cuh",
+        "lang": "c",
+        "spans": [
+          "664-719",
+          "724-804",
+          "808-915",
+          "917-973"
+        ],
+        "code": 223,
+        "comment": 20,
+        "blank": 59,
+        "raw": 302
+      },
+      {
+        "path": "ggml/src/ggml-cuda/fattn.cu",
+        "lang": "c",
+        "spans": [
+          "8-89",
+          "92-107",
+          "471-489",
+          "581-583",
+          "669-701",
+          "703-718",
+          "720-722"
+        ],
+        "code": 153,
+        "comment": 1,
+        "blank": 18,
+        "raw": 172
+      }
+    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
+    "unresolved": [],
+    "method": "span",
+    "measured_at": "2026-09-06T16:21:35Z",
+    "source_spec": [
+      "ggml/src/ggml-cuda/fattn-common.cuh:flash_attn_combine_results,flash_attn_mask_to_KV_max,flash_attn_stream_k_fixup_general,flash_attn_stream_k_fixup_uniform"
+    ]
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "id": "conv2d",
+  "name": "conv2d",
+  "source": "ggml/src/ggml-cuda/conv2d.cu:calculate_input_coord,conv2d_kernel,conv2d_cuda,conv2d_cuda_f16,conv2d_cuda_f32,ggml_cuda_op_conv2d",
+  "source_lang": "cuda",
+  "status": "pending",
+  "risk": "medium",
+  "algorithm": "Compute a 2D convolution over image tiles, mapping filter taps and channels onto output pixels for F16/F32 inputs.",
+  "cuda_constructs": [
+    "launch-config"
+  ],
+  "io_spec": {
+    "inputs": [
+      {
+        "name": "src0",
+        "dtypes": [
+          "f16",
+          "f32"
+        ],
+        "shape": "filter tensor"
+      },
+      {
+        "name": "src1",
+        "dtypes": [
+          "f16",
+          "f32"
+        ],
+        "shape": "input image/feature map"
+      },
+      {
+        "name": "op_params",
+        "fields": [
+          "stride",
+          "padding",
+          "dilation",
+          "layout metadata"
+        ]
+      }
+    ],
+    "output": {
+      "name": "dst",
+      "dtypes": [
+        "f16",
+        "f32"
+      ],
+      "shape": "output feature map"
+    }
+  },
+  "reference": {
+    "kind": "cpu",
+    "crosscheck": "-"
+  },
+  "notes": "Risk reason: multidimensional indexing and convolution layout handling need care. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
+  "updated_at": "2026-09-06T16:21:34Z",
+  "loc": {
+    "source_lang": "cuda",
+    "source": {
+      "code": 80,
+      "comment": 3,
+      "blank": 16,
+      "raw": 99,
+      "files": 1
+    },
+    "sycl": {
+      "code": 0,
+      "comment": 0,
+      "blank": 0,
+      "raw": 0,
+      "files": 0
+    },
+    "source_files": [
+      {
+        "path": "ggml/src/ggml-cuda/conv2d.cu",
+        "lang": "c",
+        "spans": [
+          "38-44",
+          "72-106",
+          "108-112",
+          "114-116",
+          "118-120",
+          "122-167"
+        ],
+        "code": 80,
+        "comment": 3,
+        "blank": 16,
+        "raw": 99
+      }
+    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
+    "unresolved": [],
+    "method": "span",
+    "measured_at": "2026-09-06T16:21:34Z"
+  }
+}

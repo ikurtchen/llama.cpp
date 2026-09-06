@@ -1,0 +1,91 @@
+{
+  "id": "ssm-scan",
+  "name": "ssm-scan-family",
+  "source": "ggml/src/ggml-cuda/ssm-scan.cu:ssm_scan_f32,ssm_scan_f32_group,ssm_scan_f32_cuda,ssm_ssd_prepare_dt_kernel,ssm_ssd_pre_matmul_kernel,ssm_ssd_scale_state_kernel,ssm_ssd_init_state_kernel,ssm_scan_ssd_f32_cuda,ggml_cuda_op_ssm_scan",
+  "source_lang": "cuda",
+  "status": "pending",
+  "risk": "high",
+  "algorithm": "Run the selective state-space scan used by SSM/Mamba blocks, choosing between direct scan kernels and an SSD matmul-based decomposition with state prepare/scale/init helpers.",
+  "cuda_constructs": [
+    "launch-config",
+    "shared-memory",
+    "CUB",
+    "cuBLAS",
+    "fast-math intrinsics",
+    "launch-bounds"
+  ],
+  "io_spec": {
+    "inputs": [
+      {
+        "name": "s0/x/dt/A/B/C",
+        "dtypes": [
+          "f32"
+        ],
+        "shape": "state, inputs, and SSM parameters"
+      },
+      {
+        "name": "seq offsets",
+        "dtypes": [
+          "i32"
+        ],
+        "shape": "per-sequence state slot ids"
+      }
+    ],
+    "output": {
+      "name": "dst",
+      "dtypes": [
+        "f32"
+      ],
+      "shape": "scan outputs plus updated state buffer"
+    }
+  },
+  "reference": {
+    "kind": "cpu",
+    "crosscheck": "-"
+  },
+  "notes": "Risk reason: direct scan, grouped scan, and SSD decomposition all coexist and are numerically/state sensitive. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
+  "updated_at": "2026-09-06T16:21:38Z",
+  "loc": {
+    "source_lang": "cuda",
+    "source": {
+      "code": 669,
+      "comment": 41,
+      "blank": 79,
+      "raw": 789,
+      "files": 1
+    },
+    "sycl": {
+      "code": 0,
+      "comment": 0,
+      "blank": 0,
+      "raw": 0,
+      "files": 0
+    },
+    "source_files": [
+      {
+        "path": "ggml/src/ggml-cuda/ssm-scan.cu",
+        "lang": "c",
+        "spans": [
+          "30-137",
+          "143-237",
+          "239-343",
+          "357-435",
+          "443-524",
+          "531-554",
+          "558-571",
+          "576-764",
+          "767-859"
+        ],
+        "code": 669,
+        "comment": 41,
+        "blank": 79,
+        "raw": 789
+      }
+    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
+    "unresolved": [],
+    "method": "span",
+    "measured_at": "2026-09-06T16:21:38Z"
+  }
+}

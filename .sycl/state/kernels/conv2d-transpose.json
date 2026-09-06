@@ -1,0 +1,82 @@
+{
+  "id": "conv2d-transpose",
+  "name": "conv2d-transpose",
+  "source": "ggml/src/ggml-cuda/conv2d-transpose.cu:conv2d_transpose_kernel,ggml_cuda_conv_2d_transpose_p0",
+  "source_lang": "cuda",
+  "status": "pending",
+  "risk": "medium",
+  "algorithm": "Compute transposed 2D convolution (deconvolution) by mapping output pixels back to contributing input/filter coordinates.",
+  "cuda_constructs": [
+    "launch-config"
+  ],
+  "io_spec": {
+    "inputs": [
+      {
+        "name": "src0",
+        "dtypes": [
+          "f16",
+          "f32"
+        ],
+        "shape": "filters"
+      },
+      {
+        "name": "src1",
+        "dtypes": [
+          "f16",
+          "f32"
+        ],
+        "shape": "input activations"
+      }
+    ],
+    "output": {
+      "name": "dst",
+      "dtypes": [
+        "f16",
+        "f32"
+      ],
+      "shape": "upsampled feature map"
+    }
+  },
+  "reference": {
+    "kind": "cpu",
+    "crosscheck": "-"
+  },
+  "notes": "Risk reason: inverse convolution geometry and type handling require validation. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
+  "updated_at": "2026-09-06T16:21:34Z",
+  "loc": {
+    "source_lang": "cuda",
+    "source": {
+      "code": 90,
+      "comment": 1,
+      "blank": 19,
+      "raw": 110,
+      "files": 1
+    },
+    "sycl": {
+      "code": 0,
+      "comment": 0,
+      "blank": 0,
+      "raw": 0,
+      "files": 0
+    },
+    "source_files": [
+      {
+        "path": "ggml/src/ggml-cuda/conv2d-transpose.cu",
+        "lang": "c",
+        "spans": [
+          "4-68",
+          "71-115"
+        ],
+        "code": 90,
+        "comment": 1,
+        "blank": 19,
+        "raw": 110
+      }
+    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
+    "unresolved": [],
+    "method": "span",
+    "measured_at": "2026-09-06T16:21:34Z"
+  }
+}

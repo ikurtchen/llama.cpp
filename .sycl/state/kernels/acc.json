@@ -1,0 +1,89 @@
+{
+  "id": "acc",
+  "name": "accumulate-with-offset",
+  "source": "ggml/src/ggml-cuda/acc.cu:acc_f32,acc_f32_cuda,ggml_cuda_op_acc",
+  "source_lang": "cuda",
+  "status": "pending",
+  "risk": "low",
+  "algorithm": "Add a contiguous source tensor into a destination view with a flat offset and per-dimension bounds checks, leaving out-of-range destination elements unchanged except for the base src0 value.",
+  "cuda_constructs": [
+    "launch-config"
+  ],
+  "io_spec": {
+    "inputs": [
+      {
+        "name": "src0",
+        "dtypes": [
+          "f32"
+        ],
+        "shape": "full destination tensor"
+      },
+      {
+        "name": "src1",
+        "dtypes": [
+          "f32"
+        ],
+        "shape": "contiguous source slice"
+      },
+      {
+        "name": "op_params",
+        "fields": [
+          "stride1",
+          "stride2",
+          "stride3",
+          "offset"
+        ]
+      }
+    ],
+    "output": {
+      "name": "dst",
+      "dtypes": [
+        "f32"
+      ],
+      "shape": "same as src0"
+    }
+  },
+  "reference": {
+    "kind": "cpu",
+    "crosscheck": "-"
+  },
+  "notes": "Risk reason: flat elementwise add with simple offset math. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
+  "updated_at": "2026-09-06T16:21:34Z",
+  "loc": {
+    "source_lang": "cuda",
+    "source": {
+      "code": 47,
+      "comment": 0,
+      "blank": 10,
+      "raw": 57,
+      "files": 1
+    },
+    "sycl": {
+      "code": 0,
+      "comment": 0,
+      "blank": 0,
+      "raw": 0,
+      "files": 0
+    },
+    "source_files": [
+      {
+        "path": "ggml/src/ggml-cuda/acc.cu",
+        "lang": "c",
+        "spans": [
+          "3-28",
+          "30-35",
+          "37-61"
+        ],
+        "code": 47,
+        "comment": 0,
+        "blank": 10,
+        "raw": 57
+      }
+    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
+    "unresolved": [],
+    "method": "span",
+    "measured_at": "2026-09-06T16:21:34Z"
+  }
+}
