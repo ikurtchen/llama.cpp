@@ -1,0 +1,17 @@
+{
+  "schema": "sycl-agent/env-fingerprint",
+  "id": "env-68d8b007",
+  "first_seen": "2026-09-06T15:57:11Z",
+  "last_seen": "2026-09-06T15:57:11Z",
+  "label": "",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41"
+  },
+  "icpx": "unknown",
+  "gpu": "unknown",
+  "arch": "unknown",
+  "platform": "unknown",
+  "freq_pinned": "unknown",
+  "raw": "[remote] sync -> root@10.239.98.41:/workspace/sycl-agent-runs/llama.cpp (additive, no deletions)\n[remote root@10.239.98.41] echo \"== host ==\"; hostname; echo \"== icpx ==\"; (icpx --version 2>/dev/null | head -1) || echo \"icpx: not found\"; echo \"== sycl-ls ==\"; (sycl-ls 2>/dev/null) || echo \"sycl-ls: not found\"; echo \"== unitrace ==\"; if [ -x \"$UNITRACE\" ] || command -v \"$UNITRACE\" >/dev/null 2>&1; then echo \"unitrace: $UNITRACE\"; else echo \"unitrace: not found ($UNITRACE)\"; fi; echo \"== python deps ==\"; python3 -c \"import pandas,matplotlib;print(\\\"pandas\\\",pandas.__version__,\\\"matplotlib\\\",matplotlib.__version__)\" 2>/dev/null || echo \"pandas/matplotlib: MISSING (run: .sycl/scripts/run.sh setup)\"\n \n:: initializing oneAPI environment ...\n   bash: BASH_VERSION = 5.2.15(1)-release\n   args: Using \"$@\" for setvars.sh arguments: \n:: advisor -- latest\n:: ccl -- latest\n:: compiler -- latest\n:: dal -- latest\n:: debugger -- latest\n:: dev-utilities -- latest\n:: dnnl -- latest\n:: dpcpp-ct -- latest\n:: dpl -- latest\n:: ipp -- latest\n:: ippcp -- latest\n:: mkl -- latest\n:: mpi -- latest\n:: tbb -- latest\n:: umf -- latest\n:: vtune -- latest\n:: oneAPI environment initialized ::\n \n== host ==\ncripoc02\n== icpx ==\nIntel(R) oneAPI DPC++/C++ Compiler 2025.3.2 (2025.3.2.20260112)\n== sycl-ls ==\n[level_zero:gpu][level_zero:0] Intel(R) oneAPI Unified Runtime over Level-Zero V2, Intel(R) Graphics [0xe223] 20.2.0 [1.15.37833+4]\n[opencl:cpu][opencl:0] Intel(R) OpenCL, Intel(R) Xeon(R) W-3375 CPU @ 2.50GHz OpenCL 3.0 (Build 0) [2026.20.1.0.12_160000]\n[opencl:gpu][opencl:1] Intel(R) OpenCL Graphics, Intel(R) Graphics [0xe223] OpenCL 3.0 NEO  [26.14.37833.4]\n== unitrace ==\nunitrace: /workspace/intel_gpu_tools/applications.analyzers.profilingtoolsinterfaces.sdk/tools/unitrace/build/unitrace\n== python deps ==\npandas 1.5.3 matplotlib 3.6.3\n[remote] pull <- root@10.239.98.41:/workspace/sycl-agent-runs/llama.cpp (.sycl/reports, .sycl/logs, state ref/)"
+}

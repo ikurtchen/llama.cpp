@@ -1,0 +1,90 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "sycl-agent integration readiness (Backend Readiness Level)",
+  "description": "Declared vs achieved depth of the SYCL/XPU backend integration. `achieved_level` is COMPUTED from the gates that resolve to a run record with exit_code 0 — it is never asserted. The claim rules in skill sycl-integration/references/backend-readiness.md bind the final report to this file.",
+  "type": "object",
+  "properties": {
+    "schema": { "type": "string" },
+    "note": { "type": "string" },
+    "archetype": {
+      "type": "string",
+      "enum": ["", "A", "B", "C", "D", "E", "F"],
+      "description": "A=C/C++ app with a backend seam; B=C++ library+CMake+own tests; C=framework custom-op extension; D=Python array/JIT library; E=runtime/JIT-codegen system; F=graph/parser-driven engine."
+    },
+    "archetype_reason": { "type": "string" },
+    "target_level": {
+      "type": "string",
+      "enum": ["L0", "L1", "L2", "L3", "L4"],
+      "description": "DECLARED at scaffold. Lower it early and loudly with a reason; never lower it at report time."
+    },
+    "target_reason": { "type": "string" },
+    "achieved_level": {
+      "type": "string",
+      "enum": ["L0", "L1", "L2", "L3", "L4"],
+      "description": "COMPUTED: the highest level whose gate (and every gate below it) is `pass` with resolvable evidence."
+    },
+    "entrypoint": { "type": "string", "description": "The project's real entrypoint command exercised by the L3 gate." },
+    "backend_switch": { "type": "string", "description": "How the SYCL/XPU backend is selected (build flag, CMake option, env var) and where that switch lives." },
+    "gates": {
+      "type": "object",
+      "description": "One entry per level. Only `pass` counts toward achieved_level (L2 also accepts `partial` when `exceptions` is non-empty), and only if `evidence` resolves to a record with exit_code 0.",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "status": { "type": "string", "enum": ["pending", "pass", "partial", "fail", "waived"] },
+          "evidence": { "type": "array", "items": { "type": "string" } },
+          "exceptions": {
+            "type": "array",
+            "description": "L2 only: enumerated test failures accepted for a `partial`, one reason each. An empty list with status `partial` is invalid.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "test": { "type": "string" },
+                "reason": { "type": "string" }
+              },
+              "required": ["test", "reason"]
+            }
+          },
+          "reference": { "type": "string", "description": "L3: what the workload output was compared against." },
+          "tolerance": { "type": "string", "description": "L3: the project's own tolerance for that comparison." },
+          "note": { "type": "string" }
+        },
+        "required": ["status"]
+      }
+    },
+    "waivers": {
+      "type": "array",
+      "description": "Anything stubbed, disabled or scoped out. A silent stub is a defect; a recorded waiver is a scoped engagement.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "what": { "type": "string" },
+          "reason": { "type": "string" },
+          "blast_radius": { "type": "string", "description": "What stops working for a user because of this waiver." },
+          "level_impact": { "type": "string", "description": "Which readiness level this waiver caps, or 'none'." }
+        },
+        "required": ["what", "reason", "blast_radius"]
+      }
+    },
+    "residual": {
+      "type": "array",
+      "description": "The scoped work package for everything not reached — what turns 'we did not finish' into a next step.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "surface": { "type": "string" },
+          "what": { "type": "string" },
+          "unlocks": { "type": "string" },
+          "effort_weeks": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+          "risk": { "type": "string", "enum": ["low", "medium", "high"] },
+          "prerequisite": { "type": "string" }
+        },
+        "required": ["what", "unlocks"]
+      }
+    },
+    "updated_at": { "type": "string", "format": "date-time" }
+  },
+  "required": ["target_level", "achieved_level", "gates"]
+}

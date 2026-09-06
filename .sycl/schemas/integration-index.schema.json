@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "sycl-agent integration surface index",
+  "description": "Last-mile backend-integration work items. A surface the project does not have is marked with a reason in `notes` or `status: waived` — never deleted, so coverage cannot be improved by shrinking the denominator.",
+  "type": "object",
+  "properties": {
+    "schema": { "type": "string" },
+    "note": { "type": "string" },
+    "surfaces": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Canonical surface id. Extra project-specific surfaces are allowed; the seven canonical ones should always be present.",
+            "examples": ["build", "runtime", "memory", "dispatch", "hostlib", "package", "nvonly"]
+          },
+          "title": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "in-progress", "done", "waived", "deferred", "blocked"],
+            "description": "waived = deliberately not done, with a waiver in readiness.json; deferred = in the residual work package; blocked = a prerequisite must be fixed first."
+          },
+          "blocks_level": {
+            "type": "string",
+            "enum": ["L1", "L2", "L3", "L4", "none"],
+            "description": "The lowest Backend Readiness Level this surface blocks while incomplete."
+          },
+          "owner_archetype": { "type": "string", "description": "Which archetypes have this surface (A..F, or 'all')." },
+          "what": { "type": "string", "description": "One line of concrete work." },
+          "effort_weeks": {
+            "type": "array",
+            "description": "[low, high] engineer-weeks for one experienced SYCL/C++ engineer.",
+            "items": { "type": "number" },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "risk": { "type": "string", "enum": ["low", "medium", "high"] },
+          "prerequisite": { "type": "string", "description": "Blocking item that must be fixed first (e.g. a kernel that segfaults on the backward path)." },
+          "evidence": {
+            "type": "array",
+            "description": "Run ids (evidence.sh record build|integration|test|e2e) backing this surface's completion.",
+            "items": { "type": "string" }
+          },
+          "notes": { "type": "string" }
+        },
+        "required": ["id", "status"]
+      }
+    },
+    "updated_at": { "type": "string", "format": "date-time" }
+  },
+  "required": ["surfaces"]
+}

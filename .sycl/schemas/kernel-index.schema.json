@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "sycl-agent kernel index",
+  "type": "object",
+  "properties": {
+    "schema": { "type": "string" },
+    "kernels": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "source": { "type": "string" },
+          "source_lang": {
+            "type": "string",
+            "enum": ["cuda", "triton"],
+            "default": "cuda",
+            "description": "Original kernel language. Absent = cuda."
+          },
+          "target_style": {
+            "type": "string",
+            "enum": ["plain-sycl", "sycl-tla"],
+            "default": "plain-sycl",
+            "description": "SYCL target style. Absent = plain-sycl."
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "migrated", "skipped", "needs-reference", "optimizing"]
+          },
+          "risk": { "type": "string", "enum": ["low", "medium", "high"] },
+          "detail": { "type": "string", "description": "Path to kernels/<id>.json" },
+          "loc": {
+            "type": "object",
+            "description": "GENERATED rollup mirror of kernels/<id>.json `loc` (code lines only), so the index alone can answer 'how much was migrated'. Written by .sycl/scripts/loc.sh.",
+            "properties": {
+              "source_code": { "type": "integer" },
+              "sycl_code": { "type": "integer" }
+            }
+          },
+          "notes": { "type": "string" }
+        },
+        "required": ["id", "source", "status"]
+      }
+    },
+    "updated_at": { "type": "string", "format": "date-time" }
+  },
+  "required": ["kernels"]
+}

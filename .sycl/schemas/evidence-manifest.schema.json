@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "sycl-agent/evidence-manifest",
+  "title": "sycl-agent evidence manifest",
+  "description": "GENERATED index of every evidence artifact under .sycl/reports/, with content hashes. Rebuilt by `evidence.sh manifest`; read by `evidence.sh verify` to detect a log that was edited, truncated or lost in a sync. Never hand-edit.",
+  "type": "object",
+  "required": ["schema", "artifacts", "updated_at"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "sycl-agent/evidence-manifest" },
+    "project": { "type": "string" },
+    "totals": {
+      "type": "object",
+      "properties": {
+        "records": { "type": "integer" },
+        "artifacts": { "type": "integer" },
+        "bytes": { "type": "integer" },
+        "by_class": {
+          "type": "object",
+          "description": "Record count per evidence class (test/bench/e2e/build/profile).",
+          "additionalProperties": { "type": "integer" }
+        }
+      }
+    },
+    "env_fingerprints": {
+      "type": "array",
+      "description": "Every machine snapshot referenced by a record. More than one is normal (local detect + remote runs); more than one across a baseline/final PAIR is an audit failure.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "path": { "type": "string" },
+          "gpu": { "type": "string" },
+          "freq_pinned": { "type": ["boolean", "string"] },
+          "used_by": { "type": "integer", "description": "Number of records captured on it." }
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "sha256", "bytes"],
+        "properties": {
+          "path": { "type": "string", "description": "Relative to .sycl/reports/." },
+          "sha256": { "type": "string" },
+          "bytes": { "type": "integer" },
+          "kind": { "type": "string", "description": "record | log | csv | asm | json | pdf | trace | md | other" },
+          "run_id": { "type": "string", "description": "Owning run record, when the artifact belongs to one." },
+          "subject": { "type": "string" },
+          "class": { "type": "string" },
+          "mtime": { "type": "string" }
+        }
+      }
+    },
+    "updated_at": { "type": "string" }
+  }
+}

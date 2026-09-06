@@ -1,0 +1,138 @@
+{
+  "schema": "sycl-agent/phases",
+  "note": "The phase-exit contract. Every phase has completion criteria a machine can check; `evidence.sh gate <phase>` evaluates them and is the ONLY way a phase may be marked exited. This file exists because the evidence checks E1-E14 all ask 'is what you said true?' and none of them can ask 'did you do the thing this phase exists to do?' \u2014 so a phase that was skipped entirely used to pass a clean audit in silence. Criteria are defined in skills/sycl-review/references/phase-exit-criteria.md.",
+  "hotspot_pct_threshold": 5,
+  "hotspot_pct_threshold_note": "A kernel at or above this share of e2e wall-clock in profile/e2e.baseline.json is a hotspot, and the optimize phase may not be left until each hotspot has either a measured trial or a recorded reason for having none.",
+  "max_gate_attempts": 2,
+  "max_gate_attempts_note": "Failed gate -> fix the gap, or record a waiver with a reason and blast radius, then re-gate. After this many failed attempts, stop refining and escalate: record the unmet criteria as a blocker and say so in the report. A gate loop that never terminates burns the budget that the remaining phases need.",
+  "phases": {
+    "detect": {
+      "status": "exited",
+      "entered_at": "2026-09-06T15:58:44Z",
+      "exited_at": "2026-09-06T15:59:01Z",
+      "gate": {
+        "result": "pass",
+        "attempts": 1,
+        "checked_at": "2026-09-06T15:59:01Z",
+        "unmet": []
+      },
+      "waivers": [],
+      "notes": ""
+    },
+    "inventory": {
+      "status": "in-progress",
+      "entered_at": "2026-09-06T15:59:07Z",
+      "exited_at": "",
+      "gate": {
+        "result": "pending",
+        "attempts": 0,
+        "checked_at": "",
+        "unmet": []
+      },
+      "waivers": [],
+      "notes": ""
+    },
+    "scaffold": {
+      "status": "pending",
+      "entered_at": "",
+      "exited_at": "",
+      "gate": {
+        "result": "pending",
+        "attempts": 0,
+        "checked_at": "",
+        "unmet": []
+      },
+      "waivers": [],
+      "notes": ""
+    },
+    "migrate": {
+      "status": "pending",
+      "entered_at": "",
+      "exited_at": "",
+      "gate": {
+        "result": "pending",
+        "attempts": 0,
+        "checked_at": "",
+        "unmet": []
+      },
+      "waivers": [],
+      "notes": ""
+    },
+    "integrate": {
+      "status": "pending",
+      "entered_at": "",
+      "exited_at": "",
+      "gate": {
+        "result": "pending",
+        "attempts": 0,
+        "checked_at": "",
+        "unmet": []
+      },
+      "waivers": [],
+      "notes": ""
+    },
+    "profile-e2e": {
+      "status": "pending",
+      "entered_at": "",
+      "exited_at": "",
+      "gate": {
+        "result": "pending",
+        "attempts": 0,
+        "checked_at": "",
+        "unmet": []
+      },
+      "waivers": [],
+      "notes": ""
+    },
+    "optimize": {
+      "status": "pending",
+      "entered_at": "",
+      "exited_at": "",
+      "gate": {
+        "result": "pending",
+        "attempts": 0,
+        "checked_at": "",
+        "unmet": []
+      },
+      "waivers": [],
+      "notes": ""
+    },
+    "done": {
+      "status": "pending",
+      "entered_at": "",
+      "exited_at": "",
+      "gate": {
+        "result": "pending",
+        "attempts": 0,
+        "checked_at": "",
+        "unmet": []
+      },
+      "waivers": [],
+      "notes": ""
+    },
+    "report": {
+      "status": "pending",
+      "entered_at": "",
+      "exited_at": "",
+      "gate": {
+        "result": "pending",
+        "attempts": 0,
+        "checked_at": "",
+        "unmet": []
+      },
+      "waivers": [],
+      "notes": ""
+    }
+  },
+  "scope": {
+    "note": "The work-item denominator, frozen when inventory exits. Check E17 fails any id that later disappears without a matching entry in `changes` \u2014 a result stays comparable to the plan it started from, and 'pending: 0' can never be reached by re-cutting the inventory at a coarser granularity.",
+    "baseline": {
+      "captured_at": "",
+      "captured_in_phase": "",
+      "kernel_ids": [],
+      "surface_ids": []
+    },
+    "changes": []
+  },
+  "updated_at": "2026-09-06T15:59:07Z"
+}

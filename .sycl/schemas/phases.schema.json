@@ -1,0 +1,126 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "sycl-agent phase-exit contract",
+  "type": "object",
+  "properties": {
+    "schema": { "type": "string" },
+    "note": { "type": "string" },
+    "hotspot_pct_threshold": {
+      "type": "number",
+      "default": 5,
+      "description": "Share of e2e wall-clock (percent) at or above which a kernel in profile/e2e.baseline.json `ranking` is a hotspot and must be accounted for before the optimize phase may be left."
+    },
+    "hotspot_pct_threshold_note": { "type": "string" },
+    "max_gate_attempts": {
+      "type": "integer",
+      "default": 2,
+      "description": "Failed gates to refine through before escalating the unmet criteria as a recorded blocker."
+    },
+    "max_gate_attempts_note": { "type": "string" },
+    "phases": {
+      "type": "object",
+      "description": "Keyed by phase name: detect, inventory, scaffold, migrate, integrate, profile-e2e, optimize, done, report.",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["pending", "in-progress", "exited", "waived"],
+            "description": "`exited` is written ONLY by `evidence.sh gate <phase>` when every criterion is met (or waived). Hand-editing it to 'exited' is what check E15 exists to catch."
+          },
+          "entered_at": { "type": "string" },
+          "exited_at": { "type": "string" },
+          "gate": {
+            "type": "object",
+            "properties": {
+              "result": { "type": "string", "enum": ["pending", "pass", "fail", "waived"] },
+              "attempts": {
+                "type": "integer",
+                "description": "Incremented on every gate evaluation. A phase that passed on attempt 3 is a phase that was refined twice — that history is part of the audit."
+              },
+              "checked_at": { "type": "string" },
+              "unmet": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Criteria that failed on the last evaluation, verbatim from the gate."
+              }
+            }
+          },
+          "waivers": {
+            "type": "array",
+            "description": "A criterion deliberately not met. A waiver is a legitimate exit — an unrecorded skip is not.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "criterion": { "type": "string", "description": "The criterion id being waived, e.g. optimize.hotspots_accounted." },
+                "reason": { "type": "string", "description": "Why it cannot be met. 'It was hard' is not a reason; 'unitrace segfaults on this driver, blocker recorded' is." },
+                "blast_radius": { "type": "string", "description": "What is unknown or unproven as a result — the cost the reader inherits." },
+                "evidence": { "type": "array", "items": { "type": "string" }, "description": "Run id(s) of the failed attempt, where one exists. A tool that crashed still leaves a record." }
+              },
+              "required": ["criterion", "reason", "blast_radius"]
+            }
+          },
+          "review": {
+            "type": "object",
+            "description": "Result of the sycl-review pass at this boundary. The review runs AFTER the mechanical gate and may not override its verdict.",
+            "properties": {
+              "verdict": { "type": "string", "enum": ["pending", "accept", "accept-with-findings", "reject"] },
+              "reviewed_at": { "type": "string" },
+              "reviewer": { "type": "string", "description": "Fresh-context subagent id or 'inline' when the review ran in the main conversation." },
+              "findings": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string" },
+                    "severity": { "type": "string", "enum": ["blocker", "concern", "note"] },
+                    "what": { "type": "string" },
+                    "resolution": { "type": "string", "enum": ["fixed", "waived", "accepted-risk", "open"] },
+                    "evidence": { "type": "array", "items": { "type": "string" } }
+                  },
+                  "required": ["severity", "what"]
+                }
+              }
+            }
+          },
+          "notes": { "type": "string" }
+        },
+        "required": ["status"]
+      }
+    },
+    "scope": {
+      "type": "object",
+      "description": "The frozen work-item denominator. Enforced by check E17.",
+      "properties": {
+        "note": { "type": "string" },
+        "baseline": {
+          "type": "object",
+          "properties": {
+            "captured_at": { "type": "string" },
+            "captured_in_phase": { "type": "string" },
+            "kernel_ids": { "type": "array", "items": { "type": "string" } },
+            "surface_ids": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "changes": {
+          "type": "array",
+          "description": "Every later change to the denominator. Removing a work item is allowed; removing it silently is not.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "ts": { "type": "string" },
+              "phase": { "type": "string" },
+              "removed": { "type": "array", "items": { "type": "string" } },
+              "added": { "type": "array", "items": { "type": "string" } },
+              "reason": { "type": "string", "description": "Why the denominator moved. Re-cutting the inventory at a coarser granularity is a reason that must be stated, because it changes every percentage in the report." },
+              "kind": { "type": "string", "enum": ["re-granularity", "out-of-scope", "duplicate", "not-a-kernel", "added-late", "other"] }
+            },
+            "required": ["removed", "reason"]
+          }
+        }
+      }
+    },
+    "updated_at": { "type": "string", "format": "date-time" }
+  },
+  "required": ["phases"]
+}

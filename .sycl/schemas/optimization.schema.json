@@ -1,0 +1,79 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "sycl-agent optimization trial log",
+  "type": "object",
+  "properties": {
+    "schema": { "type": "string" },
+    "kernel_id": { "type": "string" },
+    "metric": { "type": "string", "description": "e.g. bandwidth GB/s, time ms, GFLOP/s" },
+    "baseline": { "type": "number" },
+    "target": { "type": "number", "description": "e.g. roofline-derived expectation" },
+    "best": {
+      "type": "object",
+      "properties": {
+        "value": { "type": "number" },
+        "commit": { "type": "string" }
+      }
+    },
+    "status": { "type": "string", "enum": ["pending", "in-progress", "done", "skipped"] },
+    "diagnosis": {
+      "type": "object",
+      "description": "Deep-profile root cause from sycl-profiler §4 (step 0.5), drives optimization choice.",
+      "properties": {
+        "bottleneck_class": { "type": "string", "enum": ["memory", "compute", "occupancy", "launch", "other"] },
+        "dominant_stall": { "type": "string", "description": "e.g. SendStall, PipeStall, SbidStall, SyncStall" },
+        "occupancy_pct": { "type": "number" },
+        "register_spills": { "type": "boolean" },
+        "xmx_used": { "type": "boolean" },
+        "tools": { "type": "string", "description": "e.g. unitrace metric-query + stall-sampling + IGC dump" },
+        "artifacts": {
+          "type": "object",
+          "description": "Retained deep-profile output (metric CSVs + IGC shader/asm dump) for human audit. `verify` (E6) fails when a kernel with kept trials is missing either side.",
+          "properties": {
+            "baseline": { "type": "string", "description": "dir of the baseline diagnosis, e.g. .sycl/reports/opt_<id>/baseline" },
+            "final": { "type": "string", "description": "dir of the deep profile of the best kept commit, e.g. .sycl/reports/opt_<id>/final" },
+            "diagnosis_md": { "type": "string", "description": "Generated before/after claim check, e.g. .sycl/reports/opt_<id>/DIAGNOSIS.md (`evidence.sh diagnosis <id>`). Shows whether the metric this diagnosis BLAMED actually moved the predicted way — the check that the optimization went in the right direction." }
+          }
+        },
+        "notes": { "type": "string" }
+      }
+    },
+    "stop_reason": {
+      "type": "string",
+      "description": "target-met | diminishing-returns | checklist-exhausted | correctness-block"
+    },
+    "trials": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "n": { "type": "integer" },
+          "hypothesis": { "type": "string", "description": "The single optimization tried." },
+          "bottleneck_class": { "type": "string", "enum": ["memory", "compute", "occupancy", "launch", "other"] },
+          "commit": { "type": "string" },
+          "build": { "type": "string", "enum": ["ok", "fail"] },
+          "correctness": { "type": "string", "enum": ["pass", "fail", "-"] },
+          "metric_before": { "type": "number" },
+          "metric_after": { "type": "number" },
+          "decision": { "type": "string", "enum": ["keep", "revert"] },
+          "root_cause": { "type": "string", "description": "Why kept or reverted (esp. anti-pattern reverts)." },
+          "combination": { "type": "boolean", "description": "True if this trial stacks multiple winners." },
+          "evidence": {
+            "type": "object",
+            "description": "REQUIRED for a KEPT trial (it changed the shipped code): the run records proving it stayed correct and got faster. `verify` (E3) fails a kept trial missing either.",
+            "properties": {
+              "test": { "type": "string", "description": "Run id of the correctness re-check after this change." },
+              "bench_before": { "type": "string", "description": "Run id of the benchmark at the previous commit." },
+              "bench_after": { "type": "string", "description": "Run id of the benchmark at this trial's commit." },
+              "profile": { "type": "string", "description": "Optional: deep-profile dir or run id, when this trial was re-diagnosed." }
+            }
+          },
+          "ts": { "type": "string", "format": "date-time" }
+        },
+        "required": ["n", "hypothesis", "decision"]
+      }
+    },
+    "updated_at": { "type": "string", "format": "date-time" }
+  },
+  "required": ["kernel_id", "trials"]
+}

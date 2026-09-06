@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "sycl-agent e2e profile / optimization priority",
+  "type": "object",
+  "properties": {
+    "schema": { "type": "string" },
+    "label": { "type": "string", "enum": ["baseline", "current", "final"], "description": "Which snapshot this is: baseline (pre-opt), current (live ranking), or final (post-opt)." },
+    "basis": { "type": "string", "enum": ["e2e-workload", "kernel-suite"], "description": "How the ranking was built: e2e-workload = wall-clock share of a real workload (application); kernel-suite = per-kernel benchmark runtime (library, no single driver). Default e2e-workload." },
+    "workload": { "type": "string", "description": "The e2e workload/command profiled (application); for a library, the kernel-benchmark suite that was timed." },
+    "cases": {
+      "type": "array",
+      "description": "When multiple e2e cases were aggregated into this ranking: the cases and the weight each contributed.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "weight": { "type": "number" },
+          "wallclock_ms": { "type": "number" },
+          "evidence": { "type": "string", "description": "Run id of this case's e2e record (raw workload log + timing)." }
+        },
+        "required": ["name"]
+      }
+    },
+    "total_wallclock_ms": { "type": "number" },
+    "evidence": {
+      "type": ["string", "array"],
+      "items": { "type": "string" },
+      "description": "REQUIRED on the immutable baseline/final snapshots: run id(s) of the e2e records behind this ranking — one per case. This is what backs the headline speedup in the final report. `verify` (E4) fails a snapshot with no record; (E7) fails when baseline and final ran on different env fingerprints."
+    },
+    "method": { "type": "string", "description": "How wall-clock was attributed: unitrace device-timing | unitrace slice | in-app sycl::event timers. A fallback method must be stated here so the report does not overclaim precision." },
+    "ranking": {
+      "type": "array",
+      "description": "Kernels ordered by descending share of e2e wall-clock (optimization priority).",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "wallclock_ms": { "type": "number" },
+          "wallclock_pct": { "type": "number" },
+          "calls": { "type": "integer" }
+        },
+        "required": ["id", "wallclock_pct"]
+      }
+    },
+    "updated_at": { "type": "string", "format": "date-time" }
+  },
+  "required": ["ranking"]
+}

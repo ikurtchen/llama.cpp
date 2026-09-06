@@ -1,0 +1,82 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "sycl-agent project state",
+  "type": "object",
+  "properties": {
+    "schema": { "type": "string" },
+    "name": { "type": "string" },
+    "phase": {
+      "type": "string",
+      "enum": ["detect", "inventory", "scaffold", "migrate", "integrate", "profile-e2e", "optimize", "done", "report"]
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["application", "library"],
+      "description": "application = has a runnable e2e workload/entrypoint; library = exports kernels/ops with no single driver. Set in detect; branches integrate/profile-e2e/report. When unsure, default to application."
+    },
+    "runner_mode": { "type": "string", "enum": ["local", "remote"] },
+    "runner_host": { "type": "string" },
+    "build_system": { "type": "string" },
+    "sycl_build": { "type": "string" },
+    "sources": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["cuda", "triton"] },
+      "description": "Source kernel language(s) detected in the project."
+    },
+    "e2e_cases": {
+      "type": "array",
+      "description": "e2e cases discovered in detect (drivers/configs/scenarios). Used only when config.benchmark.e2e_cases is empty; a non-empty config list overrides this.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "cmd": { "type": "string" },
+          "weight": { "type": "number" }
+        },
+        "required": ["name"]
+      }
+    },
+    "sycl_tla": {
+      "type": "object",
+      "description": "sycl-tla target availability/build info.",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "include": { "type": "string", "description": "sycl-tla include dir (header-only)." },
+        "notes": { "type": "string" }
+      }
+    },
+    "integration": {
+      "type": "object",
+      "description": "Summary of the backend integration. Authoritative detail is state/integration/readiness.json (levels, gates, waivers, residual) and state/integration/index.json (surfaces).",
+      "properties": {
+        "archetype": { "type": "string", "enum": ["", "A", "B", "C", "D", "E", "F"] },
+        "target_level": { "type": "string", "enum": ["", "L0", "L1", "L2", "L3", "L4"], "description": "Declared at scaffold." },
+        "achieved_level": { "type": "string", "enum": ["L0", "L1", "L2", "L3", "L4"], "description": "Computed from evidence-backed gates; 'runs on Intel GPU' requires L3." },
+        "entrypoint": { "type": "string" },
+        "backend_switch": { "type": "string" },
+        "notes": { "type": "string" }
+      }
+    },
+    "env": {
+      "type": "object",
+      "properties": {
+        "icpx": { "type": "string" },
+        "oneapi": { "type": "string" },
+        "gpu": { "type": "string" },
+        "platform": { "type": "string" },
+        "arch": { "type": "string" },
+        "freq_pinned": { "type": ["string", "boolean"] },
+        "evidence": { "type": "string", "description": "Env fingerprint id (.sycl/reports/evidence/env/<id>.json) captured by `evidence.sh env` — the machine snapshot every benchmark record is pinned to." }
+      }
+    },
+    "reference": {
+      "type": "object",
+      "properties": {
+        "source": { "type": "string" },
+        "notes": { "type": "string" }
+      }
+    },
+    "updated_at": { "type": "string", "format": "date-time" }
+  },
+  "required": ["name", "phase"]
+}

@@ -1,0 +1,91 @@
+{
+  "schema": "sycl-agent/integration-index",
+  "note": "Last-mile backend-integration work items ('surfaces'). One row per surface the project actually has; skip a surface only by saying so in `notes`, never by deleting the row. Detail (if any) lives in state/integration/<id>.json. Ordered by blocks_level so the cheapest unblocking work comes first.",
+  "surfaces": [
+    {
+      "id": "build",
+      "title": "Build-system integration",
+      "status": "pending",
+      "blocks_level": "L1",
+      "owner_archetype": "all",
+      "what": "Add a SYCL/XPU backend option to the project's own build so its own artifact is produced with the backend enabled.",
+      "effort_weeks": [0, 0],
+      "risk": "low",
+      "evidence": [],
+      "notes": ""
+    },
+    {
+      "id": "runtime",
+      "title": "Device runtime layer",
+      "status": "pending",
+      "blocks_level": "L1",
+      "owner_archetype": "all",
+      "what": "Implement the project's device abstraction over SYCL: device/context/queue(stream)/event/sync, error translation.",
+      "effort_weeks": [0, 0],
+      "risk": "low",
+      "evidence": [],
+      "notes": ""
+    },
+    {
+      "id": "memory",
+      "title": "Allocator / memory manager",
+      "status": "pending",
+      "blocks_level": "L2",
+      "owner_archetype": "all",
+      "what": "Replace cudaMalloc / RMM / the caching allocator with a USM equivalent behind the project's own allocator interface.",
+      "effort_weeks": [0, 0],
+      "risk": "low",
+      "evidence": [],
+      "notes": ""
+    },
+    {
+      "id": "dispatch",
+      "title": "Registration & dispatch",
+      "status": "pending",
+      "blocks_level": "L2",
+      "owner_archetype": "all",
+      "what": "Make the project's own call path reach the migrated SYCL kernels (dispatch table, op registration, layer/graph factory).",
+      "effort_weeks": [0, 0],
+      "risk": "medium",
+      "evidence": [],
+      "notes": ""
+    },
+    {
+      "id": "hostlib",
+      "title": "Host library call sites",
+      "status": "pending",
+      "blocks_level": "L2",
+      "owner_archetype": "all",
+      "what": "Replace host-side Thrust/CUB/cuBLAS/cuFFT/cuRAND/NCCL with oneDPL/oneMKL/oneDNN/oneCCL.",
+      "effort_weeks": [0, 0],
+      "risk": "medium",
+      "evidence": [],
+      "notes": ""
+    },
+    {
+      "id": "package",
+      "title": "Packaging / import path",
+      "status": "pending",
+      "blocks_level": "L3",
+      "owner_archetype": "B,C,D",
+      "what": "Make the user-facing entry work: `import <pkg>`, the extension build, find_package/CMake export.",
+      "effort_weeks": [0, 0],
+      "risk": "medium",
+      "evidence": [],
+      "notes": ""
+    },
+    {
+      "id": "nvonly",
+      "title": "NVIDIA-only feature paths",
+      "status": "pending",
+      "blocks_level": "L3",
+      "owner_archetype": "all",
+      "what": "Stub or disable NVIDIA-only paths (OptiX/DLSS/TensorRT/NVML/OpenXR) and record a waiver with its blast radius for each.",
+      "effort_weeks": [0, 0],
+      "risk": "low",
+      "evidence": [],
+      "notes": ""
+    }
+  ],
+  "updated_at": "1970-01-01T00:00:00Z"
+}

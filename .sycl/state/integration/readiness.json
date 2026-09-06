@@ -1,0 +1,21 @@
+{
+  "schema": "sycl-agent/integration-readiness",
+  "note": "Backend Readiness Level (BRL). `target_level` is DECLARED at scaffold; `achieved_level` is COMPUTED from gates that resolve to a run record with exit code 0 — never asserted. See skill sycl-integration/references/backend-readiness.md.",
+  "archetype": "",
+  "archetype_reason": "",
+  "target_level": "L3",
+  "target_reason": "",
+  "achieved_level": "L0",
+  "entrypoint": "",
+  "backend_switch": "",
+  "gates": {
+    "L0": { "name": "kernel-standalone", "status": "pending", "evidence": [], "note": "" },
+    "L1": { "name": "build-through",     "status": "pending", "evidence": [], "note": "" },
+    "L2": { "name": "runtime-live",      "status": "pending", "evidence": [], "exceptions": [], "note": "" },
+    "L3": { "name": "workload-correct",  "status": "pending", "evidence": [], "reference": "", "tolerance": "", "note": "" },
+    "L4": { "name": "workload-fast",     "status": "pending", "evidence": [], "note": "" }
+  },
+  "waivers": [],
+  "residual": [],
+  "updated_at": "1970-01-01T00:00:00Z"
+}

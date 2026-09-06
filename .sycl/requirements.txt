@@ -1,0 +1,15 @@
+# Python dependencies for the sycl-agent runtime.
+#
+# Installed automatically (once per runner) by .sycl/scripts/run.sh the first time it executes
+# any command on a runner — locally or on the remote GPU host — through the runner's proxy/env.
+# Re-run `.sycl/scripts/run.sh setup` to force a reinstall (e.g. after editing this file).
+#
+# This is the single, global place for the agent's Python deps — not tied to any one skill. Add new
+# requirements here (one per line, annotated with what needs them) and they install the same way; do
+# not add a second install path elsewhere.
+#
+# pandas + matplotlib
+#   sycl-profiler deep profiling: unitrace post-processing (analyzeperfmetrics.py) turns
+#   stall-sampling CSVs into per-IP asm annotations + PDF reports.
+pandas >= 2.2.1
+matplotlib >= 3.8.0

@@ -1,0 +1,145 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "sycl-agent/run-record",
+  "title": "sycl-agent run record",
+  "description": "Immutable evidence for ONE command executed on ONE machine at ONE commit. Produced by .sycl/scripts/evidence.sh record; never hand-written. A state claim is only valid if a run record proves it.",
+  "type": "object",
+  "required": ["schema", "run_id", "class", "subject", "ts", "command", "exit_code", "verdict", "log"],
+  "additionalProperties": true,
+  "properties": {
+    "schema": { "const": "sycl-agent/run-record" },
+
+    "run_id": {
+      "type": "string",
+      "description": "<class>-<subject>-<UTC stamp>-<sha6>; unique, sortable, and the filename stem of both the record and its log."
+    },
+    "class": {
+      "enum": ["test", "bench", "e2e", "build", "profile"],
+      "description": "Evidence class. test = correctness gate; bench = single-kernel performance; e2e = whole-workload performance/accuracy; build = compile transcript; profile = deep-profile capture."
+    },
+    "subject": {
+      "type": "string",
+      "description": "Kernel id for test/bench/profile; e2e case label (or 'baseline'/'final') for e2e; target name for build."
+    },
+    "label": {
+      "type": "string",
+      "description": "Which point in the story this run belongs to: baseline | final | migrate | trial-<n> | case-<name>. Baseline/final comparisons are built from this."
+    },
+    "phase": {
+      "enum": ["detect", "inventory", "migrate", "integrate", "profile-e2e", "optimize", "done", "report"]
+    },
+    "ts": { "type": "string", "description": "ISO-8601 UTC capture time." },
+    "duration_s": { "type": "number", "description": "Wall-clock seconds the command took." },
+
+    "command": {
+      "type": "string",
+      "description": "EXACT command executed, copy-pasteable for reproduction. Never a paraphrase."
+    },
+    "via": {
+      "type": "string",
+      "description": "How it was routed: 'run.sh test' | 'run.sh bench' | 'run.sh exec' | 'local'."
+    },
+    "runner": {
+      "type": "object",
+      "properties": {
+        "mode": { "enum": ["local", "remote"] },
+        "host": { "type": "string" },
+        "workdir": { "type": "string" }
+      }
+    },
+    "env_fingerprint": {
+      "type": "string",
+      "description": "Id of the machine snapshot in evidence/env/<id>.json. Two numbers are only comparable when this matches."
+    },
+    "commit": { "type": "string", "description": "git commit (short) of the code under test." },
+    "dirty": {
+      "type": "boolean",
+      "description": "Working tree had uncommitted changes at capture time; the run is not reproducible from git alone."
+    },
+
+    "exit_code": {
+      "type": "integer",
+      "description": "The machine's verdict. verdict:'pass' REQUIRES exit_code == 0 — the agent cannot override it."
+    },
+    "verdict": {
+      "enum": ["pass", "fail", "error", "recorded"],
+      "description": "pass/fail for gated runs (test, e2e accuracy); 'recorded' for measurement-only runs (bench, profile, build)."
+    },
+
+    "log": { "type": "string", "description": "Path (relative to .sycl/reports/) of the RAW stdout+stderr capture." },
+    "log_sha256": { "type": "string", "description": "Hash taken at capture; re-checked by `evidence.sh verify` so a later edit or a lost sync is detected." },
+    "log_bytes": { "type": "integer" },
+    "log_truncated": { "type": "boolean", "description": "True when the log exceeded the capture cap and the middle was elided (head+tail kept)." },
+
+    "artifacts": {
+      "type": "array",
+      "description": "Extra files this run produced (metric CSVs, asm dumps, traces, plots), hashed for the manifest.",
+      "items": {
+        "type": "object",
+        "required": ["path"],
+        "properties": {
+          "path": { "type": "string" },
+          "kind": { "type": "string", "description": "csv | asm | json | pdf | trace | other" },
+          "sha256": { "type": "string" },
+          "bytes": { "type": "integer" }
+        }
+      }
+    },
+
+    "measurements": {
+      "type": "object",
+      "description": "The numbers a reviewer checks. Auto-parsed from the log where the format allows, otherwise supplied by `evidence.sh annotate --set`. Anything here must also be readable in the raw log.",
+      "additionalProperties": true,
+      "properties": {
+        "reference": { "type": "string", "description": "Correctness oracle used, with its source path (e.g. 'cpu-oracle fp64 accum, dev/common.hpp:validate_result')." },
+        "tolerance": {
+          "type": "object",
+          "properties": {
+            "rtol": { "type": "number" },
+            "atol": { "type": "number" },
+            "source": { "type": "string", "description": "Where the tolerance was inherited from — proves it was not loosened." }
+          }
+        },
+        "max_abs_err": { "type": "number" },
+        "max_rel_err": { "type": "number" },
+        "mismatch_count": { "type": "integer" },
+        "elements_checked": { "type": "integer" },
+
+        "shape": { "type": "string", "description": "Problem size for this run (one record per shape)." },
+        "shape_class": { "enum": ["model", "general", "edge"] },
+        "dtype": { "type": "string" },
+        "seed": { "type": ["integer", "string"], "description": "Input seed — with shape+dtype this regenerates the exact inputs." },
+
+        "warmup": { "type": "integer" },
+        "iters": { "type": "integer" },
+        "samples_ms": {
+          "type": "array",
+          "items": { "type": "number" },
+          "description": "EVERY timed iteration. Kept raw so a reviewer can recompute the median and see a bimodal/drifting run that a lone median hides."
+        },
+        "median_ms": { "type": "number" },
+        "p90_ms": { "type": "number" },
+        "stddev_ms": { "type": "number" },
+        "min_ms": { "type": "number" },
+
+        "bandwidth_gbps": { "type": "number" },
+        "tflops": { "type": "number" },
+        "fraction_of_peak": { "type": "number" },
+        "total_wallclock_ms": { "type": "number" }
+      }
+    },
+
+    "extracted": {
+      "type": "object",
+      "description": "Auto-parsed key/value pairs lifted verbatim from the log by the capture wrapper. Advisory: `measurements` is what the audit reads.",
+      "additionalProperties": true
+    },
+
+    "flags": {
+      "type": "array",
+      "description": "Audit warnings attached by `evidence.sh verify`.",
+      "items": { "enum": ["unstable", "unreproducible", "margin-thin", "truncated", "no-env"] }
+    },
+    "notes": { "type": "string" }
+  }
+}

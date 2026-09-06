@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "sycl-agent analytics (efficiency & cost) rollup",
+  "type": "object",
+  "properties": {
+    "schema": { "type": "string" },
+    "unit": {
+      "type": "object",
+      "properties": {
+        "time": { "type": "string" },
+        "cost": { "type": "string" }
+      }
+    },
+    "totals": { "$ref": "#/definitions/bucket" },
+    "phases": {
+      "type": "object",
+      "description": "Per-phase breakdown keyed by workflow phase name.",
+      "additionalProperties": { "$ref": "#/definitions/bucket" }
+    },
+    "updated_at": { "type": "string", "format": "date-time" }
+  },
+  "required": ["totals", "phases"],
+  "definitions": {
+    "bucket": {
+      "type": "object",
+      "description": "Time + cost accumulated for one phase (or the grand total).",
+      "properties": {
+        "wall_clock_seconds": { "type": "number", "description": "Agent wall-clock: reasoning + tool/runner time." },
+        "tokens_in": { "type": "number", "description": "Uncached prompt tokens (token-billed / BYOM models)." },
+        "tokens_out": { "type": "number", "description": "Completion tokens." },
+        "cache_read": { "type": "number", "description": "Cached input tokens read (cheaper on some vendors, e.g. Anthropic ~0.1x)." },
+        "cache_write": { "type": "number", "description": "Cache-creation input tokens written (pricier on some vendors, e.g. Anthropic ~1.25x)." },
+        "tokens_total": { "type": "number", "description": "All tokens processed (uncached in + cached read/write + out)." },
+        "requests": { "type": "number", "description": "GitHub Copilot premium requests." },
+        "credits": { "type": "number", "description": "GitHub AI credits consumed (may be fractional)." },
+        "cost_usd": { "type": "number", "description": "Direct dollar cost, if the agent/tool reports one (best signal)." }
+      }
+    }
+  }
+}
