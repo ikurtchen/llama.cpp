@@ -3,7 +3,7 @@
   "name": "two-gpu-allreduce",
   "source": "ggml/src/ggml-cuda/allreduce.cu:ggml_cuda_ar_signal_set,ggml_cuda_ar_signal_get,ggml_cuda_ar_kernel,ggml_cuda_ar_add_kernel,ggml_cuda_ar_chunk_bytes,ggml_cuda_ar_wait_for_compute,ggml_cuda_ar_pipeline_free,ggml_cuda_ar_allreduce_copy_impl,ggml_cuda_ar_allreduce_copy_outer,ggml_cuda_ar_allreduce",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "waived",
   "risk": "high",
   "algorithm": "Perform an in-place sum reduction across matching tensors on two GPUs, using either a chunked device kernel that stages through pinned host memory or a copy-engine path plus device-side accumulation for larger tensors.",
   "cuda_constructs": [
@@ -53,8 +53,8 @@
     "kind": "analytical",
     "crosscheck": "-"
   },
-  "notes": "Risk reason: cross-GPU synchronization, host staging, and precision-roundtrip behavior need careful porting. Reference oracle: analytical sum semantics plus backend tests.",
-  "updated_at": "2026-09-06T16:21:34Z",
+  "notes": "Risk reason: cross-GPU synchronization, host staging, and precision-roundtrip behavior need careful porting. Reference oracle: analytical sum semantics plus backend tests. Waived per instructions.md sec 2.3: multi-GPU split-buffer reduction, explicitly deferrable to residual[] when the single-GPU B70 target and time budget make it out of scope. Blast radius: multi-GPU tensor-parallel inference is unavailable on this SYCL backend.",
+  "updated_at": "2026-09-06T17:15:50Z",
   "loc": {
     "source_lang": "cuda",
     "source": {

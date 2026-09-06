@@ -29,7 +29,7 @@
       "id": "allreduce",
       "source": "ggml/src/ggml-cuda/allreduce.cu:ggml_cuda_ar_signal_set,ggml_cuda_ar_signal_get,ggml_cuda_ar_kernel,ggml_cuda_ar_add_kernel,ggml_cuda_ar_chunk_bytes,ggml_cuda_ar_wait_for_compute,ggml_cuda_ar_pipeline_free,ggml_cuda_ar_allreduce_copy_impl,ggml_cuda_ar_allreduce_copy_outer,ggml_cuda_ar_allreduce",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "waived",
       "risk": "high",
       "detail": ".sycl/state/kernels/allreduce.json",
       "loc": {
@@ -926,7 +926,14 @@
         "source_code": 207,
         "sycl_code": 0
       }
+    },
+    {
+      "id": "conv3d",
+      "name": "conv3d",
+      "source_lang": "cpu-reference",
+      "status": "pending",
+      "risk": "high"
     }
   ],
-  "updated_at": "2026-09-06T17:13:43Z"
+  "updated_at": "2026-09-06T17:15:50Z"
 }

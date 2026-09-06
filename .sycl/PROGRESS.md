@@ -6,9 +6,9 @@
 - **Benchmark GPU freq pinned**: True
 - **Build system**: cmake → SYCL build: set-up (ggml/src/ggml-sycl/ builds via icpx -fsycl, AOT bmg-g31, links oneMKL; registers as backend SYCL0)
 - **Phase**: migrate
-- **Updated**: 2026-09-06T17:13:43Z
+- **Updated**: 2026-09-06T17:15:50Z
 
-**Summary**: 75 kernels — 16 migrated, 0 optimized, 0 skipped, 0 needs-reference, 59 pending.
+**Summary**: 76 kernels — 16 migrated, 0 optimized, 0 skipped, 0 needs-reference, 59 pending.
 
 **Code migrated**: 15949 source code lines (76 files; attributed per kernel: cuda 16006) → 0 SYCL code lines (0 files)  ·  ratio 0.0×  ·  44.0% of the project's CUDA/Triton code lines  ·  measured 75/75 kernels
 
@@ -56,7 +56,7 @@
 |----|--------|--------|-----------|----------|----------------|----------|-----------|-------|
 | acc | ggml/src/ggml-cuda/acc.cu:acc_f32,acc_f32_cuda,ggml_cuda_op_acc | migrated | pass | - | 47→0 | - | - | Risk reason: flat elementwise add with simple offset math. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Scope matches CUDA: requires ggml_is_contiguous(src0) && ggml_is_contiguous(src1) (fixes a crash on non-contiguous stride_dim test cases). |
 | add-id | ggml/src/ggml-cuda/add-id.cu:add_id_kernel,ggml_cuda_op_add_id | pending | - | - | 45→0 | - | - | Risk reason: indexed row gather plus rowwise add. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
-| allreduce | ggml/src/ggml-cuda/allreduce.cu:ggml_cuda_ar_signal_set,ggml_cuda_ar_signal_get,ggml_cuda_ar_kernel,ggml_cuda_ar_add_kernel,ggml_cuda_ar_chunk_bytes,ggml_cuda_ar_wait_for_compute,ggml_cuda_ar_pipeline_free,ggml_cuda_ar_allreduce_copy_impl,ggml_cuda_ar_allreduce_copy_outer,ggml_cuda_ar_allreduce | pending | - | - | 404→0 | - | - | Risk reason: cross-GPU synchronization, host staging, and precision-roundtrip behavior need careful porting. Reference oracle: analytical sum semantics plus backend tests. |
+| allreduce | ggml/src/ggml-cuda/allreduce.cu:ggml_cuda_ar_signal_set,ggml_cuda_ar_signal_get,ggml_cuda_ar_kernel,ggml_cuda_ar_add_kernel,ggml_cuda_ar_chunk_bytes,ggml_cuda_ar_wait_for_compute,ggml_cuda_ar_pipeline_free,ggml_cuda_ar_allreduce_copy_impl,ggml_cuda_ar_allreduce_copy_outer,ggml_cuda_ar_allreduce | waived | - | - | 404→0 | - | - | Risk reason: cross-GPU synchronization, host staging, and precision-roundtrip behavior need careful porting. Reference oracle: analytical sum semantics plus backend tests. Waived per instructions.md sec 2.3: multi-GPU split-buffer reduction, explicitly deferrable to residual[] when the single-GPU B70 target and time budget make it out of scope. Blast radius: multi-GPU tensor-parallel inference is unavailable on this SYCL backend. |
 | arange | ggml/src/ggml-cuda/arange.cu:arange_f32,arange_f32_cuda,ggml_cuda_op_arange | migrated | test-backend-ops ARANGE: all cases passed on SYCL0 | - | 25→0 | - | - | Risk reason: direct 1D map kernel. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated in full: single f32 fill kernel, no residual. |
 | argmax | ggml/src/ggml-cuda/argmax.cu:argmax_f32,ggml_cuda_argmax | migrated | test-backend-ops ARGMAX: 7/7 passed on SYCL0 | - | 69→0 | - | - | Risk reason: reduction ordering and tie handling come from warp/block reductions. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated in full: f32->i32 per-row argmax via work-group reduction (sycl::reduce_over_group with a packed sortable 64-bit key), no residual. |
 | argsort | ggml/src/ggml-cuda/argsort.cu:init_indices,init_offsets,argsort_f32_i32_cuda_cub_chunk_nrows,argsort_f32_i32_cuda_cub,ggml_cuda_swap,k_argsort_f32_i32,next_power_of_2,argsort_f32_i32_cuda_bitonic,ggml_cuda_op_argsort | migrated | test-backend-ops ARGSORT: 46/46 passed on SYCL0 (ncols<=1024, bitonic-sort work-group cap) | - | 223→0 | - | - | Risk reason: hybrid CUB plus custom bitonic sort with rowwise offsets. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated the portable bitonic-sort path (one work-group per row, local-memory index array) matching CUDA's non-CUB fallback. CUDA's CUB-based radix/segmented-sort fast path for large ncols (>1024) is not ported - tracked as residual, out of scope for the Qwen3 dense text path (used by top-k selection, not full-vocab sort). |
@@ -129,12 +129,13 @@
 | unary | ggml/src/ggml-cuda/unary.cu:op_abs,op_sgn,op_neg,op_step,op_gelu,op_gelu_erf,op_gelu_quick,op_silu,op_tanh,op_relu,op_sigmoid,op_hardsigmoid,op_hardswish,op_exp,op_sqr,op_relu_sqr,op_sqrt,op_sin,op_cos,op_log,op_expm1,op_softplus,op_elu,op_floor,op_ceil,op_round,op_trunc,unary_op_kernel,unary_cuda,ggml_cuda_op_unary,ggml_cuda_op_abs,ggml_cuda_op_sgn,ggml_cuda_op_neg,ggml_cuda_op_step,ggml_cuda_op_gelu,ggml_cuda_op_gelu_erf,ggml_cuda_op_gelu_quick,ggml_cuda_op_silu,ggml_cuda_op_tanh,ggml_cuda_op_relu,ggml_cuda_op_sigmoid,ggml_cuda_op_hardsigmoid,ggml_cuda_op_hardswish,ggml_cuda_op_exp,ggml_cuda_op_sqr,ggml_cuda_op_sqrt,ggml_cuda_op_sin,ggml_cuda_op_cos,ggml_cuda_op_log,ggml_cuda_op_elu,ggml_cuda_op_floor,ggml_cuda_op_ceil,ggml_cuda_op_round,ggml_cuda_op_trunc,ggml_cuda_op_expm1,ggml_cuda_op_softplus,unary_gated_op_kernel,unary_gated_cuda,ggml_cuda_op_unary_gated,ggml_cuda_op_reglu,ggml_cuda_op_geglu,ggml_cuda_op_swiglu,ggml_cuda_op_geglu_erf,ggml_cuda_op_geglu_quick,swiglu_oai_kernel,swiglu_oai_cuda,ggml_cuda_op_swiglu_oai,swiglu_clamp_kernel,swiglu_clamp_cuda,ggml_cuda_op_swiglu_clamp,xielu_kernel,xielu_cuda,ggml_cuda_op_xielu,op_silu_back,silu_back_kernel,silu_back_cuda,ggml_cuda_op_silu_back,op_leaky_relu,leaky_relu_kernel,leaky_relu_cuda,ggml_cuda_op_leaky_relu,ggml_cuda_op_unary_mul_impl,ggml_cuda_op_unary_mul,ggml_cuda_op_relu_sqr | migrated | pass | - | 541→0 | - | - | Covers plain unary ops (GGML_OP_UNARY sub-ops), GLU gated ops (REGLU/GEGLU/SWIGLU/GEGLU_ERF/GEGLU_QUICK/SWIGLU_OAI), and the standalone SQR/SQRT/SIN/COS/LOG ops. XIELU and SWIGLU_CLAMP (newer ops) not yet ported -- tracked as residual. |
 | upscale | ggml/src/ggml-cuda/upscale.cu:upscale_f32,upscale_f32_bilinear,upscale_f32_bilinear_antialias,weight1,weight2,bicubic,upscale_f32_bicubic,upscale_f32_cuda,upscale_f32_bilinear_cuda,upscale_f32_bicubic_cuda,ggml_cuda_op_upscale | pending | - | - | 224→0 | - | - | Risk reason: interpolation kernels must match coordinate and edge rules exactly. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | wkv | ggml/src/ggml-cuda/wkv.cu:rwkv_wkv_f32,rwkv_wkv7_f32,rwkv_wkv7_f32_t1_warp_row,ggml_cuda_op_rwkv_wkv6,ggml_cuda_op_rwkv_wkv7 | pending | - | - | 207→0 | - | - | Risk reason: recurrent state update order and warp-specialized fast path are model-specific and sensitive. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
+| conv3d | - | pending | - | - | - | - | - | No CUDA counterpart (per instructions.md sec 2.1); reference taken from ggml-cpu ops.cpp:ggml_compute_forward_conv_3d, cross-checked against ggml-vulkan's implementation. |
 
 ## Agent efficiency & cost
 
 - **Elapsed**: 27m27s (whole run)  ·  **Active**: 13m14s (bracketed)  ·  **Cost**: $0.0  ·  **Tokens**: 0 (in 0 / out 0 / cache r 0 / cache w 0)  ·  **Premium requests**: 0  ·  **AI credits**: 0.0
-- **Observed (gen-progress heartbeat)**: span 1h29m12s  ·  working ≈ 1h29m12s (idle-capped 30m00s)  ·  12 snapshots — independent of metrics.sh
-  - ⚠️ bracketed active time (13m14s) is far below observed work (1h29m12s); phases were under-bracketed — trust elapsed/observed figures.
+- **Observed (gen-progress heartbeat)**: span 1h31m19s  ·  working ≈ 1h31m19s (idle-capped 30m00s)  ·  13 snapshots — independent of metrics.sh
+  - ⚠️ bracketed active time (13m14s) is far below observed work (1h31m19s); phases were under-bracketed — trust elapsed/observed figures.
 
 | phase | elapsed | active | tokens | requests | credits | USD |
 |-------|--------:|-------:|-------:|---------:|--------:|----:|
@@ -146,7 +147,6 @@
 <!-- append-only from logs/progress.jsonl — one row per gen-progress run -->
 | time (UTC) | phase | migrated | optimized | skipped | pending |
 |------------|-------|---------:|----------:|--------:|--------:|
-| 2026-09-06T15:44:31Z | detect | 0/0 | 0 | 0 | 0 |
 | 2026-09-06T15:59:07Z | inventory | 0/0 | 0 | 0 | 0 |
 | 2026-09-06T16:12:08Z | migrate | 0/0 | 0 | 0 | 0 |
 | 2026-09-06T16:21:47Z | migrate | 0/75 | 0 | 0 | 75 |
@@ -158,4 +158,5 @@
 | 2026-09-06T17:12:47Z | migrate | 16/75 | 0 | 0 | 59 |
 | 2026-09-06T17:12:56Z | migrate | 16/75 | 0 | 1 | 58 |
 | 2026-09-06T17:13:43Z | migrate | 16/75 | 0 | 0 | 59 |
+| 2026-09-06T17:15:50Z | migrate | 16/76 | 0 | 0 | 59 |
 

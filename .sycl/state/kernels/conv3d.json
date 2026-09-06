@@ -1,0 +1,42 @@
+{
+  "id": "conv3d",
+  "name": "conv3d",
+  "source": "ggml/src/ggml-cpu/ops.cpp:ggml_compute_forward_conv_3d (no CUDA counterpart; ggml-vulkan/ggml-vulkan.cpp also implements it)",
+  "source_lang": "cpu-reference",
+  "status": "pending",
+  "risk": "high",
+  "algorithm": "3D convolution: slide a 3D kernel over a 3D input volume across channels, accumulating dot products per output voxel; no CUDA backend implementation exists, so ggml-cpu/ggml-vulkan is the reference for both algorithm and expected numerics.",
+  "cuda_constructs": [],
+  "io_spec": {
+    "inputs": [
+      {
+        "name": "src0",
+        "dtypes": [
+          "f16",
+          "f32"
+        ],
+        "shape": "3D convolution kernel/weights"
+      },
+      {
+        "name": "src1",
+        "dtypes": [
+          "f32"
+        ],
+        "shape": "3D input volume"
+      }
+    ],
+    "output": {
+      "name": "dst",
+      "dtypes": [
+        "f32"
+      ],
+      "shape": "3D convolution output"
+    }
+  },
+  "reference": {
+    "kind": "cpu",
+    "crosscheck": "ggml-vulkan also implements this op, useful as a second cross-check"
+  },
+  "notes": "No CUDA counterpart (per instructions.md sec 2.1); reference taken from ggml-cpu ops.cpp:ggml_compute_forward_conv_3d, cross-checked against ggml-vulkan's implementation.",
+  "updated_at": "2026-09-06T17:15:50Z"
+}
