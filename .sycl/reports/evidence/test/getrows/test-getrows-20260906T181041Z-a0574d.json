@@ -1,0 +1,33 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-getrows-20260906T181041Z-a0574d",
+  "class": "test",
+  "subject": "getrows",
+  "phase": "migrate",
+  "ts": "2026-09-06T18:10:44Z",
+  "duration_s": 2.591,
+  "command": "./build/bin/test-backend-ops -o GET_ROWS",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "900466333",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/getrows/test-getrows-20260906T181041Z-a0574d.log",
+  "log_sha256": "a2478f9dbf3a196703fd79e08ed6e931886dfbf0c73441e557b211a975245da6",
+  "log_bytes": 10136,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "cpu",
+    "tolerance": {
+      "source": "cuda-parity"
+    }
+  },
+  "extracted": {}
+}

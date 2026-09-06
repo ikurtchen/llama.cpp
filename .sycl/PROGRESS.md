@@ -6,9 +6,9 @@
 - **Benchmark GPU freq pinned**: True
 - **Build system**: cmake → SYCL build: set-up (ggml/src/ggml-sycl/ builds via icpx -fsycl, AOT bmg-g31, links oneMKL; registers as backend SYCL0)
 - **Phase**: migrate
-- **Updated**: 2026-09-06T17:45:10Z
+- **Updated**: 2026-09-06T18:11:06Z
 
-**Summary**: 76 kernels — 21 migrated, 0 optimized, 0 skipped, 0 needs-reference, 54 pending.
+**Summary**: 76 kernels — 22 migrated, 0 optimized, 0 skipped, 0 needs-reference, 53 pending.
 
 **Code migrated**: 15949 source code lines (76 files; attributed per kernel: cuda 16006) → 0 SYCL code lines (0 files)  ·  ratio 0.0×  ·  44.0% of the project's CUDA/Triton code lines  ·  measured 75/75 kernels
 
@@ -84,7 +84,7 @@
 | flash-attn-mma-f16 | ggml/src/ggml-cuda/fattn.cu:ggml_cuda_flash_attn_ext_mma_f16_shall_use_sparse,ggml_cuda_flash_attn_ext_mma_f16_switch_ncols1,ggml_cuda_flash_attn_ext_mma_f16_switch_ncols2,ggml_cuda_flash_attn_ext_mma_f16 | pending | - | - | 394→0 | - | - | Risk reason: tensor-core MMA pipelines, sparse path selection, and streamed partial-result handling make this the hardest attention variant. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | fwht | ggml/src/ggml-cuda/fwht.cu:fwht_cuda,ggml_cuda_op_fwht | pending | - | - | 81→0 | - | - | Risk reason: butterfly transform ordering matters, but the kernel structure is regular. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | gated-delta-net | ggml/src/ggml-cuda/gated_delta_net.cu:launch_gated_delta_net,ggml_cuda_op_gated_delta_net_impl,ggml_cuda_op_gated_delta_net,ggml_cuda_op_gated_delta_net_fused_cache | pending | - | - | 262→0 | - | - | Risk reason: recurrent stateful update with warp reductions and rollback-slot semantics is complex. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
-| getrows | ggml/src/ggml-cuda/getrows.cu:k_get_rows,k_get_rows_kq,k_get_rows_float,k_get_rows_float_vec,k_get_rows_back_float,get_rows_cuda_q,get_rows_cuda_kq,get_rows_cuda_float,ggml_cuda_get_rows_switch_src0_type,get_rows_cuda,ggml_cuda_op_get_rows,ggml_cuda_op_get_rows_back | pending | - | - | 408→0 | - | - | Risk reason: forward uses many type/layout cases and backward performs index-based reductions. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
+| getrows | ggml/src/ggml-cuda/getrows.cu:k_get_rows,k_get_rows_kq,k_get_rows_float,k_get_rows_float_vec,k_get_rows_back_float,get_rows_cuda_q,get_rows_cuda_kq,get_rows_cuda_float,ggml_cuda_get_rows_switch_src0_type,get_rows_cuda,ggml_cuda_op_get_rows,ggml_cuda_op_get_rows_back | migrated | pass | - | 408→0 | - | - | Risk reason: forward uses many type/layout cases and backward performs index-based reductions. Reference oracle: ggml-cpu backend via tests/test-backend-ops. This SYCL port adds the forward op file and dispatch wiring, but currently narrows support to the Q8_0 path only per instructions.md sec 2.2; non-Q8_0 types and GET_ROWS_BACK remain fallback residuals. Current evidence run for test-backend-ops -o GET_ROWS passed with the backend reporting the op unsupported on this branch, so no backend-executed GET_ROWS case was validated yet. |
 | batched-ptrs | ggml/src/ggml-cuda/ggml-cuda.cu:k_compute_batched_ptrs | pending | - | - | 20→0 | - | - | Risk reason: simple pointer arithmetic kernel. Reference oracle: analytical pointer mapping plus backend GEMM tests. |
 | gla | ggml/src/ggml-cuda/gla.cu:gated_linear_attn_f32,ggml_cuda_op_gated_linear_attn | pending | - | - | 73→0 | - | - | Risk reason: recurrent attention update with custom memory layout is specialized and stateful. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | im2col | ggml/src/ggml-cuda/im2col.cu:im2col_kernel,im2col_cuda,im2col_cuda_f16,im2col_cuda_f32,ggml_cuda_op_im2col,im2col_3d_kernel,im2col_3d_cuda,im2col_3d_cuda_f16,im2col_3d_cuda_f32,ggml_cuda_op_im2col_3d | pending | - | - | 219→0 | - | - | Risk reason: multi-axis patch extraction and padding logic need exact matching. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
@@ -133,21 +133,20 @@
 
 ## Agent efficiency & cost
 
-- **Elapsed**: 27m27s (whole run)  ·  **Active**: 13m14s (bracketed)  ·  **Cost**: $0.0  ·  **Tokens**: 0 (in 0 / out 0 / cache r 0 / cache w 0)  ·  **Premium requests**: 0  ·  **AI credits**: 0.0
-- **Observed (gen-progress heartbeat)**: span 2h00m39s  ·  working ≈ 2h00m39s (idle-capped 30m00s)  ·  15 snapshots — independent of metrics.sh
-  - ⚠️ bracketed active time (13m14s) is far below observed work (2h00m39s); phases were under-bracketed — trust elapsed/observed figures.
+- **Elapsed**: 2h02m23s (whole run)  ·  **Active**: 1h48m10s (bracketed)  ·  **Cost**: $0.0  ·  **Tokens**: 0 (in 0 / out 0 / cache r 0 / cache w 0)  ·  **Premium requests**: 0  ·  **AI credits**: 0.0
+- **Observed (gen-progress heartbeat)**: span 2h26m35s  ·  working ≈ 2h26m35s (idle-capped 30m00s)  ·  16 snapshots — independent of metrics.sh
 
 | phase | elapsed | active | tokens | requests | credits | USD |
 |-------|--------:|-------:|-------:|---------:|--------:|----:|
 | detect | 23s | 23s | 0 | 0 | 0.0 | 0.0 |
 | inventory | 12m51s | 12m51s | 0 | 0 | 0.0 | 0.0 |
+| migrate | 1h34m56s | 1h34m56s | 0 | 0 | 0.0 | 0.0 |
 
 ## Progress history
 
 <!-- append-only from logs/progress.jsonl — one row per gen-progress run -->
 | time (UTC) | phase | migrated | optimized | skipped | pending |
 |------------|-------|---------:|----------:|--------:|--------:|
-| 2026-09-06T16:21:47Z | migrate | 0/75 | 0 | 0 | 75 |
 | 2026-09-06T16:27:05Z | migrate | 4/75 | 0 | 0 | 71 |
 | 2026-09-06T16:34:01Z | migrate | 5/75 | 0 | 0 | 70 |
 | 2026-09-06T16:38:34Z | migrate | 8/75 | 0 | 0 | 67 |
@@ -159,4 +158,5 @@
 | 2026-09-06T17:15:50Z | migrate | 16/76 | 0 | 0 | 59 |
 | 2026-09-06T17:38:08Z | migrate | 20/76 | 0 | 0 | 55 |
 | 2026-09-06T17:45:10Z | migrate | 21/76 | 0 | 0 | 54 |
+| 2026-09-06T18:11:06Z | migrate | 22/76 | 0 | 0 | 53 |
 

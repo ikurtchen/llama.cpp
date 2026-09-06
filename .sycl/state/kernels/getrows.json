@@ -3,7 +3,7 @@
   "name": "get-rows-family",
   "source": "ggml/src/ggml-cuda/getrows.cu:k_get_rows,k_get_rows_kq,k_get_rows_float,k_get_rows_float_vec,k_get_rows_back_float,get_rows_cuda_q,get_rows_cuda_kq,get_rows_cuda_float,ggml_cuda_get_rows_switch_src0_type,get_rows_cuda,ggml_cuda_op_get_rows,ggml_cuda_op_get_rows_back",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "medium",
   "algorithm": "Gather rows from dense or quantized source tensors using integer row ids, with dense copy, block dequantization, k-quant specializations, and a backward accumulation kernel.",
   "cuda_constructs": [
@@ -43,8 +43,8 @@
     "kind": "cpu",
     "crosscheck": "-"
   },
-  "notes": "Risk reason: forward uses many type/layout cases and backward performs index-based reductions. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:35Z",
+  "notes": "Risk reason: forward uses many type/layout cases and backward performs index-based reductions. Reference oracle: ggml-cpu backend via tests/test-backend-ops. This SYCL port adds the forward op file and dispatch wiring, but currently narrows support to the Q8_0 path only per instructions.md sec 2.2; non-Q8_0 types and GET_ROWS_BACK remain fallback residuals. Current evidence run for test-backend-ops -o GET_ROWS passed with the backend reporting the op unsupported on this branch, so no backend-executed GET_ROWS case was validated yet.",
+  "updated_at": "2026-09-06T18:10:41Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -90,5 +90,16 @@
     "unresolved": [],
     "method": "span",
     "measured_at": "2026-09-06T16:21:35Z"
+  },
+  "target_style": "plain-sycl",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/getrows.hpp",
+    "ggml/src/ggml-sycl/getrows.cpp"
+  ],
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "GET_ROWS",
+    "result": "pass",
+    "evidence": "test-getrows-20260906T181041Z-a0574d"
   }
 }

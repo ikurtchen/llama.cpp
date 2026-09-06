@@ -23,6 +23,7 @@
 #include "argmax.hpp"
 #include "norm.hpp"
 #include "top-k.hpp"
+#include "getrows.hpp"
 #include "set-rows.hpp"
 #include "reduce_rows.hpp"
 #include "acc.hpp"
@@ -314,6 +315,9 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, ggml_tens
         case GGML_OP_TOP_K:
             ggml_sycl_op_top_k(ctx, dst);
             return true;
+        case GGML_OP_GET_ROWS:
+            ggml_sycl_op_get_rows(ctx, dst);
+            return true;
         case GGML_OP_SET_ROWS:
             ggml_sycl_op_set_rows(ctx, dst);
             return true;
@@ -507,6 +511,8 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
             return ggml_sycl_supports_argmax(op);
         case GGML_OP_TOP_K:
             return ggml_sycl_supports_top_k(op);
+        case GGML_OP_GET_ROWS:
+            return ggml_sycl_supports_get_rows(op);
         case GGML_OP_SET_ROWS:
             return ggml_sycl_supports_set_rows(op);
         case GGML_OP_SUM:

@@ -283,7 +283,19 @@ bool ggml_sycl_supports_get_rows(const ggml_tensor * op) {
         return false;
     }
 
-    if (op->type != GGML_TYPE_F32 && op->type != GGML_TYPE_F16) {
+    if (op->type != GGML_TYPE_F32) {
+        return false;
+    }
+
+    if (src0->type != GGML_TYPE_Q8_0) {
+        return false;
+    }
+
+    if (!ggml_is_contiguous(src1)) {
+        return false;
+    }
+
+    if (src0->ne[2] != src1->ne[1] || src0->ne[3] != src1->ne[2]) {
         return false;
     }
 
@@ -291,17 +303,5 @@ bool ggml_sycl_supports_get_rows(const ggml_tensor * op) {
         return false;
     }
 
-    switch (src0->type) {
-        case GGML_TYPE_F32:
-        case GGML_TYPE_F16:
-            return true;
-        case GGML_TYPE_Q8_0:
-            return src0->ne[0] % QK8_0 == 0;
-        case GGML_TYPE_Q4_0:
-            return src0->ne[0] % QK4_0 == 0;
-        case GGML_TYPE_Q4_1:
-            return src0->ne[0] % QK4_1 == 0;
-        default:
-            return false;
-    }
+    return src0->ne[0] % QK8_0 == 0;
 }
