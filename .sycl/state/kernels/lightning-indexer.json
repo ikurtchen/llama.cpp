@@ -51,7 +51,7 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: custom WMMA sparse-index scoring is highly specialized and architecture-sensitive. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T21:32:17Z",
+  "updated_at": "2026-09-06T21:36:27Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -132,7 +132,7 @@
     "harness": "tests/test-backend-ops.cpp",
     "filter": "LIGHTNING_INDEXER",
     "result": "pass",
-    "evidence": "test-lightning-indexer-20260906T213058Z-5b12db"
+    "evidence": "test-lightning-indexer-20260906T213610Z-22e12d"
   },
   "sycl_impl": "ggml/src/ggml-sycl/lightning-indexer.hpp,ggml/src/ggml-sycl/lightning-indexer.cpp"
 }

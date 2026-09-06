@@ -6,7 +6,7 @@
 - **Benchmark GPU freq pinned**: True
 - **Build system**: cmake → SYCL build: set-up (ggml/src/ggml-sycl/ builds via icpx -fsycl, AOT bmg-g31, links oneMKL; registers as backend SYCL0)
 - **Phase**: migrate
-- **Updated**: 2026-09-06T21:32:28Z
+- **Updated**: 2026-09-06T21:36:27Z
 
 **Summary**: 76 kernels — 57 migrated, 0 optimized, 1 skipped, 0 needs-reference, 17 pending.
 
@@ -135,7 +135,7 @@
 ## Agent efficiency & cost
 
 - **Elapsed**: 5h02m01s (whole run)  ·  **Active**: 4h30m37s (bracketed)  ·  **Cost**: $0.0  ·  **Tokens**: 256612832 (in 8803075 / out 1255396 / cache r 245376631 / cache w 1177730)  ·  **Premium requests**: 2017  ·  **AI credits**: 2011.0
-- **Observed (gen-progress heartbeat)**: span 5h47m57s  ·  working ≈ 4h50m16s (idle-capped 30m00s)  ·  31 snapshots — independent of metrics.sh
+- **Observed (gen-progress heartbeat)**: span 5h51m56s  ·  working ≈ 4h54m15s (idle-capped 30m00s)  ·  32 snapshots — independent of metrics.sh
 
 | phase | elapsed | active | tokens | requests | credits | USD |
 |-------|--------:|-------:|-------:|---------:|--------:|----:|
@@ -148,7 +148,6 @@
 <!-- append-only from logs/progress.jsonl — one row per gen-progress run -->
 | time (UTC) | phase | migrated | optimized | skipped | pending |
 |------------|-------|---------:|----------:|--------:|--------:|
-| 2026-09-06T19:04:02Z | migrate | 30/76 | 0 | 0 | 45 |
 | 2026-09-06T19:05:08Z | migrate | 30/76 | 0 | 0 | 45 |
 | 2026-09-06T19:06:20Z | migrate | 30/76 | 0 | 0 | 45 |
 | 2026-09-06T19:31:30Z | migrate | 30/76 | 0 | 2 | 43 |
@@ -160,4 +159,5 @@
 | 2026-09-06T21:31:38Z | migrate | 51/76 | 0 | 1 | 23 |
 | 2026-09-06T21:32:17Z | migrate | 52/76 | 0 | 1 | 22 |
 | 2026-09-06T21:32:28Z | migrate | 57/76 | 0 | 1 | 17 |
+| 2026-09-06T21:36:27Z | migrate | 57/76 | 0 | 1 | 17 |
 
