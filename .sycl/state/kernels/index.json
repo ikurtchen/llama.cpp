@@ -208,12 +208,12 @@
       "id": "count-equal",
       "source": "ggml/src/ggml-cuda/count-equal.cu:count_equal,ggml_cuda_count_equal",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "medium",
       "detail": ".sycl/state/kernels/count-equal.json",
       "loc": {
-        "source_code": 45,
-        "sycl_code": 0
+        "source_code": 48,
+        "sycl_code": 84
       }
     },
     {
@@ -444,7 +444,7 @@
       "id": "batched-ptrs",
       "source": "ggml/src/ggml-cuda/ggml-cuda.cu:k_compute_batched_ptrs",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "skipped",
       "risk": "low",
       "detail": ".sycl/state/kernels/batched-ptrs.json",
       "loc": {
@@ -580,12 +580,12 @@
       "id": "mmq",
       "source": "ggml/src/ggml-cuda/mmq.cu:ggml_cuda_mul_mat_q_switch_type,ggml_cuda_mul_mat_q,ggml_cuda_should_use_mmq",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "high",
       "detail": ".sycl/state/kernels/mmq.json",
       "loc": {
-        "source_code": 638,
-        "sycl_code": 0
+        "source_code": 1933,
+        "sycl_code": 898
       }
     },
     {
@@ -604,12 +604,12 @@
       "id": "mmvq",
       "source": "ggml/src/ggml-cuda/mmvq.cu:get_vdr_mmvq,get_mmvq_mmid_max_batch_pascal_older,get_mmvq_mmid_max_batch_turing_plus,get_mmvq_mmid_max_batch_gcn,get_mmvq_mmid_max_batch_cdna,get_mmvq_mmid_max_batch_rdna1_rdna2,get_mmvq_mmid_max_batch_rdna3,get_mmvq_mmid_max_batch_rdna4,get_mmvq_mmid_max_batch,ggml_cuda_should_use_mmvq,get_mmvq_mmid_max_batch_for_device,calc_nwarps,calc_rows_per_block,mul_mat_vec_q,mul_mat_vec_q_moe,mul_mat_vec_q_switch_fusion,mul_mat_vec_q_moe_launch,mul_mat_vec_q_switch_ncols_dst,mul_mat_vec_q_switch_type,ggml_cuda_mul_mat_vec_q,ggml_cuda_op_mul_mat_vec_q",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "high",
       "detail": ".sycl/state/kernels/mmvq.json",
       "loc": {
-        "source_code": 1247,
-        "sycl_code": 0
+        "source_code": 2542,
+        "sycl_code": 898
       }
     },
     {
@@ -747,12 +747,12 @@
       "id": "rms-norm-rope",
       "source": "ggml/src/ggml-cuda/rope.cu:rms_norm_mul_rope_f32,rms_norm_mul_rope_cuda,ggml_cuda_op_rms_norm_mul_rope_fused",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "high",
       "detail": ".sycl/state/kernels/rms-norm-rope.json",
       "loc": {
-        "source_code": 197,
-        "sycl_code": 0
+        "source_code": 1104,
+        "sycl_code": 535
       }
     },
     {
@@ -1038,5 +1038,5 @@
       }
     }
   ],
-  "updated_at": "2026-09-06T21:45:20Z"
+  "updated_at": "2026-09-06T21:46:32Z"
 }

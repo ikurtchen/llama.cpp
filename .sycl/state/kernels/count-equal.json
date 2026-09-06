@@ -3,7 +3,7 @@
   "name": "count-equal",
   "source": "ggml/src/ggml-cuda/count-equal.cu:count_equal,ggml_cuda_count_equal",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "medium",
   "algorithm": "Count how many positions are equal across two tensors by comparing elements and atomically accumulating the result.",
   "cuda_constructs": [
@@ -34,23 +34,23 @@
     "kind": "cpu",
     "crosscheck": "-"
   },
-  "notes": "Risk reason: atomic accumulation and type-specialized comparisons need care. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Not on the Qwen3 dense-inference path (qwen3 flag: false); scheduled after the Qwen3-path and lowest-risk units per instructions.md scope (all 117 ops in scope, difficulty is never a skip reason).",
-  "updated_at": "2026-09-06T17:13:43Z",
+  "notes": "Migrated as a plain SYCL reduction in ggml/src/ggml-sycl/count-equal.cpp: compare I32 inputs elementwise, reduce per work-group, then atomically add into the I64 scalar result. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
+  "updated_at": "2026-09-06T21:46:32Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 45,
+      "code": 48,
       "comment": 0,
-      "blank": 13,
-      "raw": 58,
-      "files": 1
+      "blank": 15,
+      "raw": 63,
+      "files": 2
     },
     "sycl": {
-      "code": 0,
+      "code": 84,
       "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "blank": 20,
+      "raw": 104,
+      "files": 2
     },
     "source_files": [
       {
@@ -64,12 +64,55 @@
         "comment": 0,
         "blank": 13,
         "raw": 58
+      },
+      {
+        "path": "ggml/src/ggml-cuda/count-equal.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 3,
+        "comment": 0,
+        "blank": 2,
+        "raw": 5
       }
     ],
-    "sycl_files": [],
-    "mirrored_sources": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/count-equal.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 80,
+        "comment": 0,
+        "blank": 18,
+        "raw": 98
+      },
+      {
+        "path": "ggml/src/ggml-sycl/count-equal.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 4,
+        "comment": 0,
+        "blank": 2,
+        "raw": 6
+      }
+    ],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/count-equal.cuh"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:34Z"
+    "measured_at": "2026-09-06T21:46:32Z"
+  },
+  "target_style": "plain-sycl",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/count-equal.hpp",
+    "ggml/src/ggml-sycl/count-equal.cpp"
+  ],
+  "sycl_file": "ggml/src/ggml-sycl/count-equal.cpp",
+  "sycl_impl": "ggml/src/ggml-sycl/count-equal.hpp,ggml/src/ggml-sycl/count-equal.cpp",
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "COUNT_EQUAL",
+    "result": "pass",
+    "evidence": "test-count-equal-20260906T214402Z-cccb43"
   }
 }

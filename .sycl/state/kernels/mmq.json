@@ -3,7 +3,7 @@
   "name": "mul-mat-q",
   "source": "ggml/src/ggml-cuda/mmq.cu:ggml_cuda_mul_mat_q_switch_type,ggml_cuda_mul_mat_q,ggml_cuda_should_use_mmq",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "high",
   "algorithm": "Multiply quantized weight matrices by F32 activations, first re-quantizing activations into q8_1/fp4 helper layouts and then running architecture-specific shared-memory MMA or stream-k kernels.",
   "cuda_constructs": [
@@ -70,25 +70,52 @@
     "kind": "cpu",
     "crosscheck": "-"
   },
-  "notes": "Risk reason: custom quantized GEMM data layouts, activation requantization, and stream-k fixup make this one of the core hard ports. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:35Z",
+  "notes": "Q8_0 quantized GGML_OP_MUL_MAT is migrated in ggml/src/ggml-sycl/mmf.cpp by dequantizing src0 to F32 with the shared SYCL dequantize helpers and then calling oneMKL GEMM. This is the correctness-first migrate-phase implementation for quantized weights; a quantized-native MMA kernel is deferred to optimize phase. Q8_0 GGML_OP_MUL_MAT_ID uses the same backend file and was also validated separately with build/bin/test-backend-ops -b SYCL0 -o MUL_MAT_ID -p 'type_a=q8_0' (75/75 passed). Other quantized src0 types remain residual by scope.",
+  "updated_at": "2026-09-06T21:46:32Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 638,
-      "comment": 42,
-      "blank": 120,
-      "raw": 800,
-      "files": 2
+      "code": 1933,
+      "comment": 65,
+      "blank": 353,
+      "raw": 2351,
+      "files": 5
     },
     "sycl": {
-      "code": 0,
+      "code": 898,
       "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "blank": 139,
+      "raw": 1037,
+      "files": 4
     },
     "source_files": [
+      {
+        "path": "ggml/src/ggml-cuda/dequantize.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 338,
+        "comment": 12,
+        "blank": 102,
+        "raw": 452
+      },
+      {
+        "path": "ggml/src/ggml-cuda/mmf.cu",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 157,
+        "comment": 4,
+        "blank": 30,
+        "raw": 191
+      },
+      {
+        "path": "ggml/src/ggml-cuda/mmf.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 800,
+        "comment": 7,
+        "blank": 101,
+        "raw": 908
+      },
       {
         "path": "ggml/src/ggml-cuda/mmq.cu",
         "lang": "c",
@@ -115,13 +142,69 @@
         "raw": 423
       }
     ],
-    "sycl_files": [],
-    "mirrored_sources": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/dequantize.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 104,
+        "comment": 0,
+        "blank": 12,
+        "raw": 116
+      },
+      {
+        "path": "ggml/src/ggml-sycl/dequantize.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 259,
+        "comment": 0,
+        "blank": 36,
+        "raw": 295
+      },
+      {
+        "path": "ggml/src/ggml-sycl/mmf.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 529,
+        "comment": 0,
+        "blank": 89,
+        "raw": 618
+      },
+      {
+        "path": "ggml/src/ggml-sycl/mmf.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 6,
+        "comment": 0,
+        "blank": 2,
+        "raw": 8
+      }
+    ],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/mmf.cuh",
+      "ggml/src/ggml-cuda/mmf.cu",
+      "ggml/src/ggml-cuda/dequantize.cuh"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:35Z",
+    "measured_at": "2026-09-06T21:46:32Z",
     "source_spec": [
       "ggml/src/ggml-cuda/mmq.cuh:mul_mat_q,mul_mat_q_stream_k_fixup"
     ]
+  },
+  "target_style": "dequantize-plus-onemkl-gemm",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/mmf.hpp",
+    "ggml/src/ggml-sycl/mmf.cpp",
+    "ggml/src/ggml-sycl/dequantize.hpp",
+    "ggml/src/ggml-sycl/dequantize.cpp"
+  ],
+  "sycl_file": "ggml/src/ggml-sycl/mmf.cpp",
+  "sycl_impl": "ggml/src/ggml-sycl/mmf.hpp,ggml/src/ggml-sycl/mmf.cpp,ggml/src/ggml-sycl/dequantize.hpp,ggml/src/ggml-sycl/dequantize.cpp",
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "MUL_MAT(type_a=q8_0,type_b=f32,m=16,n=16,k=256,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1,src_overlap=0)",
+    "result": "pass",
+    "evidence": "test-mmq-20260906T214542Z-6b3d9f"
   }
 }

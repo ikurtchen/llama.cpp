@@ -3,7 +3,7 @@
   "name": "batched-pointer-setup",
   "source": "ggml/src/ggml-cuda/ggml-cuda.cu:k_compute_batched_ptrs",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "skipped",
   "risk": "low",
   "algorithm": "Build device arrays of per-batch matrix pointers so cuBLAS batched GEMM and similar helpers can consume ggml tensor batches with broadcasted strides.",
   "cuda_constructs": [
@@ -33,8 +33,8 @@
     "kind": "analytical",
     "crosscheck": "-"
   },
-  "notes": "Risk reason: simple pointer arithmetic kernel. Reference oracle: analytical pointer mapping plus backend GEMM tests.",
-  "updated_at": "2026-09-06T16:21:35Z",
+  "notes": "Skipped for a non-difficulty reason. k_compute_batched_ptrs is a CUDA-internal helper that builds per-batch pointer arrays for cuBLAS batched GEMM. The SYCL backend's oneMKL batched GEMM path in ggml/src/ggml-sycl/mmf.cpp uses GEMM_BATCH with strided batch metadata and does not need manual pointer-array setup, so the functionality is already covered by the migrated batched MUL_MAT path.",
+  "updated_at": "2026-09-06T21:46:32Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -68,6 +68,8 @@
     "mirrored_sources": [],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:35Z"
-  }
+    "measured_at": "2026-09-06T21:46:32Z"
+  },
+  "target_style": "covered-by-onemkl-batched-gemm",
+  "sycl_files": []
 }

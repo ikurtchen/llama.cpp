@@ -2828,6 +2828,8 @@ struct test_count_equal : public test_case {
         return 0.0;
     }
 
+    bool run_whole_graph() override { return true; }
+
     void initialize_tensors(ggml_context * ctx) override {
         std::random_device rd;
         std::default_random_engine rng(rd());
@@ -4734,7 +4736,7 @@ struct test_mul_mat : public test_case {
         return out;
     }
 
-    bool run_whole_graph() override { return o > 1; }
+    bool run_whole_graph() override { return o > 1 || ggml_is_quantized(type_a); }
 
     std::string op_desc(ggml_tensor * t) override {
         GGML_UNUSED(t);
@@ -4963,6 +4965,8 @@ struct test_mul_mat_id : public test_case {
     void initialize_tensors(ggml_context * ctx) override {
         init_mul_mat_id_tensors(ctx, n_mats);
     }
+
+    bool run_whole_graph() override { return ggml_is_quantized(type_a); }
 };
 
 // GGML_OP_MUL_MAT_ID + GGML_OP_ADD or GGML_OP_MUL

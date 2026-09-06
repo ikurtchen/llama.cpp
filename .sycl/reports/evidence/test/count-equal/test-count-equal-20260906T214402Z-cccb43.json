@@ -1,0 +1,33 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-count-equal-20260906T214402Z-cccb43",
+  "class": "test",
+  "subject": "count-equal",
+  "phase": "migrate",
+  "ts": "2026-09-06T21:44:50Z",
+  "duration_s": 47.748,
+  "command": "build/bin/test-backend-ops -b SYCL0 -o COUNT_EQUAL",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "0e0daeb49",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/count-equal/test-count-equal-20260906T214402Z-cccb43.log",
+  "log_sha256": "321b82ae02ad3ebc07ffdd425edee592b2aa55d25ae003893d5f24e20614f8f6",
+  "log_bytes": 1219,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "cpu",
+    "tolerance": {
+      "source": "cuda-parity"
+    }
+  },
+  "extracted": {}
+}

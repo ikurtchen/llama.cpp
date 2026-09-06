@@ -22,6 +22,7 @@
 #include "arange.hpp"
 #include "argsort.hpp"
 #include "argmax.hpp"
+#include "count-equal.hpp"
 #include "fattn.hpp"
 #include "norm.hpp"
 #include "top-k.hpp"
@@ -356,6 +357,9 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, ggml_tens
             return true;
         case GGML_OP_ARGMAX:
             ggml_sycl_op_argmax(ctx, dst);
+            return true;
+        case GGML_OP_COUNT_EQUAL:
+            ggml_sycl_op_count_equal(ctx, dst);
             return true;
         case GGML_OP_MUL_MAT:
             ggml_sycl_op_mul_mat(ctx, dst);
@@ -708,6 +712,8 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
             return ggml_sycl_supports_argsort(op);
         case GGML_OP_ARGMAX:
             return ggml_sycl_supports_argmax(op);
+        case GGML_OP_COUNT_EQUAL:
+            return ggml_sycl_supports_count_equal(op);
         case GGML_OP_MUL_MAT:
             return ggml_sycl_supports_mul_mat(op);
         case GGML_OP_MUL_MAT_ID:

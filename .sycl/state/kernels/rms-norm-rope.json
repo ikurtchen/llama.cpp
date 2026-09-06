@@ -3,7 +3,7 @@
   "name": "rms-norm-mul-rope-fused",
   "source": "ggml/src/ggml-cuda/rope.cu:rms_norm_mul_rope_f32,rms_norm_mul_rope_cuda,ggml_cuda_op_rms_norm_mul_rope_fused",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "high",
   "algorithm": "Fuse RMS normalization, optional multiplicative scale, and rotary position embedding into one pass over attention inputs.",
   "cuda_constructs": [
@@ -47,25 +47,43 @@
     "kind": "cpu",
     "crosscheck": "-"
   },
-  "notes": "Risk reason: fused norm + RoPE changes operation order and is hot-path relevant. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:37Z",
+  "notes": "The fused RMS_NORM_MUL_ROPE graph runs on SYCL by composing the already-migrated RMS norm, multiply, rope, view, and set_rows paths. No separate fused op enum or helper kernel is required on SYCL for this migrate phase because the graph computes correctly through the existing backend dispatch.",
+  "updated_at": "2026-09-06T21:46:32Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 197,
-      "comment": 0,
-      "blank": 33,
-      "raw": 230,
-      "files": 1
+      "code": 1104,
+      "comment": 41,
+      "blank": 217,
+      "raw": 1362,
+      "files": 6
     },
     "sycl": {
-      "code": 0,
-      "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "code": 535,
+      "comment": 17,
+      "blank": 111,
+      "raw": 663,
+      "files": 6
     },
     "source_files": [
+      {
+        "path": "ggml/src/ggml-cuda/norm.cu",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 544,
+        "comment": 39,
+        "blank": 115,
+        "raw": 698
+      },
+      {
+        "path": "ggml/src/ggml-cuda/norm.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 11,
+        "comment": 0,
+        "blank": 7,
+        "raw": 18
+      },
       {
         "path": "ggml/src/ggml-cuda/rope.cu",
         "lang": "c",
@@ -78,12 +96,117 @@
         "comment": 0,
         "blank": 33,
         "raw": 230
+      },
+      {
+        "path": "ggml/src/ggml-cuda/rope.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 6,
+        "comment": 0,
+        "blank": 5,
+        "raw": 11
+      },
+      {
+        "path": "ggml/src/ggml-cuda/set-rows.cu",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 342,
+        "comment": 2,
+        "blank": 54,
+        "raw": 398
+      },
+      {
+        "path": "ggml/src/ggml-cuda/set-rows.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 4,
+        "comment": 0,
+        "blank": 3,
+        "raw": 7
       }
     ],
-    "sycl_files": [],
-    "mirrored_sources": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/norm.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 316,
+        "comment": 2,
+        "blank": 63,
+        "raw": 381
+      },
+      {
+        "path": "ggml/src/ggml-sycl/norm.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 7,
+        "comment": 0,
+        "blank": 3,
+        "raw": 10
+      },
+      {
+        "path": "ggml/src/ggml-sycl/rope.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 138,
+        "comment": 11,
+        "blank": 26,
+        "raw": 175
+      },
+      {
+        "path": "ggml/src/ggml-sycl/rope.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 4,
+        "comment": 0,
+        "blank": 2,
+        "raw": 6
+      },
+      {
+        "path": "ggml/src/ggml-sycl/set-rows.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 64,
+        "comment": 4,
+        "blank": 14,
+        "raw": 82
+      },
+      {
+        "path": "ggml/src/ggml-sycl/set-rows.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 6,
+        "comment": 0,
+        "blank": 3,
+        "raw": 9
+      }
+    ],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/norm.cu",
+      "ggml/src/ggml-cuda/norm.cuh",
+      "ggml/src/ggml-cuda/rope.cuh",
+      "ggml/src/ggml-cuda/set-rows.cuh",
+      "ggml/src/ggml-cuda/set-rows.cu"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:37Z"
+    "measured_at": "2026-09-06T21:46:32Z"
+  },
+  "target_style": "graph-composition",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/norm.hpp",
+    "ggml/src/ggml-sycl/norm.cpp",
+    "ggml/src/ggml-sycl/rope.hpp",
+    "ggml/src/ggml-sycl/rope.cpp",
+    "ggml/src/ggml-sycl/set-rows.hpp",
+    "ggml/src/ggml-sycl/set-rows.cpp"
+  ],
+  "sycl_file": "ggml/src/ggml-sycl/rope.cpp",
+  "sycl_impl": "ggml/src/ggml-sycl/norm.hpp,ggml/src/ggml-sycl/norm.cpp,ggml/src/ggml-sycl/rope.hpp,ggml/src/ggml-sycl/rope.cpp,ggml/src/ggml-sycl/set-rows.hpp,ggml/src/ggml-sycl/set-rows.cpp",
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "RMS_NORM_MUL_ROPE",
+    "result": "pass",
+    "evidence": "test-rms-norm-rope-20260906T214402Z-ae39a2"
   }
 }

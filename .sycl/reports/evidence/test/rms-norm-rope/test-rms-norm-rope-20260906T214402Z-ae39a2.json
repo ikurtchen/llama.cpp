@@ -1,0 +1,33 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-rms-norm-rope-20260906T214402Z-ae39a2",
+  "class": "test",
+  "subject": "rms-norm-rope",
+  "phase": "migrate",
+  "ts": "2026-09-06T21:44:24Z",
+  "duration_s": 22.695,
+  "command": "build/bin/test-backend-ops -b SYCL0 -o RMS_NORM_MUL_ROPE",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "0e0daeb49",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/rms-norm-rope/test-rms-norm-rope-20260906T214402Z-ae39a2.log",
+  "log_sha256": "28deb305531bb6d4af48dc584b4417d27f7ed12554955dfb1cc83b61d3299e94",
+  "log_bytes": 16480,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "cpu",
+    "tolerance": {
+      "source": "cuda-parity"
+    }
+  },
+  "extracted": {}
+}
