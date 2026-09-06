@@ -3,7 +3,7 @@
   "name": "tri",
   "source": "ggml/src/ggml-cuda/tri.cu:tri_kernel,tri_cuda,ggml_cuda_op_tri",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "low",
   "algorithm": "Zero either the upper or lower triangle of each matrix while preserving the requested diagonal convention.",
   "cuda_constructs": [
@@ -39,22 +39,22 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: direct matrix masking. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:38Z",
+  "updated_at": "2026-09-06T19:31:41Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 119,
+      "code": 122,
       "comment": 0,
-      "blank": 10,
-      "raw": 129,
-      "files": 1
+      "blank": 12,
+      "raw": 134,
+      "files": 2
     },
     "sycl": {
-      "code": 0,
+      "code": 112,
       "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "blank": 17,
+      "raw": 129,
+      "files": 2
     },
     "source_files": [
       {
@@ -69,12 +69,55 @@
         "comment": 0,
         "blank": 10,
         "raw": 129
+      },
+      {
+        "path": "ggml/src/ggml-cuda/tri.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 3,
+        "comment": 0,
+        "blank": 2,
+        "raw": 5
       }
     ],
-    "sycl_files": [],
-    "mirrored_sources": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/tri.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 106,
+        "comment": 0,
+        "blank": 14,
+        "raw": 120
+      },
+      {
+        "path": "ggml/src/ggml-sycl/tri.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 6,
+        "comment": 0,
+        "blank": 3,
+        "raw": 9
+      }
+    ],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/tri.cuh"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:38Z"
+    "measured_at": "2026-09-06T19:31:41Z"
+  },
+  "target_style": "plain-sycl",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/tri.hpp",
+    "ggml/src/ggml-sycl/tri.cpp"
+  ],
+  "sycl_file": "ggml/src/ggml-sycl/tri.cpp",
+  "sycl_impl": "ggml/src/ggml-sycl/tri.hpp,ggml/src/ggml-sycl/tri.cpp",
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "TRI",
+    "result": "pass",
+    "evidence": "test-tri-20260906T193111Z-2d23cd"
   }
 }

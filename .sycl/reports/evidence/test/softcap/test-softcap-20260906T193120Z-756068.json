@@ -1,0 +1,33 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-softcap-20260906T193120Z-756068",
+  "class": "test",
+  "subject": "softcap",
+  "phase": "migrate",
+  "ts": "2026-09-06T19:31:23Z",
+  "duration_s": 2.672,
+  "command": "./build/bin/test-backend-ops -o SOFTCAP",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "6f0f87888",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/softcap/test-softcap-20260906T193120Z-756068.log",
+  "log_sha256": "27e482a3445d9a7dc01024db1117a7742aed3de9b1d1bb5c8c0085d250c3147b",
+  "log_bytes": 1075,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "cpu",
+    "tolerance": {
+      "source": "cuda-parity"
+    }
+  },
+  "extracted": {}
+}

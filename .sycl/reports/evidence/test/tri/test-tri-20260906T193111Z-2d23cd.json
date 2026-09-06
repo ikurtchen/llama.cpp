@@ -1,0 +1,33 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-tri-20260906T193111Z-2d23cd",
+  "class": "test",
+  "subject": "tri",
+  "phase": "migrate",
+  "ts": "2026-09-06T19:31:14Z",
+  "duration_s": 2.671,
+  "command": "./build/bin/test-backend-ops -o TRI",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "6f0f87888",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/tri/test-tri-20260906T193111Z-2d23cd.log",
+  "log_sha256": "c7a4a4d9d71d9e0aa46d833441ce849c51339f9f619ca078185698ad2a163546",
+  "log_bytes": 1229,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "cpu",
+    "tolerance": {
+      "source": "cuda-parity"
+    }
+  },
+  "extracted": {}
+}

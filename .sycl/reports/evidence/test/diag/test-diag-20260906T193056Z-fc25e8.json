@@ -1,0 +1,33 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-diag-20260906T193056Z-fc25e8",
+  "class": "test",
+  "subject": "diag",
+  "phase": "migrate",
+  "ts": "2026-09-06T19:30:59Z",
+  "duration_s": 2.871,
+  "command": "./build/bin/test-backend-ops -o DIAG",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "6f0f87888",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/diag/test-diag-20260906T193056Z-fc25e8.log",
+  "log_sha256": "63a7c87140e3df3a711611d25076b3a405dc229377624195b04a0ac825420351",
+  "log_bytes": 1144,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "cpu",
+    "tolerance": {
+      "source": "cuda-parity"
+    }
+  },
+  "extracted": {}
+}

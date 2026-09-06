@@ -1,0 +1,33 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-roll-20260906T193105Z-7a21a1",
+  "class": "test",
+  "subject": "roll",
+  "phase": "migrate",
+  "ts": "2026-09-06T19:31:08Z",
+  "duration_s": 2.679,
+  "command": "./build/bin/test-backend-ops -o ROLL",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "6f0f87888",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/roll/test-roll-20260906T193105Z-7a21a1.log",
+  "log_sha256": "5a54f075394a5c232063558aa64eb01dddd7b27d10d3b54fae619d2f94645641",
+  "log_bytes": 1153,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "cpu",
+    "tolerance": {
+      "source": "cuda-parity"
+    }
+  },
+  "extracted": {}
+}

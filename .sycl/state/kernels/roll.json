@@ -3,7 +3,7 @@
   "name": "roll",
   "source": "ggml/src/ggml-cuda/roll.cu:roll_f32_cuda,ggml_cuda_op_roll",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "low",
   "algorithm": "Roll tensor elements cyclically along configured dimensions.",
   "cuda_constructs": [
@@ -38,22 +38,22 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: pure index remap. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:37Z",
+  "updated_at": "2026-09-06T19:31:41Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 43,
+      "code": 46,
       "comment": 0,
-      "blank": 10,
-      "raw": 53,
-      "files": 1
+      "blank": 12,
+      "raw": 58,
+      "files": 2
     },
     "sycl": {
-      "code": 0,
+      "code": 58,
       "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "blank": 16,
+      "raw": 74,
+      "files": 2
     },
     "source_files": [
       {
@@ -67,12 +67,55 @@
         "comment": 0,
         "blank": 10,
         "raw": 53
+      },
+      {
+        "path": "ggml/src/ggml-cuda/roll.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 3,
+        "comment": 0,
+        "blank": 2,
+        "raw": 5
       }
     ],
-    "sycl_files": [],
-    "mirrored_sources": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/roll.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 52,
+        "comment": 0,
+        "blank": 13,
+        "raw": 65
+      },
+      {
+        "path": "ggml/src/ggml-sycl/roll.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 6,
+        "comment": 0,
+        "blank": 3,
+        "raw": 9
+      }
+    ],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/roll.cuh"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:37Z"
+    "measured_at": "2026-09-06T19:31:41Z"
+  },
+  "target_style": "plain-sycl",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/roll.hpp",
+    "ggml/src/ggml-sycl/roll.cpp"
+  ],
+  "sycl_file": "ggml/src/ggml-sycl/roll.cpp",
+  "sycl_impl": "ggml/src/ggml-sycl/roll.hpp,ggml/src/ggml-sycl/roll.cpp",
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "ROLL",
+    "result": "pass",
+    "evidence": "test-roll-20260906T193105Z-7a21a1"
   }
 }

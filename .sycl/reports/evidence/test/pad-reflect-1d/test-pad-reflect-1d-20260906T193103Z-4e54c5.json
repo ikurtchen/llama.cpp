@@ -1,0 +1,33 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-pad-reflect-1d-20260906T193103Z-4e54c5",
+  "class": "test",
+  "subject": "pad-reflect-1d",
+  "phase": "migrate",
+  "ts": "2026-09-06T19:31:05Z",
+  "duration_s": 2.696,
+  "command": "./build/bin/test-backend-ops -o PAD_REFLECT_1D",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "6f0f87888",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/pad-reflect-1d/test-pad-reflect-1d-20260906T193103Z-4e54c5.log",
+  "log_sha256": "86405691e5bcdae2b0bec554c9489db29ec5297407bd97d86c4e479b1064a904",
+  "log_bytes": 1168,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "cpu",
+    "tolerance": {
+      "source": "cuda-parity"
+    }
+  },
+  "extracted": {}
+}

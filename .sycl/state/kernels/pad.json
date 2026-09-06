@@ -3,7 +3,7 @@
   "name": "pad",
   "source": "ggml/src/ggml-cuda/pad.cu:pad_f32,pad_f32_cuda,ggml_cuda_op_pad",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "low",
   "algorithm": "Pad a tensor with constant zeros or a configured fill region along the innermost dimension.",
   "cuda_constructs": [
@@ -39,22 +39,22 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: simple index remap. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:36Z",
+  "updated_at": "2026-09-06T19:31:41Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 76,
+      "code": 79,
       "comment": 5,
-      "blank": 13,
-      "raw": 94,
-      "files": 1
+      "blank": 15,
+      "raw": 99,
+      "files": 2
     },
     "sycl": {
-      "code": 0,
+      "code": 88,
       "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "blank": 15,
+      "raw": 103,
+      "files": 2
     },
     "source_files": [
       {
@@ -69,12 +69,55 @@
         "comment": 5,
         "blank": 13,
         "raw": 94
+      },
+      {
+        "path": "ggml/src/ggml-cuda/pad.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 3,
+        "comment": 0,
+        "blank": 2,
+        "raw": 5
       }
     ],
-    "sycl_files": [],
-    "mirrored_sources": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/pad.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 82,
+        "comment": 0,
+        "blank": 12,
+        "raw": 94
+      },
+      {
+        "path": "ggml/src/ggml-sycl/pad.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 6,
+        "comment": 0,
+        "blank": 3,
+        "raw": 9
+      }
+    ],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/pad.cuh"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:36Z"
+    "measured_at": "2026-09-06T19:31:41Z"
+  },
+  "target_style": "plain-sycl",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/pad.hpp",
+    "ggml/src/ggml-sycl/pad.cpp"
+  ],
+  "sycl_file": "ggml/src/ggml-sycl/pad.cpp",
+  "sycl_impl": "ggml/src/ggml-sycl/pad.hpp,ggml/src/ggml-sycl/pad.cpp",
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "PAD",
+    "result": "pass",
+    "evidence": "test-pad-20260906T193059Z-61f32b"
   }
 }

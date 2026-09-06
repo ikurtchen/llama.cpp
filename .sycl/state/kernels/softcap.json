@@ -3,7 +3,7 @@
   "name": "softcap",
   "source": "ggml/src/ggml-cuda/softcap.cu:softcap_f32,softcap_f32_cuda,ggml_cuda_op_softcap",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "low",
   "algorithm": "Apply the softcap nonlinearity elementwise to clamp large magnitudes smoothly.",
   "cuda_constructs": [
@@ -33,22 +33,22 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: simple pointwise map. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:37Z",
+  "updated_at": "2026-09-06T19:31:42Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 27,
+      "code": 30,
       "comment": 0,
-      "blank": 5,
-      "raw": 32,
-      "files": 1
+      "blank": 7,
+      "raw": 37,
+      "files": 2
     },
     "sycl": {
-      "code": 0,
+      "code": 46,
       "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "blank": 12,
+      "raw": 58,
+      "files": 2
     },
     "source_files": [
       {
@@ -63,12 +63,55 @@
         "comment": 0,
         "blank": 5,
         "raw": 32
+      },
+      {
+        "path": "ggml/src/ggml-cuda/softcap.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 3,
+        "comment": 0,
+        "blank": 2,
+        "raw": 5
       }
     ],
-    "sycl_files": [],
-    "mirrored_sources": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/softcap.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 40,
+        "comment": 0,
+        "blank": 9,
+        "raw": 49
+      },
+      {
+        "path": "ggml/src/ggml-sycl/softcap.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 6,
+        "comment": 0,
+        "blank": 3,
+        "raw": 9
+      }
+    ],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/softcap.cuh"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:37Z"
+    "measured_at": "2026-09-06T19:31:42Z"
+  },
+  "target_style": "plain-sycl",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/softcap.hpp",
+    "ggml/src/ggml-sycl/softcap.cpp"
+  ],
+  "sycl_file": "ggml/src/ggml-sycl/softcap.cpp",
+  "sycl_impl": "ggml/src/ggml-sycl/softcap.hpp,ggml/src/ggml-sycl/softcap.cpp",
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "SOFTCAP",
+    "result": "pass",
+    "evidence": "test-softcap-20260906T193120Z-756068"
   }
 }

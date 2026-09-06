@@ -3,7 +3,7 @@
   "name": "timestep-embedding",
   "source": "ggml/src/ggml-cuda/tsembd.cu:timestep_embedding_f32,timestep_embedding_f32_cuda,ggml_cuda_op_timestep_embedding",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "low",
   "algorithm": "Generate sinusoidal timestep embeddings by writing cos/sin features for each requested timestep.",
   "cuda_constructs": [
@@ -40,22 +40,22 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: simple analytical embedding map. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:38Z",
+  "updated_at": "2026-09-06T19:31:41Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 35,
+      "code": 38,
       "comment": 2,
-      "blank": 6,
-      "raw": 43,
-      "files": 1
+      "blank": 8,
+      "raw": 48,
+      "files": 2
     },
     "sycl": {
-      "code": 0,
+      "code": 42,
       "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "blank": 12,
+      "raw": 54,
+      "files": 2
     },
     "source_files": [
       {
@@ -70,12 +70,55 @@
         "comment": 2,
         "blank": 6,
         "raw": 43
+      },
+      {
+        "path": "ggml/src/ggml-cuda/tsembd.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 3,
+        "comment": 0,
+        "blank": 2,
+        "raw": 5
       }
     ],
-    "sycl_files": [],
-    "mirrored_sources": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/tsembd.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 36,
+        "comment": 0,
+        "blank": 9,
+        "raw": 45
+      },
+      {
+        "path": "ggml/src/ggml-sycl/tsembd.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 6,
+        "comment": 0,
+        "blank": 3,
+        "raw": 9
+      }
+    ],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/tsembd.cuh"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:38Z"
+    "measured_at": "2026-09-06T19:31:41Z"
+  },
+  "target_style": "plain-sycl",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/tsembd.hpp",
+    "ggml/src/ggml-sycl/tsembd.cpp"
+  ],
+  "sycl_file": "ggml/src/ggml-sycl/tsembd.cpp",
+  "sycl_impl": "ggml/src/ggml-sycl/tsembd.hpp,ggml/src/ggml-sycl/tsembd.cpp",
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "TIMESTEP_EMBEDDING",
+    "result": "pass",
+    "evidence": "test-tsembd-20260906T193114Z-79c7f3"
   }
 }

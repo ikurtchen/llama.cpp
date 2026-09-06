@@ -1,0 +1,40 @@
+[remote] sync -> root@10.239.98.41:/workspace/sycl-agent-runs/llama.cpp (additive, no deletions)
+[remote root@10.239.98.41] ./build/bin/test-backend-ops -o DIAG
+ 
+:: initializing oneAPI environment ...
+   bash: BASH_VERSION = 5.2.15(1)-release
+   args: Using "$@" for setvars.sh arguments: 
+:: advisor -- latest
+:: ccl -- latest
+:: compiler -- latest
+:: dal -- latest
+:: debugger -- latest
+:: dev-utilities -- latest
+:: dnnl -- latest
+:: dpcpp-ct -- latest
+:: dpl -- latest
+:: ipp -- latest
+:: ippcp -- latest
+:: mkl -- latest
+:: mpi -- latest
+:: tbb -- latest
+:: umf -- latest
+:: vtune -- latest
+:: oneAPI environment initialized ::
+ 
+Testing 2 devices
+
+Backend 1/2: SYCL0
+  Device description: Intel(R) Graphics [0xe223]
+  Device memory: 32656 MB (32656 MB free)
+
+  DIAG(type=f32,ne=[10,1,4,3]): [1;32mOK[0m
+  DIAG(type=f32,ne=[79,1,19,13]): [1;32mOK[0m
+  DIAG(type=f32,ne=[256,1,8,16]): [1;32mOK[0m
+  3/3 tests passed
+  Backend SYCL0: [1;32mOK[0m
+Backend 2/2: CPU
+  Skipping CPU backend
+2/2 backends passed
+[1;32mOK[0m
+[remote] pull <- root@10.239.98.41:/workspace/sycl-agent-runs/llama.cpp (.sycl/reports, .sycl/logs, state ref/)

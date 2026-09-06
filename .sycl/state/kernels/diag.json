@@ -3,7 +3,7 @@
   "name": "diag",
   "source": "ggml/src/ggml-cuda/diag.cu:diag_kernel,ggml_cuda_op_diag",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "low",
   "algorithm": "Write a vector or row source onto the diagonal positions of a square matrix/tensor view.",
   "cuda_constructs": [
@@ -33,22 +33,22 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: simple index mapping. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:35Z",
+  "updated_at": "2026-09-06T19:31:41Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 60,
+      "code": 63,
       "comment": 0,
-      "blank": 12,
-      "raw": 72,
-      "files": 1
+      "blank": 14,
+      "raw": 77,
+      "files": 2
     },
     "sycl": {
-      "code": 0,
+      "code": 62,
       "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "blank": 13,
+      "raw": 75,
+      "files": 2
     },
     "source_files": [
       {
@@ -62,12 +62,55 @@
         "comment": 0,
         "blank": 12,
         "raw": 72
+      },
+      {
+        "path": "ggml/src/ggml-cuda/diag.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 3,
+        "comment": 0,
+        "blank": 2,
+        "raw": 5
       }
     ],
-    "sycl_files": [],
-    "mirrored_sources": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/diag.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 56,
+        "comment": 0,
+        "blank": 10,
+        "raw": 66
+      },
+      {
+        "path": "ggml/src/ggml-sycl/diag.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 6,
+        "comment": 0,
+        "blank": 3,
+        "raw": 9
+      }
+    ],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/diag.cuh"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:35Z"
+    "measured_at": "2026-09-06T19:31:41Z"
+  },
+  "target_style": "plain-sycl",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/diag.hpp",
+    "ggml/src/ggml-sycl/diag.cpp"
+  ],
+  "sycl_file": "ggml/src/ggml-sycl/diag.cpp",
+  "sycl_impl": "ggml/src/ggml-sycl/diag.hpp,ggml/src/ggml-sycl/diag.cpp",
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "DIAG",
+    "result": "pass",
+    "evidence": "test-diag-20260906T193056Z-fc25e8"
   }
 }

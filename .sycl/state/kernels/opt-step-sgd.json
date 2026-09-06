@@ -3,7 +3,7 @@
   "name": "optimizer-step-sgd",
   "source": "ggml/src/ggml-cuda/opt-step-sgd.cu:opt_step_sgd_f32,opt_step_sgd_f32_cuda,ggml_cuda_opt_step_sgd",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "low",
   "algorithm": "Apply one fused SGD parameter update step.",
   "cuda_constructs": [
@@ -38,22 +38,22 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: straightforward fused elementwise update. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:36Z",
+  "updated_at": "2026-09-06T19:31:42Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 34,
+      "code": 37,
       "comment": 0,
-      "blank": 8,
-      "raw": 42,
-      "files": 1
+      "blank": 10,
+      "raw": 47,
+      "files": 2
     },
     "sycl": {
-      "code": 0,
+      "code": 44,
       "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "blank": 9,
+      "raw": 53,
+      "files": 2
     },
     "source_files": [
       {
@@ -68,12 +68,55 @@
         "comment": 0,
         "blank": 8,
         "raw": 42
+      },
+      {
+        "path": "ggml/src/ggml-cuda/opt-step-sgd.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 3,
+        "comment": 0,
+        "blank": 2,
+        "raw": 5
       }
     ],
-    "sycl_files": [],
-    "mirrored_sources": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/opt-step-sgd.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 38,
+        "comment": 0,
+        "blank": 6,
+        "raw": 44
+      },
+      {
+        "path": "ggml/src/ggml-sycl/opt-step-sgd.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 6,
+        "comment": 0,
+        "blank": 3,
+        "raw": 9
+      }
+    ],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/opt-step-sgd.cuh"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:36Z"
+    "measured_at": "2026-09-06T19:31:42Z"
+  },
+  "target_style": "plain-sycl",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/opt-step-sgd.hpp",
+    "ggml/src/ggml-sycl/opt-step-sgd.cpp"
+  ],
+  "sycl_file": "ggml/src/ggml-sycl/opt-step-sgd.cpp",
+  "sycl_impl": "ggml/src/ggml-sycl/opt-step-sgd.hpp,ggml/src/ggml-sycl/opt-step-sgd.cpp",
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "OPT_STEP_SGD",
+    "result": "pass",
+    "evidence": "test-opt-step-sgd-20260906T193123Z-bead5d"
   }
 }

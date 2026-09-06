@@ -21,14 +21,50 @@
 #include "concat.hpp"
 #include "arange.hpp"
 #include "argsort.hpp"
-#include "fattn.hpp"
 #include "argmax.hpp"
+#include "fattn.hpp"
 #include "norm.hpp"
 #include "top-k.hpp"
 #include "getrows.hpp"
 #include "set-rows.hpp"
+#include "set.hpp"
+#include "add-id.hpp"
+#include "diag.hpp"
+#include "pad.hpp"
+#include "pad_reflect_1d.hpp"
+#include "roll.hpp"
+#include "tsembd.hpp"
+#include "tri.hpp"
+#include "opt-step-sgd.hpp"
+#include "fill.hpp"
+#include "snake.hpp"
+#include "softcap.hpp"
+#include "im2col.hpp"
+#include "conv2d.hpp"
+#include "conv2d-dw.hpp"
+#include "conv2d-transpose.hpp"
+#include "conv-transpose-1d.hpp"
+#include "col2im-1d.hpp"
+#include "pool1d.hpp"
+#include "pool2d.hpp"
+#include "upscale.hpp"
+#include "conv3d.hpp"
 #include "reduce_rows.hpp"
 #include "acc.hpp"
+#include "mmf.hpp"
+#include "fwht.hpp"
+#include "opt-step-adamw.hpp"
+#include "cross-entropy-loss.hpp"
+#include "cumsum.hpp"
+#include "out-prod.hpp"
+#include "solve-tri.hpp"
+#include "dsv4-hc.hpp"
+#include "lightning-indexer.hpp"
+#include "gla.hpp"
+#include "ssm-conv.hpp"
+#include "wkv.hpp"
+#include "gated_delta_net.hpp"
+#include "ssm-scan.hpp"
 
 #include <sycl/sycl.hpp>
 
@@ -320,17 +356,89 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, ggml_tens
         case GGML_OP_ARGMAX:
             ggml_sycl_op_argmax(ctx, dst);
             return true;
+        case GGML_OP_MUL_MAT:
+            ggml_sycl_op_mul_mat(ctx, dst);
+            return true;
+        case GGML_OP_OUT_PROD:
+            ggml_sycl_out_prod(ctx, dst);
+            return true;
         case GGML_OP_FLASH_ATTN_EXT:
             ggml_sycl_op_flash_attn_ext(ctx, dst);
             return true;
         case GGML_OP_TOP_K:
             ggml_sycl_op_top_k(ctx, dst);
             return true;
+        case GGML_OP_IM2COL:
+            ggml_sycl_op_im2col(ctx, dst);
+            return true;
+        case GGML_OP_IM2COL_3D:
+            ggml_sycl_op_im2col_3d(ctx, dst);
+            return true;
+        case GGML_OP_CONV_2D:
+            ggml_sycl_op_conv2d(ctx, dst);
+            return true;
+        case GGML_OP_CONV_2D_DW:
+            ggml_sycl_op_conv2d_dw(ctx, dst);
+            return true;
+        case GGML_OP_CONV_TRANSPOSE_2D:
+            ggml_sycl_op_conv2d_transpose(ctx, dst);
+            return true;
+        case GGML_OP_CONV_TRANSPOSE_1D:
+            ggml_sycl_op_conv_transpose_1d(ctx, dst);
+            return true;
+        case GGML_OP_COL2IM_1D:
+            ggml_sycl_op_col2im_1d(ctx, dst);
+            return true;
+        case GGML_OP_POOL_1D:
+            ggml_sycl_op_pool1d(ctx, dst);
+            return true;
+        case GGML_OP_POOL_2D:
+            ggml_sycl_op_pool2d(ctx, dst);
+            return true;
+        case GGML_OP_UPSCALE:
+            ggml_sycl_op_upscale(ctx, dst);
+            return true;
+        case GGML_OP_CONV_3D:
+            ggml_sycl_op_conv3d(ctx, dst);
+            return true;
         case GGML_OP_GET_ROWS:
             ggml_sycl_op_get_rows(ctx, dst);
             return true;
         case GGML_OP_SET_ROWS:
             ggml_sycl_op_set_rows(ctx, dst);
+            return true;
+        case GGML_OP_SET:
+            ggml_sycl_op_set(ctx, dst);
+            return true;
+        case GGML_OP_ADD_ID:
+            ggml_sycl_op_add_id(ctx, dst);
+            return true;
+        case GGML_OP_DIAG:
+            ggml_sycl_op_diag(ctx, dst);
+            return true;
+        case GGML_OP_PAD:
+            ggml_sycl_op_pad(ctx, dst);
+            return true;
+        case GGML_OP_PAD_REFLECT_1D:
+            ggml_sycl_op_pad_reflect_1d(ctx, dst);
+            return true;
+        case GGML_OP_ROLL:
+            ggml_sycl_op_roll(ctx, dst);
+            return true;
+        case GGML_OP_TIMESTEP_EMBEDDING:
+            ggml_sycl_op_timestep_embedding(ctx, dst);
+            return true;
+        case GGML_OP_TRI:
+            ggml_sycl_op_tri(ctx, dst);
+            return true;
+        case GGML_OP_OPT_STEP_SGD:
+            ggml_sycl_opt_step_sgd(ctx, dst);
+            return true;
+        case GGML_OP_OPT_STEP_ADAMW:
+            ggml_sycl_opt_step_adamw(ctx, dst);
+            return true;
+        case GGML_OP_FILL:
+            ggml_sycl_op_fill(ctx, dst);
             return true;
         case GGML_OP_SUM:
             ggml_sycl_op_sum(ctx, dst);
@@ -343,6 +451,48 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, ggml_tens
             return true;
         case GGML_OP_ACC:
             ggml_sycl_op_acc(ctx, dst);
+            return true;
+        case GGML_OP_CROSS_ENTROPY_LOSS:
+            ggml_sycl_cross_entropy_loss(ctx, dst);
+            return true;
+        case GGML_OP_CROSS_ENTROPY_LOSS_BACK:
+            ggml_sycl_cross_entropy_loss_back(ctx, dst);
+            return true;
+        case GGML_OP_CUMSUM:
+            ggml_sycl_op_cumsum(ctx, dst);
+            return true;
+        case GGML_OP_SOLVE_TRI:
+            ggml_sycl_op_solve_tri(ctx, dst);
+            return true;
+        case GGML_OP_DSV4_HC_COMB:
+            ggml_sycl_op_dsv4_hc_comb(ctx, dst);
+            return true;
+        case GGML_OP_DSV4_HC_PRE:
+            ggml_sycl_op_dsv4_hc_pre(ctx, dst);
+            return true;
+        case GGML_OP_DSV4_HC_POST:
+            ggml_sycl_op_dsv4_hc_post(ctx, dst);
+            return true;
+        case GGML_OP_SSM_CONV:
+            ggml_sycl_op_ssm_conv(ctx, dst);
+            return true;
+        case GGML_OP_SSM_SCAN:
+            ggml_sycl_op_ssm_scan(ctx, dst);
+            return true;
+        case GGML_OP_RWKV_WKV6:
+            ggml_sycl_op_rwkv_wkv6(ctx, dst);
+            return true;
+        case GGML_OP_GATED_LINEAR_ATTN:
+            ggml_sycl_op_gated_linear_attn(ctx, dst);
+            return true;
+        case GGML_OP_RWKV_WKV7:
+            ggml_sycl_op_rwkv_wkv7(ctx, dst);
+            return true;
+        case GGML_OP_GATED_DELTA_NET:
+            ggml_sycl_op_gated_delta_net(ctx, dst);
+            return true;
+        case GGML_OP_LIGHTNING_INDEXER:
+            ggml_sycl_op_lightning_indexer(ctx, dst);
             return true;
         default:
             return false;
@@ -357,6 +507,28 @@ static enum ggml_status ggml_backend_sycl_graph_compute(ggml_backend_t backend, 
         if (ggml_is_empty(node) || (node->flags & GGML_TENSOR_FLAG_COMPUTE) == 0) {
             continue;
         }
+
+        if (node->op == GGML_OP_MUL && ggml_sycl_can_fuse_snake(cgraph, i)) {
+            const ggml_tensor * mul0 = cgraph->nodes[i + 0];
+            const ggml_tensor * sqr  = cgraph->nodes[i + 2];
+            const ggml_tensor * mul1 = cgraph->nodes[i + 3];
+            ggml_tensor *       add  = cgraph->nodes[i + 4];
+
+            const ggml_tensor * x = ggml_are_same_shape(mul0, mul0->src[0]) ? mul0->src[0] : mul0->src[1];
+            const ggml_tensor * a = x == mul0->src[0] ? mul0->src[1] : mul0->src[0];
+            const ggml_tensor * inv_b = mul1->src[0] == sqr ? mul1->src[1] : mul1->src[0];
+
+            ggml_sycl_op_snake_fused(*ctx, x, a, inv_b, add);
+            i += 4;
+            continue;
+        }
+
+        if (node->op == GGML_OP_SCALE && ggml_sycl_can_fuse_softcap(cgraph, i)) {
+            ggml_sycl_op_softcap(*ctx, cgraph->nodes[i + 2], node);
+            i += 2;
+            continue;
+        }
+
         bool ok = ggml_sycl_compute_forward(*ctx, node);
         if (!ok) {
             GGML_LOG_ERROR("%s: unsupported op %s\n", __func__, ggml_op_desc(node));
@@ -524,14 +696,62 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
             return ggml_sycl_supports_argsort(op);
         case GGML_OP_ARGMAX:
             return ggml_sycl_supports_argmax(op);
+        case GGML_OP_MUL_MAT:
+            return ggml_sycl_supports_mul_mat(op);
+        case GGML_OP_OUT_PROD:
+            return ggml_sycl_supports_out_prod(op);
         case GGML_OP_FLASH_ATTN_EXT:
             return ggml_sycl_supports_flash_attn_ext(op);
         case GGML_OP_TOP_K:
             return ggml_sycl_supports_top_k(op);
+        case GGML_OP_IM2COL:
+            return ggml_sycl_supports_im2col(op);
+        case GGML_OP_IM2COL_3D:
+            return ggml_sycl_supports_im2col_3d(op);
+        case GGML_OP_CONV_2D:
+            return ggml_sycl_supports_conv2d(op);
+        case GGML_OP_CONV_2D_DW:
+            return ggml_sycl_supports_conv2d_dw(op);
+        case GGML_OP_CONV_TRANSPOSE_2D:
+            return ggml_sycl_supports_conv2d_transpose(op);
+        case GGML_OP_CONV_TRANSPOSE_1D:
+            return ggml_sycl_supports_conv_transpose_1d(op);
+        case GGML_OP_COL2IM_1D:
+            return ggml_sycl_supports_col2im_1d(op);
+        case GGML_OP_POOL_1D:
+            return ggml_sycl_supports_pool1d(op);
+        case GGML_OP_POOL_2D:
+            return ggml_sycl_supports_pool2d(op);
+        case GGML_OP_UPSCALE:
+            return ggml_sycl_supports_upscale(op);
+        case GGML_OP_CONV_3D:
+            return ggml_sycl_supports_conv3d(op);
         case GGML_OP_GET_ROWS:
             return ggml_sycl_supports_get_rows(op);
         case GGML_OP_SET_ROWS:
             return ggml_sycl_supports_set_rows(op);
+        case GGML_OP_SET:
+            return ggml_sycl_supports_set(op);
+        case GGML_OP_ADD_ID:
+            return ggml_sycl_supports_add_id(op);
+        case GGML_OP_DIAG:
+            return ggml_sycl_supports_diag(op);
+        case GGML_OP_PAD:
+            return ggml_sycl_supports_pad(op);
+        case GGML_OP_PAD_REFLECT_1D:
+            return ggml_sycl_supports_pad_reflect_1d(op);
+        case GGML_OP_ROLL:
+            return ggml_sycl_supports_roll(op);
+        case GGML_OP_TIMESTEP_EMBEDDING:
+            return ggml_sycl_supports_timestep_embedding(op);
+        case GGML_OP_TRI:
+            return ggml_sycl_supports_tri(op);
+        case GGML_OP_OPT_STEP_SGD:
+            return ggml_sycl_supports_opt_step_sgd(op);
+        case GGML_OP_OPT_STEP_ADAMW:
+            return ggml_sycl_supports_opt_step_adamw(op);
+        case GGML_OP_FILL:
+            return ggml_sycl_supports_fill(op);
         case GGML_OP_SUM:
             return ggml_sycl_supports_sum(op);
         case GGML_OP_SUM_ROWS:
@@ -540,6 +760,34 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
             return ggml_sycl_supports_mean(op);
         case GGML_OP_ACC:
             return ggml_sycl_supports_acc(op);
+        case GGML_OP_CROSS_ENTROPY_LOSS:
+            return ggml_sycl_supports_cross_entropy_loss(op);
+        case GGML_OP_CROSS_ENTROPY_LOSS_BACK:
+            return ggml_sycl_supports_cross_entropy_loss_back(op);
+        case GGML_OP_CUMSUM:
+            return ggml_sycl_supports_cumsum(op);
+        case GGML_OP_SOLVE_TRI:
+            return ggml_sycl_supports_solve_tri(op);
+        case GGML_OP_DSV4_HC_COMB:
+            return ggml_sycl_supports_dsv4_hc_comb(op);
+        case GGML_OP_DSV4_HC_PRE:
+            return ggml_sycl_supports_dsv4_hc_pre(op);
+        case GGML_OP_DSV4_HC_POST:
+            return ggml_sycl_supports_dsv4_hc_post(op);
+        case GGML_OP_SSM_CONV:
+            return ggml_sycl_supports_ssm_conv(op);
+        case GGML_OP_SSM_SCAN:
+            return ggml_sycl_supports_ssm_scan(op);
+        case GGML_OP_RWKV_WKV6:
+            return ggml_sycl_supports_rwkv_wkv6(op);
+        case GGML_OP_GATED_LINEAR_ATTN:
+            return ggml_sycl_supports_gated_linear_attn(op);
+        case GGML_OP_RWKV_WKV7:
+            return ggml_sycl_supports_rwkv_wkv7(op);
+        case GGML_OP_GATED_DELTA_NET:
+            return ggml_sycl_supports_gated_delta_net(op);
+        case GGML_OP_LIGHTNING_INDEXER:
+            return ggml_sycl_supports_lightning_indexer(op);
         default:
             return false;
     }

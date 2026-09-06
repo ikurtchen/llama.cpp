@@ -1,0 +1,33 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-snake-20260906T193117Z-174763",
+  "class": "test",
+  "subject": "snake",
+  "phase": "migrate",
+  "ts": "2026-09-06T19:31:20Z",
+  "duration_s": 3.176,
+  "command": "./build/bin/test-backend-ops -o SNAKE_FUSE",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "6f0f87888",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/snake/test-snake-20260906T193117Z-174763.log",
+  "log_sha256": "a3fff240d9a8c2a3781029c577e3c64dd66e68cb453bedcd609609468fddce55",
+  "log_bytes": 2595,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "cpu",
+    "tolerance": {
+      "source": "cuda-parity"
+    }
+  },
+  "extracted": {}
+}

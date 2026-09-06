@@ -1,0 +1,61 @@
+[remote] sync -> root@10.239.98.41:/workspace/sycl-agent-runs/llama.cpp (additive, no deletions)
+[remote root@10.239.98.41] ./build/bin/test-backend-ops -o SNAKE_FUSE
+ 
+:: initializing oneAPI environment ...
+   bash: BASH_VERSION = 5.2.15(1)-release
+   args: Using "$@" for setvars.sh arguments: 
+:: advisor -- latest
+:: ccl -- latest
+:: compiler -- latest
+:: dal -- latest
+:: debugger -- latest
+:: dev-utilities -- latest
+:: dnnl -- latest
+:: dpcpp-ct -- latest
+:: dpl -- latest
+:: ipp -- latest
+:: ippcp -- latest
+:: mkl -- latest
+:: mpi -- latest
+:: tbb -- latest
+:: umf -- latest
+:: vtune -- latest
+:: oneAPI environment initialized ::
+ 
+Testing 2 devices
+
+Backend 1/2: SYCL0
+  Device description: Intel(R) Graphics [0xe223]
+  Device memory: 32656 MB (32656 MB free)
+
+  SNAKE_FUSE(type=f32,ne=[5,7,1,1]): [1;32mOK[0m
+  SNAKE_FUSE(type=f32,ne=[33,32,1,1]): [1;32mOK[0m
+  SNAKE_FUSE(type=f32,ne=[1025,13,1,1]): [1;32mOK[0m
+  SNAKE_FUSE(type=f32,ne=[128,16,1,1]): [1;32mOK[0m
+  SNAKE_FUSE(type=f32,ne=[256,192,1,1]): [1;32mOK[0m
+  SNAKE_FUSE(type=f32,ne=[64,32,2,1]): [1;32mOK[0m
+  SNAKE_FUSE(type=f32,ne=[64,32,1,2]): [1;32mOK[0m
+  SNAKE_FUSE(type=f32,ne=[64,32,2,3]): [1;32mOK[0m
+  SNAKE_FUSE(type=f16,ne=[5,7,1,1]): [1;32mOK[0m
+  SNAKE_FUSE(type=f16,ne=[33,32,1,1]): [1;32mOK[0m
+  SNAKE_FUSE(type=f16,ne=[1025,13,1,1]): [1;32mOK[0m
+  SNAKE_FUSE(type=f16,ne=[128,16,1,1]): [1;32mOK[0m
+  SNAKE_FUSE(type=f16,ne=[256,192,1,1]): [1;32mOK[0m
+  SNAKE_FUSE(type=f16,ne=[64,32,2,1]): [1;32mOK[0m
+  SNAKE_FUSE(type=f16,ne=[64,32,1,2]): [1;32mOK[0m
+  SNAKE_FUSE(type=f16,ne=[64,32,2,3]): [1;32mOK[0m
+  SNAKE_FUSE(type=bf16,ne=[5,7,1,1]): not supported [SYCL0, SYCL0, SYCL0, SYCL0, SYCL0] 
+  SNAKE_FUSE(type=bf16,ne=[33,32,1,1]): not supported [SYCL0, SYCL0, SYCL0, SYCL0, SYCL0] 
+  SNAKE_FUSE(type=bf16,ne=[1025,13,1,1]): not supported [SYCL0, SYCL0, SYCL0, SYCL0, SYCL0] 
+  SNAKE_FUSE(type=bf16,ne=[128,16,1,1]): not supported [SYCL0, SYCL0, SYCL0, SYCL0, SYCL0] 
+  SNAKE_FUSE(type=bf16,ne=[256,192,1,1]): not supported [SYCL0, SYCL0, SYCL0, SYCL0, SYCL0] 
+  SNAKE_FUSE(type=bf16,ne=[64,32,2,1]): not supported [SYCL0, SYCL0, SYCL0, SYCL0, SYCL0] 
+  SNAKE_FUSE(type=bf16,ne=[64,32,1,2]): not supported [SYCL0, SYCL0, SYCL0, SYCL0, SYCL0] 
+  SNAKE_FUSE(type=bf16,ne=[64,32,2,3]): not supported [SYCL0, SYCL0, SYCL0, SYCL0, SYCL0] 
+  16/16 tests passed
+  Backend SYCL0: [1;32mOK[0m
+Backend 2/2: CPU
+  Skipping CPU backend
+2/2 backends passed
+[1;32mOK[0m
+[remote] pull <- root@10.239.98.41:/workspace/sycl-agent-runs/llama.cpp (.sycl/reports, .sycl/logs, state ref/)

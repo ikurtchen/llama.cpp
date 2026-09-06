@@ -6,6 +6,7 @@
 #include "common.hpp"
 
 #include <sycl/sycl.hpp>
+#include <cstdint>
 
 template <typename src_t, typename dst_t>
 static void ggml_sycl_op_cpy_impl(sycl::queue & q, const char * cx, char * cdst, int64_t ne,
@@ -51,6 +52,9 @@ static void dispatch_src(sycl::queue & q, const ggml_tensor * src0, const char *
         case GGML_TYPE_F16:
             ggml_sycl_op_cpy_impl<sycl::half, dst_t>(q, cx, cdst, ne, ne00, ne01, ne02, nb00, nb01, nb02, nb03, ne10, ne11, ne12, nb10, nb11, nb12, nb13);
             break;
+        case GGML_TYPE_I32:
+            ggml_sycl_op_cpy_impl<int32_t, dst_t>(q, cx, cdst, ne, ne00, ne01, ne02, nb00, nb01, nb02, nb03, ne10, ne11, ne12, nb10, nb11, nb12, nb13);
+            break;
         default:
             GGML_ABORT("%s: unsupported src type for SYCL cpy: %s", __func__, ggml_type_name(src0->type));
     }
@@ -77,6 +81,9 @@ void ggml_sycl_cpy(ggml_backend_sycl_context & ctx, const ggml_tensor * src0, gg
         case GGML_TYPE_F16:
             dispatch_src<sycl::half>(q, src0, cx, cdst, ne, ne00, ne01, ne02, nb00, nb01, nb02, nb03, ne10, ne11, ne12, nb10, nb11, nb12, nb13);
             break;
+        case GGML_TYPE_I32:
+            dispatch_src<int32_t>(q, src0, cx, cdst, ne, ne00, ne01, ne02, nb00, nb01, nb02, nb03, ne10, ne11, ne12, nb10, nb11, nb12, nb13);
+            break;
         default:
             GGML_ABORT("%s: unsupported dst type for SYCL cpy: %s", __func__, ggml_type_name(dst->type));
     }
@@ -84,6 +91,8 @@ void ggml_sycl_cpy(ggml_backend_sycl_context & ctx, const ggml_tensor * src0, gg
 
 bool ggml_sycl_supports_cpy(const ggml_tensor * op) {
     const ggml_tensor * src0 = op->src[0];
-    auto is_supported_type = [](ggml_type t) { return t == GGML_TYPE_F32 || t == GGML_TYPE_F16; };
-    return is_supported_type(src0->type) && is_supported_type(op->type);
+    const bool float_copy = (src0->type == GGML_TYPE_F32 || src0->type == GGML_TYPE_F16) &&
+                            (op->type == GGML_TYPE_F32 || op->type == GGML_TYPE_F16);
+    const bool i32_copy = src0->type == GGML_TYPE_I32 && op->type == GGML_TYPE_I32;
+    return float_copy || i32_copy;
 }

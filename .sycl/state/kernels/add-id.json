@@ -3,7 +3,7 @@
   "name": "add-by-id",
   "source": "ggml/src/ggml-cuda/add-id.cu:add_id_kernel,ggml_cuda_op_add_id",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "low",
   "algorithm": "For each token/expert-used slot, gather one expert row from src1 using integer ids and add it to the matching row from src0.",
   "cuda_constructs": [
@@ -46,22 +46,22 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: indexed row gather plus rowwise add. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:34Z",
+  "updated_at": "2026-09-06T19:31:42Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 45,
+      "code": 47,
       "comment": 0,
-      "blank": 10,
-      "raw": 55,
-      "files": 1
+      "blank": 11,
+      "raw": 58,
+      "files": 2
     },
     "sycl": {
-      "code": 0,
+      "code": 49,
       "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "blank": 13,
+      "raw": 62,
+      "files": 2
     },
     "source_files": [
       {
@@ -75,12 +75,55 @@
         "comment": 0,
         "blank": 10,
         "raw": 55
+      },
+      {
+        "path": "ggml/src/ggml-cuda/add-id.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 2,
+        "comment": 0,
+        "blank": 1,
+        "raw": 3
       }
     ],
-    "sycl_files": [],
-    "mirrored_sources": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/add-id.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 43,
+        "comment": 0,
+        "blank": 10,
+        "raw": 53
+      },
+      {
+        "path": "ggml/src/ggml-sycl/add-id.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 6,
+        "comment": 0,
+        "blank": 3,
+        "raw": 9
+      }
+    ],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/add-id.cuh"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:34Z"
+    "measured_at": "2026-09-06T19:31:42Z"
+  },
+  "target_style": "plain-sycl",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/add-id.hpp",
+    "ggml/src/ggml-sycl/add-id.cpp"
+  ],
+  "sycl_file": "ggml/src/ggml-sycl/add-id.cpp",
+  "sycl_impl": "ggml/src/ggml-sycl/add-id.hpp,ggml/src/ggml-sycl/add-id.cpp",
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "ADD_ID",
+    "result": "pass",
+    "evidence": "test-add-id-20260906T193126Z-13fbbf"
   }
 }

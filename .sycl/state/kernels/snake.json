@@ -3,7 +3,7 @@
   "name": "snake",
   "source": "ggml/src/ggml-cuda/snake.cu:snake_kernel,launch_snake,ggml_cuda_op_snake_fused",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "low",
   "algorithm": "Apply the Snake activation and its fused form to each element.",
   "cuda_constructs": [
@@ -33,22 +33,22 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: elementwise nonlinear map. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:37Z",
+  "updated_at": "2026-09-06T19:31:41Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 53,
-      "comment": 0,
-      "blank": 6,
-      "raw": 59,
-      "files": 1
+      "code": 59,
+      "comment": 1,
+      "blank": 7,
+      "raw": 67,
+      "files": 2
     },
     "sycl": {
-      "code": 0,
+      "code": 117,
       "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "blank": 18,
+      "raw": 135,
+      "files": 2
     },
     "source_files": [
       {
@@ -63,12 +63,55 @@
         "comment": 0,
         "blank": 6,
         "raw": 59
+      },
+      {
+        "path": "ggml/src/ggml-cuda/snake.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 6,
+        "comment": 1,
+        "blank": 1,
+        "raw": 8
       }
     ],
-    "sycl_files": [],
-    "mirrored_sources": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/snake.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 107,
+        "comment": 0,
+        "blank": 14,
+        "raw": 121
+      },
+      {
+        "path": "ggml/src/ggml-sycl/snake.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 10,
+        "comment": 0,
+        "blank": 4,
+        "raw": 14
+      }
+    ],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/snake.cuh"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:37Z"
+    "measured_at": "2026-09-06T19:31:41Z"
+  },
+  "target_style": "plain-sycl",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/snake.hpp",
+    "ggml/src/ggml-sycl/snake.cpp"
+  ],
+  "sycl_file": "ggml/src/ggml-sycl/snake.cpp",
+  "sycl_impl": "ggml/src/ggml-sycl/snake.hpp,ggml/src/ggml-sycl/snake.cpp",
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "SNAKE_FUSE",
+    "result": "pass",
+    "evidence": "test-snake-20260906T193117Z-174763"
   }
 }
