@@ -1,0 +1,53 @@
+[remote] sync -> root@10.239.98.41:/workspace/sycl-agent-runs/llama.cpp (additive, no deletions)
+[remote root@10.239.98.41] ./.sycl/scratch/quant_sycl_validation
+ 
+:: initializing oneAPI environment ...
+   bash: BASH_VERSION = 5.2.15(1)-release
+   args: Using "$@" for setvars.sh arguments: 
+:: advisor -- latest
+:: ccl -- latest
+:: compiler -- latest
+:: dal -- latest
+:: debugger -- latest
+:: dev-utilities -- latest
+:: dnnl -- latest
+:: dpcpp-ct -- latest
+:: dpl -- latest
+:: ipp -- latest
+:: ippcp -- latest
+:: mkl -- latest
+:: mpi -- latest
+:: tbb -- latest
+:: umf -- latest
+:: vtune -- latest
+:: oneAPI environment initialized ::
+ 
+[gpu-lock remote] waiting: another GPU job holds /workspace/sycl-agent-runs/llama.cpp/.sycl/.gpu-run.lock
+DEVICE Intel(R) Graphics [0xe223]
+PASS F32->fp32 max_abs=0
+PASS F16->fp32 max_abs=0
+PASS F32->fp16 max_abs=0
+PASS F16->fp16 max_abs=0
+PASS Q4_0->fp32 max_abs=0
+PASS Q4_0->fp16 max_abs=0
+PASS Q4_1->fp32 max_abs=0
+PASS Q4_1->fp16 max_abs=0
+PASS Q5_0->fp32 max_abs=0
+PASS Q5_0->fp16 max_abs=0
+PASS Q5_1->fp32 max_abs=0
+PASS Q5_1->fp16 max_abs=0
+PASS Q8_0->fp32 max_abs=0
+PASS Q8_0->fp16 max_abs=0
+PASS Q2_K->fp32 max_abs=0
+PASS Q2_K->fp16 max_abs=0
+PASS Q3_K->fp32 max_abs=0
+PASS Q3_K->fp16 max_abs=0
+PASS Q4_K->fp32 max_abs=0
+PASS Q4_K->fp16 max_abs=0
+PASS Q5_K->fp32 max_abs=0
+PASS Q5_K->fp16 max_abs=0
+PASS Q6_K->fp32 max_abs=0
+PASS Q6_K->fp16 max_abs=0
+PASS f32->q8_0 max_abs=0
+PASS f32->q8_1 max_abs=0
+[remote] pull <- root@10.239.98.41:/workspace/sycl-agent-runs/llama.cpp (.sycl/reports, .sycl/logs, state ref/)

@@ -16,3 +16,7 @@
 {"ts": "2026-09-06T18:11:06Z", "phase": "migrate", "total": 76, "migrated": 22, "optimized": 0, "skipped": 0, "needs_reference": 0, "pending": 53, "achieved_level": "L1", "target_level": "L4"}
 {"ts": "2026-09-06T18:36:58Z", "phase": "migrate", "total": 76, "migrated": 25, "optimized": 0, "skipped": 0, "needs_reference": 0, "pending": 50, "achieved_level": "L1", "target_level": "L4"}
 {"ts": "2026-09-06T18:38:48Z", "phase": "migrate", "total": 76, "migrated": 25, "optimized": 0, "skipped": 0, "needs_reference": 0, "pending": 50, "achieved_level": "L1", "target_level": "L4"}
+{"ts": "2026-09-06T19:03:06Z", "phase": "migrate", "total": 76, "migrated": 30, "optimized": 0, "skipped": 0, "needs_reference": 0, "pending": 45, "achieved_level": "L1", "target_level": "L4"}
+{"ts": "2026-09-06T19:04:02Z", "phase": "migrate", "total": 76, "migrated": 30, "optimized": 0, "skipped": 0, "needs_reference": 0, "pending": 45, "achieved_level": "L1", "target_level": "L4"}
+{"ts": "2026-09-06T19:05:08Z", "phase": "migrate", "total": 76, "migrated": 30, "optimized": 0, "skipped": 0, "needs_reference": 0, "pending": 45, "achieved_level": "L1", "target_level": "L4"}
+{"ts": "2026-09-06T19:06:20Z", "phase": "migrate", "total": 76, "migrated": 30, "optimized": 0, "skipped": 0, "needs_reference": 0, "pending": 45, "achieved_level": "L1", "target_level": "L4"}

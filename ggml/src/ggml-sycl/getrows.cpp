@@ -206,35 +206,35 @@ static void dispatch_src0_type(sycl::queue & q, const ggml_tensor * src0, const 
             get_rows_dense<float, dst_t>(q, (const float *) src0->data, src1_d, dst_d,
                 src0->ne[0], dst->ne[1], dst->ne[2], dst->ne[3],
                 src0->nb[1], src0->nb[2], src0->nb[3],
-                src1->nb[1], src1->nb[2], src1->nb[3],
+                src1->nb[0], src1->nb[1], src1->nb[2],
                 dst->nb[1], dst->nb[2], dst->nb[3]);
             break;
         case GGML_TYPE_F16:
             get_rows_dense<sycl::half, dst_t>(q, (const sycl::half *) src0->data, src1_d, dst_d,
                 src0->ne[0], dst->ne[1], dst->ne[2], dst->ne[3],
                 src0->nb[1], src0->nb[2], src0->nb[3],
-                src1->nb[1], src1->nb[2], src1->nb[3],
+                src1->nb[0], src1->nb[1], src1->nb[2],
                 dst->nb[1], dst->nb[2], dst->nb[3]);
             break;
         case GGML_TYPE_Q8_0:
             get_rows_q8_0<dst_t>(q, src0->data, src1_d, dst_d,
                 src0->ne[0], dst->ne[1], dst->ne[2], dst->ne[3],
                 src0->nb[1], src0->nb[2], src0->nb[3],
-                src1->nb[1], src1->nb[2], src1->nb[3],
+                src1->nb[0], src1->nb[1], src1->nb[2],
                 dst->nb[1], dst->nb[2], dst->nb[3]);
             break;
         case GGML_TYPE_Q4_0:
             get_rows_q4_0<dst_t>(q, src0->data, src1_d, dst_d,
                 src0->ne[0], dst->ne[1], dst->ne[2], dst->ne[3],
                 src0->nb[1], src0->nb[2], src0->nb[3],
-                src1->nb[1], src1->nb[2], src1->nb[3],
+                src1->nb[0], src1->nb[1], src1->nb[2],
                 dst->nb[1], dst->nb[2], dst->nb[3]);
             break;
         case GGML_TYPE_Q4_1:
             get_rows_q4_1<dst_t>(q, src0->data, src1_d, dst_d,
                 src0->ne[0], dst->ne[1], dst->ne[2], dst->ne[3],
                 src0->nb[1], src0->nb[2], src0->nb[3],
-                src1->nb[1], src1->nb[2], src1->nb[3],
+                src1->nb[0], src1->nb[1], src1->nb[2],
                 dst->nb[1], dst->nb[2], dst->nb[3]);
             break;
         default:
@@ -287,10 +287,6 @@ bool ggml_sycl_supports_get_rows(const ggml_tensor * op) {
         return false;
     }
 
-    if (src0->type != GGML_TYPE_Q8_0) {
-        return false;
-    }
-
     if (!ggml_is_contiguous(src1)) {
         return false;
     }
@@ -303,5 +299,13 @@ bool ggml_sycl_supports_get_rows(const ggml_tensor * op) {
         return false;
     }
 
-    return src0->ne[0] % QK8_0 == 0;
+    switch (src0->type) {
+        case GGML_TYPE_F32:
+        case GGML_TYPE_F16:
+            return true;
+        case GGML_TYPE_Q8_0:
+            return src0->ne[0] % QK8_0 == 0;
+        default:
+            return false;
+    }
 }

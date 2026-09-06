@@ -6,7 +6,7 @@
 - **Benchmark GPU freq pinned**: True
 - **Build system**: cmake → SYCL build: set-up (ggml/src/ggml-sycl/ builds via icpx -fsycl, AOT bmg-g31, links oneMKL; registers as backend SYCL0)
 - **Phase**: migrate
-- **Updated**: 2026-09-06T19:04:02Z
+- **Updated**: 2026-09-06T19:06:20Z
 
 **Summary**: 76 kernels — 30 migrated, 0 optimized, 0 skipped, 0 needs-reference, 45 pending.
 
@@ -85,7 +85,7 @@
 | flash-attn-mma-f16 | ggml/src/ggml-cuda/fattn.cu:ggml_cuda_flash_attn_ext_mma_f16_shall_use_sparse,ggml_cuda_flash_attn_ext_mma_f16_switch_ncols1,ggml_cuda_flash_attn_ext_mma_f16_switch_ncols2,ggml_cuda_flash_attn_ext_mma_f16 | migrated | test-backend-ops FLASH_ATTN_EXT: 324/324 supported cases passed on SYCL0, 0 failed, unsupported cases fell back per supports_op | - | 394→0 | - | - | Risk reason: tensor-core MMA pipelines, sparse path selection, and streamed partial-result handling make this the hardest attention variant. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated as one unified plain-SYCL online-softmax kernel in ggml/src/ggml-sycl/fattn.cpp with the public declaration in fattn.hpp, instead of mirroring CUDA's separate vec/tile/mma/common dispatch split. This SYCL path permanently registers GGML_OP_FLASH_ATTN_EXT in ggml/src/ggml-sycl/ggml-sycl.cpp. Scope is the dense decoder path only: Q=f32/f16, K/V=f16, dst=f32, additive mask, ALiBi, and GQA for head dims 64/80/128. Residual/waiver: Q8_0 KV-cache variants (f16-q8_0, q8_0-f16, q8_0-q8_0), sinks, logit softcap, sparse n_kv_max mask compaction/streamed fixup, and the full CUDA MMA feature matrix are not implemented; those configurations fall back. |
 | fwht | ggml/src/ggml-cuda/fwht.cu:fwht_cuda,ggml_cuda_op_fwht | pending | - | - | 81→0 | - | - | Risk reason: butterfly transform ordering matters, but the kernel structure is regular. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | gated-delta-net | ggml/src/ggml-cuda/gated_delta_net.cu:launch_gated_delta_net,ggml_cuda_op_gated_delta_net_impl,ggml_cuda_op_gated_delta_net,ggml_cuda_op_gated_delta_net_fused_cache | pending | - | - | 262→0 | - | - | Risk reason: recurrent stateful update with warp reductions and rollback-slot semantics is complex. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
-| getrows | ggml/src/ggml-cuda/getrows.cu:k_get_rows,k_get_rows_kq,k_get_rows_float,k_get_rows_float_vec,k_get_rows_back_float,get_rows_cuda_q,get_rows_cuda_kq,get_rows_cuda_float,ggml_cuda_get_rows_switch_src0_type,get_rows_cuda,ggml_cuda_op_get_rows,ggml_cuda_op_get_rows_back | migrated | pass | - | 408→0 | - | - | Risk reason: forward uses many type/layout cases and backward performs index-based reductions. Reference oracle: ggml-cpu backend via tests/test-backend-ops. This SYCL port adds the forward op file and dispatch wiring, but currently narrows support to the Q8_0 path only per instructions.md sec 2.2; non-Q8_0 types and GET_ROWS_BACK remain fallback residuals. Current evidence run for test-backend-ops -o GET_ROWS passed with the backend reporting the op unsupported on this branch, so no backend-executed GET_ROWS case was validated yet. |
+| getrows | ggml/src/ggml-cuda/getrows.cu:k_get_rows,k_get_rows_kq,k_get_rows_float,k_get_rows_float_vec,k_get_rows_back_float,get_rows_cuda_q,get_rows_cuda_kq,get_rows_cuda_float,ggml_cuda_get_rows_switch_src0_type,get_rows_cuda,ggml_cuda_op_get_rows,ggml_cuda_op_get_rows_back | migrated | pass | - | 419→262 | - | - | Risk reason: forward uses many type/layout cases and backward performs index-based reductions. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated the forward GET_ROWS path for dense F32/F16 and quantized Q8_0 src0 tensors, including contiguous src1 layouts exercised by the inherited test-backend-ops harness. Evidence run executed 13/13 supported GET_ROWS cases on SYCL0. Residuals: BF16, I32, non-Q8_0 quantized src0 types, GET_ROWS_BACK, and src1 layouts that fail the current ggml_is_contiguous(src1) gate (for example v=1 cases with be1=7). |
 | batched-ptrs | ggml/src/ggml-cuda/ggml-cuda.cu:k_compute_batched_ptrs | pending | - | - | 20→0 | - | - | Risk reason: simple pointer arithmetic kernel. Reference oracle: analytical pointer mapping plus backend GEMM tests. |
 | gla | ggml/src/ggml-cuda/gla.cu:gated_linear_attn_f32,ggml_cuda_op_gated_linear_attn | pending | - | - | 73→0 | - | - | Risk reason: recurrent attention update with custom memory layout is specialized and stateful. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | im2col | ggml/src/ggml-cuda/im2col.cu:im2col_kernel,im2col_cuda,im2col_cuda_f16,im2col_cuda_f32,ggml_cuda_op_im2col,im2col_3d_kernel,im2col_3d_cuda,im2col_3d_cuda_f16,im2col_3d_cuda_f32,ggml_cuda_op_im2col_3d | pending | - | - | 219→0 | - | - | Risk reason: multi-axis patch extraction and padding logic need exact matching. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
@@ -135,7 +135,7 @@
 ## Agent efficiency & cost
 
 - **Elapsed**: 3h05m14s (whole run)  ·  **Active**: 2h51m01s (bracketed)  ·  **Cost**: $0.0  ·  **Tokens**: 0 (in 0 / out 0 / cache r 0 / cache w 0)  ·  **Premium requests**: 0  ·  **AI credits**: 0.0
-- **Observed (gen-progress heartbeat)**: span 3h19m31s  ·  working ≈ 3h19m31s (idle-capped 30m00s)  ·  20 snapshots — independent of metrics.sh
+- **Observed (gen-progress heartbeat)**: span 3h21m49s  ·  working ≈ 3h21m49s (idle-capped 30m00s)  ·  22 snapshots — independent of metrics.sh
 
 | phase | elapsed | active | tokens | requests | credits | USD |
 |-------|--------:|-------:|-------:|---------:|--------:|----:|
@@ -148,8 +148,6 @@
 <!-- append-only from logs/progress.jsonl — one row per gen-progress run -->
 | time (UTC) | phase | migrated | optimized | skipped | pending |
 |------------|-------|---------:|----------:|--------:|--------:|
-| 2026-09-06T16:49:22Z | migrate | 12/75 | 0 | 0 | 63 |
-| 2026-09-06T17:12:47Z | migrate | 16/75 | 0 | 0 | 59 |
 | 2026-09-06T17:12:56Z | migrate | 16/75 | 0 | 1 | 58 |
 | 2026-09-06T17:13:43Z | migrate | 16/75 | 0 | 0 | 59 |
 | 2026-09-06T17:15:50Z | migrate | 16/76 | 0 | 0 | 59 |
@@ -160,4 +158,6 @@
 | 2026-09-06T18:38:48Z | migrate | 25/76 | 0 | 0 | 50 |
 | 2026-09-06T19:03:06Z | migrate | 30/76 | 0 | 0 | 45 |
 | 2026-09-06T19:04:02Z | migrate | 30/76 | 0 | 0 | 45 |
+| 2026-09-06T19:05:08Z | migrate | 30/76 | 0 | 0 | 45 |
+| 2026-09-06T19:06:20Z | migrate | 30/76 | 0 | 0 | 45 |
 
