@@ -1,0 +1,33 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-binbcast-repeat-back-20260906T174405Z-3ad0d0",
+  "class": "test",
+  "subject": "binbcast-repeat-back",
+  "phase": "migrate",
+  "ts": "2026-09-06T17:44:23Z",
+  "duration_s": 17.772,
+  "command": "./build/bin/test-backend-ops -o REPEAT_BACK",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "5fa7ff17f",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/binbcast-repeat-back/test-binbcast-repeat-back-20260906T174405Z-3ad0d0.log",
+  "log_sha256": "3119115057bbfdb0c634dc8b40569eb4ca689c4d1f8726a5b5da7d5e0bfdab51",
+  "log_bytes": 4687,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "cpu",
+    "tolerance": {
+      "source": "cuda-parity"
+    }
+  },
+  "extracted": {}
+}

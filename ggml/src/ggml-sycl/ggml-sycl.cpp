@@ -13,6 +13,7 @@
 #include "cpy.hpp"
 #include "scale.hpp"
 #include "clamp.hpp"
+#include "binbcast.hpp"
 #include "unary.hpp"
 #include "rope.hpp"
 #include "diagmask.hpp"
@@ -237,6 +238,25 @@ static bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, ggml_tens
         case GGML_OP_SCALE:
             ggml_sycl_op_scale(ctx, dst);
             return true;
+        case GGML_OP_REPEAT:
+            ggml_sycl_op_repeat(ctx, dst);
+            return true;
+        case GGML_OP_REPEAT_BACK:
+            ggml_sycl_op_repeat_back(ctx, dst);
+            return true;
+        case GGML_OP_ADD:
+        case GGML_OP_ADD1:
+            ggml_sycl_op_add(ctx, dst);
+            return true;
+        case GGML_OP_SUB:
+            ggml_sycl_op_sub(ctx, dst);
+            return true;
+        case GGML_OP_MUL:
+            ggml_sycl_op_mul(ctx, dst);
+            return true;
+        case GGML_OP_DIV:
+            ggml_sycl_op_div(ctx, dst);
+            return true;
         case GGML_OP_CLAMP:
             ggml_sycl_op_clamp(ctx, dst);
             return true;
@@ -448,6 +468,14 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
             return ggml_sycl_supports_cpy(op);
         case GGML_OP_SCALE:
             return ggml_sycl_supports_scale(op);
+        case GGML_OP_REPEAT:
+        case GGML_OP_REPEAT_BACK:
+        case GGML_OP_ADD:
+        case GGML_OP_ADD1:
+        case GGML_OP_SUB:
+        case GGML_OP_MUL:
+        case GGML_OP_DIV:
+            return ggml_sycl_supports_binbcast(op);
         case GGML_OP_CLAMP:
             return ggml_sycl_supports_clamp(op);
         case GGML_OP_UNARY:

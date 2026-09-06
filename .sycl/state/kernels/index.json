@@ -77,12 +77,18 @@
       "id": "binbcast",
       "source": "ggml/src/ggml-cuda/binbcast.cu:launch_bin_bcast_pack,k_repeat_back,repeat_back_cuda,ggml_cuda_op_bin_bcast,ggml_cuda_op_repeat,ggml_cuda_op_add,ggml_cuda_op_sub,ggml_cuda_op_mul,ggml_cuda_op_div,ggml_cuda_op_fused_binbcast_impl,ggml_cuda_op_fused_add,ggml_cuda_op_fused_mul,ggml_cuda_op_repeat_back",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "medium",
       "detail": ".sycl/state/kernels/binbcast.json",
       "loc": {
-        "source_code": 439,
-        "sycl_code": 0
+        "source_code": 448,
+        "sycl_code": 248
+      },
+      "target_style": "plain-sycl",
+      "sycl_file": "ggml/src/ggml-sycl/binbcast.cpp",
+      "unit_test": {
+        "result": "pass",
+        "evidence": "test-binbcast-20260906T174334Z-90e1b1"
       }
     },
     {
@@ -935,5 +941,5 @@
       "risk": "high"
     }
   ],
-  "updated_at": "2026-09-06T17:15:50Z"
+  "updated_at": "2026-09-06T17:45:00Z"
 }

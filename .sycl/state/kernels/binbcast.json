@@ -3,7 +3,7 @@
   "name": "binary-broadcast-family",
   "source": "ggml/src/ggml-cuda/binbcast.cu:launch_bin_bcast_pack,k_repeat_back,repeat_back_cuda,ggml_cuda_op_bin_bcast,ggml_cuda_op_repeat,ggml_cuda_op_add,ggml_cuda_op_sub,ggml_cuda_op_mul,ggml_cuda_op_div,ggml_cuda_op_fused_binbcast_impl,ggml_cuda_op_fused_add,ggml_cuda_op_fused_mul,ggml_cuda_op_repeat_back",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "medium",
   "algorithm": "Apply broadcasted binary elementwise ops (add, sub, mul, div), fused binary forms, repeat, and repeat_back across ggml tensor views with arbitrary strides.",
   "cuda_constructs": [
@@ -40,23 +40,23 @@
     "kind": "cpu",
     "crosscheck": "-"
   },
-  "notes": "Risk reason: mostly indexing logic, but many broadcast and repeat layouts share the same implementation. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:34Z",
+  "notes": "Risk reason: mostly indexing logic, but many broadcast and repeat layouts share the same implementation. Reference oracle: ggml-cpu backend via tests/test-backend-ops. REPEAT_BACK also validated separately with evidence test-binbcast-repeat-back-20260906T174405Z-3ad0d0.",
+  "updated_at": "2026-09-06T17:45:00Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 439,
+      "code": 448,
       "comment": 9,
-      "blank": 68,
-      "raw": 516,
-      "files": 1
+      "blank": 71,
+      "raw": 528,
+      "files": 2
     },
     "sycl": {
-      "code": 0,
-      "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "code": 248,
+      "comment": 2,
+      "blank": 55,
+      "raw": 305,
+      "files": 2
     },
     "source_files": [
       {
@@ -82,16 +82,58 @@
         "comment": 9,
         "blank": 68,
         "raw": 516
+      },
+      {
+        "path": "ggml/src/ggml-cuda/binbcast.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 9,
+        "comment": 0,
+        "blank": 3,
+        "raw": 12
       }
     ],
-    "sycl_files": [],
-    "mirrored_sources": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/binbcast.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 239,
+        "comment": 2,
+        "blank": 52,
+        "raw": 293
+      },
+      {
+        "path": "ggml/src/ggml-sycl/binbcast.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 9,
+        "comment": 0,
+        "blank": 3,
+        "raw": 12
+      }
+    ],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/binbcast.cuh"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:34Z",
+    "measured_at": "2026-09-06T17:45:00Z",
     "source_spec": [
       "ggml/src/ggml-cuda/binbcast.cu:29-99",
       "ggml/src/ggml-cuda/binbcast.cu:106-174"
     ]
-  }
+  },
+  "target_style": "plain-sycl",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/binbcast.hpp",
+    "ggml/src/ggml-sycl/binbcast.cpp"
+  ],
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "ADD,SUB,MUL,DIV,REPEAT",
+    "result": "pass",
+    "evidence": "test-binbcast-20260906T174334Z-90e1b1"
+  },
+  "sycl_impl": "ggml/src/ggml-sycl/binbcast.hpp,ggml/src/ggml-sycl/binbcast.cpp"
 }
