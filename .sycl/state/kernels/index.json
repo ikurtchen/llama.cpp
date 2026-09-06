@@ -113,12 +113,12 @@
       "id": "col2im-1d",
       "source": "ggml/src/ggml-cuda/col2im-1d.cu:col2im_1d_kernel,ggml_cuda_op_col2im_1d",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "medium",
       "detail": ".sycl/state/kernels/col2im-1d.json",
       "loc": {
-        "source_code": 59,
-        "sycl_code": 0
+        "source_code": 61,
+        "sycl_code": 92
       }
     },
     {
@@ -137,48 +137,48 @@
       "id": "conv2d",
       "source": "ggml/src/ggml-cuda/conv2d.cu:calculate_input_coord,conv2d_kernel,conv2d_cuda,conv2d_cuda_f16,conv2d_cuda_f32,ggml_cuda_op_conv2d",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "medium",
       "detail": ".sycl/state/kernels/conv2d.json",
       "loc": {
-        "source_code": 80,
-        "sycl_code": 0
+        "source_code": 84,
+        "sycl_code": 145
       }
     },
     {
       "id": "conv2d-dw",
       "source": "ggml/src/ggml-cuda/conv2d-dw.cu:calculate_input_coord,conv2d_dw_kernel,ggml_cuda_op_conv2d_dw",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "medium",
       "detail": ".sycl/state/kernels/conv2d-dw.json",
       "loc": {
-        "source_code": 68,
-        "sycl_code": 0
+        "source_code": 72,
+        "sycl_code": 144
       }
     },
     {
       "id": "conv2d-transpose",
       "source": "ggml/src/ggml-cuda/conv2d-transpose.cu:conv2d_transpose_kernel,ggml_cuda_conv_2d_transpose_p0",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "medium",
       "detail": ".sycl/state/kernels/conv2d-transpose.json",
       "loc": {
-        "source_code": 90,
-        "sycl_code": 0
+        "source_code": 93,
+        "sycl_code": 119
       }
     },
     {
       "id": "conv-transpose-1d",
       "source": "ggml/src/ggml-cuda/conv-transpose-1d.cu:conv_transpose_1d_kernel,conv_transpose_1d_f32_f32_cuda,ggml_cuda_op_conv_transpose_1d",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "medium",
       "detail": ".sycl/state/kernels/conv-transpose-1d.json",
       "loc": {
-        "source_code": 69,
-        "sycl_code": 0
+        "source_code": 72,
+        "sycl_code": 92
       }
     },
     {
@@ -474,12 +474,12 @@
       "id": "im2col",
       "source": "ggml/src/ggml-cuda/im2col.cu:im2col_kernel,im2col_cuda,im2col_cuda_f16,im2col_cuda_f32,ggml_cuda_op_im2col,im2col_3d_kernel,im2col_3d_cuda,im2col_3d_cuda_f16,im2col_3d_cuda_f32,ggml_cuda_op_im2col_3d",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "medium",
       "detail": ".sycl/state/kernels/im2col.json",
       "loc": {
-        "source_code": 219,
-        "sycl_code": 0
+        "source_code": 223,
+        "sycl_code": 226
       }
     },
     {
@@ -688,24 +688,24 @@
       "id": "pool1d",
       "source": "ggml/src/ggml-cuda/pool1d.cu:pool1d_nchw_kernel,pool1d_nchw_kernel_f32_f32_cuda,ggml_cuda_op_pool1d",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "medium",
       "detail": ".sycl/state/kernels/pool1d.json",
       "loc": {
-        "source_code": 69,
-        "sycl_code": 0
+        "source_code": 72,
+        "sycl_code": 71
       }
     },
     {
       "id": "pool2d",
       "source": "ggml/src/ggml-cuda/pool2d.cu:pool2d_nchw_kernel,pool2d_nchw_kernel_f32_f32_cuda,ggml_cuda_op_pool2d",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "medium",
       "detail": ".sycl/state/kernels/pool2d.json",
       "loc": {
-        "source_code": 80,
-        "sycl_code": 0
+        "source_code": 83,
+        "sycl_code": 97
       }
     },
     {
@@ -1000,12 +1000,12 @@
       "id": "upscale",
       "source": "ggml/src/ggml-cuda/upscale.cu:upscale_f32,upscale_f32_bilinear,upscale_f32_bilinear_antialias,weight1,weight2,bicubic,upscale_f32_bicubic,upscale_f32_cuda,upscale_f32_bilinear_cuda,upscale_f32_bicubic_cuda,ggml_cuda_op_upscale",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "medium",
       "detail": ".sycl/state/kernels/upscale.json",
       "loc": {
-        "source_code": 224,
-        "sycl_code": 0
+        "source_code": 227,
+        "sycl_code": 193
       }
     },
     {
@@ -1030,9 +1030,13 @@
       "id": "conv3d",
       "name": "conv3d",
       "source_lang": "cpu-reference",
-      "status": "pending",
-      "risk": "high"
+      "status": "migrated",
+      "risk": "high",
+      "loc": {
+        "source_code": 7,
+        "sycl_code": 127
+      }
     }
   ],
-  "updated_at": "2026-09-06T21:32:17Z"
+  "updated_at": "2026-09-06T21:38:24Z"
 }

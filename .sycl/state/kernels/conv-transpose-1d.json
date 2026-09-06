@@ -3,7 +3,7 @@
   "name": "conv-transpose-1d",
   "source": "ggml/src/ggml-cuda/conv-transpose-1d.cu:conv_transpose_1d_kernel,conv_transpose_1d_f32_f32_cuda,ggml_cuda_op_conv_transpose_1d",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "medium",
   "algorithm": "Compute transposed 1D convolution for sequence data, distributing each input position over a wider output span.",
   "cuda_constructs": [
@@ -31,23 +31,23 @@
     "kind": "cpu",
     "crosscheck": "-"
   },
-  "notes": "Risk reason: transposed-window index math must match CPU exactly. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:34Z",
+  "notes": "Risk reason: transposed-window index math must match CPU exactly. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Fixed a device-lost bug by removing host-side ggml_tensor pointer dereferences from the device lambda.",
+  "updated_at": "2026-09-06T21:38:00Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 69,
+      "code": 72,
       "comment": 0,
-      "blank": 15,
-      "raw": 84,
-      "files": 1
+      "blank": 17,
+      "raw": 89,
+      "files": 2
     },
     "sycl": {
-      "code": 0,
+      "code": 92,
       "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "blank": 17,
+      "raw": 109,
+      "files": 2
     },
     "source_files": [
       {
@@ -62,12 +62,55 @@
         "comment": 0,
         "blank": 15,
         "raw": 84
+      },
+      {
+        "path": "ggml/src/ggml-cuda/conv-transpose-1d.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 3,
+        "comment": 0,
+        "blank": 2,
+        "raw": 5
       }
     ],
-    "sycl_files": [],
-    "mirrored_sources": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/conv-transpose-1d.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 86,
+        "comment": 0,
+        "blank": 14,
+        "raw": 100
+      },
+      {
+        "path": "ggml/src/ggml-sycl/conv-transpose-1d.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 6,
+        "comment": 0,
+        "blank": 3,
+        "raw": 9
+      }
+    ],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/conv-transpose-1d.cuh"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:34Z"
+    "measured_at": "2026-09-06T21:38:00Z"
+  },
+  "target_style": "plain-sycl",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/conv-transpose-1d.hpp",
+    "ggml/src/ggml-sycl/conv-transpose-1d.cpp"
+  ],
+  "sycl_file": "ggml/src/ggml-sycl/conv-transpose-1d.cpp",
+  "sycl_impl": "ggml/src/ggml-sycl/conv-transpose-1d.hpp,ggml/src/ggml-sycl/conv-transpose-1d.cpp",
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "CONV_TRANSPOSE_1D",
+    "result": "pass",
+    "evidence": "test-convt1d-col2im1d-20260906T213636Z-ab9206"
   }
 }

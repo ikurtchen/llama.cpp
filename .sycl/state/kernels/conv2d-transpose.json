@@ -3,7 +3,7 @@
   "name": "conv2d-transpose",
   "source": "ggml/src/ggml-cuda/conv2d-transpose.cu:conv2d_transpose_kernel,ggml_cuda_conv_2d_transpose_p0",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "medium",
   "algorithm": "Compute transposed 2D convolution (deconvolution) by mapping output pixels back to contributing input/filter coordinates.",
   "cuda_constructs": [
@@ -42,22 +42,22 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: inverse convolution geometry and type handling require validation. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:34Z",
+  "updated_at": "2026-09-06T21:38:00Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 90,
+      "code": 93,
       "comment": 1,
-      "blank": 19,
-      "raw": 110,
-      "files": 1
+      "blank": 21,
+      "raw": 115,
+      "files": 2
     },
     "sycl": {
-      "code": 0,
+      "code": 119,
       "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "blank": 19,
+      "raw": 138,
+      "files": 2
     },
     "source_files": [
       {
@@ -71,12 +71,55 @@
         "comment": 1,
         "blank": 19,
         "raw": 110
+      },
+      {
+        "path": "ggml/src/ggml-cuda/conv2d-transpose.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 3,
+        "comment": 0,
+        "blank": 2,
+        "raw": 5
       }
     ],
-    "sycl_files": [],
-    "mirrored_sources": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/conv2d-transpose.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 113,
+        "comment": 0,
+        "blank": 16,
+        "raw": 129
+      },
+      {
+        "path": "ggml/src/ggml-sycl/conv2d-transpose.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 6,
+        "comment": 0,
+        "blank": 3,
+        "raw": 9
+      }
+    ],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/conv2d-transpose.cuh"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:34Z"
+    "measured_at": "2026-09-06T21:38:00Z"
+  },
+  "target_style": "plain-sycl",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/conv2d-transpose.hpp",
+    "ggml/src/ggml-sycl/conv2d-transpose.cpp"
+  ],
+  "sycl_file": "ggml/src/ggml-sycl/conv2d-transpose.cpp",
+  "sycl_impl": "ggml/src/ggml-sycl/conv2d-transpose.hpp,ggml/src/ggml-sycl/conv2d-transpose.cpp",
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "CONV_TRANSPOSE_2D",
+    "result": "pass",
+    "evidence": "test-conv-pack-20260906T213659Z-c9eedb"
   }
 }

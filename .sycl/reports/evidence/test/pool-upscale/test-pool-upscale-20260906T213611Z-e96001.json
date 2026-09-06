@@ -1,0 +1,33 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-pool-upscale-20260906T213611Z-e96001",
+  "class": "test",
+  "subject": "pool-upscale",
+  "phase": "migrate",
+  "ts": "2026-09-06T21:36:33Z",
+  "duration_s": 22.065,
+  "command": "./build/bin/test-backend-ops -o POOL_1D,POOL_2D,UPSCALE",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "934c2670e",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/pool-upscale/test-pool-upscale-20260906T213611Z-e96001.log",
+  "log_sha256": "5154f2094d7581d2c65e0fb6d5007ae73a7e41adf565ca76806f6c2f369f32a0",
+  "log_bytes": 36204,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "cpu",
+    "tolerance": {
+      "source": "cuda-parity"
+    }
+  },
+  "extracted": {}
+}

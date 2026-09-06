@@ -1,0 +1,33 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-conv-pack-20260906T213659Z-c9eedb",
+  "class": "test",
+  "subject": "conv-pack",
+  "phase": "migrate",
+  "ts": "2026-09-06T21:37:06Z",
+  "duration_s": 6.838,
+  "command": "./build/bin/test-backend-ops -o CONV_2D_DW,CONV_TRANSPOSE_2D,CONV_3D",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "28f681bf3",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/conv-pack/test-conv-pack-20260906T213659Z-c9eedb.log",
+  "log_sha256": "d2f504a1f26c6c063bb71d5b1fa0f925eb6cc7a4a3fdb51ee8834dfaeb147ff6",
+  "log_bytes": 37448,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "cpu",
+    "tolerance": {
+      "source": "cuda-parity"
+    }
+  },
+  "extracted": {}
+}

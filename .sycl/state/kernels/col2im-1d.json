@@ -3,7 +3,7 @@
   "name": "col2im-1d",
   "source": "ggml/src/ggml-cuda/col2im-1d.cu:col2im_1d_kernel,ggml_cuda_op_col2im_1d",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "medium",
   "algorithm": "Scatter a 1D im2col-style matrix back into the output signal layout, reconstructing overlapped windows into their image positions.",
   "cuda_constructs": [
@@ -43,22 +43,22 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: inverse window indexing is more error-prone than pure elementwise code. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:34Z",
+  "updated_at": "2026-09-06T21:38:00Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 59,
+      "code": 61,
       "comment": 3,
-      "blank": 11,
-      "raw": 73,
-      "files": 1
+      "blank": 12,
+      "raw": 76,
+      "files": 2
     },
     "sycl": {
-      "code": 0,
+      "code": 92,
       "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "blank": 18,
+      "raw": 110,
+      "files": 2
     },
     "source_files": [
       {
@@ -72,12 +72,55 @@
         "comment": 3,
         "blank": 11,
         "raw": 73
+      },
+      {
+        "path": "ggml/src/ggml-cuda/col2im-1d.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 2,
+        "comment": 0,
+        "blank": 1,
+        "raw": 3
       }
     ],
-    "sycl_files": [],
-    "mirrored_sources": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/col2im-1d.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 86,
+        "comment": 0,
+        "blank": 15,
+        "raw": 101
+      },
+      {
+        "path": "ggml/src/ggml-sycl/col2im-1d.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 6,
+        "comment": 0,
+        "blank": 3,
+        "raw": 9
+      }
+    ],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/col2im-1d.cuh"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:34Z"
+    "measured_at": "2026-09-06T21:38:00Z"
+  },
+  "target_style": "plain-sycl",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/col2im-1d.hpp",
+    "ggml/src/ggml-sycl/col2im-1d.cpp"
+  ],
+  "sycl_file": "ggml/src/ggml-sycl/col2im-1d.cpp",
+  "sycl_impl": "ggml/src/ggml-sycl/col2im-1d.hpp,ggml/src/ggml-sycl/col2im-1d.cpp",
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "COL2IM_1D",
+    "result": "pass",
+    "evidence": "test-convt1d-col2im1d-20260906T213636Z-ab9206"
   }
 }

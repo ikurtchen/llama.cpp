@@ -3,7 +3,7 @@
   "name": "conv2d-depthwise",
   "source": "ggml/src/ggml-cuda/conv2d-dw.cu:calculate_input_coord,conv2d_dw_kernel,ggml_cuda_op_conv2d_dw",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "medium",
   "algorithm": "Compute depthwise 2D convolution where each channel is convolved independently, with layout-specific specializations.",
   "cuda_constructs": [
@@ -48,22 +48,22 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: depthwise layout transforms and edge handling are moderately tricky. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:34Z",
+  "updated_at": "2026-09-06T21:38:00Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 68,
+      "code": 72,
       "comment": 0,
-      "blank": 15,
-      "raw": 83,
-      "files": 1
+      "blank": 16,
+      "raw": 88,
+      "files": 2
     },
     "sycl": {
-      "code": 0,
+      "code": 144,
       "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "blank": 28,
+      "raw": 172,
+      "files": 2
     },
     "source_files": [
       {
@@ -78,12 +78,55 @@
         "comment": 0,
         "blank": 15,
         "raw": 83
+      },
+      {
+        "path": "ggml/src/ggml-cuda/conv2d-dw.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 4,
+        "comment": 0,
+        "blank": 1,
+        "raw": 5
       }
     ],
-    "sycl_files": [],
-    "mirrored_sources": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/conv2d-dw.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 138,
+        "comment": 0,
+        "blank": 25,
+        "raw": 163
+      },
+      {
+        "path": "ggml/src/ggml-sycl/conv2d-dw.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 6,
+        "comment": 0,
+        "blank": 3,
+        "raw": 9
+      }
+    ],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/conv2d-dw.cuh"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:34Z"
+    "measured_at": "2026-09-06T21:38:00Z"
+  },
+  "target_style": "plain-sycl",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/conv2d-dw.hpp",
+    "ggml/src/ggml-sycl/conv2d-dw.cpp"
+  ],
+  "sycl_file": "ggml/src/ggml-sycl/conv2d-dw.cpp",
+  "sycl_impl": "ggml/src/ggml-sycl/conv2d-dw.hpp,ggml/src/ggml-sycl/conv2d-dw.cpp",
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "CONV_2D_DW",
+    "result": "pass",
+    "evidence": "test-conv-pack-20260906T213659Z-c9eedb"
   }
 }

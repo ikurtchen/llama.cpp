@@ -3,7 +3,7 @@
   "name": "pool2d",
   "source": "ggml/src/ggml-cuda/pool2d.cu:pool2d_nchw_kernel,pool2d_nchw_kernel_f32_f32_cuda,ggml_cuda_op_pool2d",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "medium",
   "algorithm": "Compute 2D pooling over NCHW-style tensors for supported pooling modes.",
   "cuda_constructs": [
@@ -41,22 +41,22 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: multidimensional window indexing and padding logic matter. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:36Z",
+  "updated_at": "2026-09-06T21:38:01Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 80,
+      "code": 83,
       "comment": 0,
-      "blank": 10,
-      "raw": 90,
-      "files": 1
+      "blank": 12,
+      "raw": 95,
+      "files": 2
     },
     "sycl": {
-      "code": 0,
+      "code": 97,
       "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "blank": 16,
+      "raw": 113,
+      "files": 2
     },
     "source_files": [
       {
@@ -71,12 +71,55 @@
         "comment": 0,
         "blank": 10,
         "raw": 90
+      },
+      {
+        "path": "ggml/src/ggml-cuda/pool2d.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 3,
+        "comment": 0,
+        "blank": 2,
+        "raw": 5
       }
     ],
-    "sycl_files": [],
-    "mirrored_sources": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/pool2d.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 91,
+        "comment": 0,
+        "blank": 13,
+        "raw": 104
+      },
+      {
+        "path": "ggml/src/ggml-sycl/pool2d.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 6,
+        "comment": 0,
+        "blank": 3,
+        "raw": 9
+      }
+    ],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/pool2d.cuh"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:36Z"
+    "measured_at": "2026-09-06T21:38:01Z"
+  },
+  "target_style": "plain-sycl",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/pool2d.hpp",
+    "ggml/src/ggml-sycl/pool2d.cpp"
+  ],
+  "sycl_file": "ggml/src/ggml-sycl/pool2d.cpp",
+  "sycl_impl": "ggml/src/ggml-sycl/pool2d.hpp,ggml/src/ggml-sycl/pool2d.cpp",
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "POOL_2D",
+    "result": "pass",
+    "evidence": "test-pool-upscale-20260906T213611Z-e96001"
   }
 }

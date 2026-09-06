@@ -3,7 +3,7 @@
   "name": "upscale",
   "source": "ggml/src/ggml-cuda/upscale.cu:upscale_f32,upscale_f32_bilinear,upscale_f32_bilinear_antialias,weight1,weight2,bicubic,upscale_f32_bicubic,upscale_f32_cuda,upscale_f32_bilinear_cuda,upscale_f32_bicubic_cuda,ggml_cuda_op_upscale",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "medium",
   "algorithm": "Upsample tensors with nearest, bilinear, bilinear-antialias, and bicubic interpolation kernels.",
   "cuda_constructs": [
@@ -39,22 +39,22 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: interpolation kernels must match coordinate and edge rules exactly. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:38Z",
+  "updated_at": "2026-09-06T21:38:01Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 224,
+      "code": 227,
       "comment": 3,
-      "blank": 48,
-      "raw": 275,
-      "files": 1
+      "blank": 50,
+      "raw": 280,
+      "files": 2
     },
     "sycl": {
-      "code": 0,
+      "code": 193,
       "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "blank": 31,
+      "raw": 224,
+      "files": 2
     },
     "source_files": [
       {
@@ -76,12 +76,55 @@
         "comment": 3,
         "blank": 48,
         "raw": 275
+      },
+      {
+        "path": "ggml/src/ggml-cuda/upscale.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 3,
+        "comment": 0,
+        "blank": 2,
+        "raw": 5
       }
     ],
-    "sycl_files": [],
-    "mirrored_sources": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/upscale.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 187,
+        "comment": 0,
+        "blank": 28,
+        "raw": 215
+      },
+      {
+        "path": "ggml/src/ggml-sycl/upscale.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 6,
+        "comment": 0,
+        "blank": 3,
+        "raw": 9
+      }
+    ],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/upscale.cuh"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:38Z"
+    "measured_at": "2026-09-06T21:38:01Z"
+  },
+  "target_style": "plain-sycl",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/upscale.hpp",
+    "ggml/src/ggml-sycl/upscale.cpp"
+  ],
+  "sycl_file": "ggml/src/ggml-sycl/upscale.cpp",
+  "sycl_impl": "ggml/src/ggml-sycl/upscale.hpp,ggml/src/ggml-sycl/upscale.cpp",
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "UPSCALE",
+    "result": "pass",
+    "evidence": "test-pool-upscale-20260906T213611Z-e96001"
   }
 }

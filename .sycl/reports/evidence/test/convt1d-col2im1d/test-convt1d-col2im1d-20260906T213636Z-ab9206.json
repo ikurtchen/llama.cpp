@@ -1,0 +1,33 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-convt1d-col2im1d-20260906T213636Z-ab9206",
+  "class": "test",
+  "subject": "convt1d-col2im1d",
+  "phase": "migrate",
+  "ts": "2026-09-06T21:36:46Z",
+  "duration_s": 9.693,
+  "command": "./build/bin/test-backend-ops -o CONV_TRANSPOSE_1D,COL2IM_1D",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "934c2670e",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/convt1d-col2im1d/test-convt1d-col2im1d-20260906T213636Z-ab9206.log",
+  "log_sha256": "3f84fef97de19a1900d0ab1f423a14c14aaafa11d9a65e0a7690f37c0759f880",
+  "log_bytes": 13851,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "cpu",
+    "tolerance": {
+      "source": "cuda-parity"
+    }
+  },
+  "extracted": {}
+}

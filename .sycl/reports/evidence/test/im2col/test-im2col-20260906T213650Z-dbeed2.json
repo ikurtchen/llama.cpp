@@ -1,0 +1,33 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-im2col-20260906T213650Z-dbeed2",
+  "class": "test",
+  "subject": "im2col",
+  "phase": "migrate",
+  "ts": "2026-09-06T21:36:55Z",
+  "duration_s": 5.75,
+  "command": "./build/bin/test-backend-ops -o IM2COL",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "28f681bf3",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/im2col/test-im2col-20260906T213650Z-dbeed2.log",
+  "log_sha256": "74fcbd4839dfbbc6af77c7e903b8458f5b37fdc69b448c8ec95d0d1607b2fe14",
+  "log_bytes": 14702,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "cpu",
+    "tolerance": {
+      "source": "cuda-parity"
+    }
+  },
+  "extracted": {}
+}

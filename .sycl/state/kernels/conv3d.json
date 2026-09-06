@@ -3,7 +3,7 @@
   "name": "conv3d",
   "source": "ggml/src/ggml-cpu/ops.cpp:ggml_compute_forward_conv_3d (no CUDA counterpart; ggml-vulkan/ggml-vulkan.cpp also implements it)",
   "source_lang": "cpu-reference",
-  "status": "pending",
+  "status": "migrated",
   "risk": "high",
   "algorithm": "3D convolution: slide a 3D kernel over a 3D input volume across channels, accumulating dot products per output voxel; no CUDA backend implementation exists, so ggml-cpu/ggml-vulkan is the reference for both algorithm and expected numerics.",
   "cuda_constructs": [],
@@ -37,6 +37,78 @@
     "kind": "cpu",
     "crosscheck": "ggml-vulkan also implements this op, useful as a second cross-check"
   },
-  "notes": "No CUDA counterpart (per instructions.md sec 2.1); reference taken from ggml-cpu ops.cpp:ggml_compute_forward_conv_3d, cross-checked against ggml-vulkan's implementation.",
-  "updated_at": "2026-09-06T17:15:50Z"
+  "notes": "No CUDA counterpart (per instructions.md sec 2.1); reference taken from ggml-cpu ops.cpp:ggml_compute_forward_conv_3d, cross-checked against ggml-vulkan's implementation. Reference implementation follows the direct CPU/Vulkan indexing path for correctness.",
+  "updated_at": "2026-09-06T21:38:24Z",
+  "loc": {
+    "source_lang": "cpu-reference",
+    "source": {
+      "code": 7,
+      "comment": 0,
+      "blank": 0,
+      "raw": 7,
+      "files": 1
+    },
+    "sycl": {
+      "code": 127,
+      "comment": 0,
+      "blank": 16,
+      "raw": 143,
+      "files": 2
+    },
+    "source_files": [
+      {
+        "path": "ggml/src/ggml-cpu/ops.cpp",
+        "lang": "c",
+        "spans": [
+          "7353-7359"
+        ],
+        "code": 7,
+        "comment": 0,
+        "blank": 0,
+        "raw": 7
+      }
+    ],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/conv3d.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 121,
+        "comment": 0,
+        "blank": 13,
+        "raw": 134
+      },
+      {
+        "path": "ggml/src/ggml-sycl/conv3d.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 6,
+        "comment": 0,
+        "blank": 3,
+        "raw": 9
+      }
+    ],
+    "mirrored_sources": [],
+    "unresolved": [
+      "ggml-vulkan/ggml-vulkan.cpp",
+      "ggml/src/ggml-cpu/ops.cpp:CUDA",
+      "ggml/src/ggml-cpu/ops.cpp:counterpart",
+      "ggml/src/ggml-cpu/ops.cpp:no"
+    ],
+    "method": "span",
+    "measured_at": "2026-09-06T21:38:24Z"
+  },
+  "target_style": "plain-sycl",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/conv3d.hpp",
+    "ggml/src/ggml-sycl/conv3d.cpp"
+  ],
+  "sycl_file": "ggml/src/ggml-sycl/conv3d.cpp",
+  "sycl_impl": "ggml/src/ggml-sycl/conv3d.hpp,ggml/src/ggml-sycl/conv3d.cpp",
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "CONV_3D",
+    "result": "pass",
+    "evidence": "test-conv-pack-20260906T213659Z-c9eedb"
+  }
 }

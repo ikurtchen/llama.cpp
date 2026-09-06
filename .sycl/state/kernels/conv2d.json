@@ -3,7 +3,7 @@
   "name": "conv2d",
   "source": "ggml/src/ggml-cuda/conv2d.cu:calculate_input_coord,conv2d_kernel,conv2d_cuda,conv2d_cuda_f16,conv2d_cuda_f32,ggml_cuda_op_conv2d",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "medium",
   "algorithm": "Compute a 2D convolution over image tiles, mapping filter taps and channels onto output pixels for F16/F32 inputs.",
   "cuda_constructs": [
@@ -50,23 +50,23 @@
     "kind": "cpu",
     "crosscheck": "-"
   },
-  "notes": "Risk reason: multidimensional indexing and convolution layout handling need care. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:34Z",
+  "notes": "Risk reason: multidimensional indexing and convolution layout handling need care. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Unit test evidence covers representative direct-conv cases because the full CONV_2D matrix exceeded the shared runner budget in this session.",
+  "updated_at": "2026-09-06T21:38:00Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 80,
+      "code": 84,
       "comment": 3,
-      "blank": 16,
-      "raw": 99,
-      "files": 1
+      "blank": 17,
+      "raw": 104,
+      "files": 2
     },
     "sycl": {
-      "code": 0,
+      "code": 145,
       "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "blank": 26,
+      "raw": 171,
+      "files": 2
     },
     "source_files": [
       {
@@ -84,12 +84,55 @@
         "comment": 3,
         "blank": 16,
         "raw": 99
+      },
+      {
+        "path": "ggml/src/ggml-cuda/conv2d.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 4,
+        "comment": 0,
+        "blank": 1,
+        "raw": 5
       }
     ],
-    "sycl_files": [],
-    "mirrored_sources": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/conv2d.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 139,
+        "comment": 0,
+        "blank": 23,
+        "raw": 162
+      },
+      {
+        "path": "ggml/src/ggml-sycl/conv2d.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 6,
+        "comment": 0,
+        "blank": 3,
+        "raw": 9
+      }
+    ],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/conv2d.cuh"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:34Z"
+    "measured_at": "2026-09-06T21:38:00Z"
+  },
+  "target_style": "plain-sycl",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/conv2d.hpp",
+    "ggml/src/ggml-sycl/conv2d.cpp"
+  ],
+  "sycl_file": "ggml/src/ggml-sycl/conv2d.cpp",
+  "sycl_impl": "ggml/src/ggml-sycl/conv2d.hpp,ggml/src/ggml-sycl/conv2d.cpp",
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "CONV_2D -p representative-direct-cases",
+    "result": "pass",
+    "evidence": "test-conv2d-20260906T213710Z-54c2cc"
   }
 }

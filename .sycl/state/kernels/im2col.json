@@ -3,7 +3,7 @@
   "name": "im2col-family",
   "source": "ggml/src/ggml-cuda/im2col.cu:im2col_kernel,im2col_cuda,im2col_cuda_f16,im2col_cuda_f32,ggml_cuda_op_im2col,im2col_3d_kernel,im2col_3d_cuda,im2col_3d_cuda_f16,im2col_3d_cuda_f32,ggml_cuda_op_im2col_3d",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "medium",
   "algorithm": "Lower 2D and 3D convolution inputs into column-major patch matrices used by later GEMM-based convolution paths.",
   "cuda_constructs": [
@@ -42,22 +42,22 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: multi-axis patch extraction and padding logic need exact matching. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:35Z",
+  "updated_at": "2026-09-06T21:38:00Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 219,
+      "code": 223,
       "comment": 0,
-      "blank": 31,
-      "raw": 250,
-      "files": 1
+      "blank": 33,
+      "raw": 256,
+      "files": 2
     },
     "sycl": {
-      "code": 0,
+      "code": 226,
       "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "blank": 39,
+      "raw": 265,
+      "files": 2
     },
     "source_files": [
       {
@@ -79,12 +79,55 @@
         "comment": 0,
         "blank": 31,
         "raw": 250
+      },
+      {
+        "path": "ggml/src/ggml-cuda/im2col.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 4,
+        "comment": 0,
+        "blank": 2,
+        "raw": 6
       }
     ],
-    "sycl_files": [],
-    "mirrored_sources": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/im2col.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 218,
+        "comment": 0,
+        "blank": 35,
+        "raw": 253
+      },
+      {
+        "path": "ggml/src/ggml-sycl/im2col.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 8,
+        "comment": 0,
+        "blank": 4,
+        "raw": 12
+      }
+    ],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/im2col.cuh"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:35Z"
+    "measured_at": "2026-09-06T21:38:00Z"
+  },
+  "target_style": "plain-sycl",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/im2col.hpp",
+    "ggml/src/ggml-sycl/im2col.cpp"
+  ],
+  "sycl_file": "ggml/src/ggml-sycl/im2col.cpp",
+  "sycl_impl": "ggml/src/ggml-sycl/im2col.hpp,ggml/src/ggml-sycl/im2col.cpp",
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "IM2COL",
+    "result": "pass",
+    "evidence": "test-im2col-20260906T213650Z-dbeed2"
   }
 }
