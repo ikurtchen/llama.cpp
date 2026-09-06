@@ -3,7 +3,7 @@
   "name": "lightning-indexer",
   "source": "ggml/src/ggml-cuda/lightning-indexer.cu:lightning_indexer_kernel_wmma,lightning_indexer_kernel_vec,ggml_cuda_lightning_indexer_supported",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "high",
   "algorithm": "Score key/value cache entries for Lightning-style sparse attention indexing by computing weighted ReLU(QK) scores with either WMMA or vectorized kernels, adding mask bias on output.",
   "cuda_constructs": [
@@ -51,22 +51,22 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: custom WMMA sparse-index scoring is highly specialized and architecture-sensitive. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:35Z",
+  "updated_at": "2026-09-06T21:32:17Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 417,
+      "code": 420,
       "comment": 41,
-      "blank": 86,
-      "raw": 544,
-      "files": 1
+      "blank": 87,
+      "raw": 548,
+      "files": 2
     },
     "sycl": {
-      "code": 0,
+      "code": 214,
       "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "blank": 40,
+      "raw": 254,
+      "files": 2
     },
     "source_files": [
       {
@@ -82,15 +82,57 @@
         "comment": 41,
         "blank": 86,
         "raw": 544
+      },
+      {
+        "path": "ggml/src/ggml-cuda/lightning-indexer.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 3,
+        "comment": 0,
+        "blank": 1,
+        "raw": 4
       }
     ],
-    "sycl_files": [],
-    "mirrored_sources": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/lightning-indexer.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 208,
+        "comment": 0,
+        "blank": 37,
+        "raw": 245
+      },
+      {
+        "path": "ggml/src/ggml-sycl/lightning-indexer.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 6,
+        "comment": 0,
+        "blank": 3,
+        "raw": 9
+      }
+    ],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/lightning-indexer.cuh"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:35Z",
+    "measured_at": "2026-09-06T21:32:17Z",
     "source_spec": [
       "ggml/src/ggml-cuda/lightning-indexer.cu:400-535"
     ]
-  }
+  },
+  "target_style": "plain-sycl",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/lightning-indexer.hpp",
+    "ggml/src/ggml-sycl/lightning-indexer.cpp"
+  ],
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "LIGHTNING_INDEXER",
+    "result": "pass",
+    "evidence": "test-lightning-indexer-20260906T213058Z-5b12db"
+  },
+  "sycl_impl": "ggml/src/ggml-sycl/lightning-indexer.hpp,ggml/src/ggml-sycl/lightning-indexer.cpp"
 }

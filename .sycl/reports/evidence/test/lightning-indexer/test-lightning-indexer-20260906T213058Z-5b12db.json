@@ -1,0 +1,33 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-lightning-indexer-20260906T213058Z-5b12db",
+  "class": "test",
+  "subject": "lightning-indexer",
+  "phase": "migrate",
+  "ts": "2026-09-06T21:31:15Z",
+  "duration_s": 16.596,
+  "command": "./build/bin/test-backend-ops test -b SYCL0 -o LIGHTNING_INDEXER",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "9efaa0ed4",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/lightning-indexer/test-lightning-indexer-20260906T213058Z-5b12db.log",
+  "log_sha256": "edb18f1081acea1b3310fc914695b341243afe87f6da21912b7e69c70cbdc3f7",
+  "log_bytes": 15057,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "cpu",
+    "tolerance": {
+      "source": "cuda-parity"
+    }
+  },
+  "extracted": {}
+}

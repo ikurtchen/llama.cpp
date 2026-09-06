@@ -404,12 +404,18 @@
       "id": "gated-delta-net",
       "source": "ggml/src/ggml-cuda/gated_delta_net.cu:launch_gated_delta_net,ggml_cuda_op_gated_delta_net_impl,ggml_cuda_op_gated_delta_net,ggml_cuda_op_gated_delta_net_fused_cache",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "high",
       "detail": ".sycl/state/kernels/gated-delta-net.json",
       "loc": {
         "source_code": 271,
         "sycl_code": 197
+      },
+      "target_style": "plain-sycl",
+      "sycl_file": "ggml/src/ggml-sycl/gated_delta_net.cpp",
+      "unit_test": {
+        "result": "pass",
+        "evidence": "test-gated-delta-net-20260906T213054Z-da4afd"
       }
     },
     {
@@ -450,12 +456,18 @@
       "id": "gla",
       "source": "ggml/src/ggml-cuda/gla.cu:gated_linear_attn_f32,ggml_cuda_op_gated_linear_attn",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "high",
       "detail": ".sycl/state/kernels/gla.json",
       "loc": {
         "source_code": 75,
         "sycl_code": 117
+      },
+      "target_style": "plain-sycl",
+      "sycl_file": "ggml/src/ggml-sycl/gla.cpp",
+      "unit_test": {
+        "result": "pass",
+        "evidence": "test-gla-20260906T213031Z-d3ea5e"
       }
     },
     {
@@ -510,12 +522,22 @@
       "id": "lightning-indexer",
       "source": "ggml/src/ggml-cuda/lightning-indexer.cu:lightning_indexer_kernel_wmma,lightning_indexer_kernel_vec,ggml_cuda_lightning_indexer_supported",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "high",
       "detail": ".sycl/state/kernels/lightning-indexer.json",
       "loc": {
-        "source_code": 417,
-        "sycl_code": 0
+        "source_code": 420,
+        "sycl_code": 214
+      },
+      "target_style": "plain-sycl",
+      "sycl_file": "ggml/src/ggml-sycl/lightning-indexer.cpp",
+      "sycl_files": [
+        "ggml/src/ggml-sycl/lightning-indexer.hpp",
+        "ggml/src/ggml-sycl/lightning-indexer.cpp"
+      ],
+      "unit_test": {
+        "result": "pass",
+        "evidence": "test-lightning-indexer-20260906T213058Z-5b12db"
       }
     },
     {
@@ -851,24 +873,36 @@
       "id": "ssm-conv",
       "source": "ggml/src/ggml-cuda/ssm-conv.cu:ssm_conv_f32,ssm_conv_long_token_f32,ssm_conv_f32_cuda,ggml_cuda_op_ssm_conv",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "high",
       "detail": ".sycl/state/kernels/ssm-conv.json",
       "loc": {
         "source_code": 169,
         "sycl_code": 95
+      },
+      "target_style": "plain-sycl",
+      "sycl_file": "ggml/src/ggml-sycl/ssm-conv.cpp",
+      "unit_test": {
+        "result": "pass",
+        "evidence": "test-ssm-conv-20260906T213036Z-fe6456"
       }
     },
     {
       "id": "ssm-scan",
       "source": "ggml/src/ggml-cuda/ssm-scan.cu:ssm_scan_f32,ssm_scan_f32_group,ssm_scan_f32_cuda,ssm_ssd_prepare_dt_kernel,ssm_ssd_pre_matmul_kernel,ssm_ssd_scale_state_kernel,ssm_ssd_init_state_kernel,ssm_scan_ssd_f32_cuda,ggml_cuda_op_ssm_scan",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "high",
       "detail": ".sycl/state/kernels/ssm-scan.json",
       "loc": {
         "source_code": 671,
         "sycl_code": 162
+      },
+      "target_style": "plain-sycl",
+      "sycl_file": "ggml/src/ggml-sycl/ssm-scan.cpp",
+      "unit_test": {
+        "result": "pass",
+        "evidence": "test-ssm-scan-20260906T213100Z-5cb239"
       }
     },
     {
@@ -978,12 +1012,18 @@
       "id": "wkv",
       "source": "ggml/src/ggml-cuda/wkv.cu:rwkv_wkv_f32,rwkv_wkv7_f32,rwkv_wkv7_f32_t1_warp_row,ggml_cuda_op_rwkv_wkv6,ggml_cuda_op_rwkv_wkv7",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "high",
       "detail": ".sycl/state/kernels/wkv.json",
       "loc": {
         "source_code": 211,
         "sycl_code": 200
+      },
+      "target_style": "plain-sycl",
+      "sycl_file": "ggml/src/ggml-sycl/wkv.cpp",
+      "unit_test": {
+        "result": "pass",
+        "evidence": "test-wkv-20260906T213043Z-e61aec"
       }
     },
     {
@@ -994,5 +1034,5 @@
       "risk": "high"
     }
   ],
-  "updated_at": "2026-09-06T21:32:05Z"
+  "updated_at": "2026-09-06T21:32:17Z"
 }
