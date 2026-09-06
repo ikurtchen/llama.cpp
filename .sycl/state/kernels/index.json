@@ -191,7 +191,7 @@
       "id": "count-equal",
       "source": "ggml/src/ggml-cuda/count-equal.cu:count_equal,ggml_cuda_count_equal",
       "source_lang": "cuda",
-      "status": "skipped",
+      "status": "pending",
       "risk": "medium",
       "detail": ".sycl/state/kernels/count-equal.json",
       "loc": {
@@ -928,5 +928,5 @@
       }
     }
   ],
-  "updated_at": "2026-09-06T17:12:56Z"
+  "updated_at": "2026-09-06T17:13:43Z"
 }

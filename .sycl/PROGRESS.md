@@ -6,9 +6,9 @@
 - **Benchmark GPU freq pinned**: True
 - **Build system**: cmake → SYCL build: set-up (ggml/src/ggml-sycl/ builds via icpx -fsycl, AOT bmg-g31, links oneMKL; registers as backend SYCL0)
 - **Phase**: migrate
-- **Updated**: 2026-09-06T17:12:56Z
+- **Updated**: 2026-09-06T17:13:43Z
 
-**Summary**: 75 kernels — 16 migrated, 0 optimized, 1 skipped, 0 needs-reference, 58 pending.
+**Summary**: 75 kernels — 16 migrated, 0 optimized, 0 skipped, 0 needs-reference, 59 pending.
 
 **Code migrated**: 15949 source code lines (76 files; attributed per kernel: cuda 16006) → 0 SYCL code lines (0 files)  ·  ratio 0.0×  ·  44.0% of the project's CUDA/Triton code lines  ·  measured 75/75 kernels
 
@@ -69,7 +69,7 @@
 | conv2d-transpose | ggml/src/ggml-cuda/conv2d-transpose.cu:conv2d_transpose_kernel,ggml_cuda_conv_2d_transpose_p0 | pending | - | - | 90→0 | - | - | Risk reason: inverse convolution geometry and type handling require validation. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | conv-transpose-1d | ggml/src/ggml-cuda/conv-transpose-1d.cu:conv_transpose_1d_kernel,conv_transpose_1d_f32_f32_cuda,ggml_cuda_op_conv_transpose_1d | pending | - | - | 69→0 | - | - | Risk reason: transposed-window index math must match CPU exactly. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | convert | ggml/src/ggml-cuda/convert.cu:convert_unary,convert_unary_cuda,convert_unary_cont_cuda | pending | - | - | 35→0 | - | - | Risk reason: direct per-element casts only. Reference oracle: analytical type conversion plus callers validated by ggml-cpu backend. |
-| count-equal | ggml/src/ggml-cuda/count-equal.cu:count_equal,ggml_cuda_count_equal | skipped | - | - | 45→0 | - | - | Risk reason: atomic accumulation and type-specialized comparisons need care. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Skipped: training/accuracy-metric op (used for evaluating discrete-token prediction accuracy), not on the Qwen3 dense-inference hot path. Excluded per user's explicit scope decision, not for difficulty. |
+| count-equal | ggml/src/ggml-cuda/count-equal.cu:count_equal,ggml_cuda_count_equal | pending | - | - | 45→0 | - | - | Risk reason: atomic accumulation and type-specialized comparisons need care. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Not on the Qwen3 dense-inference path (qwen3 flag: false); scheduled after the Qwen3-path and lowest-risk units per instructions.md scope (all 117 ops in scope, difficulty is never a skip reason). |
 | cpy | ggml/src/ggml-cuda/cpy.cu:cpy_scalar,cpy_scalar_transpose,cpy_blck_q8_0_f32,cpy_blck_q_f32,cpy_f32_q,cpy_q_f32,cpy_scalar_contiguous,ggml_cpy_scalar_contiguous_cuda,ggml_cpy_scalar_cuda,ggml_cpy_f32_q8_0_cuda,ggml_cpy_q8_0_f32_cuda,ggml_cpy_f32_q4_0_cuda,ggml_cpy_q4_0_f32_cuda,ggml_cpy_f32_q4_1_cuda,ggml_cpy_q4_1_f32_cuda,ggml_cpy_f32_q5_0_cuda,ggml_cpy_q5_0_f32_cuda,ggml_cpy_f32_q5_1_cuda,ggml_cpy_q5_1_f32_cuda,ggml_cpy_f32_iq4_nl_cuda,ggml_cuda_cpy_as_memcpy_2d,ggml_cuda_cpy,ggml_cuda_dup | migrated | pass | - | 0→0 | - | - | Partial coverage vs CUDA: F32/F16 CPY/DUP/CONT only. CUDA's cpy.cu additionally quantizes/dequantizes during copy for Q8_0/Q4_0/Q4_1/Q5_0/Q5_1/IQ4_NL (used for direct-to-quantized KV cache writes). Quantized cpy variants are not yet ported; tracked as residual work, not silently dropped. |
 | cross-entropy-loss | ggml/src/ggml-cuda/cross-entropy-loss.cu:cross_entropy_loss_f32,cross_entropy_loss_back_f32,ggml_cuda_cross_entropy_loss,ggml_cuda_cross_entropy_loss_back | pending | - | - | 132→0 | - | - | Risk reason: reduction numerics and forward/backward coupling need validation. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | cumsum | ggml/src/ggml-cuda/cumsum.cu:cumsum_cub_kernel,cumsum_kernel,cumsum_cub,cumsum_cuda,ggml_cuda_op_cumsum | pending | - | - | 216→0 | - | - | Risk reason: scan carry propagation and fallback/shared-memory logic must be preserved. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
@@ -133,8 +133,8 @@
 ## Agent efficiency & cost
 
 - **Elapsed**: 27m27s (whole run)  ·  **Active**: 13m14s (bracketed)  ·  **Cost**: $0.0  ·  **Tokens**: 0 (in 0 / out 0 / cache r 0 / cache w 0)  ·  **Premium requests**: 0  ·  **AI credits**: 0.0
-- **Observed (gen-progress heartbeat)**: span 1h28m25s  ·  working ≈ 1h28m25s (idle-capped 30m00s)  ·  11 snapshots — independent of metrics.sh
-  - ⚠️ bracketed active time (13m14s) is far below observed work (1h28m25s); phases were under-bracketed — trust elapsed/observed figures.
+- **Observed (gen-progress heartbeat)**: span 1h29m12s  ·  working ≈ 1h29m12s (idle-capped 30m00s)  ·  12 snapshots — independent of metrics.sh
+  - ⚠️ bracketed active time (13m14s) is far below observed work (1h29m12s); phases were under-bracketed — trust elapsed/observed figures.
 
 | phase | elapsed | active | tokens | requests | credits | USD |
 |-------|--------:|-------:|-------:|---------:|--------:|----:|
@@ -157,4 +157,5 @@
 | 2026-09-06T16:49:22Z | migrate | 12/75 | 0 | 0 | 63 |
 | 2026-09-06T17:12:47Z | migrate | 16/75 | 0 | 0 | 59 |
 | 2026-09-06T17:12:56Z | migrate | 16/75 | 0 | 1 | 58 |
+| 2026-09-06T17:13:43Z | migrate | 16/75 | 0 | 0 | 59 |
 
