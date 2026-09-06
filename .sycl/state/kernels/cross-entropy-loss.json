@@ -3,7 +3,7 @@
   "name": "cross-entropy-loss",
   "source": "ggml/src/ggml-cuda/cross-entropy-loss.cu:cross_entropy_loss_f32,cross_entropy_loss_back_f32,ggml_cuda_cross_entropy_loss,ggml_cuda_cross_entropy_loss_back",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "medium",
   "algorithm": "Compute cross-entropy loss and its backward gradient over logits/probabilities, using row reductions for normalization terms.",
   "cuda_constructs": [
@@ -32,23 +32,23 @@
     "kind": "cpu",
     "crosscheck": "-"
   },
-  "notes": "Risk reason: reduction numerics and forward/backward coupling need validation. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:34Z",
+  "notes": "Risk reason: reduction numerics and forward/backward coupling need validation. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Forward and backward are both covered by the same backend-ops evidence run.",
+  "updated_at": "2026-09-06T21:29:35Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 132,
+      "code": 136,
       "comment": 4,
-      "blank": 31,
-      "raw": 167,
-      "files": 1
+      "blank": 34,
+      "raw": 174,
+      "files": 2
     },
     "sycl": {
-      "code": 0,
+      "code": 136,
       "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "blank": 30,
+      "raw": 166,
+      "files": 2
     },
     "source_files": [
       {
@@ -64,12 +64,53 @@
         "comment": 4,
         "blank": 31,
         "raw": 167
+      },
+      {
+        "path": "ggml/src/ggml-cuda/cross-entropy-loss.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 4,
+        "comment": 0,
+        "blank": 3,
+        "raw": 7
       }
     ],
-    "sycl_files": [],
-    "mirrored_sources": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/cross-entropy-loss.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 128,
+        "comment": 0,
+        "blank": 27,
+        "raw": 155
+      },
+      {
+        "path": "ggml/src/ggml-sycl/cross-entropy-loss.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 8,
+        "comment": 0,
+        "blank": 3,
+        "raw": 11
+      }
+    ],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/cross-entropy-loss.cuh"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:34Z"
+    "measured_at": "2026-09-06T20:54:10Z"
+  },
+  "target_style": "plain-sycl",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/cross-entropy-loss.hpp",
+    "ggml/src/ggml-sycl/cross-entropy-loss.cpp"
+  ],
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "CROSS_ENTROPY_LOSS,CROSS_ENTROPY_LOSS_BACK",
+    "result": "pass",
+    "evidence": "test-opt-step-adamw-cumsum-cross-entropy-loss-fwht-out-prod-solve-tri-20260906T211508Z-72065b"
   }
 }

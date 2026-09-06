@@ -3,7 +3,7 @@
   "name": "fwht",
   "source": "ggml/src/ggml-cuda/fwht.cu:fwht_cuda,ggml_cuda_op_fwht",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "medium",
   "algorithm": "Compute the fast Walsh-Hadamard transform over rows using staged butterfly combinations.",
   "cuda_constructs": [
@@ -33,23 +33,23 @@
     "kind": "cpu",
     "crosscheck": "-"
   },
-  "notes": "Risk reason: butterfly transform ordering matters, but the kernel structure is regular. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:35Z",
+  "notes": "Risk reason: butterfly transform ordering matters, but the kernel structure is regular. Reference oracle: ggml-cpu backend via tests/test-backend-ops. SYCL wires the FWHT path through ggml_sycl_op_mul_mat() when GGML_HINT_SRC0_IS_HADAMARD selects the Hadamard fast path.",
+  "updated_at": "2026-09-06T21:29:35Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 81,
-      "comment": 0,
-      "blank": 16,
-      "raw": 97,
-      "files": 1
+      "code": 83,
+      "comment": 1,
+      "blank": 17,
+      "raw": 101,
+      "files": 2
     },
     "sycl": {
-      "code": 0,
+      "code": 52,
       "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "blank": 17,
+      "raw": 69,
+      "files": 2
     },
     "source_files": [
       {
@@ -63,12 +63,54 @@
         "comment": 0,
         "blank": 16,
         "raw": 97
+      },
+      {
+        "path": "ggml/src/ggml-cuda/fwht.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 2,
+        "comment": 1,
+        "blank": 1,
+        "raw": 4
       }
     ],
-    "sycl_files": [],
-    "mirrored_sources": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/fwht.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 47,
+        "comment": 0,
+        "blank": 14,
+        "raw": 61
+      },
+      {
+        "path": "ggml/src/ggml-sycl/fwht.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 5,
+        "comment": 0,
+        "blank": 3,
+        "raw": 8
+      }
+    ],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/fwht.cuh"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:35Z"
+    "measured_at": "2026-09-06T20:54:10Z"
+  },
+  "target_style": "plain-sycl",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/fwht.hpp",
+    "ggml/src/ggml-sycl/fwht.cpp",
+    "ggml/src/ggml-sycl/mmf.cpp"
+  ],
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "MUL_MAT_HADAMARD",
+    "result": "pass",
+    "evidence": "test-opt-step-adamw-cumsum-cross-entropy-loss-fwht-out-prod-solve-tri-20260906T211508Z-72065b"
   }
 }

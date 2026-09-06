@@ -3,7 +3,7 @@
   "name": "out-prod",
   "source": "ggml/src/ggml-cuda/out-prod.cu:k_compute_out_prod_ptrs,ggml_cuda_out_prod",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "medium",
   "algorithm": "Compute outer-product-style batched matrix products, using a small pointer-setup kernel and cuBLAS single/strided/batched GEMM depending on broadcast pattern.",
   "cuda_constructs": [
@@ -32,23 +32,23 @@
     "kind": "cpu",
     "crosscheck": "-"
   },
-  "notes": "Risk reason: GEMM mode selection and pointer batching matter more than the tiny helper kernel. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:36Z",
+  "notes": "Risk reason: GEMM mode selection and pointer batching matter more than the tiny helper kernel. Reference oracle: ggml-cpu backend via tests/test-backend-ops. SYCL uses oneMKL column_major::gemm and gemm_batch for the actual matrix products.",
+  "updated_at": "2026-09-06T21:29:35Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 95,
+      "code": 97,
       "comment": 6,
-      "blank": 19,
-      "raw": 120,
-      "files": 1
+      "blank": 20,
+      "raw": 123,
+      "files": 2
     },
     "sycl": {
-      "code": 0,
+      "code": 90,
       "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "blank": 20,
+      "raw": 110,
+      "files": 2
     },
     "source_files": [
       {
@@ -62,12 +62,53 @@
         "comment": 6,
         "blank": 19,
         "raw": 120
+      },
+      {
+        "path": "ggml/src/ggml-cuda/out-prod.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 2,
+        "comment": 0,
+        "blank": 1,
+        "raw": 3
       }
     ],
-    "sycl_files": [],
-    "mirrored_sources": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/out-prod.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 84,
+        "comment": 0,
+        "blank": 17,
+        "raw": 101
+      },
+      {
+        "path": "ggml/src/ggml-sycl/out-prod.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 6,
+        "comment": 0,
+        "blank": 3,
+        "raw": 9
+      }
+    ],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/out-prod.cuh"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:36Z"
+    "measured_at": "2026-09-06T20:54:10Z"
+  },
+  "target_style": "onemkl-gemm",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/out-prod.hpp",
+    "ggml/src/ggml-sycl/out-prod.cpp"
+  ],
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "OUT_PROD",
+    "result": "pass",
+    "evidence": "test-opt-step-adamw-cumsum-cross-entropy-loss-fwht-out-prod-solve-tri-20260906T211508Z-72065b"
   }
 }

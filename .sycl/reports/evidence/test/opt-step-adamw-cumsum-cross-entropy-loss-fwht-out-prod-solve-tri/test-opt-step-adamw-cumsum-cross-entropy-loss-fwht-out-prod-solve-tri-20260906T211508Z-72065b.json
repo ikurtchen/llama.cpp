@@ -1,0 +1,34 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-opt-step-adamw-cumsum-cross-entropy-loss-fwht-out-prod-solve-tri-20260906T211508Z-72065b",
+  "class": "test",
+  "subject": "opt-step-adamw-cumsum-cross-entropy-loss-fwht-out-prod-solve-tri",
+  "label": "migrate",
+  "phase": "migrate",
+  "ts": "2026-09-06T21:29:28Z",
+  "duration_s": 860.228,
+  "command": "./build/bin/test-backend-ops -o OPT_STEP_ADAMW,CUMSUM,CROSS_ENTROPY_LOSS,CROSS_ENTROPY_LOSS_BACK,OUT_PROD,SOLVE_TRI,MUL_MAT_HADAMARD",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "83d85d665",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/opt-step-adamw-cumsum-cross-entropy-loss-fwht-out-prod-solve-tri/test-opt-step-adamw-cumsum-cross-entropy-loss-fwht-out-prod-solve-tri-20260906T211508Z-72065b.log",
+  "log_sha256": "f2ba146e1f5dfa8d9becd03025ddd10dbf91e501feaea1299697f31e7014fc98",
+  "log_bytes": 156153,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "cpu",
+    "tolerance": {
+      "source": "cuda-parity"
+    }
+  },
+  "extracted": {}
+}

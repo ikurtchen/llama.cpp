@@ -3,7 +3,7 @@
   "name": "optimizer-step-adamw",
   "source": "ggml/src/ggml-cuda/opt-step-adamw.cu:opt_step_adamw_f32,opt_step_adamw_f32_cuda,ggml_cuda_opt_step_adamw",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "medium",
   "algorithm": "Apply one fused AdamW parameter update step over parameter, gradient, and moment tensors.",
   "cuda_constructs": [
@@ -43,22 +43,22 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: fused optimizer math must preserve update order but is otherwise elementwise. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:36Z",
+  "updated_at": "2026-09-06T21:29:35Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 58,
+      "code": 61,
       "comment": 0,
-      "blank": 13,
-      "raw": 71,
-      "files": 1
+      "blank": 15,
+      "raw": 76,
+      "files": 2
     },
     "sycl": {
-      "code": 0,
+      "code": 83,
       "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "blank": 17,
+      "raw": 100,
+      "files": 2
     },
     "source_files": [
       {
@@ -73,12 +73,53 @@
         "comment": 0,
         "blank": 13,
         "raw": 71
+      },
+      {
+        "path": "ggml/src/ggml-cuda/opt-step-adamw.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 3,
+        "comment": 0,
+        "blank": 2,
+        "raw": 5
       }
     ],
-    "sycl_files": [],
-    "mirrored_sources": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/opt-step-adamw.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 77,
+        "comment": 0,
+        "blank": 14,
+        "raw": 91
+      },
+      {
+        "path": "ggml/src/ggml-sycl/opt-step-adamw.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 6,
+        "comment": 0,
+        "blank": 3,
+        "raw": 9
+      }
+    ],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/opt-step-adamw.cuh"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:36Z"
+    "measured_at": "2026-09-06T20:54:10Z"
+  },
+  "target_style": "plain-sycl",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/opt-step-adamw.hpp",
+    "ggml/src/ggml-sycl/opt-step-adamw.cpp"
+  ],
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "OPT_STEP_ADAMW",
+    "result": "pass",
+    "evidence": "test-opt-step-adamw-cumsum-cross-entropy-loss-fwht-out-prod-solve-tri-20260906T211508Z-72065b"
   }
 }

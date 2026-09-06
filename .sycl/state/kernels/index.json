@@ -239,24 +239,24 @@
       "id": "cross-entropy-loss",
       "source": "ggml/src/ggml-cuda/cross-entropy-loss.cu:cross_entropy_loss_f32,cross_entropy_loss_back_f32,ggml_cuda_cross_entropy_loss,ggml_cuda_cross_entropy_loss_back",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "medium",
       "detail": ".sycl/state/kernels/cross-entropy-loss.json",
       "loc": {
-        "source_code": 132,
-        "sycl_code": 0
+        "source_code": 136,
+        "sycl_code": 136
       }
     },
     {
       "id": "cumsum",
       "source": "ggml/src/ggml-cuda/cumsum.cu:cumsum_cub_kernel,cumsum_kernel,cumsum_cub,cumsum_cuda,ggml_cuda_op_cumsum",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "medium",
       "detail": ".sycl/state/kernels/cumsum.json",
       "loc": {
-        "source_code": 216,
-        "sycl_code": 0
+        "source_code": 219,
+        "sycl_code": 78
       }
     },
     {
@@ -382,12 +382,12 @@
       "id": "fwht",
       "source": "ggml/src/ggml-cuda/fwht.cu:fwht_cuda,ggml_cuda_op_fwht",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "medium",
       "detail": ".sycl/state/kernels/fwht.json",
       "loc": {
-        "source_code": 81,
-        "sycl_code": 0
+        "source_code": 83,
+        "sycl_code": 52
       }
     },
     {
@@ -596,12 +596,12 @@
       "id": "opt-step-adamw",
       "source": "ggml/src/ggml-cuda/opt-step-adamw.cu:opt_step_adamw_f32,opt_step_adamw_f32_cuda,ggml_cuda_opt_step_adamw",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "medium",
       "detail": ".sycl/state/kernels/opt-step-adamw.json",
       "loc": {
-        "source_code": 58,
-        "sycl_code": 0
+        "source_code": 61,
+        "sycl_code": 83
       }
     },
     {
@@ -620,12 +620,12 @@
       "id": "out-prod",
       "source": "ggml/src/ggml-cuda/out-prod.cu:k_compute_out_prod_ptrs,ggml_cuda_out_prod",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "medium",
       "detail": ".sycl/state/kernels/out-prod.json",
       "loc": {
-        "source_code": 95,
-        "sycl_code": 0
+        "source_code": 97,
+        "sycl_code": 90
       }
     },
     {
@@ -829,12 +829,12 @@
       "id": "solve-tri",
       "source": "ggml/src/ggml-cuda/solve_tri.cu:get_batch_pointers,solve_tri_f32_cublas,solve_tri_f32_fast,solve_tri_f32_cuda,ggml_cuda_op_solve_tri",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "high",
       "detail": ".sycl/state/kernels/solve-tri.json",
       "loc": {
         "source_code": 222,
-        "sycl_code": 0
+        "sycl_code": 67
       }
     },
     {
@@ -901,7 +901,7 @@
       "id": "topk-moe",
       "source": "ggml/src/ggml-cuda/topk-moe.cu:softmax_warp_inplace,sigmoid_warp_inplace,sqrt_softplus_warp_inplace,topk_moe_cuda,launch_topk_moe_cuda,ggml_cuda_op_topk_moe,ggml_cuda_should_use_topk_moe",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "skipped",
       "risk": "high",
       "detail": ".sycl/state/kernels/topk-moe.json",
       "loc": {
@@ -984,5 +984,5 @@
       "risk": "high"
     }
   ],
-  "updated_at": "2026-09-06T19:05:03Z"
+  "updated_at": "2026-09-06T20:54:10Z"
 }

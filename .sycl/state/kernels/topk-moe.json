@@ -3,7 +3,7 @@
   "name": "topk-moe",
   "source": "ggml/src/ggml-cuda/topk-moe.cu:softmax_warp_inplace,sigmoid_warp_inplace,sqrt_softplus_warp_inplace,topk_moe_cuda,launch_topk_moe_cuda,ggml_cuda_op_topk_moe,ggml_cuda_should_use_topk_moe",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "skipped",
   "risk": "high",
   "algorithm": "Fuse MoE gating softmax/sigmoid/softplus, iterative top-k expert selection, id writeout, and optional post-selection normalization into one kernel.",
   "cuda_constructs": [
@@ -42,8 +42,8 @@
     "kind": "cpu",
     "crosscheck": "-"
   },
-  "notes": "Risk reason: fused gating modes plus iterative warp-level selection are non-trivial and MoE-hot. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:38Z",
+  "notes": "Skipped as a legitimate fusion-only optimization. ggml_cuda_topk_moe_fusion() in ggml-cuda.cu only matches optional graph patterns rooted at SOFT_MAX, UNARY, or ARGSORT, and ggml_cuda_should_use_topk_moe() gates the fused CUDA fast path. If SYCL does not register this fusion, llama.cpp runs the already-supported unfused graph of SOFT_MAX/ARGSORT or TOP_K/GET_ROWS and optional SUM_ROWS/CLAMP/DIV/SCALE nodes, which preserves model semantics.",
+  "updated_at": "2026-09-06T20:13:23Z",
   "loc": {
     "source_lang": "cuda",
     "source": {

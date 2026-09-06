@@ -3,7 +3,7 @@
   "name": "cumsum",
   "source": "ggml/src/ggml-cuda/cumsum.cu:cumsum_cub_kernel,cumsum_kernel,cumsum_cub,cumsum_cuda,ggml_cuda_op_cumsum",
   "source_lang": "cuda",
-  "status": "pending",
+  "status": "migrated",
   "risk": "medium",
   "algorithm": "Compute inclusive cumulative sums along the innermost dimension, using a CUB scan when available and a tiled warp/block scan fallback otherwise.",
   "cuda_constructs": [
@@ -36,22 +36,22 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: scan carry propagation and fallback/shared-memory logic must be preserved. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:21:34Z",
+  "updated_at": "2026-09-06T21:29:35Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 216,
+      "code": 219,
       "comment": 39,
-      "blank": 36,
-      "raw": 291,
-      "files": 1
+      "blank": 38,
+      "raw": 296,
+      "files": 2
     },
     "sycl": {
-      "code": 0,
+      "code": 78,
       "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "blank": 24,
+      "raw": 102,
+      "files": 2
     },
     "source_files": [
       {
@@ -68,12 +68,53 @@
         "comment": 39,
         "blank": 36,
         "raw": 291
+      },
+      {
+        "path": "ggml/src/ggml-cuda/cumsum.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 3,
+        "comment": 0,
+        "blank": 2,
+        "raw": 5
       }
     ],
-    "sycl_files": [],
-    "mirrored_sources": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/cumsum.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 72,
+        "comment": 0,
+        "blank": 21,
+        "raw": 93
+      },
+      {
+        "path": "ggml/src/ggml-sycl/cumsum.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 6,
+        "comment": 0,
+        "blank": 3,
+        "raw": 9
+      }
+    ],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/cumsum.cuh"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:34Z"
+    "measured_at": "2026-09-06T20:54:10Z"
+  },
+  "target_style": "plain-sycl",
+  "sycl_files": [
+    "ggml/src/ggml-sycl/cumsum.hpp",
+    "ggml/src/ggml-sycl/cumsum.cpp"
+  ],
+  "unit_test": {
+    "harness": "tests/test-backend-ops.cpp",
+    "filter": "CUMSUM",
+    "result": "pass",
+    "evidence": "test-opt-step-adamw-cumsum-cross-entropy-loss-fwht-out-prod-solve-tri-20260906T211508Z-72065b"
   }
 }
