@@ -185,13 +185,24 @@
       "id": "convert",
       "source": "ggml/src/ggml-cuda/convert.cu:convert_unary,convert_unary_cuda,convert_unary_cont_cuda",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "low",
       "detail": ".sycl/state/kernels/convert.json",
       "loc": {
-        "source_code": 35,
-        "sycl_code": 0
-      }
+        "source_code": 373,
+        "sycl_code": 363
+      },
+      "target_style": "plain-sycl",
+      "unit_test": {
+        "result": "pass",
+        "evidence": "test-dequantize-quantize-lib-20260906T183837Z-af13e9"
+      },
+      "notes": "Implemented helper-library dense conversion dispatch in ggml/src/ggml-sycl/dequantize.{hpp,cpp}. Covered F32/F16 passthrough plus dequant-to-fp32/fp16 dispatch for Q4_0/Q4_1/Q5_0/Q5_1/Q8_0/Q2_K/Q3_K/Q4_K/Q5_K/Q6_K. BF16 and non-contiguous convert paths remain residual. Selftest passes against ggml/src/ggml-quants.c and CUDA q8_1 semantics, but current consumer ops do not yet call this library: getrows.cpp keeps inline Q8_0/Q4_0/Q4_1 dequant code, and cpy.cpp only handles F32/F16.",
+      "sycl_files": [
+        "ggml/src/ggml-sycl/dequantize.hpp",
+        "ggml/src/ggml-sycl/dequantize.cpp"
+      ],
+      "sycl_file": "ggml/src/ggml-sycl/dequantize.cpp"
     },
     {
       "id": "count-equal",
@@ -252,13 +263,24 @@
       "id": "dequantize",
       "source": "ggml/src/ggml-cuda/convert.cu:dequantize_block,dequantize_block_q8_0_f16,dequantize_block_q4_0,dequantize_block_q4_1,dequantize_block_q2_K,dequantize_block_q3_K,dequantize_block_q4_K,dequantize_block_q5_K,dequantize_block_q6_K,dequantize_block_iq2_xxs,dequantize_block_iq2_xs,dequantize_block_iq2_s,dequantize_block_iq3_xxs,dequantize_block_iq3_s,dequantize_block_iq1_s,dequantize_block_iq1_m,dequantize_block_iq4_nl,dequantize_block_iq4_xs,dequantize_block_mxfp4,dequantize_block_nvfp4,dequantize_block_cuda,dequantize_block_cont_cuda,dequantize_block_q8_0_f16_cuda,dequantize_row_q2_K_cuda,dequantize_row_q3_K_cuda,dequantize_row_q4_0_cuda,dequantize_row_q4_1_cuda,dequantize_row_q4_K_cuda,dequantize_row_q5_K_cuda,dequantize_row_q6_K_cuda,dequantize_row_iq2_xxs_cuda,dequantize_row_iq2_xs_cuda,dequantize_row_iq2_s_cuda,dequantize_row_iq3_xxs_cuda,dequantize_row_iq3_s_cuda,dequantize_row_iq1_s_cuda,dequantize_row_iq1_m_cuda,dequantize_row_iq4_nl_cuda,dequantize_row_iq4_xs_cuda,dequantize_row_mxfp4_cuda,dequantize_row_nvfp4_cuda",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "high",
       "detail": ".sycl/state/kernels/dequantize.json",
       "loc": {
-        "source_code": 316,
-        "sycl_code": 0
-      }
+        "source_code": 654,
+        "sycl_code": 363
+      },
+      "target_style": "plain-sycl",
+      "unit_test": {
+        "result": "pass",
+        "evidence": "test-dequantize-quantize-lib-20260906T183837Z-af13e9"
+      },
+      "notes": "Implemented plain-SYCL helper-library dequantization in ggml/src/ggml-sycl/dequantize.{hpp,cpp}. Covered F32, F16, Q4_0, Q4_1, Q5_0, Q5_1, Q8_0, Q2_K, Q3_K, Q4_K, Q5_K, and Q6_K to fp32/fp16. IQ*, MXFP4, NVFP4, BF16 output, and non-contiguous dispatch remain residual. Selftest passes bit-exact against ggml/src/ggml-quants.c and CUDA q8_1 semantics. Existing GET_ROWS/CPY backend tests cover similar quant types, but they do not yet prove this helper library is exercised because getrows.cpp duplicates the relevant inline dequant code and cpy.cpp does not consume it.",
+      "sycl_files": [
+        "ggml/src/ggml-sycl/dequantize.hpp",
+        "ggml/src/ggml-sycl/dequantize.cpp"
+      ],
+      "sycl_file": "ggml/src/ggml-sycl/dequantize.cpp"
     },
     {
       "id": "diag",
@@ -648,13 +670,24 @@
       "id": "quantize",
       "source": "ggml/src/ggml-cuda/quantize.cu:nvfp4_native_scale_error,quantize_q8_1,quantize_mmq_nvfp4,quantize_mmq_mxfp4,quantize_mmq_q8_1,quantize_row_q8_1_cuda,quantize_mmq_q8_1_cuda,quantize_scatter_mmq_q8_1_cuda,quantize_scatter_mmq_fp4_cuda,quantize_mmq_fp4_cuda",
       "source_lang": "cuda",
-      "status": "pending",
+      "status": "migrated",
       "risk": "high",
       "detail": ".sycl/state/kernels/quantize.json",
       "loc": {
-        "source_code": 557,
-        "sycl_code": 0
-      }
+        "source_code": 616,
+        "sycl_code": 83
+      },
+      "target_style": "plain-sycl",
+      "unit_test": {
+        "result": "pass",
+        "evidence": "test-dequantize-quantize-lib-20260906T183837Z-af13e9"
+      },
+      "notes": "Implemented plain-SYCL helper-library runtime quantization in ggml/src/ggml-sycl/quantize.{hpp,cpp}. Covered F32 -> Q8_0 and F32 -> Q8_1 row helpers matching CUDA quantize.cu semantics used by quantized matmul helpers. MMQ scatter, MXFP4, and NVFP4 helper paths remain residual by design. Selftest passes bit-exact against ggml/src/ggml-quants.c for Q8_0 and against a direct CUDA-semantics Q8_1 reference. No current SYCL consumer is wired to this helper yet; it is ready for later mmq/mmvq/getrows integration.",
+      "sycl_files": [
+        "ggml/src/ggml-sycl/quantize.hpp",
+        "ggml/src/ggml-sycl/quantize.cpp"
+      ],
+      "sycl_file": "ggml/src/ggml-sycl/quantize.cpp"
     },
     {
       "id": "rms-norm",
@@ -941,5 +974,5 @@
       "risk": "high"
     }
   ],
-  "updated_at": "2026-09-06T17:45:00Z"
+  "updated_at": "2026-09-06T18:33:33Z"
 }

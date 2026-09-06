@@ -1,0 +1,41 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-dequantize-quantize-lib-20260906T183837Z-af13e9",
+  "class": "test",
+  "subject": "dequantize-quantize-lib",
+  "label": "migrate",
+  "phase": "migrate",
+  "ts": "2026-09-06T18:38:39Z",
+  "duration_s": 1.154,
+  "command": "bash -lc ssh\\ -p\\ 2332\\ -o\\ BatchMode=yes\\ -o\\ StrictHostKeyChecking=accept-new\\ root@10.239.98.41\\ \\'cd\\ /workspace/sycl-agent-runs/llama.cpp\\ \\&\\&\\ source\\ /opt/intel/oneapi/setvars.sh\\ \\>/dev/null\\ 2\\>\\&1\\ \\&\\&\\ export\\ ONEAPI_DEVICE_SELECTOR=opencl:cpu\\ \\&\\&\\ ./.sycl/scratch/quant_sycl_validation\\'",
+  "via": "local",
+  "runner": {
+    "mode": "local"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "cd70e6a76",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/dequantize-quantize-lib/test-dequantize-quantize-lib-20260906T183837Z-af13e9.log",
+  "log_sha256": "1b5d6ac7dbdb77493a3cee2bdae5e846679072bad3af41011d0d594b13a60c7b",
+  "log_bytes": 670,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "CPU dequantize_row_* in ggml/src/ggml-quants.c; CUDA q8_1 semantics from ggml/src/ggml-cuda/quantize.cu",
+    "tolerance": {
+      "source": "helper-library parity against ggml CPU/CUDA references"
+    }
+  },
+  "extracted": {
+    "verdict_tokens": [
+      "PASS",
+      "PASS",
+      "PASS",
+      "PASS",
+      "PASS"
+    ]
+  },
+  "notes": "remote selftest run via SSH fallback on opencl:cpu because run.sh GPU lock was saturated by other agents"
+}
