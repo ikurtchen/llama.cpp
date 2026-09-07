@@ -1,0 +1,59 @@
+{
+  "schema": "e2e-profile.schema.json",
+  "label": "final",
+  "basis": "e2e-workload",
+  "workload": "llama-cli -m Qwen3-0.6B-Q8_0.gguf -p 'The capital of France is' -n 128 --ignore-eos --temp 0 --seed 42 --reasoning off -ngl 99 --single-turn (decode-dominated: 6-token prompt + 128 generated tokens)",
+  "method": "in-app op-level SYCL device timers (GGML_SYCL_PROFILE=1): same fallback method as e2e.baseline.json (unitrace segfaults deterministically during model load on this runner). Ranking tool (relative op share, forced-sync so not an absolute-latency benchmark), same env fingerprint (env-68d8b007).",
+  "total_wallclock_ms": 2411.6558,
+  "evidence": "e2e-final-20260907T014717Z-afca0c",
+  "ranking": [
+    {
+      "id": "mmvq",
+      "op": "MUL_MAT",
+      "kernel_ids": ["mmvq", "mmq"],
+      "notes": "Unchanged from baseline: dequantize-then-oneMKL-GEMM path used unconditionally for all n (the fused fast-path optimization was trialed and then reverted in this optimize phase -- see optimization/mmvq.json regression_found_in_done_phase). Still the dominant op by wall-clock share.",
+      "calls": 25610,
+      "wallclock_ms": 1280.0462,
+      "wallclock_pct": 53.08
+    },
+    {
+      "id": "flash-attn-vec",
+      "op": "FLASH_ATTN_EXT",
+      "kernel_ids": ["flash-attn-vec", "flash-attn-common"],
+      "notes": "Split-KV optimization kept (15.02x/7.56x/3.85x for nsplit=16/8/4 on the isolated kernel benchmark). Wall-clock share slightly up vs baseline (18.27% vs 17.17%) only because MUL_MAT+MUL's absolute time changed the denominator; the optimization is independently verified via its own kernel-level bench evidence, not by this ranking.",
+      "calls": 3640,
+      "wallclock_ms": 440.5965,
+      "wallclock_pct": 18.27
+    },
+    {
+      "id": "binbcast",
+      "op": "MUL",
+      "kernel_ids": ["binbcast"],
+      "notes": "Elementwise broadcast multiply (RMSNorm weight scale, SwiGLU gate, etc). Unchanged.",
+      "calls": 14690,
+      "wallclock_ms": 192.4042,
+      "wallclock_pct": 7.98
+    },
+    {
+      "id": "rms-norm",
+      "op": "RMS_NORM",
+      "kernel_ids": ["rms-norm"],
+      "notes": "Parallel row-reduction norm. Unchanged.",
+      "calls": 14690,
+      "wallclock_ms": 172.8657,
+      "wallclock_pct": 7.17
+    },
+    {
+      "id": "getrows",
+      "op": "GET_ROWS",
+      "kernel_ids": ["getrows"],
+      "notes": "Host-round-trip removal kept (device-side gather, no host sync). Wall-clock share dropped from 0.54% baseline-equivalent share (its own optimization is on absolute per-token latency, not visible as a wall-clock-pct drop here since the sync-forced ranking harness bounds every op's own cost by construction -- see method note); confirmed independently via getrows kernel-level bench evidence and via the real (non-profiled) e2e Generation throughput gain.",
+      "calls": 260,
+      "wallclock_ms": 13.1139,
+      "wallclock_pct": 0.54
+    }
+  ],
+  "unranked_tail_pct": 12.96,
+  "unranked_tail_ops": ["ADD", "ROPE", "SET_ROWS", "SWIGLU", "VIEW", "RESHAPE", "PERMUTE"],
+  "notes": "mmvq's fused fast-path optimization was trialed and reverted during this optimize/done cycle (see optimization/mmvq.json). The e2e ranking share is materially unchanged from baseline for MUL_MAT because the shipped code path (dequant+oneMKL GEMM) IS the baseline path. The real, uninstrumented (non-profiled) e2e wall-clock throughput -- the number that actually matters -- improved from Prompt 622.7/Generation 71.9 t/s (baseline) to Prompt 635.8-653.5/Generation 77.6 t/s (final), driven entirely by the getrows and flash-attn-vec kernel optimizations. See e2e-final-20260907T014143Z-32ca2d (uninstrumented) for that measurement."
+}

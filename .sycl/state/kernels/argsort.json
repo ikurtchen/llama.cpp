@@ -35,7 +35,7 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: hybrid CUB plus custom bitonic sort with rowwise offsets. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated the portable bitonic-sort path (one work-group per row, local-memory index array) matching CUDA's non-CUB fallback. CUDA's CUB-based radix/segmented-sort fast path for large ncols (>1024) is not ported - tracked as residual, out of scope for the Qwen3 dense text path (used by top-k selection, not full-vocab sort).",
-  "updated_at": "2026-09-06T16:43:12Z",
+  "updated_at": "2026-09-07T01:48:10Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -77,7 +77,7 @@
     "mirrored_sources": [],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:34Z"
+    "measured_at": "2026-09-07T01:48:10Z"
   },
   "unit_test": {
     "command": "build/bin/test-backend-ops test -b SYCL0 -o ARGSORT",

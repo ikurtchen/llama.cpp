@@ -21,7 +21,7 @@
       "risk": "low",
       "detail": ".sycl/state/kernels/add-id.json",
       "loc": {
-        "source_code": 45,
+        "source_code": 47,
         "sycl_code": 49
       }
     },
@@ -46,7 +46,7 @@
       "detail": ".sycl/state/kernels/arange.json",
       "loc": {
         "source_code": 25,
-        "sycl_code": 31
+        "sycl_code": 0
       }
     },
     {
@@ -58,7 +58,7 @@
       "detail": ".sycl/state/kernels/argmax.json",
       "loc": {
         "source_code": 69,
-        "sycl_code": 70
+        "sycl_code": 0
       }
     },
     {
@@ -70,7 +70,7 @@
       "detail": ".sycl/state/kernels/argsort.json",
       "loc": {
         "source_code": 223,
-        "sycl_code": 94
+        "sycl_code": 0
       }
     },
     {
@@ -100,7 +100,7 @@
       "detail": ".sycl/state/kernels/clamp.json",
       "loc": {
         "source_code": 34,
-        "sycl_code": 44
+        "sycl_code": 0
       },
       "sycl_file": "ggml/src/ggml-sycl/clamp.cpp",
       "target_style": "plain-sycl",
@@ -130,7 +130,7 @@
       "detail": ".sycl/state/kernels/concat.json",
       "loc": {
         "source_code": 210,
-        "sycl_code": 66
+        "sycl_code": 0
       }
     },
     {
@@ -189,8 +189,8 @@
       "risk": "low",
       "detail": ".sycl/state/kernels/convert.json",
       "loc": {
-        "source_code": 373,
-        "sycl_code": 363
+        "source_code": 35,
+        "sycl_code": 0
       },
       "target_style": "plain-sycl",
       "unit_test": {
@@ -225,7 +225,7 @@
       "detail": ".sycl/state/kernels/cpy.json",
       "loc": {
         "source_code": 516,
-        "sycl_code": 89
+        "sycl_code": 0
       },
       "sycl_file": "ggml/src/ggml-sycl/cpy.cpp",
       "target_style": "plain-sycl",
@@ -243,8 +243,8 @@
       "risk": "medium",
       "detail": ".sycl/state/kernels/cross-entropy-loss.json",
       "loc": {
-        "source_code": 136,
-        "sycl_code": 136
+        "source_code": 132,
+        "sycl_code": 0
       }
     },
     {
@@ -255,8 +255,8 @@
       "risk": "medium",
       "detail": ".sycl/state/kernels/cumsum.json",
       "loc": {
-        "source_code": 219,
-        "sycl_code": 78
+        "source_code": 216,
+        "sycl_code": 0
       }
     },
     {
@@ -267,8 +267,8 @@
       "risk": "high",
       "detail": ".sycl/state/kernels/dequantize.json",
       "loc": {
-        "source_code": 654,
-        "sycl_code": 363
+        "source_code": 316,
+        "sycl_code": 0
       },
       "target_style": "plain-sycl",
       "unit_test": {
@@ -290,7 +290,7 @@
       "risk": "low",
       "detail": ".sycl/state/kernels/diag.json",
       "loc": {
-        "source_code": 60,
+        "source_code": 63,
         "sycl_code": 62
       }
     },
@@ -303,7 +303,7 @@
       "detail": ".sycl/state/kernels/diagmask.json",
       "loc": {
         "source_code": 28,
-        "sycl_code": 41
+        "sycl_code": 0
       }
     },
     {
@@ -336,7 +336,7 @@
       "risk": "low",
       "detail": ".sycl/state/kernels/fill.json",
       "loc": {
-        "source_code": 27,
+        "source_code": 29,
         "sycl_code": 43
       }
     },
@@ -348,8 +348,8 @@
       "risk": "high",
       "detail": ".sycl/state/kernels/flash-attn-common.json",
       "loc": {
-        "source_code": 376,
-        "sycl_code": 0
+        "source_code": 380,
+        "sycl_code": 564
       }
     },
     {
@@ -360,8 +360,8 @@
       "risk": "high",
       "detail": ".sycl/state/kernels/flash-attn-vec.json",
       "loc": {
-        "source_code": 500,
-        "sycl_code": 0
+        "source_code": 504,
+        "sycl_code": 564
       }
     },
     {
@@ -372,8 +372,8 @@
       "risk": "high",
       "detail": ".sycl/state/kernels/flash-attn-tile.json",
       "loc": {
-        "source_code": 354,
-        "sycl_code": 0
+        "source_code": 983,
+        "sycl_code": 564
       }
     },
     {
@@ -384,8 +384,8 @@
       "risk": "high",
       "detail": ".sycl/state/kernels/flash-attn-mma-f16.json",
       "loc": {
-        "source_code": 394,
-        "sycl_code": 0
+        "source_code": 398,
+        "sycl_code": 564
       }
     },
     {
@@ -396,8 +396,8 @@
       "risk": "medium",
       "detail": ".sycl/state/kernels/fwht.json",
       "loc": {
-        "source_code": 83,
-        "sycl_code": 52
+        "source_code": 81,
+        "sycl_code": 0
       }
     },
     {
@@ -427,7 +427,7 @@
       "detail": ".sycl/state/kernels/getrows.json",
       "loc": {
         "source_code": 419,
-        "sycl_code": 224
+        "sycl_code": 216
       },
       "target_style": "plain-sycl",
       "sycl_file": "ggml/src/ggml-sycl/getrows.cpp",
@@ -561,7 +561,7 @@
       "detail": ".sycl/state/kernels/mmf.json",
       "loc": {
         "source_code": 603,
-        "sycl_code": 292
+        "sycl_code": 0
       }
     },
     {
@@ -572,8 +572,8 @@
       "risk": "medium",
       "detail": ".sycl/state/kernels/mmid.json",
       "loc": {
-        "source_code": 126,
-        "sycl_code": 91
+        "source_code": 122,
+        "sycl_code": 0
       }
     },
     {
@@ -597,7 +597,7 @@
       "detail": ".sycl/state/kernels/mmvf.json",
       "loc": {
         "source_code": 783,
-        "sycl_code": 292
+        "sycl_code": 0
       }
     },
     {
@@ -620,8 +620,8 @@
       "risk": "medium",
       "detail": ".sycl/state/kernels/moe-weighted-reduction.json",
       "loc": {
-        "source_code": 63,
-        "sycl_code": 190
+        "source_code": 57,
+        "sycl_code": 0
       }
     },
     {
@@ -632,8 +632,8 @@
       "risk": "medium",
       "detail": ".sycl/state/kernels/opt-step-adamw.json",
       "loc": {
-        "source_code": 61,
-        "sycl_code": 83
+        "source_code": 58,
+        "sycl_code": 0
       }
     },
     {
@@ -644,7 +644,7 @@
       "risk": "low",
       "detail": ".sycl/state/kernels/opt-step-sgd.json",
       "loc": {
-        "source_code": 34,
+        "source_code": 37,
         "sycl_code": 44
       }
     },
@@ -656,8 +656,8 @@
       "risk": "medium",
       "detail": ".sycl/state/kernels/out-prod.json",
       "loc": {
-        "source_code": 97,
-        "sycl_code": 90
+        "source_code": 95,
+        "sycl_code": 0
       }
     },
     {
@@ -668,7 +668,7 @@
       "risk": "low",
       "detail": ".sycl/state/kernels/pad.json",
       "loc": {
-        "source_code": 76,
+        "source_code": 79,
         "sycl_code": 88
       }
     },
@@ -680,7 +680,7 @@
       "risk": "low",
       "detail": ".sycl/state/kernels/pad-reflect-1d.json",
       "loc": {
-        "source_code": 23,
+        "source_code": 26,
         "sycl_code": 63
       }
     },
@@ -716,8 +716,8 @@
       "risk": "high",
       "detail": ".sycl/state/kernels/quantize.json",
       "loc": {
-        "source_code": 616,
-        "sycl_code": 83
+        "source_code": 557,
+        "sycl_code": 0
       },
       "target_style": "plain-sycl",
       "unit_test": {
@@ -763,7 +763,7 @@
       "risk": "low",
       "detail": ".sycl/state/kernels/roll.json",
       "loc": {
-        "source_code": 43,
+        "source_code": 46,
         "sycl_code": 58
       }
     },
@@ -776,7 +776,7 @@
       "detail": ".sycl/state/kernels/rope.json",
       "loc": {
         "source_code": 578,
-        "sycl_code": 175
+        "sycl_code": 0
       }
     },
     {
@@ -788,7 +788,7 @@
       "detail": ".sycl/state/kernels/scale.json",
       "loc": {
         "source_code": 27,
-        "sycl_code": 37
+        "sycl_code": 0
       },
       "sycl_file": "ggml/src/ggml-sycl/scale.cpp",
       "target_style": "plain-sycl",
@@ -805,7 +805,7 @@
       "risk": "low",
       "detail": ".sycl/state/kernels/set.json",
       "loc": {
-        "source_code": 29,
+        "source_code": 33,
         "sycl_code": 46
       }
     },
@@ -818,7 +818,7 @@
       "detail": ".sycl/state/kernels/set-rows.json",
       "loc": {
         "source_code": 299,
-        "sycl_code": 82
+        "sycl_code": 0
       }
     },
     {
@@ -829,7 +829,7 @@
       "risk": "low",
       "detail": ".sycl/state/kernels/snake.json",
       "loc": {
-        "source_code": 53,
+        "source_code": 59,
         "sycl_code": 117
       }
     },
@@ -841,7 +841,7 @@
       "risk": "low",
       "detail": ".sycl/state/kernels/softcap.json",
       "loc": {
-        "source_code": 27,
+        "source_code": 30,
         "sycl_code": 46
       }
     },
@@ -853,7 +853,7 @@
       "risk": "high",
       "detail": ".sycl/state/kernels/softmax.json",
       "loc": {
-        "source_code": 308,
+        "source_code": 312,
         "sycl_code": 306
       }
     },
@@ -866,7 +866,7 @@
       "detail": ".sycl/state/kernels/solve-tri.json",
       "loc": {
         "source_code": 222,
-        "sycl_code": 67
+        "sycl_code": 0
       }
     },
     {
@@ -938,7 +938,7 @@
       "detail": ".sycl/state/kernels/top-k.json",
       "loc": {
         "source_code": 204,
-        "sycl_code": 45
+        "sycl_code": 0
       }
     },
     {
@@ -961,7 +961,7 @@
       "risk": "low",
       "detail": ".sycl/state/kernels/tri.json",
       "loc": {
-        "source_code": 119,
+        "source_code": 122,
         "sycl_code": 112
       }
     },
@@ -973,7 +973,7 @@
       "risk": "low",
       "detail": ".sycl/state/kernels/tsembd.json",
       "loc": {
-        "source_code": 35,
+        "source_code": 38,
         "sycl_code": 42
       }
     },
@@ -986,7 +986,7 @@
       "detail": ".sycl/state/kernels/unary.json",
       "loc": {
         "source_code": 541,
-        "sycl_code": 260
+        "sycl_code": 0
       },
       "sycl_file": "ggml/src/ggml-sycl/unary.cpp",
       "target_style": "plain-sycl",
@@ -1039,5 +1039,5 @@
       "source": "ggml/src/ggml-cpu/ops.cpp:ggml_compute_forward_conv_3d (no CUDA counterpart; ggml-vulkan/ggml-vulkan.cpp also implements it)"
     }
   ],
-  "updated_at": "2026-09-06T21:50:06Z"
+  "updated_at": "2026-09-07T01:48:38Z"
 }

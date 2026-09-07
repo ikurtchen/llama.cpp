@@ -51,15 +51,15 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: numerically stable reductions, optional modifiers, and multi-CTA cooperative reduction all matter. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated forward softmax with optional F16/F32 mask, optional sinks, and ALiBi max_bias. Migrated softmax_back for the CUDA-supported max_bias == 0 path; max_bias != 0 remains not-supported, matching ggml-cuda.cu.",
-  "updated_at": "2026-09-06T19:02:22Z",
+  "updated_at": "2026-09-07T01:48:14Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 308,
+      "code": 312,
       "comment": 20,
-      "blank": 76,
-      "raw": 404,
-      "files": 1
+      "blank": 79,
+      "raw": 411,
+      "files": 2
     },
     "sycl": {
       "code": 306,
@@ -87,18 +87,18 @@
         "comment": 20,
         "blank": 76,
         "raw": 404
+      },
+      {
+        "path": "ggml/src/ggml-cuda/softmax.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 4,
+        "comment": 0,
+        "blank": 3,
+        "raw": 7
       }
     ],
     "sycl_files": [
-      {
-        "path": "ggml/src/ggml-sycl/softmax.hpp",
-        "lang": "c",
-        "spans": "whole-file",
-        "code": 6,
-        "comment": 0,
-        "blank": 2,
-        "raw": 8
-      },
       {
         "path": "ggml/src/ggml-sycl/softmax.cpp",
         "lang": "c",
@@ -107,12 +107,23 @@
         "comment": 2,
         "blank": 61,
         "raw": 363
+      },
+      {
+        "path": "ggml/src/ggml-sycl/softmax.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 6,
+        "comment": 0,
+        "blank": 2,
+        "raw": 8
       }
     ],
-    "mirrored_sources": [],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/softmax.cuh"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T19:02:22Z"
+    "measured_at": "2026-09-07T01:48:14Z"
   },
   "target_style": "plain-sycl",
   "sycl_files": [

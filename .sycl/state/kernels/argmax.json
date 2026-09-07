@@ -35,7 +35,7 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: reduction ordering and tie handling come from warp/block reductions. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated in full: f32->i32 per-row argmax via work-group reduction (sycl::reduce_over_group with a packed sortable 64-bit key), no residual.",
-  "updated_at": "2026-09-06T16:43:12Z",
+  "updated_at": "2026-09-07T01:48:10Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -70,7 +70,7 @@
     "mirrored_sources": [],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:34Z"
+    "measured_at": "2026-09-07T01:48:10Z"
   },
   "unit_test": {
     "command": "build/bin/test-backend-ops test -b SYCL0 -o ARGMAX",

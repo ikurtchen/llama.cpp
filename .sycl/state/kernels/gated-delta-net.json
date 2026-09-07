@@ -42,7 +42,7 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: recurrent stateful update with warp reductions and rollback-slot semantics is complex. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T21:32:50Z",
+  "updated_at": "2026-09-07T01:48:11Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -110,7 +110,7 @@
     ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T21:32:05Z",
+    "measured_at": "2026-09-07T01:48:11Z",
     "source_spec": [
       "ggml/src/ggml-cuda/gated_delta_net.cu:4-167"
     ]

@@ -33,10 +33,44 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: simple pointwise map. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:23:05Z",
+  "updated_at": "2026-09-07T01:48:10Z",
   "loc": {
-    "source_code": 34,
-    "sycl_code": 44
+    "source_lang": "cuda",
+    "source": {
+      "code": 34,
+      "comment": 0,
+      "blank": 5,
+      "raw": 39,
+      "files": 1
+    },
+    "sycl": {
+      "code": 0,
+      "comment": 0,
+      "blank": 0,
+      "raw": 0,
+      "files": 0
+    },
+    "source_files": [
+      {
+        "path": "ggml/src/ggml-cuda/clamp.cu",
+        "lang": "c",
+        "spans": [
+          "3-5",
+          "7-16",
+          "18-22",
+          "25-45"
+        ],
+        "code": 34,
+        "comment": 0,
+        "blank": 5,
+        "raw": 39
+      }
+    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
+    "unresolved": [],
+    "method": "span",
+    "measured_at": "2026-09-07T01:48:10Z"
   },
   "sycl_file": "ggml/src/ggml-sycl/clamp.cpp",
   "target_style": "plain-sycl",

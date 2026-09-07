@@ -33,7 +33,7 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: elementwise nonlinear map. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T19:31:41Z",
+  "updated_at": "2026-09-07T01:48:14Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -99,7 +99,7 @@
     ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T19:31:41Z"
+    "measured_at": "2026-09-07T01:48:14Z"
   },
   "target_style": "plain-sycl",
   "sycl_files": [

@@ -33,7 +33,7 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: recurrent attention update with custom memory layout is specialized and stateful. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T21:32:50Z",
+  "updated_at": "2026-09-07T01:48:11Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -98,7 +98,7 @@
     ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T21:32:05Z"
+    "measured_at": "2026-09-07T01:48:11Z"
   },
   "target_style": "plain-sycl",
   "sycl_impl": "ggml/src/ggml-sycl/gla.hpp,ggml/src/ggml-sycl/gla.cpp",

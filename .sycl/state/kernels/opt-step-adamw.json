@@ -43,22 +43,22 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: fused optimizer math must preserve update order but is otherwise elementwise. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T21:29:35Z",
+  "updated_at": "2026-09-07T01:48:12Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 61,
+      "code": 58,
       "comment": 0,
-      "blank": 15,
-      "raw": 76,
-      "files": 2
+      "blank": 13,
+      "raw": 71,
+      "files": 1
     },
     "sycl": {
-      "code": 83,
+      "code": 0,
       "comment": 0,
-      "blank": 17,
-      "raw": 100,
-      "files": 2
+      "blank": 0,
+      "raw": 0,
+      "files": 0
     },
     "source_files": [
       {
@@ -73,43 +73,13 @@
         "comment": 0,
         "blank": 13,
         "raw": 71
-      },
-      {
-        "path": "ggml/src/ggml-cuda/opt-step-adamw.cuh",
-        "lang": "c",
-        "spans": "whole-file",
-        "code": 3,
-        "comment": 0,
-        "blank": 2,
-        "raw": 5
       }
     ],
-    "sycl_files": [
-      {
-        "path": "ggml/src/ggml-sycl/opt-step-adamw.cpp",
-        "lang": "c",
-        "spans": "whole-file",
-        "code": 77,
-        "comment": 0,
-        "blank": 14,
-        "raw": 91
-      },
-      {
-        "path": "ggml/src/ggml-sycl/opt-step-adamw.hpp",
-        "lang": "c",
-        "spans": "whole-file",
-        "code": 6,
-        "comment": 0,
-        "blank": 3,
-        "raw": 9
-      }
-    ],
-    "mirrored_sources": [
-      "ggml/src/ggml-cuda/opt-step-adamw.cuh"
-    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T20:54:10Z"
+    "measured_at": "2026-09-07T01:48:12Z"
   },
   "target_style": "plain-sycl",
   "sycl_files": [

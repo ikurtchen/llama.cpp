@@ -44,7 +44,7 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: forward uses many type/layout cases and backward performs index-based reductions. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated the forward GET_ROWS path for dense F32/F16 and quantized Q8_0 src0 tensors, including the batched/broadcast cases exercised by the inherited test-backend-ops harness. Current evidence run executed 13/13 supported GET_ROWS cases on SYCL0 with no ERR lines and no DEVICE_LOST crash. Residuals: BF16, I32, non-Q8_0 quantized src0 types, GET_ROWS_BACK, and non-contiguous src1 layouts that fail the current ggml_is_contiguous(src1) gate (for example v=1 cases with be1=7).",
-  "updated_at": "2026-09-06T21:50:06Z",
+  "updated_at": "2026-09-07T01:48:11Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -55,10 +55,10 @@
       "files": 2
     },
     "sycl": {
-      "code": 224,
-      "comment": 2,
-      "blank": 40,
-      "raw": 266,
+      "code": 216,
+      "comment": 7,
+      "blank": 36,
+      "raw": 259,
       "files": 2
     },
     "source_files": [
@@ -99,10 +99,10 @@
         "path": "ggml/src/ggml-sycl/getrows.cpp",
         "lang": "c",
         "spans": "whole-file",
-        "code": 220,
-        "comment": 2,
-        "blank": 38,
-        "raw": 260
+        "code": 212,
+        "comment": 7,
+        "blank": 34,
+        "raw": 253
       },
       {
         "path": "ggml/src/ggml-sycl/getrows.hpp",
@@ -119,7 +119,7 @@
     ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T21:50:06Z"
+    "measured_at": "2026-09-07T01:48:11Z"
   },
   "target_style": "plain-sycl",
   "sycl_files": [

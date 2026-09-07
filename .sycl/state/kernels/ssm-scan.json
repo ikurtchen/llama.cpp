@@ -44,7 +44,7 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: direct scan, grouped scan, and SSD decomposition all coexist and are numerically/state sensitive. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T21:32:50Z",
+  "updated_at": "2026-09-07T01:48:14Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -116,7 +116,7 @@
     ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T21:32:05Z"
+    "measured_at": "2026-09-07T01:48:14Z"
   },
   "target_style": "plain-sycl",
   "sycl_impl": "ggml/src/ggml-sycl/ssm-scan.hpp,ggml/src/ggml-sycl/ssm-scan.cpp",

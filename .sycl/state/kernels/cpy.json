@@ -40,10 +40,63 @@
     "crosscheck": "-"
   },
   "notes": "Partial coverage vs CUDA: F32/F16 CPY/DUP/CONT only. CUDA's cpy.cu additionally quantizes/dequantizes during copy for Q8_0/Q4_0/Q4_1/Q5_0/Q5_1/IQ4_NL (used for direct-to-quantized KV cache writes). Quantized cpy variants are not yet ported; tracked as residual work, not silently dropped.",
-  "updated_at": "2026-09-06T16:23:05Z",
+  "updated_at": "2026-09-07T01:48:11Z",
   "loc": {
-    "source_code": 516,
-    "sycl_code": 89
+    "source_lang": "cuda",
+    "source": {
+      "code": 516,
+      "comment": 9,
+      "blank": 55,
+      "raw": 580,
+      "files": 1
+    },
+    "sycl": {
+      "code": 0,
+      "comment": 0,
+      "blank": 0,
+      "raw": 0,
+      "files": 0
+    },
+    "source_files": [
+      {
+        "path": "ggml/src/ggml-cuda/cpy.cu",
+        "lang": "c",
+        "spans": [
+          "14-42",
+          "44-98",
+          "100-110",
+          "112-123",
+          "125-150",
+          "152-177",
+          "179-192",
+          "194-203",
+          "205-248",
+          "250-260",
+          "262-271",
+          "273-283",
+          "285-297",
+          "299-309",
+          "311-323",
+          "325-335",
+          "337-349",
+          "351-361",
+          "363-375",
+          "377-387",
+          "391-427",
+          "429-612",
+          "614-617"
+        ],
+        "code": 516,
+        "comment": 9,
+        "blank": 55,
+        "raw": 580
+      }
+    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
+    "unresolved": [],
+    "method": "span",
+    "measured_at": "2026-09-07T01:48:11Z"
   },
   "sycl_file": "ggml/src/ggml-sycl/cpy.cpp",
   "target_style": "plain-sycl",

@@ -58,22 +58,22 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: warp-level softmax, quantized K/V handling, and head-size templating make this a complex direct-attention port. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated as one unified plain-SYCL online-softmax kernel in ggml/src/ggml-sycl/fattn.cpp with the public declaration in fattn.hpp, instead of mirroring CUDA's separate vec/tile/mma/common dispatch split. This SYCL path permanently registers GGML_OP_FLASH_ATTN_EXT in ggml/src/ggml-sycl/ggml-sycl.cpp. Scope is the dense decoder path only: Q=f32/f16, K/V=f16, dst=f32, additive mask, ALiBi, and GQA for head dims 64/80/128. Residual/waiver: Q8_0 KV-cache variants (f16-q8_0, q8_0-f16, q8_0-q8_0), sinks, logit softcap, sparse n_kv_max mask compaction/streamed fixup, and the full CUDA MMA feature matrix are not implemented; those configurations fall back.",
-  "updated_at": "2026-09-06T19:02:58Z",
+  "updated_at": "2026-09-07T01:48:11Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 500,
+      "code": 504,
       "comment": 7,
-      "blank": 73,
-      "raw": 580,
-      "files": 2
+      "blank": 76,
+      "raw": 587,
+      "files": 3
     },
     "sycl": {
-      "code": 0,
-      "comment": 0,
-      "blank": 0,
-      "raw": 0,
-      "files": 0
+      "code": 564,
+      "comment": 21,
+      "blank": 128,
+      "raw": 713,
+      "files": 2
     },
     "source_files": [
       {
@@ -97,22 +97,49 @@
         "comment": 0,
         "blank": 8,
         "raw": 70
+      },
+      {
+        "path": "ggml/src/ggml-cuda/fattn.cuh",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 4,
+        "comment": 0,
+        "blank": 3,
+        "raw": 7
       }
     ],
-    "sycl_files": [],
-    "mirrored_sources": [],
+    "sycl_files": [
+      {
+        "path": "ggml/src/ggml-sycl/fattn.cpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 560,
+        "comment": 21,
+        "blank": 126,
+        "raw": 707
+      },
+      {
+        "path": "ggml/src/ggml-sycl/fattn.hpp",
+        "lang": "c",
+        "spans": "whole-file",
+        "code": 4,
+        "comment": 0,
+        "blank": 2,
+        "raw": 6
+      }
+    ],
+    "mirrored_sources": [
+      "ggml/src/ggml-cuda/fattn.cuh"
+    ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:35Z",
+    "measured_at": "2026-09-07T01:48:11Z",
     "source_spec": [
       "ggml/src/ggml-cuda/fattn-vec.cuh:19-528"
     ]
   },
   "target_style": "plain-sycl",
-  "sycl_impl": [
-    "ggml/src/ggml-sycl/fattn.cpp",
-    "ggml/src/ggml-sycl/fattn.hpp"
-  ],
+  "sycl_impl": "ggml/src/ggml-sycl/fattn.cpp,ggml/src/ggml-sycl/fattn.hpp",
   "unit_test": {
     "command": "./build/bin/test-backend-ops -o FLASH_ATTN_EXT",
     "result": "pass",

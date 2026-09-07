@@ -1,0 +1,31 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "e2e-final-20260907T014717Z-afca0c",
+  "class": "e2e",
+  "subject": "final",
+  "label": "e2e-ranking-final",
+  "phase": "optimize",
+  "ts": "2026-09-07T01:47:23Z",
+  "duration_s": 5.898,
+  "command": "env GGML_SYCL_PROFILE=1 ./build/bin/llama-cli -m /workspace/models/Qwen3-0.6B-Q8_0.gguf -p The\\ capital\\ of\\ France\\ is -n 128 --ignore-eos --temp 0 --seed 42 --reasoning off -ngl 99 --single-turn",
+  "via": "run.sh exec",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "8ed30bc1e",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/e2e/final/e2e-final-20260907T014717Z-afca0c.log",
+  "log_sha256": "beeaa3f7c0b47e21cf10163b009357d0ecb1ad785f96dc8aa3a42f0ca0f2c29f",
+  "log_bytes": 121078,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "shape": "n=128,ignore-eos,ngl99,profiled"
+  },
+  "extracted": {}
+}

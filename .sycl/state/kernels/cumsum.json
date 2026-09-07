@@ -36,22 +36,22 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: scan carry propagation and fallback/shared-memory logic must be preserved. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T21:29:35Z",
+  "updated_at": "2026-09-07T01:48:11Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 219,
+      "code": 216,
       "comment": 39,
-      "blank": 38,
-      "raw": 296,
-      "files": 2
+      "blank": 36,
+      "raw": 291,
+      "files": 1
     },
     "sycl": {
-      "code": 78,
+      "code": 0,
       "comment": 0,
-      "blank": 24,
-      "raw": 102,
-      "files": 2
+      "blank": 0,
+      "raw": 0,
+      "files": 0
     },
     "source_files": [
       {
@@ -68,43 +68,13 @@
         "comment": 39,
         "blank": 36,
         "raw": 291
-      },
-      {
-        "path": "ggml/src/ggml-cuda/cumsum.cuh",
-        "lang": "c",
-        "spans": "whole-file",
-        "code": 3,
-        "comment": 0,
-        "blank": 2,
-        "raw": 5
       }
     ],
-    "sycl_files": [
-      {
-        "path": "ggml/src/ggml-sycl/cumsum.cpp",
-        "lang": "c",
-        "spans": "whole-file",
-        "code": 72,
-        "comment": 0,
-        "blank": 21,
-        "raw": 93
-      },
-      {
-        "path": "ggml/src/ggml-sycl/cumsum.hpp",
-        "lang": "c",
-        "spans": "whole-file",
-        "code": 6,
-        "comment": 0,
-        "blank": 3,
-        "raw": 9
-      }
-    ],
-    "mirrored_sources": [
-      "ggml/src/ggml-cuda/cumsum.cuh"
-    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T20:54:10Z"
+    "measured_at": "2026-09-07T01:48:11Z"
   },
   "target_style": "plain-sycl",
   "sycl_files": [

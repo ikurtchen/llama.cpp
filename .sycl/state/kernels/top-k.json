@@ -43,7 +43,7 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: custom radix select with atomics plus optional CUB fallback is algorithmically complex. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated via full-row descending bitonic sort (reusing argsort's kernel) + take-first-k copy, matching CUDA's non-CUB/non-HIP fallback contract (unordered ties within the k slots). CUDA's CUB DeviceTopK fast path and the HIP radix-select path (no full sort, larger ncols) not ported - tracked as residual.",
-  "updated_at": "2026-09-06T16:43:12Z",
+  "updated_at": "2026-09-07T01:48:14Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -85,7 +85,7 @@
     "mirrored_sources": [],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:38Z"
+    "measured_at": "2026-09-07T01:48:14Z"
   },
   "unit_test": {
     "command": "build/bin/test-backend-ops test -b SYCL0 -o TOP_K",

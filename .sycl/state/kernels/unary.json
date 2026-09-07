@@ -34,7 +34,7 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: mostly independent pointwise formulas with minor fusion helpers. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T16:26:59Z",
+  "updated_at": "2026-09-07T01:48:15Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -151,8 +151,7 @@
     "mirrored_sources": [],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:38Z",
-    "sycl_code": 260
+    "measured_at": "2026-09-07T01:48:15Z"
   },
   "sycl_file": "ggml/src/ggml-sycl/unary.cpp",
   "target_style": "plain-sycl",

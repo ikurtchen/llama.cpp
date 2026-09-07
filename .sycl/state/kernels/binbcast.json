@@ -41,7 +41,7 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: mostly indexing logic, but many broadcast and repeat layouts share the same implementation. Reference oracle: ggml-cpu backend via tests/test-backend-ops. REPEAT_BACK also validated separately with evidence test-binbcast-repeat-back-20260906T174405Z-3ad0d0.",
-  "updated_at": "2026-09-06T17:45:00Z",
+  "updated_at": "2026-09-07T01:48:10Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -118,7 +118,7 @@
     ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T17:45:00Z",
+    "measured_at": "2026-09-07T01:48:10Z",
     "source_spec": [
       "ggml/src/ggml-cuda/binbcast.cu:29-99",
       "ggml/src/ggml-cuda/binbcast.cu:106-174"

@@ -35,22 +35,22 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: routing compaction and inverse-map options must match MoE matmul expectations exactly. Reference oracle: ggml-cpu backend via tests/test-backend-ops. SYCL ports the mmid helper in mmid.cpp and uses it to compact expert groups for the oneMKL-backed MUL_MAT_ID path in mmf.cpp.",
-  "updated_at": "2026-09-06T21:45:23Z",
+  "updated_at": "2026-09-07T01:48:12Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 126,
+      "code": 122,
       "comment": 8,
-      "blank": 19,
-      "raw": 153,
-      "files": 2
+      "blank": 18,
+      "raw": 148,
+      "files": 1
     },
     "sycl": {
-      "code": 91,
+      "code": 0,
       "comment": 0,
-      "blank": 13,
-      "raw": 104,
-      "files": 2
+      "blank": 0,
+      "raw": 0,
+      "files": 0
     },
     "source_files": [
       {
@@ -65,43 +65,13 @@
         "comment": 8,
         "blank": 18,
         "raw": 148
-      },
-      {
-        "path": "ggml/src/ggml-cuda/mmid.cuh",
-        "lang": "c",
-        "spans": "whole-file",
-        "code": 4,
-        "comment": 0,
-        "blank": 1,
-        "raw": 5
       }
     ],
-    "sycl_files": [
-      {
-        "path": "ggml/src/ggml-sycl/mmid.cpp",
-        "lang": "c",
-        "spans": "whole-file",
-        "code": 76,
-        "comment": 0,
-        "blank": 11,
-        "raw": 87
-      },
-      {
-        "path": "ggml/src/ggml-sycl/mmid.hpp",
-        "lang": "c",
-        "spans": "whole-file",
-        "code": 15,
-        "comment": 0,
-        "blank": 2,
-        "raw": 17
-      }
-    ],
-    "mirrored_sources": [
-      "ggml/src/ggml-cuda/mmid.cuh"
-    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T21:45:20Z"
+    "measured_at": "2026-09-07T01:48:12Z"
   },
   "target_style": "plain-sycl",
   "sycl_files": [

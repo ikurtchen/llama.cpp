@@ -46,7 +46,7 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: indexed row gather plus rowwise add. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T19:31:42Z",
+  "updated_at": "2026-09-07T01:48:10Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -111,7 +111,7 @@
     ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T19:31:42Z"
+    "measured_at": "2026-09-07T01:48:10Z"
   },
   "target_style": "plain-sycl",
   "sycl_files": [

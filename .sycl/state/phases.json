@@ -113,13 +113,13 @@
       "notes": ""
     },
     "done": {
-      "status": "in-progress",
+      "status": "exited",
       "entered_at": "2026-09-07T00:36:28Z",
-      "exited_at": "",
+      "exited_at": "2026-09-07T01:49:28Z",
       "gate": {
-        "result": "pending",
-        "attempts": 0,
-        "checked_at": "",
+        "result": "pass",
+        "attempts": 1,
+        "checked_at": "2026-09-07T01:49:28Z",
         "unmet": []
       },
       "waivers": [],
@@ -226,5 +226,5 @@
     },
     "changes": []
   },
-  "updated_at": "2026-09-07T00:36:28Z"
+  "updated_at": "2026-09-07T01:49:28Z"
 }

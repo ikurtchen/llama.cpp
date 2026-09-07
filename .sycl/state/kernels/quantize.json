@@ -45,22 +45,22 @@
     "crosscheck": "test-dequantize-quantize-lib-20260906T193108Z-081974"
   },
   "notes": "Implemented plain-SYCL helper-library runtime quantization in ggml/src/ggml-sycl/quantize.{hpp,cpp}. Covered F32 -> Q8_0 and F32 -> Q8_1 row helpers matching CUDA quantize.cu semantics used by quantized matmul helpers. MMQ scatter, MXFP4, and NVFP4 helper paths remain residual by design. Selftest passes bit-exact against ggml/src/ggml-quants.c for Q8_0 and against a direct CUDA-semantics Q8_1 reference. No current SYCL consumer is wired to this helper yet; it is ready for later mmq/mmvq/getrows integration.",
-  "updated_at": "2026-09-06T19:32:43Z",
+  "updated_at": "2026-09-07T01:48:12Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 616,
-      "comment": 8,
-      "blank": 91,
-      "raw": 715,
-      "files": 2
+      "code": 557,
+      "comment": 7,
+      "blank": 81,
+      "raw": 645,
+      "files": 1
     },
     "sycl": {
-      "code": 83,
+      "code": 0,
       "comment": 0,
-      "blank": 23,
-      "raw": 106,
-      "files": 2
+      "blank": 0,
+      "raw": 0,
+      "files": 0
     },
     "source_files": [
       {
@@ -82,43 +82,13 @@
         "comment": 7,
         "blank": 81,
         "raw": 645
-      },
-      {
-        "path": "ggml/src/ggml-cuda/quantize.cuh",
-        "lang": "c",
-        "spans": "whole-file",
-        "code": 59,
-        "comment": 1,
-        "blank": 10,
-        "raw": 70
       }
     ],
-    "sycl_files": [
-      {
-        "path": "ggml/src/ggml-sycl/quantize.cpp",
-        "lang": "c",
-        "spans": "whole-file",
-        "code": 60,
-        "comment": 0,
-        "blank": 15,
-        "raw": 75
-      },
-      {
-        "path": "ggml/src/ggml-sycl/quantize.hpp",
-        "lang": "c",
-        "spans": "whole-file",
-        "code": 23,
-        "comment": 0,
-        "blank": 8,
-        "raw": 31
-      }
-    ],
-    "mirrored_sources": [
-      "ggml/src/ggml-cuda/quantize.cuh"
-    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T18:33:33Z"
+    "measured_at": "2026-09-07T01:48:12Z"
   },
   "target_style": "plain-sycl",
   "sycl_files": [

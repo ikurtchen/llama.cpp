@@ -33,22 +33,22 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: reduction numerics and forward/backward coupling need validation. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Forward and backward are both covered by the same backend-ops evidence run.",
-  "updated_at": "2026-09-06T21:29:35Z",
+  "updated_at": "2026-09-07T01:48:11Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 136,
+      "code": 132,
       "comment": 4,
-      "blank": 34,
-      "raw": 174,
-      "files": 2
+      "blank": 31,
+      "raw": 167,
+      "files": 1
     },
     "sycl": {
-      "code": 136,
+      "code": 0,
       "comment": 0,
-      "blank": 30,
-      "raw": 166,
-      "files": 2
+      "blank": 0,
+      "raw": 0,
+      "files": 0
     },
     "source_files": [
       {
@@ -64,43 +64,13 @@
         "comment": 4,
         "blank": 31,
         "raw": 167
-      },
-      {
-        "path": "ggml/src/ggml-cuda/cross-entropy-loss.cuh",
-        "lang": "c",
-        "spans": "whole-file",
-        "code": 4,
-        "comment": 0,
-        "blank": 3,
-        "raw": 7
       }
     ],
-    "sycl_files": [
-      {
-        "path": "ggml/src/ggml-sycl/cross-entropy-loss.cpp",
-        "lang": "c",
-        "spans": "whole-file",
-        "code": 128,
-        "comment": 0,
-        "blank": 27,
-        "raw": 155
-      },
-      {
-        "path": "ggml/src/ggml-sycl/cross-entropy-loss.hpp",
-        "lang": "c",
-        "spans": "whole-file",
-        "code": 8,
-        "comment": 0,
-        "blank": 3,
-        "raw": 11
-      }
-    ],
-    "mirrored_sources": [
-      "ggml/src/ggml-cuda/cross-entropy-loss.cuh"
-    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T20:54:10Z"
+    "measured_at": "2026-09-07T01:48:11Z"
   },
   "target_style": "plain-sycl",
   "sycl_files": [

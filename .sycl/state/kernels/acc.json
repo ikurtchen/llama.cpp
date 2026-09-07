@@ -48,7 +48,7 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: flat elementwise add with simple offset math. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Scope matches CUDA: requires ggml_is_contiguous(src0) && ggml_is_contiguous(src1) (fixes a crash on non-contiguous stride_dim test cases).",
-  "updated_at": "2026-09-06T17:12:35Z",
+  "updated_at": "2026-09-07T01:48:10Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -84,7 +84,7 @@
     "mirrored_sources": [],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:34Z"
+    "measured_at": "2026-09-07T01:48:10Z"
   },
   "target_style": "plain-sycl",
   "sycl_files": [

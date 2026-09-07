@@ -34,22 +34,22 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: butterfly transform ordering matters, but the kernel structure is regular. Reference oracle: ggml-cpu backend via tests/test-backend-ops. SYCL wires the FWHT path through ggml_sycl_op_mul_mat() when GGML_HINT_SRC0_IS_HADAMARD selects the Hadamard fast path.",
-  "updated_at": "2026-09-06T21:29:35Z",
+  "updated_at": "2026-09-07T01:48:11Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 83,
-      "comment": 1,
-      "blank": 17,
-      "raw": 101,
-      "files": 2
+      "code": 81,
+      "comment": 0,
+      "blank": 16,
+      "raw": 97,
+      "files": 1
     },
     "sycl": {
-      "code": 52,
+      "code": 0,
       "comment": 0,
-      "blank": 17,
-      "raw": 69,
-      "files": 2
+      "blank": 0,
+      "raw": 0,
+      "files": 0
     },
     "source_files": [
       {
@@ -63,43 +63,13 @@
         "comment": 0,
         "blank": 16,
         "raw": 97
-      },
-      {
-        "path": "ggml/src/ggml-cuda/fwht.cuh",
-        "lang": "c",
-        "spans": "whole-file",
-        "code": 2,
-        "comment": 1,
-        "blank": 1,
-        "raw": 4
       }
     ],
-    "sycl_files": [
-      {
-        "path": "ggml/src/ggml-sycl/fwht.cpp",
-        "lang": "c",
-        "spans": "whole-file",
-        "code": 47,
-        "comment": 0,
-        "blank": 14,
-        "raw": 61
-      },
-      {
-        "path": "ggml/src/ggml-sycl/fwht.hpp",
-        "lang": "c",
-        "spans": "whole-file",
-        "code": 5,
-        "comment": 0,
-        "blank": 3,
-        "raw": 8
-      }
-    ],
-    "mirrored_sources": [
-      "ggml/src/ggml-cuda/fwht.cuh"
-    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T20:54:10Z"
+    "measured_at": "2026-09-07T01:48:11Z"
   },
   "target_style": "plain-sycl",
   "sycl_files": [

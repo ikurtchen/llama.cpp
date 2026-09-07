@@ -38,7 +38,7 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: straightforward fused elementwise update. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T19:31:42Z",
+  "updated_at": "2026-09-07T01:48:12Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -104,7 +104,7 @@
     ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T19:31:42Z"
+    "measured_at": "2026-09-07T01:48:12Z"
   },
   "target_style": "plain-sycl",
   "sycl_files": [

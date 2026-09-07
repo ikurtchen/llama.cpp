@@ -5,7 +5,7 @@
   "archetype_reason": "C/C++ application (llama-cli) with an existing backend seam (ggml_backend_reg + per-backend CMake option), matching config.integration.archetype override.",
   "target_level": "L4",
   "target_reason": "config.integration.target_level=L4 (user override); archetype A is the cheapest to reach L4 per backend-readiness.md.",
-  "achieved_level": "L3",
+  "achieved_level": "L4",
   "entrypoint": "build/bin/llama-cli",
   "backend_switch": "cmake -B build -DGGML_SYCL=ON -DGGML_SYCL_TARGET=INTEL -DGGML_SYCL_DEVICE_ARCH=bmg-g31 -DCMAKE_C_COMPILER=icx -DCMAKE_CXX_COMPILER=icpx",
   "gates": {
@@ -47,9 +47,12 @@
     },
     "L4": {
       "name": "workload-fast",
-      "status": "pending",
-      "evidence": [],
-      "note": ""
+      "status": "pass",
+      "evidence": [
+        "e2e-baseline-20260907T003914Z-8161e2",
+        "e2e-final-20260907T014143Z-32ca2d"
+      ],
+      "note": "Real, uninstrumented llama-cli wall-clock (Qwen3-0.6B-Q8_0, 6-token prompt, 128 generated tokens, -ngl 99), same env fingerprint (env-68d8b007) for baseline and final. Prompt: 622.7 -> 635.8-653.5 t/s (+2-5%). Generation: 71.9 -> 77.6 t/s (+7.9%). Gains driven by the getrows (host-round-trip removal) and flash-attn-vec (split-KV, up to 15.02x on isolated decode-shape kernel bench) optimizations; the mmvq fused fast-path optimization was trialed and reverted after a done-phase e2e regression showed it does not generalize to this model's actual matmul dims (see optimization/mmvq.json)."
     }
   },
   "waivers": [
@@ -87,5 +90,5 @@
       ]
     }
   ],
-  "updated_at": "2026-09-06T18:30:48Z"
+  "updated_at": "2026-09-07T01:50:00Z"
 }

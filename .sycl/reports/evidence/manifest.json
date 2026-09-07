@@ -2,14 +2,14 @@
   "schema": "sycl-agent/evidence-manifest",
   "project": "llama.cpp",
   "totals": {
-    "records": 94,
-    "artifacts": 226,
-    "bytes": 32029332,
+    "records": 95,
+    "artifacts": 252,
+    "bytes": 212396112,
     "by_class": {
       "build": 3,
       "integration": 7,
       "test": 67,
-      "e2e": 6,
+      "e2e": 7,
       "bench": 11
     }
   },
@@ -19,7 +19,7 @@
       "path": "evidence/env/env-68d8b007.json",
       "gpu": "unknown",
       "freq_pinned": "unknown",
-      "used_by": 94
+      "used_by": 95
     }
   ],
   "artifacts": [
@@ -1800,6 +1800,26 @@
       "subject": "final"
     },
     {
+      "path": "evidence/e2e/final/e2e-final-20260907T014717Z-afca0c.json",
+      "sha256": "0aa710eeff01757f5480a91038308db54544c2c924a7dd6711f214e1c55e6b4b",
+      "bytes": 1033,
+      "kind": "record",
+      "mtime": "2026-09-07T01:47:23Z",
+      "run_id": "e2e-final-20260907T014717Z-afca0c",
+      "class": "e2e",
+      "subject": "final"
+    },
+    {
+      "path": "evidence/e2e/final/e2e-final-20260907T014717Z-afca0c.log",
+      "sha256": "beeaa3f7c0b47e21cf10163b009357d0ecb1ad785f96dc8aa3a42f0ca0f2c29f",
+      "bytes": 121078,
+      "kind": "log",
+      "mtime": "2026-09-07T01:47:23Z",
+      "run_id": "e2e-final-20260907T014717Z-afca0c",
+      "class": "e2e",
+      "subject": "final"
+    },
+    {
       "path": "evidence/e2e/qwen3-8b-sycl/e2e-qwen3-8b-sycl-20260906T220548Z-9257fa.json",
       "sha256": "d76c9f99ce1f00b65fabde8e66749a524ab9578fb2de8984724faa9ea5a64a51",
       "bytes": 1138,
@@ -2058,6 +2078,20 @@
       "mtime": "2026-09-07T12:11:36Z"
     },
     {
+      "path": "opt_flash-attn-vec/baseline/metrics_ComputeBasic.3915733.metrics.csv",
+      "sha256": "a1fb2b7c6a486384632e8afe51c8c27a1b9818a61210c7af37cd927091a8e5a7",
+      "bytes": 6208189,
+      "kind": "csv",
+      "mtime": "2026-09-07T12:11:36Z"
+    },
+    {
+      "path": "opt_flash-attn-vec/baseline/metrics_ComputeBasic.3915733.metrics_transposed.csv",
+      "sha256": "9a0a00399be5fddc521963ec616231e8ba02fd0215c52b3038bde2c252cf86da",
+      "bytes": 6905360,
+      "kind": "csv",
+      "mtime": "2026-09-07T12:11:37Z"
+    },
+    {
       "path": "opt_flash-attn-vec/baseline/metrics_ComputeBasic.3915733.metrics_transposed.csv.gz",
       "sha256": "93c308ab784b99b5f970642f3e4aba5ead4d6975415cbc2a4192cc6f6c5262fc",
       "bytes": 572632,
@@ -2072,6 +2106,20 @@
       "mtime": "2026-09-07T12:11:10Z"
     },
     {
+      "path": "opt_flash-attn-vec/baseline/metrics_VectorEngineStalls.3913903.metrics.csv",
+      "sha256": "ace8cac0cd863f8d619da740fc8e19256582187a4ed1ca7f5f6cbe7501aaa36c",
+      "bytes": 5194187,
+      "kind": "csv",
+      "mtime": "2026-09-07T12:11:10Z"
+    },
+    {
+      "path": "opt_flash-attn-vec/baseline/metrics_VectorEngineStalls.3913903.metrics_transposed.csv",
+      "sha256": "c7809259c0fbf2a2e88f998aebbfff146ac8b74c857139a04d58a6ca4411acdb",
+      "bytes": 5653500,
+      "kind": "csv",
+      "mtime": "2026-09-07T12:11:10Z"
+    },
+    {
       "path": "opt_flash-attn-vec/baseline/metrics_VectorEngineStalls.3913903.metrics_transposed.csv.gz",
       "sha256": "eae1f75f280e431ec76d94185857b849af504eb1b8930dffb2c3fdc9def78785",
       "bytes": 446932,
@@ -2079,11 +2127,39 @@
       "mtime": "2026-09-07T12:11:10Z"
     },
     {
+      "path": "opt_flash-attn-vec/baseline/test-backend-op.3913903.json",
+      "sha256": "3581a1bd1b52a9a8807f7477c44a9683fbb66ef4b902187880a8be1baf860a2c",
+      "bytes": 15201815,
+      "kind": "json",
+      "mtime": "2026-09-07T12:11:10Z"
+    },
+    {
+      "path": "opt_flash-attn-vec/baseline/test-backend-op.3915733.json",
+      "sha256": "f7ba98109d1537c9c01e4bec58f13742bb4ed5abe9dc3cb958859140cf042164",
+      "bytes": 15201816,
+      "kind": "json",
+      "mtime": "2026-09-07T12:11:36Z"
+    },
+    {
       "path": "opt_flash-attn-vec/final/metrics_ComputeBasic.3910174.csv",
       "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
       "bytes": 1,
       "kind": "csv",
       "mtime": "2026-09-07T12:10:05Z"
+    },
+    {
+      "path": "opt_flash-attn-vec/final/metrics_ComputeBasic.3910174.metrics.csv",
+      "sha256": "93e27e8cdd6fa775e991946324dc6e4cb96ea4137ca9cf2ccbec48d0d02f68b2",
+      "bytes": 12066528,
+      "kind": "csv",
+      "mtime": "2026-09-07T12:10:05Z"
+    },
+    {
+      "path": "opt_flash-attn-vec/final/metrics_ComputeBasic.3910174.metrics_transposed.csv",
+      "sha256": "2dbd54c9cfe35e03f626a05f25c9d6f0433a7b67270768a3a3ceffff73665700",
+      "bytes": 13460784,
+      "kind": "csv",
+      "mtime": "2026-09-07T12:10:06Z"
     },
     {
       "path": "opt_flash-attn-vec/final/metrics_ComputeBasic.3910174.metrics_transposed.csv.gz",
@@ -2100,11 +2176,39 @@
       "mtime": "2026-09-07T12:09:30Z"
     },
     {
+      "path": "opt_flash-attn-vec/final/metrics_VectorEngineStalls.3908344.metrics.csv",
+      "sha256": "d4f756c4e765e2158c31655d16cd57a9e23b12ed71de8c64bbeebcf217d27bdc",
+      "bytes": 10357901,
+      "kind": "csv",
+      "mtime": "2026-09-07T12:09:30Z"
+    },
+    {
+      "path": "opt_flash-attn-vec/final/metrics_VectorEngineStalls.3908344.metrics_transposed.csv",
+      "sha256": "01e031ece1ae2e4eebf2652497ddf73e0c40c892b3b97c4f50e51e85a4519ee0",
+      "bytes": 11276470,
+      "kind": "csv",
+      "mtime": "2026-09-07T12:09:31Z"
+    },
+    {
       "path": "opt_flash-attn-vec/final/metrics_VectorEngineStalls.3908344.metrics_transposed.csv.gz",
       "sha256": "840feb2ac66c70c31623a5d335d94f0c2fde1d0d050ed2abf62b9a08fa1b9a63",
       "bytes": 1087188,
       "kind": "other",
       "mtime": "2026-09-07T12:09:31Z"
+    },
+    {
+      "path": "opt_flash-attn-vec/final/test-backend-op.3908344.json",
+      "sha256": "66b1fa494b7aa9611dcf762d1ba85640aae9c5f1294e5017a740a37befb9139a",
+      "bytes": 30342313,
+      "kind": "json",
+      "mtime": "2026-09-07T12:09:30Z"
+    },
+    {
+      "path": "opt_flash-attn-vec/final/test-backend-op.3910174.json",
+      "sha256": "10e85a87262b781f7f50022f9ce305f012930264460a17617795fce6c776c724",
+      "bytes": 30342310,
+      "kind": "json",
+      "mtime": "2026-09-07T12:10:05Z"
     },
     {
       "path": "opt_getrows/DIAGNOSIS.md",
@@ -2117,6 +2221,20 @@
       "path": "opt_getrows/baseline/metrics_ComputeBasic.3906057.csv",
       "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
       "bytes": 1,
+      "kind": "csv",
+      "mtime": "2026-09-07T12:08:05Z"
+    },
+    {
+      "path": "opt_getrows/baseline/metrics_ComputeBasic.3906057.metrics.csv",
+      "sha256": "af49ab5beb8c133c249030a07b62f681076b714ad378baa6956cdfc11aa3c97b",
+      "bytes": 847202,
+      "kind": "csv",
+      "mtime": "2026-09-07T12:08:05Z"
+    },
+    {
+      "path": "opt_getrows/baseline/metrics_ComputeBasic.3906057.metrics_transposed.csv",
+      "sha256": "671da6b731f2b3c4512f8fc831a905635a27a435c94fd90d845f3952deb94454",
+      "bytes": 953028,
       "kind": "csv",
       "mtime": "2026-09-07T12:08:05Z"
     },
@@ -2135,6 +2253,20 @@
       "mtime": "2026-09-07T12:08:01Z"
     },
     {
+      "path": "opt_getrows/baseline/metrics_VectorEngineStalls.3905671.metrics.csv",
+      "sha256": "df85c506839ad736c96cece7b30651d0921731e30168bd1a8de71488ce15f5c8",
+      "bytes": 623755,
+      "kind": "csv",
+      "mtime": "2026-09-07T12:08:01Z"
+    },
+    {
+      "path": "opt_getrows/baseline/metrics_VectorEngineStalls.3905671.metrics_transposed.csv",
+      "sha256": "fb0bfc3a28cc373f92d86a95a2b936db7127516b47d2a2adcef020a36671ecc8",
+      "bytes": 681828,
+      "kind": "csv",
+      "mtime": "2026-09-07T12:08:01Z"
+    },
+    {
       "path": "opt_getrows/baseline/metrics_VectorEngineStalls.3905671.metrics_transposed.csv.gz",
       "sha256": "dd2bf4e4fcf44643b7431bc17ed4d595e6acb112d788f9be3e090f74c9d208ab",
       "bytes": 37997,
@@ -2142,9 +2274,37 @@
       "mtime": "2026-09-07T12:08:01Z"
     },
     {
+      "path": "opt_getrows/baseline/test-backend-op.3905671.json",
+      "sha256": "5bb128f76609a08a692988c9ae564b5d221aeddc8fb400d09fbbc6e6e4b0e001",
+      "bytes": 3216804,
+      "kind": "json",
+      "mtime": "2026-09-07T12:08:01Z"
+    },
+    {
+      "path": "opt_getrows/baseline/test-backend-op.3906057.json",
+      "sha256": "a3b7f52d9fafc45425baceae1f6118a935ec23adb44f63bc07ac1550d91c1d3f",
+      "bytes": 3859683,
+      "kind": "json",
+      "mtime": "2026-09-07T12:08:05Z"
+    },
+    {
       "path": "opt_getrows/final/metrics_ComputeBasic.3903384.csv",
       "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
       "bytes": 1,
+      "kind": "csv",
+      "mtime": "2026-09-07T12:07:16Z"
+    },
+    {
+      "path": "opt_getrows/final/metrics_ComputeBasic.3903384.metrics.csv",
+      "sha256": "90ffc775131fd45f496a746a634f9af597bce22339a3902506eee8dece24b849",
+      "bytes": 862437,
+      "kind": "csv",
+      "mtime": "2026-09-07T12:07:16Z"
+    },
+    {
+      "path": "opt_getrows/final/metrics_ComputeBasic.3903384.metrics_transposed.csv",
+      "sha256": "a58beb22e441189215a5d8f35dca4bd55d0421ca8e0bd875350491e4bf02b3cc",
+      "bytes": 968263,
       "kind": "csv",
       "mtime": "2026-09-07T12:07:16Z"
     },
@@ -2163,12 +2323,40 @@
       "mtime": "2026-09-07T12:07:13Z"
     },
     {
+      "path": "opt_getrows/final/metrics_VectorEngineStalls.3902998.metrics.csv",
+      "sha256": "0f4df1064e1651d8e29181162469c5967210bfa0da17c0dfc0638980789c644b",
+      "bytes": 749077,
+      "kind": "csv",
+      "mtime": "2026-09-07T12:07:13Z"
+    },
+    {
+      "path": "opt_getrows/final/metrics_VectorEngineStalls.3902998.metrics_transposed.csv",
+      "sha256": "2fe6a7f50c56f554def5c3cba3a7a494b306e07ba4fac14c28866d574b2fd26b",
+      "bytes": 818798,
+      "kind": "csv",
+      "mtime": "2026-09-07T12:07:13Z"
+    },
+    {
       "path": "opt_getrows/final/metrics_VectorEngineStalls.3902998.metrics_transposed.csv.gz",
       "sha256": "33638928d49f169edebcf1a991fa78b412b01d6c11a23039f91cc05e7d1fda37",
       "bytes": 80185,
       "kind": "other",
       "mtime": "2026-09-07T12:07:13Z"
+    },
+    {
+      "path": "opt_getrows/final/test-backend-op.3902998.json",
+      "sha256": "5ca66e0e6ecc289ed301813fcc9ee55bfe8ca993a7411b1ad91325895635f227",
+      "bytes": 2226312,
+      "kind": "json",
+      "mtime": "2026-09-07T12:07:13Z"
+    },
+    {
+      "path": "opt_getrows/final/test-backend-op.3903384.json",
+      "sha256": "b076ed8f292d7610d4d5a6200cefdf4a5ec492c35fe045fbca2e7deedc060cf4",
+      "bytes": 2226309,
+      "kind": "json",
+      "mtime": "2026-09-07T12:07:16Z"
     }
   ],
-  "updated_at": "2026-09-07T01:46:15Z"
+  "updated_at": "2026-09-07T01:49:24Z"
 }

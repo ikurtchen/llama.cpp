@@ -36,22 +36,22 @@
     "crosscheck": "test-dequantize-quantize-lib-20260906T193108Z-081974"
   },
   "notes": "Implemented helper-library dense conversion dispatch in ggml/src/ggml-sycl/dequantize.{hpp,cpp}. Covered F32/F16 passthrough plus dequant-to-fp32/fp16 dispatch for Q4_0/Q4_1/Q5_0/Q5_1/Q8_0/Q2_K/Q3_K/Q4_K/Q5_K/Q6_K. BF16 and non-contiguous convert paths remain residual. Selftest passes against ggml/src/ggml-quants.c and CUDA q8_1 semantics, but current consumer ops do not yet call this library: getrows.cpp keeps inline Q8_0/Q4_0/Q4_1 dequant code, and cpy.cpp only handles F32/F16.",
-  "updated_at": "2026-09-06T19:32:43Z",
+  "updated_at": "2026-09-07T01:48:10Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 373,
-      "comment": 12,
-      "blank": 106,
-      "raw": 491,
-      "files": 2
+      "code": 35,
+      "comment": 0,
+      "blank": 4,
+      "raw": 39,
+      "files": 1
     },
     "sycl": {
-      "code": 363,
+      "code": 0,
       "comment": 0,
-      "blank": 48,
-      "raw": 411,
-      "files": 2
+      "blank": 0,
+      "raw": 0,
+      "files": 0
     },
     "source_files": [
       {
@@ -66,43 +66,13 @@
         "comment": 0,
         "blank": 4,
         "raw": 39
-      },
-      {
-        "path": "ggml/src/ggml-cuda/dequantize.cuh",
-        "lang": "c",
-        "spans": "whole-file",
-        "code": 338,
-        "comment": 12,
-        "blank": 102,
-        "raw": 452
       }
     ],
-    "sycl_files": [
-      {
-        "path": "ggml/src/ggml-sycl/dequantize.cpp",
-        "lang": "c",
-        "spans": "whole-file",
-        "code": 104,
-        "comment": 0,
-        "blank": 12,
-        "raw": 116
-      },
-      {
-        "path": "ggml/src/ggml-sycl/dequantize.hpp",
-        "lang": "c",
-        "spans": "whole-file",
-        "code": 259,
-        "comment": 0,
-        "blank": 36,
-        "raw": 295
-      }
-    ],
-    "mirrored_sources": [
-      "ggml/src/ggml-cuda/dequantize.cuh"
-    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T18:33:33Z"
+    "measured_at": "2026-09-07T01:48:10Z"
   },
   "target_style": "plain-sycl",
   "sycl_files": [

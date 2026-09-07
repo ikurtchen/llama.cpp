@@ -39,22 +39,22 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: modest routing/index math but no unusual CUDA primitives. Reference oracle: ggml-cpu backend via tests/test-backend-ops. SYCL mirrors CUDA as a graph-fused path from ggml_backend_sycl_graph_compute() rather than a standalone GGML op switch case.",
-  "updated_at": "2026-09-06T21:45:23Z",
+  "updated_at": "2026-09-07T01:48:12Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 63,
+      "code": 57,
       "comment": 0,
-      "blank": 5,
-      "raw": 68,
-      "files": 2
+      "blank": 4,
+      "raw": 61,
+      "files": 1
     },
     "sycl": {
-      "code": 190,
+      "code": 0,
       "comment": 0,
-      "blank": 36,
-      "raw": 226,
-      "files": 2
+      "blank": 0,
+      "raw": 0,
+      "files": 0
     },
     "source_files": [
       {
@@ -69,43 +69,13 @@
         "comment": 0,
         "blank": 4,
         "raw": 61
-      },
-      {
-        "path": "ggml/src/ggml-cuda/moe-weighted-reduction.cuh",
-        "lang": "c",
-        "spans": "whole-file",
-        "code": 6,
-        "comment": 0,
-        "blank": 1,
-        "raw": 7
       }
     ],
-    "sycl_files": [
-      {
-        "path": "ggml/src/ggml-sycl/moe-weighted-reduction.cpp",
-        "lang": "c",
-        "spans": "whole-file",
-        "code": 184,
-        "comment": 0,
-        "blank": 34,
-        "raw": 218
-      },
-      {
-        "path": "ggml/src/ggml-sycl/moe-weighted-reduction.hpp",
-        "lang": "c",
-        "spans": "whole-file",
-        "code": 6,
-        "comment": 0,
-        "blank": 2,
-        "raw": 8
-      }
-    ],
-    "mirrored_sources": [
-      "ggml/src/ggml-cuda/moe-weighted-reduction.cuh"
-    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T21:45:20Z"
+    "measured_at": "2026-09-07T01:48:12Z"
   },
   "target_style": "plain-sycl",
   "sycl_files": [

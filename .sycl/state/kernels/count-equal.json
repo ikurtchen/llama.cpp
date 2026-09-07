@@ -35,7 +35,7 @@
     "crosscheck": "-"
   },
   "notes": "Migrated as a plain SYCL reduction in ggml/src/ggml-sycl/count-equal.cpp: compare I32 inputs elementwise, reduce per work-group, then atomically add into the I64 scalar result. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T21:46:32Z",
+  "updated_at": "2026-09-07T01:48:10Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -100,7 +100,7 @@
     ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T21:46:32Z"
+    "measured_at": "2026-09-07T01:48:10Z"
   },
   "target_style": "plain-sycl",
   "sycl_files": [

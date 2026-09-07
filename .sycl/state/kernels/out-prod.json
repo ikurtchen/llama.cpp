@@ -33,22 +33,22 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: GEMM mode selection and pointer batching matter more than the tiny helper kernel. Reference oracle: ggml-cpu backend via tests/test-backend-ops. SYCL uses oneMKL column_major::gemm and gemm_batch for the actual matrix products.",
-  "updated_at": "2026-09-06T21:29:35Z",
+  "updated_at": "2026-09-07T01:48:12Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
-      "code": 97,
+      "code": 95,
       "comment": 6,
-      "blank": 20,
-      "raw": 123,
-      "files": 2
+      "blank": 19,
+      "raw": 120,
+      "files": 1
     },
     "sycl": {
-      "code": 90,
+      "code": 0,
       "comment": 0,
-      "blank": 20,
-      "raw": 110,
-      "files": 2
+      "blank": 0,
+      "raw": 0,
+      "files": 0
     },
     "source_files": [
       {
@@ -62,43 +62,13 @@
         "comment": 6,
         "blank": 19,
         "raw": 120
-      },
-      {
-        "path": "ggml/src/ggml-cuda/out-prod.cuh",
-        "lang": "c",
-        "spans": "whole-file",
-        "code": 2,
-        "comment": 0,
-        "blank": 1,
-        "raw": 3
       }
     ],
-    "sycl_files": [
-      {
-        "path": "ggml/src/ggml-sycl/out-prod.cpp",
-        "lang": "c",
-        "spans": "whole-file",
-        "code": 84,
-        "comment": 0,
-        "blank": 17,
-        "raw": 101
-      },
-      {
-        "path": "ggml/src/ggml-sycl/out-prod.hpp",
-        "lang": "c",
-        "spans": "whole-file",
-        "code": 6,
-        "comment": 0,
-        "blank": 3,
-        "raw": 9
-      }
-    ],
-    "mirrored_sources": [
-      "ggml/src/ggml-cuda/out-prod.cuh"
-    ],
+    "sycl_files": [],
+    "mirrored_sources": [],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T20:54:10Z"
+    "measured_at": "2026-09-07T01:48:12Z"
   },
   "target_style": "onemkl-gemm",
   "sycl_files": [

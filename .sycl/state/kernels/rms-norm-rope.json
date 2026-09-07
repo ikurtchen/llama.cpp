@@ -48,7 +48,7 @@
     "crosscheck": "-"
   },
   "notes": "The fused RMS_NORM_MUL_ROPE graph runs on SYCL by composing the already-migrated RMS norm, multiply, rope, view, and set_rows paths. No separate fused op enum or helper kernel is required on SYCL for this migrate phase because the graph computes correctly through the existing backend dispatch.",
-  "updated_at": "2026-09-06T21:46:32Z",
+  "updated_at": "2026-09-07T01:48:14Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -190,7 +190,7 @@
     ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T21:46:32Z"
+    "measured_at": "2026-09-07T01:48:14Z"
   },
   "target_style": "graph-composition",
   "sycl_files": [

@@ -33,7 +33,7 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: reduction path switches between library and fallback implementation. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Scope matches CUDA exactly: ggml_is_contiguous_rows(src0) required (excludes permutes that break row-contiguity, matching ggml-cuda.cu's GGML_OP_SUM case).",
-  "updated_at": "2026-09-06T17:12:35Z",
+  "updated_at": "2026-09-07T01:48:14Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -68,7 +68,7 @@
     "mirrored_sources": [],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:38Z"
+    "measured_at": "2026-09-07T01:48:14Z"
   },
   "target_style": "plain-sycl",
   "sycl_files": [

@@ -38,7 +38,7 @@
     "crosscheck": "ggml-vulkan also implements this op, useful as a second cross-check"
   },
   "notes": "No CUDA counterpart (per instructions.md sec 2.1); reference taken from ggml-cpu ops.cpp:ggml_compute_forward_conv_3d, cross-checked against ggml-vulkan's implementation. Reference implementation follows the direct CPU/Vulkan indexing path for correctness.",
-  "updated_at": "2026-09-06T21:38:24Z",
+  "updated_at": "2026-09-07T01:48:38Z",
   "loc": {
     "source_lang": "cpu-reference",
     "source": {
@@ -96,7 +96,7 @@
       "ggml/src/ggml-cpu/ops.cpp:no"
     ],
     "method": "span",
-    "measured_at": "2026-09-06T21:38:24Z"
+    "measured_at": "2026-09-07T01:48:38Z"
   },
   "target_style": "plain-sycl",
   "sycl_files": [

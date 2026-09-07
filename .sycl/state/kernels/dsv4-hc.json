@@ -40,7 +40,7 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: three custom kernels implement specialized model-specific algebra not reused elsewhere. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-06T21:36:27Z",
+  "updated_at": "2026-09-07T01:48:11Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -111,7 +111,7 @@
     ],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T21:31:38Z",
+    "measured_at": "2026-09-07T01:48:11Z",
     "source_spec": [
       "ggml/src/ggml-cuda/dsv4-hc.cu:140-182"
     ]

@@ -56,7 +56,7 @@
     "evidence": "test-rope-20260906T163301Z-de1386",
     "result_detail": "282/282 passed (mode 0/2 all variants); mode 8/24/40 correctly report not-supported"
   },
-  "updated_at": "2026-09-06T16:33:01Z",
+  "updated_at": "2026-09-07T01:48:14Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -102,7 +102,7 @@
     "mirrored_sources": [],
     "unresolved": [],
     "method": "span",
-    "measured_at": "2026-09-06T16:21:37Z",
+    "measured_at": "2026-09-07T01:48:14Z",
     "source_spec": [
       "ggml/src/ggml-cuda/rope.cu:43-120",
       "ggml/src/ggml-cuda/rope.cu:122-197",
