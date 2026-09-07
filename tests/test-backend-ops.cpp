@@ -10872,10 +10872,24 @@ static std::vector<std::unique_ptr<test_case>> make_test_cases_perf() {
     test_cases.emplace_back(new test_cumsum(GGML_TYPE_F32, { 2048, 16, 5, 4 }));
     test_cases.emplace_back(new test_cumsum(GGML_TYPE_F32, { 20000, 10, 4, 1 }));
 
-    for (int bs : {1, 2, 3, 4, 5, 8, 512}) {
+    for (int bs : {1, 2, 3, 4, 5, 6, 8, 512}) {
         for (ggml_type type_a : all_types) {
             for (ggml_type type_b : {GGML_TYPE_F32}) {
                 test_cases.emplace_back(new test_mul_mat(type_a, type_b, 4096, bs, 14336, {1,  1}, {1, 1}));
+            }
+        }
+    }
+
+    // Qwen3-0.6B-like dims (n_embd=1024, n_ff=3072), n=1 (decode) and n=6 (short prompt prefill).
+    // The n=1..8,512 sweep above (m=4096,k=14336, a different model's dims) never regressed the
+    // Q8_0 mmvq fast path, but a real 6-token prompt at these dims did: ne11<=8 alone can't tell
+    // "a few decode candidates" apart from "a short prefill". Even after fixing that (ne11==1), a
+    // real decode run at these same dims still regressed -- the fused kernel's win at m=4096,
+    // k=14336 doesn't generalize to this smaller model's shapes, so mmvq's fast path was reverted.
+    for (int64_t m : {1024, 3072}) {
+        for (int64_t k : {1024, 3072}) {
+            for (int64_t n : {1, 6}) {
+                test_cases.emplace_back(new test_mul_mat(GGML_TYPE_Q8_0, GGML_TYPE_F32, m, n, k, {1, 1}, {1, 1}));
             }
         }
     }

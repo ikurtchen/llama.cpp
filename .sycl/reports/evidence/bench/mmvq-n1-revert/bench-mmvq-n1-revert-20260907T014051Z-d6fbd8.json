@@ -1,0 +1,33 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "bench-mmvq-n1-revert-20260907T014051Z-d6fbd8",
+  "class": "bench",
+  "subject": "mmvq-n1-revert",
+  "label": "revert-n1-comparison",
+  "phase": "optimize",
+  "ts": "2026-09-07T01:41:36Z",
+  "duration_s": 45.311,
+  "command": "./build/bin/test-backend-ops perf -b SYCL0 -o MUL_MAT",
+  "via": "run.sh bench",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "aac0ebdee",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/bench/mmvq-n1-revert/bench-mmvq-n1-revert-20260907T014051Z-d6fbd8.log",
+  "log_sha256": "14ed8b1c25eee444f0142dab99adf5929cd0226359a82116db8dd3a0ec4c73e5",
+  "log_bytes": 34329,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "tflops": 1.23,
+    "shape": "m=1024/3072,n=1,k=1024/3072",
+    "shape_class": "qwen3-0.6b-decode"
+  },
+  "extracted": {}
+}

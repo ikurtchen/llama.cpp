@@ -1,0 +1,29 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "e2e-baseline-20260907T003914Z-8161e2",
+  "class": "e2e",
+  "subject": "baseline",
+  "label": "e2e-baseline-realtime",
+  "phase": "optimize",
+  "ts": "2026-09-07T00:39:19Z",
+  "duration_s": 5.299,
+  "command": "./build/bin/llama-cli -m /workspace/models/Qwen3-0.6B-Q8_0.gguf -p The\\ capital\\ of\\ France\\ is -n 128 --ignore-eos --temp 0 --seed 42 --reasoning off -ngl 99 --single-turn",
+  "via": "run.sh exec",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "aac0ebdee",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/e2e/baseline/e2e-baseline-20260907T003914Z-8161e2.log",
+  "log_sha256": "b60c453f6e5c5280a96f3c36c15b20e072f2da3d7af59317d35dc6c78acf5520",
+  "log_bytes": 2234,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {},
+  "extracted": {}
+}

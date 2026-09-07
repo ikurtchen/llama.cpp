@@ -1,0 +1,31 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-mmvq-revert-full-suite-20260907T013704Z-b12607",
+  "class": "test",
+  "subject": "mmvq-revert-full-suite",
+  "label": "revert-mmvq-full-suite",
+  "phase": "optimize",
+  "ts": "2026-09-07T01:40:44Z",
+  "duration_s": 219.505,
+  "command": "./build/bin/test-backend-ops test -b SYCL0",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "aac0ebdee",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/mmvq-revert-full-suite/test-mmvq-revert-full-suite-20260907T013704Z-b12607.log",
+  "log_sha256": "def246929d129c775cebd87102980ab17e51bf41e8a24c42aa7a5089ab28a05c",
+  "log_bytes": 2000050,
+  "log_truncated": true,
+  "artifacts": [],
+  "measurements": {
+    "reference": "cpu-oracle, test-backend-ops built-in checker"
+  },
+  "extracted": {}
+}

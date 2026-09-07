@@ -48,8 +48,8 @@
     "kind": "cpu",
     "crosscheck": "-"
   },
-  "notes": "Q8_0 low-batch GGML_OP_MUL_MAT reuses the same dequantize-to-F32 plus oneMKL GEMM path in ggml/src/ggml-sycl/mmf.cpp. This covers the decode-style n=1 matrix-vector path that CUDA routes through mmvq.cu. Other quantized src0 types remain residual by scope.",
-  "updated_at": "2026-09-06T21:46:32Z",
+  "notes": "Q8_0 low-batch GGML_OP_MUL_MAT uses the dequantize-to-F32 plus oneMKL GEMM path in ggml/src/ggml-sycl/mmf.cpp unconditionally for all n. This covers the decode-style n=1 matrix-vector path that CUDA routes through mmvq.cu. Other quantized src0 types remain residual by scope. The optimize phase trialed a fused quantized-dot-product fast path for small n (n<=8, later tightened to n==1) that showed a 2.58x win at m=4096,k=14336 (a larger model's dims than the actually deployed Qwen3-0.6B); a done-phase e2e re-verification against the real deployed model found this optimization does not generalize -- at the real decode shape (n=1, m/k matching Qwen3-0.6B's n_embd/n_ff) the fused kernel loses to oneMKL GEMM in 3 of 4 shapes, causing a real Generation throughput regression (72.0->66.6 t/s). The fused fast path was reverted entirely; see optimization/mmvq.json regression_found_in_done_phase for the full investigation.",
+  "updated_at": "2026-09-07T01:41:00Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -198,13 +198,17 @@
       "value": 441.77,
       "evidence": "bench-mmvq-20260906T225331Z-401bed"
     },
-    "speedup": 2.58,
+    "speedup": 1.0,
     "fraction_of_peak": null,
-    "meets_expectation": true,
-    "notes": "Fused quantized mat-vec kernel (see optimization/mmvq.json) replaces the dequant-to-F32-scratch + oneMKL GEMM path for the decode-dominated n<=8 case; n=512 prefill shape unchanged (still routed to oneMKL GEMM). 2.58x speedup on the e2e-dominant n=1 shape.",
+    "meets_expectation": false,
+    "notes": "The fused fast-path trial (speedup 2.58x at m=4096,k=14336) was REVERTED after done-phase e2e testing against the actually-deployed model (Qwen3-0.6B, n_embd=1024, n_ff=3072) showed it does not generalize: at real decode dims the fused kernel loses to oneMKL GEMM in 3 of 4 shapes (m=1024,k=1024: 23.34 vs 15.21us; m=1024,k=3072: 33.87 vs 25.57us; m=3072,k=1024: 50.49 vs 22.96us; only m=3072,k=3072 favors the fused kernel), causing a real e2e Generation regression (72.0->66.6 t/s). Reverted to the unconditional dequant+oneMKL-GEMM path (matching true baseline behavior for this kernel); real e2e with the revert plus the (independently-verified) getrows and flash-attn-vec optimizations measures Generation 77.6 t/s (+7.8% vs baseline, entirely from getrows/flash-attn-vec, not from this kernel) and Prompt 635.8-653.5 t/s. See optimization/mmvq.json regression_found_in_done_phase for the full investigation.",
     "evidence": {
       "baseline": "bench-mmvq-20260906T225238Z-d327b0",
-      "optimized": "bench-mmvq-20260906T225331Z-401bed"
+      "optimized": "bench-mmvq-20260906T225331Z-401bed",
+      "n1_realdims_revert_bench": "bench-mmvq-n1-revert-20260907T014051Z-d6fbd8",
+      "revert_full_suite": "test-mmvq-revert-full-suite-20260907T013704Z-b12607",
+      "e2e_baseline": "e2e-baseline-20260907T003914Z-8161e2",
+      "e2e_final": "e2e-final-20260907T014143Z-32ca2d"
     }
   }
 }

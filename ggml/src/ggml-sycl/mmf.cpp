@@ -193,77 +193,6 @@ static bool ggml_sycl_mmf_can_use_strided_batch(const ggml_tensor * src0, const 
     return ggml_is_contiguous_2(src0) && ggml_is_contiguous_2(src1) && ggml_is_contiguous_2(dst);
 }
 
-// Decode-path fast path for Q8_0 x F32 mul_mat: n (number of RHS columns) is small (batch=1
-// decode, or a handful of speculative-decode/beam candidates). The general path dequantizes the
-// whole weight row block to F32 and calls oneMKL GEMM, which for n this small is dominated by the
-// cost of writing+reading the ne00*ne01 F32 scratch buffer rather than by useful FLOPs. This kernel
-// instead reads the quantized bytes once and accumulates the dot product directly in registers, so
-// memory traffic drops from O(ne00*ne01 f32) to O(ne00*ne01 q8_0 bytes) -- about a 4x cut in bytes
-// moved, on top of removing a whole kernel launch (dequantize) and the oneMKL GEMM call.
-constexpr int GGML_SYCL_MMVQ_MAX_N_COLS = 8;
-constexpr int GGML_SYCL_MMVQ_WG_SIZE    = 256;
-
-static void ggml_sycl_mul_mat_vec_q8_0_kernel(
-        const block_q8_0 * __restrict__ x,
-        const float * __restrict__ y,
-        float * __restrict__ dst,
-        int64_t nblocks_per_row,
-        int64_t s1,
-        int64_t d1,
-        int n_cols,
-        sycl::nd_item<1> item) {
-    const int64_t row = item.get_group(0);
-    const int tid = (int) item.get_local_id(0);
-    const int wg_size = (int) item.get_local_range(0);
-
-    const block_q8_0 * row_x = x + row * nblocks_per_row;
-
-    float sums[GGML_SYCL_MMVQ_MAX_N_COLS] = {0.0f};
-
-    for (int64_t ib = tid; ib < nblocks_per_row; ib += wg_size) {
-        const block_q8_0 & blk = row_x[ib];
-        const float d = (float) blk.d;
-        const int64_t base = ib * QK8_0;
-        for (int col = 0; col < n_cols; ++col) {
-            const float * yv = y + col * s1 + base;
-            float partial = 0.0f;
-#pragma unroll
-            for (int l = 0; l < QK8_0; ++l) {
-                partial += (float) blk.qs[l] * yv[l];
-            }
-            sums[col] += partial * d;
-        }
-    }
-
-    for (int col = 0; col < n_cols; ++col) {
-        const float total = sycl::reduce_over_group(item.get_group(), sums[col], sycl::plus<float>());
-        if (tid == 0) {
-            dst[col * d1 + row] = total;
-        }
-    }
-}
-
-static sycl::event ggml_sycl_mul_mat_vec_q8_0(
-        sycl::queue & q,
-        const block_q8_0 * src0,
-        const float * src1,
-        float * dst,
-        int64_t nrows_x,
-        int64_t ncols_x,
-        int64_t s1,
-        int64_t d1,
-        int n_cols) {
-    GGML_ASSERT(n_cols <= GGML_SYCL_MMVQ_MAX_N_COLS);
-    const int64_t nblocks_per_row = ncols_x / QK8_0;
-    const sycl::range<1> local(GGML_SYCL_MMVQ_WG_SIZE);
-    const sycl::range<1> global(nrows_x * GGML_SYCL_MMVQ_WG_SIZE);
-    return q.parallel_for(
-            sycl::nd_range<1>(global, local),
-            [=](sycl::nd_item<1> item) {
-                ggml_sycl_mul_mat_vec_q8_0_kernel(src0, src1, dst, nblocks_per_row, s1, d1, n_cols, item);
-            });
-}
-
 static void ggml_sycl_op_mul_mat_q8_0(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
 #ifndef GGML_SYCL_USE_ONEMKL
     GGML_UNUSED(ctx);
@@ -300,27 +229,6 @@ static void ggml_sycl_op_mul_mat_q8_0(ggml_backend_sycl_context & ctx, ggml_tens
     const char * src0_base = (const char *) src0->data;
     const float * src1_base = (const float *) src1->data;
     float * dst_base = (float *) dst->data;
-
-    // Decode-dominated case: n RHS columns is small, so skip the F32 dequant scratch + GEMM and
-    // read the quantized weights once via a fused dot-product kernel (see
-    // ggml_sycl_mul_mat_vec_q8_0 above). Falls back to the general dequant+GEMM path for large n
-    // (prefill/batched compute, where oneMKL's tiled GEMM is the better fit) or non-packed rows.
-    if (ne11 <= GGML_SYCL_MMVQ_MAX_N_COLS && ggml_sycl_mmf_has_packed_rows(src0) && ne00 % QK8_0 == 0) {
-        for (int64_t i3 = 0; i3 < ne13; ++i3) {
-            for (int64_t i2 = 0; i2 < ne12; ++i2) {
-                const int64_t i03 = i3 / r3;
-                const int64_t i02 = i2 / r2;
-
-                const block_q8_0 * src0_i =
-                        (const block_q8_0 *) (src0_base + (ptrdiff_t) i02 * src0->nb[2] + (ptrdiff_t) i03 * src0->nb[3]);
-                const float * src1_i = src1_base + i2 * s12 + i3 * s13;
-                float * dst_i = dst_base + i2 * d2 + i3 * d3;
-
-                ggml_sycl_mul_mat_vec_q8_0(q, src0_i, src1_i, dst_i, ne01, ne00, s11, d1, (int) ne11);
-            }
-        }
-        return;
-    }
 
     float * src0_f32 = ggml_sycl_mmf_reserve_f32_scratch(ctx, GGML_SYCL_MMF_SRC0_F32_SCRATCH, (size_t) (ne00 * ne01));
 

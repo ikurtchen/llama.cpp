@@ -5,10 +5,10 @@
   "baseline": 1140.18,
   "target": 285.0,
   "best": {
-    "value": 441.77,
+    "value": "n/a (reverted -- see status)",
     "commit": "pending"
   },
-  "status": "done",
+  "status": "reverted",
   "diagnosis": {
     "bottleneck_class": "memory",
     "dominant_stall": "SbidStall",
@@ -23,7 +23,27 @@
     },
     "notes": "FINAL (fused vec kernel, this commit): real unitrace counters -- GPU_BUSY ~100%, XVE_STALL ~86.8% (breakdown: XVE_STALL_SBID ~77.2%, XVE_STALL_SENDWR ~54.2%, XVE_STALL_BARRIER ~52.5%, others <10%), XVE_ACTIVE only ~7.8%, XVE_THREADS_OCCUPANCY_ALL ~88.5% (occupancy is fine), GPU_MEMORY_BYTE_READ_RATE ~131 GB/s + WRITE ~41 GB/s (well under B70 ~456 GB/s peak). Dominant stall is SBID (few outstanding async load slots relative to in-flight requests) with SendWr and Barrier both also significant -- consistent with the per-lane scalar int8/float loop (blk.qs[l], yv[l]) issuing many small, un-vectorized load/reduce-barrier sequences rather than saturating bandwidth. A vectorized-load rewrite (e.g. batched int8/float4 reads) is the natural next hypothesis; recorded as residual work rather than pursued further here (time-boxed to move to the next-ranked kernel per the workflow). BASELINE (old dequantize+oneMKL-GEMM path): unitrace's --metric-query segfaults deterministically as soon as the profiled binary calls into oneMKL GEMM dispatch, on this same single-shape driver that ran cleanly for the fused (oneMKL-free) kernel -- so no HW-counter baseline could be captured (0-byte CSV artifact retained in opt_mmvq/baseline/ as evidence of the crash). This is the same unitrace/environment incompatibility already recorded in lessons.md, now further localized to oneMKL-calling kernels specifically. The baseline root cause is therefore argued from architecture + measured wall-clock: for n=1 the old path launches a dequantize kernel that WRITES the full ne00*ne01 F32 weight matrix then a GEMM that READS it back (~2x(ne00*ne01*4) bytes of pure scratch traffic, ~470 MB for m=4096,k=14336), on top of the original quantized reads -- consistent with the measured 1140us baseline. This is a waiver on the baseline HW-counter requirement, not on the win: the kept trial correctness and wall-clock before/after are both evidence-backed (trials[].evidence)."
   },
-  "stop_reason": "diminishing-returns",
+  "stop_reason": "reverted-in-done-phase",
+  "regression_found_in_done_phase": {
+    "description": "The kept trial (n=1) above was validated only against isolated test-backend-ops shapes at m=4096,k=14336 (a larger model's dims than the actual deployed model), all n in 1..8,512, all of which showed the fused kernel winning or tying. During the done-phase e2e re-verification against the real deployed model (Qwen3-0.6B-Q8_0, n_embd=1024, n_ff=3072), a llama-cli run with a 6-token prompt showed prompt-processing throughput collapse from 622.7 to ~243 t/s (-61%). Root-caused by bisection to the fast-path's ne11<=8 condition: ne11 alone cannot distinguish a short prompt prefill (ne11=6, hit here) from a batch of up to 8 speculative-decode/beam candidates.",
+    "fix_attempt_1": "Tightened GGML_SYCL_MMVQ_MAX_N_COLS from 8 to 1, reasoning ne11==1 is unambiguous (a batch can never be a multi-token prefill) and keeps the fast path for its intended single-token decode case. This DID fix the prefill regression (confirmed via bench at real model dims, n=6: GEMM path 2.9x-6.0x faster than the fused kernel across all 4 (m,k) combinations tried) -- see trial #3.",
+    "fix_attempt_1_flaw": "An early e2e measurement after fix_attempt_1 reported Generation 77.7 t/s (an apparent improvement over the 71.9 t/s baseline) and was recorded as the resolution. This number was later shown to be a stale-binary artifact: the remote host's incremental build silently skips recompilation when a synced source file's mtime lands behind its existing .o file's mtime (root-caused via identical relinked-binary MD5 across a rm -f+rebuild cycle). After adopting a strict touch-before-build + 'Building CXX object' log-verification discipline, a properly-rebuilt binary with the SAME threshold=1 fix measured Generation 66.6 t/s, stable across repeated runs -- a genuine 7.5% decode regression vs the 72.0 t/s true baseline, not an improvement.",
+    "isolating_bisection": "With mtime-skew workaround applied at every rebuild: (getrows optimized, fattn+mmf at true baseline) -> Generation 77.5-77.6 t/s. (getrows+fattn optimized, mmf at true baseline i.e. mmvq fully absent) -> Generation 77.6-77.7 t/s. (getrows+fattn+mmf-with-threshold=1 all optimized, i.e. the fix_attempt_1 state) -> Generation 66.6 t/s. This isolates the regression to the mmvq fused kernel itself, not to its threshold, not to getrows or flash-attn-vec (both of which are pure wins independently, matching their own kernel-level evidence).",
+    "root_cause_confirmed": "Added an n=1 test-backend-ops case at the real deployed-model dims (m=1024/3072,k=1024/3072, matching Qwen3-0.6B's n_embd/n_ff -- the actual decode shape, not the m=4096,k=14336 shape the original trial was validated against). Result: the fused kernel LOSES to oneMKL's dequant+GEMM path in 3 of 4 shapes (m=1024,k=1024: 23.34 vs 15.21us; m=1024,k=3072: 33.87 vs 25.57us; m=3072,k=1024: 50.49 vs 22.96us; only m=3072,k=3072 favors the fused kernel: 84.43 vs 165.07us). The original trial's 2.58x win was real but specific to a larger model's dims (m=4096,k=14336) that this deployment does not use -- the optimization does not generalize to Qwen3-0.6B's actual matmul shapes.",
+    "decision": "REVERTED. ggml/src/ggml-sycl/mmf.cpp restored to its pre-optimization state (unconditional dequantize+oneMKL-GEMM path for all n, matching the true baseline). The fused mmvq kernel is not used. getrows and flash-attn-vec optimizations are retained -- their wins are independently confirmed and do not implicate mmvq.",
+    "correctness_after_revert": "8456/8456 test-backend-ops cases pass (full suite, SYCL0 backend)",
+    "evidence": {
+      "full_suite": "test-mmvq-revert-full-suite-20260907T013704Z-b12607",
+      "n1_realdims_bench": "bench-mmvq-n1-revert-20260907T014051Z-d6fbd8",
+      "n6_realdims_bench_before": "bench-mmvq-20260907T010940Z-bdb9df",
+      "n6_realdims_bench_after": "bench-mmvq-20260907T011218Z-9688aa",
+      "e2e_baseline": "e2e-baseline-20260907T003914Z-8161e2",
+      "e2e_final": "e2e-final-20260907T014143Z-32ca2d"
+    },
+    "e2e_result": "True baseline (mmvq absent, no other optimizations): Prompt 622.4-623.8 t/s, Generation 72.0 t/s. Final (mmvq reverted, getrows+flash-attn-vec kept): Prompt 635.8-653.5 t/s (+2-5%, from getrows/flash-attn-vec), Generation 77.6 t/s (+7.8%, from getrows/flash-attn-vec). All measurements confirmed-fresh rebuilds (touch + 'Building CXX object' verified), same env fingerprint (env-68d8b007).",
+    "lesson": "(1) A single-shape isolated microbenchmark validates an optimization only for the shape it was measured at -- it does not generalize to a different deployed model's dims, and a routing threshold based on shape-independent conditions (ne11<=N) can silently apply the 'optimization' to shapes where it is actually a regression. Always benchmark at the actual deployed model's dims before trusting a kept trial. (2) A remote incremental build can silently serve a stale binary when file mtimes are skewed between sync and build -- always touch the changed file(s) immediately before build and verify 'Building CXX object' (not just 'Built target') appears in the log before trusting any measurement taken after an edit. Both lessons recorded in lessons.md.",
+    "ts": "2026-09-07T01:41:00Z"
+  },
   "trials": [
     {
       "n": 1,
@@ -58,7 +78,47 @@
       "combination": false,
       "evidence": {},
       "ts": "2026-09-06T22:47:00Z"
+    },
+    {
+      "n": 3,
+      "hypothesis": "Restrict the fast-path threshold GGML_SYCL_MMVQ_MAX_N_COLS from 8 to 1 to fix a real e2e prefill regression: ne11<=8 misrouted short-prompt prefill (ne11=6) into the fused kernel instead of oneMKL's GEMM. See regression_found_in_done_phase.fix_attempt_1 for the full story -- this fix was correct for the prefill regression but was superseded by trial #4 (full revert) once the decode-side regression was also isolated to the mmvq kernel itself, not to its threshold.",
+      "bottleneck_class": "correctness-of-routing (not a compute bottleneck)",
+      "commit": "superseded",
+      "build": "ok",
+      "correctness": "pass",
+      "metric_before": 69.74,
+      "metric_after": 14.64,
+      "decision": "superseded-by-trial-4",
+      "root_cause": "See regression_found_in_done_phase.description and .fix_attempt_1.",
+      "combination": false,
+      "evidence": {
+        "n6_realdims_bench_before": "bench-mmvq-20260907T010940Z-bdb9df",
+        "n6_realdims_bench_after": "bench-mmvq-20260907T011218Z-9688aa"
+      },
+      "ts": "2026-09-07T00:52:00Z",
+      "metric_note": "us/run, MUL_MAT q8_0 m=1024,n=6,k=1024 (Qwen3-0.6B real dims) -- representative shape of the 4 measured; see regression_found_in_done_phase.evidence for the full n=6 sweep (m in {1024,3072} x k in {1024,3072})."
+    },
+    {
+      "n": 4,
+      "hypothesis": "Revert the mmvq fused-kernel fast path entirely (unconditional dequantize+oneMKL-GEMM for all n), because the fused kernel's original 2.58x win (trial #1) was measured only at m=4096,k=14336 -- a larger model's dims than the actually deployed Qwen3-0.6B (n_embd=1024, n_ff=3072) -- and does not generalize: at the real decode shape (n=1, real model dims) the fused kernel loses to oneMKL GEMM in 3 of 4 (m,k) combinations, and this loss is confirmed to be the direct cause of the real e2e Generation regression (72.0 -> 66.6 t/s) isolated via bisection.",
+      "bottleneck_class": "algorithm-does-not-generalize",
+      "commit": "pending",
+      "build": "ok",
+      "correctness": "pass",
+      "metric_before": 23.34,
+      "metric_after": 15.21,
+      "decision": "keep",
+      "root_cause": "See regression_found_in_done_phase.root_cause_confirmed. e2e: Generation 66.6 -> 77.6 t/s (+16.5%) with the revert, Prompt unaffected by this specific change (already fixed by getrows/flash-attn-vec).",
+      "combination": false,
+      "evidence": {
+        "correctness": "test-mmvq-revert-full-suite-20260907T013704Z-b12607",
+        "bench_after": "bench-mmvq-n1-revert-20260907T014051Z-d6fbd8",
+        "e2e_baseline": "e2e-baseline-20260907T003914Z-8161e2",
+        "e2e_final": "e2e-final-20260907T014143Z-32ca2d"
+      },
+      "ts": "2026-09-07T01:41:00Z",
+      "metric_note": "us/run, MUL_MAT q8_0 m=1024,n=1,k=1024 (Qwen3-0.6B real dims, actual decode shape) -- representative shape of the 4 measured; see root_cause_confirmed for the full n=1 sweep (m in {1024,3072} x k in {1024,3072}), where the fused kernel wins only at m=3072,k=3072."
     }
   ],
-  "updated_at": "2026-09-06T22:54:00Z"
+  "updated_at": "2026-09-07T01:41:00Z"
 }

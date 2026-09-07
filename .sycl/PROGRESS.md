@@ -6,7 +6,7 @@
 - **Benchmark GPU freq pinned**: True
 - **Build system**: cmake → SYCL build: set-up (ggml/src/ggml-sycl/ builds via icpx -fsycl, AOT bmg-g31, links oneMKL; registers as backend SYCL0)
 - **Phase**: optimize
-- **Updated**: 2026-09-07T00:35:01Z
+- **Updated**: 2026-09-07T01:46:27Z
 
 **Summary**: 76 kernels — 73 migrated, 0 optimized, 2 skipped, 0 needs-reference, 0 pending.
 
@@ -48,7 +48,7 @@
 | integrate | exited | pass | 2 | - |
 | profile-e2e | exited | pass | 1 | - |
 | optimize | exited | fail | 3 | evidence E16 phase/optimize: produced no run record between 2026-09-07T00:24:09Z and 2026-09-07T00:33:25Z — the phase was a no-op; either do the work or record a waiver with its blast radius |
-| done | pending | pending | 0 | - |
+| done | in-progress | pending | 0 | - |
 | report | pending | pending | 0 | - |
 
 **Phase waivers** (a criterion deliberately not met — visible, not silent):
@@ -59,7 +59,7 @@
 
 | id | source | status | unit test | impact % | LOC (src→sycl) | baseline | optimized | notes |
 |----|--------|--------|-----------|----------|----------------|----------|-----------|-------|
-| mmvq | ggml/src/ggml-cuda/mmvq.cu:get_vdr_mmvq,get_mmvq_mmid_max_batch_pascal_older,get_mmvq_mmid_max_batch_turing_plus,get_mmvq_mmid_max_batch_gcn,get_mmvq_mmid_max_batch_cdna,get_mmvq_mmid_max_batch_rdna1_rdna2,get_mmvq_mmid_max_batch_rdna3,get_mmvq_mmid_max_batch_rdna4,get_mmvq_mmid_max_batch,ggml_cuda_should_use_mmvq,get_mmvq_mmid_max_batch_for_device,calc_nwarps,calc_rows_per_block,mul_mat_vec_q,mul_mat_vec_q_moe,mul_mat_vec_q_switch_fusion,mul_mat_vec_q_moe_launch,mul_mat_vec_q_switch_ncols_dst,mul_mat_vec_q_switch_type,ggml_cuda_mul_mat_vec_q,ggml_cuda_op_mul_mat_vec_q | migrated | pass | 49.8 | 2542→898 | {'metric': 'us/run (MUL_MAT q8_0 m=4096,n=1,k=14336 decode)', 'value': 1140.18, 'evidence': 'bench-mmvq-20260906T225238Z-d327b0'} | {'metric': 'us/run (MUL_MAT q8_0 m=4096,n=1,k=14336 decode)', 'value': 441.77, 'evidence': 'bench-mmvq-20260906T225331Z-401bed'} | Q8_0 low-batch GGML_OP_MUL_MAT reuses the same dequantize-to-F32 plus oneMKL GEMM path in ggml/src/ggml-sycl/mmf.cpp. This covers the decode-style n=1 matrix-vector path that CUDA routes through mmvq.cu. Other quantized src0 types remain residual by scope. |
+| mmvq | ggml/src/ggml-cuda/mmvq.cu:get_vdr_mmvq,get_mmvq_mmid_max_batch_pascal_older,get_mmvq_mmid_max_batch_turing_plus,get_mmvq_mmid_max_batch_gcn,get_mmvq_mmid_max_batch_cdna,get_mmvq_mmid_max_batch_rdna1_rdna2,get_mmvq_mmid_max_batch_rdna3,get_mmvq_mmid_max_batch_rdna4,get_mmvq_mmid_max_batch,ggml_cuda_should_use_mmvq,get_mmvq_mmid_max_batch_for_device,calc_nwarps,calc_rows_per_block,mul_mat_vec_q,mul_mat_vec_q_moe,mul_mat_vec_q_switch_fusion,mul_mat_vec_q_moe_launch,mul_mat_vec_q_switch_ncols_dst,mul_mat_vec_q_switch_type,ggml_cuda_mul_mat_vec_q,ggml_cuda_op_mul_mat_vec_q | migrated | pass | 49.8 | 2542→898 | {'metric': 'us/run (MUL_MAT q8_0 m=4096,n=1,k=14336 decode)', 'value': 1140.18, 'evidence': 'bench-mmvq-20260906T225238Z-d327b0'} | {'metric': 'us/run (MUL_MAT q8_0 m=4096,n=1,k=14336 decode)', 'value': 441.77, 'evidence': 'bench-mmvq-20260906T225331Z-401bed'} | Q8_0 low-batch GGML_OP_MUL_MAT uses the dequantize-to-F32 plus oneMKL GEMM path in ggml/src/ggml-sycl/mmf.cpp unconditionally for all n. This covers the decode-style n=1 matrix-vector path that CUDA routes through mmvq.cu. Other quantized src0 types remain residual by scope. The optimize phase trialed a fused quantized-dot-product fast path for small n (n<=8, later tightened to n==1) that showed a 2.58x win at m=4096,k=14336 (a larger model's dims than the actually deployed Qwen3-0.6B); a done-phase e2e re-verification against the real deployed model found this optimization does not generalize -- at the real decode shape (n=1, m/k matching Qwen3-0.6B's n_embd/n_ff) the fused kernel loses to oneMKL GEMM in 3 of 4 shapes, causing a real Generation throughput regression (72.0->66.6 t/s). The fused fast path was reverted entirely; see optimization/mmvq.json regression_found_in_done_phase for the full investigation. |
 | flash-attn-vec | ggml/src/ggml-cuda/fattn.cu:ggml_cuda_flash_attn_ext_vec | migrated | pass | 17.2 | 500→0 | - | - | Risk reason: warp-level softmax, quantized K/V handling, and head-size templating make this a complex direct-attention port. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated as one unified plain-SYCL online-softmax kernel in ggml/src/ggml-sycl/fattn.cpp with the public declaration in fattn.hpp, instead of mirroring CUDA's separate vec/tile/mma/common dispatch split. This SYCL path permanently registers GGML_OP_FLASH_ATTN_EXT in ggml/src/ggml-sycl/ggml-sycl.cpp. Scope is the dense decoder path only: Q=f32/f16, K/V=f16, dst=f32, additive mask, ALiBi, and GQA for head dims 64/80/128. Residual/waiver: Q8_0 KV-cache variants (f16-q8_0, q8_0-f16, q8_0-q8_0), sinks, logit softcap, sparse n_kv_max mask compaction/streamed fixup, and the full CUDA MMA feature matrix are not implemented; those configurations fall back. |
 | rms-norm | ggml/src/ggml-cuda/norm.cu:rms_norm_f32,rms_norm_back_f32,rms_norm_f32_cuda,rms_norm_back_f32_cuda,ggml_cuda_op_rms_norm,ggml_cuda_op_rms_norm_fused,ggml_cuda_op_rms_norm_fused_add,ggml_cuda_op_rms_norm_back | migrated | pass | 6.7 | 344→0 | - | - | Risk reason: reduction numerics plus fused broadcast epilogues need exact matching. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | getrows | ggml/src/ggml-cuda/getrows.cu:k_get_rows,k_get_rows_kq,k_get_rows_float,k_get_rows_float_vec,k_get_rows_back_float,get_rows_cuda_q,get_rows_cuda_kq,get_rows_cuda_float,ggml_cuda_get_rows_switch_src0_type,get_rows_cuda,ggml_cuda_op_get_rows,ggml_cuda_op_get_rows_back | migrated | pass | 6.6 | 419→224 | - | - | Risk reason: forward uses many type/layout cases and backward performs index-based reductions. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated the forward GET_ROWS path for dense F32/F16 and quantized Q8_0 src0 tensors, including the batched/broadcast cases exercised by the inherited test-backend-ops harness. Current evidence run executed 13/13 supported GET_ROWS cases on SYCL0 with no ERR lines and no DEVICE_LOST crash. Residuals: BF16, I32, non-Q8_0 quantized src0 types, GET_ROWS_BACK, and non-contiguous src1 layouts that fail the current ggml_is_contiguous(src1) gate (for example v=1 cases with be1=7). |
@@ -139,7 +139,7 @@
 ## Agent efficiency & cost
 
 - **Elapsed**: 5h02m01s (whole run)  ·  **Active**: 4h30m37s (bracketed)  ·  **Cost**: $0.0  ·  **Tokens**: 256612832 (in 8803075 / out 1255396 / cache r 245376631 / cache w 1177730)  ·  **Premium requests**: 2017  ·  **AI credits**: 2011.0
-- **Observed (gen-progress heartbeat)**: span 8h50m30s  ·  working ≈ 7h22m34s (idle-capped 30m00s)  ·  44 snapshots — independent of metrics.sh
+- **Observed (gen-progress heartbeat)**: span 10h01m56s  ·  working ≈ 8h11m51s (idle-capped 30m00s)  ·  46 snapshots — independent of metrics.sh
 
 | phase | elapsed | active | tokens | requests | credits | USD |
 |-------|--------:|-------:|-------:|---------:|--------:|----:|
@@ -152,8 +152,6 @@
 <!-- append-only from logs/progress.jsonl — one row per gen-progress run -->
 | time (UTC) | phase | migrated | optimized | skipped | pending |
 |------------|-------|---------:|----------:|--------:|--------:|
-| 2026-09-06T21:38:26Z | migrate | 67/76 | 0 | 1 | 7 |
-| 2026-09-06T21:45:37Z | migrate | 69/76 | 0 | 1 | 5 |
 | 2026-09-06T21:46:43Z | migrate | 73/76 | 0 | 2 | 0 |
 | 2026-09-06T21:50:06Z | migrate | 73/76 | 0 | 2 | 0 |
 | 2026-09-06T21:53:18Z | migrate | 73/76 | 0 | 2 | 0 |
@@ -164,6 +162,8 @@
 | 2026-09-07T00:03:19Z | optimize | 73/76 | 0 | 2 | 0 |
 | 2026-09-07T00:23:49Z | optimize | 73/76 | 0 | 2 | 0 |
 | 2026-09-07T00:35:01Z | optimize | 73/76 | 0 | 2 | 0 |
+| 2026-09-07T00:54:18Z | optimize | 73/76 | 0 | 2 | 0 |
+| 2026-09-07T01:46:27Z | optimize | 73/76 | 0 | 2 | 0 |
 
 ## Lessons
 
@@ -257,4 +257,53 @@ nsplit=16/8/4. Falls back to the original single-pass kernel when nrows is alrea
 GFLOPS/GB-s AND unitrace shows GPU_BUSY high but XVE_ACTIVE low, check the work-group *count* against
 the launch shape before assuming a memory/compute bottleneck -- it may just be too few work-groups
 for the shape at hand, especially for GQA-decode-style small-batch kernels.
+
+## optimize/mmvq: a fast-path routing threshold on a shape dimension needs a semantic check, not just a bound
+
+The mmvq fused-kernel fast path was gated on `ne11 <= 8` (RHS column count), intended to mean "this
+is decode, or a handful of speculative-decode/beam candidates". But `ne11` is just a tensor dimension
+-- it cannot distinguish "up to 8 decode candidates" from "a 6-token prompt prefill", which produces
+the identical shape. Every isolated `test-backend-ops perf` benchmark used to validate the trial
+(m=4096,k=14336 at n=1..8,512) showed the fused kernel winning or tying, because none of those shapes
+represent a *real* short-prompt prefill matmul. Only a genuine end-to-end `llama-cli` run (6-token
+prompt) exposed a ~61% prompt-throughput regression, caught during the `done`-phase e2e
+re-verification -- well after the trial had already been marked "kept" and the phase gated closed.
+
+Fix: tightened the threshold to `ne11 == 1`, the only value that is *unambiguous* (a batch dimension
+can never be a multi-token prefill). General takeaway: when a fast path is gated by comparing a shape
+dimension against a bound, ask whether that dimension's *value* alone actually disambiguates the two
+cases the fast/slow paths are meant to separate. If it doesn't (as here, batch-size vs sequence-length
+both show up as "small ne11"), no set of single-shape microbenchmarks will catch the misrouting --
+only a real, whole-model e2e run exercises the call patterns where the ambiguity actually resolves the
+wrong way. This is why the `done` phase's e2e re-verification is a hard gate, not a formality: it is
+the only check that can catch this entire class of bug.
+
+## optimize/mmvq: an isolated single-shape win does not generalize to the deployed model's dims -- and a stale remote build can make a real regression look fixed
+
+Follow-up to the lesson above. The `ne11==1` threshold fix above did stop the prefill misrouting, but
+a second, independent problem was still hiding underneath it: the fused mmvq kernel's original 2.58x
+win (trial #1) was measured only at `m=4096,k=14336` -- the dims of a *different, larger* model than
+the one actually being deployed (Qwen3-0.6B, `n_embd=1024, n_ff=3072`). Once the fix was in place and
+n=1 unambiguously meant "single-token decode", a real `llama-cli` e2e run still showed a genuine
+Generation regression (72.0 -> 66.6 t/s), even though every single-token benchmark at the *original*
+validation shape still looked fine. Adding an n=1 `test-backend-ops` case at the real model's dims
+showed why: the fused kernel loses to oneMKL's dequant+GEMM path in 3 of 4 realistic (m,k)
+combinations -- the win never generalized past the shape it was born from. The fused fast path was
+reverted entirely; oneMKL GEMM is used unconditionally for all n. General takeaway: validate a kept
+optimization at the *actual deployed model's* dims before trusting it, not just at whatever shape the
+kernel-level benchmark happened to use -- a real speedup on one model's matmul dims can be a real
+regression on another's, for the exact same op and the exact same code path.
+
+A second, orthogonal trap compounded this investigation: an early re-measurement after the threshold
+fix reported Generation 77.7 t/s (an apparent *improvement*, taken as confirmation the fix worked) --
+but this was a stale-binary artifact. The remote host's incremental `cmake --build` can silently treat
+an already-compiled `.o` as up to date and skip recompilation even after a source edit is synced, if
+the synced file's mtime lands behind the existing `.o`'s mtime (confirmed via an identical relinked-
+binary MD5 across a `rm -f` + rebuild cycle with no source change). This produced a confident-looking
+but entirely wrong "problem solved" measurement, and cost significant time to unravel. General
+takeaway: on this remote runner, always `touch` the changed source file(s) immediately before a
+`cmake --build`, and confirm the build log shows `Building CXX object ...` (not just `Built target
+...`) for every file you just edited -- before trusting *any* measurement taken after a code change.
+Never conclude a performance investigation from a build you did not personally watch recompile the
+changed file.
 
