@@ -56,3 +56,35 @@ XVE_STALL ~87% dominated by SBID (~77%) and SendWr (~54%) stalls despite only ~1
 (well under B70's ~456 GB/s peak) -- i.e. still latency-bound on scattered per-lane scalar loads
 (`blk.qs[l]`, `yv[l]`), not bandwidth-saturated. A vectorized-load rewrite is a plausible next step
 (residual work), not pursued here due to time-boxing.
+
+## run.sh: touch + build must be ONE invocation, not two separate run.sh calls
+
+`run.sh` performs an automatic rsync push (local->remote) before *every* invocation, including
+`build`. If you `touch` a remote file in one `run.sh exec` call and then run a build in a *separate*
+`run.sh build` call afterward, that second call's own pre-command sync re-pushes the local file and
+resets its remote mtime back to the (older, sandbox-clock) local mtime -- silently undoing the touch
+and causing the build to skip recompilation even though the file content genuinely changed. Symptom
+is identical to the earlier "clock skew" lesson (code change appears to have zero effect) but the
+root cause here is the sync itself, not clock drift. Fix: always combine `touch <file> && cmake
+--build ...` into a **single** `run.sh build "..."` call, so only one sync happens before the
+touch-then-build sequence runs atomically on the remote side.
+
+## optimize/flash-attn-vec: GQA-decode FLASH_ATTN_EXT is occupancy-bound, not compute/memory-bound
+
+For decode shapes (nb=1, few Q rows -- e.g. nh=8 heads with nr23=[1,1] launches only 8 work-groups
+total), the existing one-work-group-per-Q-row online-softmax kernel cannot fill a B70's execution
+units: `unitrace --metric-query` showed GPU_BUSY ~100% but XVE_ACTIVE only ~2.66% and
+XVE_THREADS_OCCUPANCY_ALL only ~3.49%. This is the same problem CUDA's `fattn-vec.cuh` solves with
+`parallel_blocks`/flash-decoding. A first hypothesis (removing a redundant barrier per KV iteration,
+since `reduce_over_group`'s result is already uniform across work-items) measured *zero* wall-clock
+change -- confirming the kernel is occupancy-bound, not barrier-bound, before spending more effort on
+barrier micro-optimizations. The fix that worked: split the KV range into `nsplit` chunks per Q row
+(launching `nrows*nsplit` work-groups instead of `nrows`), write each split's partial online-softmax
+state (m, l, unnormalized acc) to a scratch buffer, then merge with a small second "combine" kernel
+(one work-group per row, redundant per-thread loop over the tiny nsplit values -- cheaper than a
+barrier-based reduction at this size). Speedup scales directly with nsplit: 15.02x/7.56x/3.85x for
+nsplit=16/8/4. Falls back to the original single-pass kernel when nrows is already large enough
+(prefill), confirmed unaffected. General takeaway: when a kernel-benchmark measures near-zero
+GFLOPS/GB-s AND unitrace shows GPU_BUSY high but XVE_ACTIVE low, check the work-group *count* against
+the launch shape before assuming a memory/compute bottleneck -- it may just be too few work-groups
+for the shape at hand, especially for GQA-decode-style small-batch kernels.
