@@ -5,8 +5,8 @@
 - **Toolchain**: Intel(R) oneAPI DPC++/C++ Compiler 2025.3.2 (2025.3.2.20260112)  ·  **GPU**: Intel(R) Graphics [0xe223] (Arc Pro B70, Battlemage) (xe2)  ·  **oneAPI**: /opt/intel/oneapi (2025.3.2)
 - **Benchmark GPU freq pinned**: True
 - **Build system**: cmake → SYCL build: set-up (ggml/src/ggml-sycl/ builds via icpx -fsycl, AOT bmg-g31, links oneMKL; registers as backend SYCL0)
-- **Phase**: optimize
-- **Updated**: 2026-09-07T01:54:46Z
+- **Phase**: report
+- **Updated**: 2026-09-07T01:55:28Z
 
 **Summary**: 76 kernels — 73 migrated, 0 optimized, 2 skipped, 0 needs-reference, 0 pending.
 
@@ -139,7 +139,7 @@
 ## Agent efficiency & cost
 
 - **Elapsed**: 10h05m03s (whole run)  ·  **Active**: 4h30m37s (bracketed)  ·  **Cost**: $0.0  ·  **Tokens**: 454425030 (in 12461557 / out 1997780 / cache r 437457054 / cache w 2508639)  ·  **Premium requests**: 3496  ·  **AI credits**: 3482.0
-- **Observed (gen-progress heartbeat)**: span 10h10m15s  ·  working ≈ 8h20m10s (idle-capped 30m00s)  ·  48 snapshots — independent of metrics.sh
+- **Observed (gen-progress heartbeat)**: span 10h10m57s  ·  working ≈ 8h20m52s (idle-capped 30m00s)  ·  49 snapshots — independent of metrics.sh
 
 | phase | elapsed | active | tokens | requests | credits | USD |
 |-------|--------:|-------:|-------:|---------:|--------:|----:|
@@ -154,7 +154,6 @@
 <!-- append-only from logs/progress.jsonl — one row per gen-progress run -->
 | time (UTC) | phase | migrated | optimized | skipped | pending |
 |------------|-------|---------:|----------:|--------:|--------:|
-| 2026-09-06T21:53:18Z | migrate | 73/76 | 0 | 2 | 0 |
 | 2026-09-06T22:07:18Z | profile-e2e | 73/76 | 0 | 2 | 0 |
 | 2026-09-06T22:40:50Z | profile-e2e | 73/76 | 0 | 2 | 0 |
 | 2026-09-06T22:41:28Z | optimize | 73/76 | 0 | 2 | 0 |
@@ -166,6 +165,7 @@
 | 2026-09-07T01:46:27Z | optimize | 73/76 | 0 | 2 | 0 |
 | 2026-09-07T01:49:34Z | optimize | 73/76 | 0 | 2 | 0 |
 | 2026-09-07T01:54:46Z | optimize | 73/76 | 0 | 2 | 0 |
+| 2026-09-07T01:55:28Z | report | 73/76 | 0 | 2 | 0 |
 
 ## Lessons
 
