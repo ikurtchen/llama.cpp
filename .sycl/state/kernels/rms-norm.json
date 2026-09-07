@@ -113,5 +113,14 @@
     "filter": "NORM,RMS_NORM,GROUP_NORM,L2_NORM",
     "result": "pass",
     "evidence": "test-norm-family-20260906T173938Z-737da8"
+  },
+  "performance": {
+    "optimization": ".sycl/state/optimization/rms-norm.json",
+    "e2e_rank": "4th (~6.72% of e2e wall-clock)",
+    "status": "diagnosed, no profitable optimization found (already at launch-overhead floor for decode shapes; single-row reduction already fully parallelized within its one work-group)",
+    "measured": {
+      "decode (ne=[1024,1,1,1])": "4.49 us/run",
+      "batched (ne=[1024,512,1,1])": "4.80 us/run at 813.18 GB/s (scales correctly)"
+    }
   }
 }

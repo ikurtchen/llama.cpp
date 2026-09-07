@@ -1,0 +1,31 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-getrows-20260907T001813Z-ad7441",
+  "class": "test",
+  "subject": "getrows",
+  "label": "host-roundtrip-removal",
+  "phase": "optimize",
+  "ts": "2026-09-07T00:18:19Z",
+  "duration_s": 5.298,
+  "command": "cd build && ./bin/test-backend-ops -b SYCL0 -o GET_ROWS",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "683de374e",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/getrows/test-getrows-20260907T001813Z-ad7441.log",
+  "log_sha256": "75e817cf9509771070a5fd6e43b5e17b4ffe6a49982f44ff44a45e3efabb4823",
+  "log_bytes": 10024,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "cpu-oracle (test-backend-ops.cpp built-in ref_get_rows), inherited tolerance"
+  },
+  "extracted": {}
+}

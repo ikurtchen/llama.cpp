@@ -135,5 +135,14 @@
     "result": "pass",
     "evidence": "test-binbcast-20260906T174334Z-90e1b1"
   },
-  "sycl_impl": "ggml/src/ggml-sycl/binbcast.hpp,ggml/src/ggml-sycl/binbcast.cpp"
+  "sycl_impl": "ggml/src/ggml-sycl/binbcast.hpp,ggml/src/ggml-sycl/binbcast.cpp",
+  "performance": {
+    "optimization": ".sycl/state/optimization/binbcast.json",
+    "e2e_rank": "3rd (MUL row, ~7.45% of e2e wall-clock; same kernel_id also covers ADD row at ~3.87%)",
+    "status": "diagnosed, no profitable optimization found (already at launch-overhead floor for decode shapes)",
+    "measured": {
+      "decode (ne=[1024,1,1,1])": "4.71 us/run",
+      "batched (ne=[1024,1,1,1], nr=[1,512,1,1])": "37.45 us/run at 156.45 GB/s (scales correctly)"
+    }
+  }
 }

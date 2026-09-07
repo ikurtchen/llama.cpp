@@ -1,0 +1,50 @@
+{
+  "schema": "optimization.schema.json",
+  "kernel_id": "getrows",
+  "metric": "us/run (test-backend-ops perf, GET_ROWS type=q8_0,n=1024,m=151936 token-embedding-lookup shape)",
+  "baseline": 635.22,
+  "target": 100.0,
+  "best": {
+    "value": 41.49,
+    "commit": "pending"
+  },
+  "status": "done",
+  "diagnosis": {
+    "bottleneck_class": "host-device-synchronization",
+    "dominant_stall": "n/a (per-call blocking host round-trip, not a GPU-side stall)",
+    "occupancy_pct": null,
+    "register_spills": false,
+    "xmx_used": false,
+    "tools": "source read (ggml_sycl_op_get_rows) + comparison against ggml-cuda/getrows.cu reference; measured via test-backend-ops perf, no HW-counter profiling needed since the bottleneck was architectural, not a GPU execution-unit issue",
+    "artifacts": {
+      "baseline": "n/a (source-level diagnosis)",
+      "final": "n/a",
+      "diagnosis_md": "n/a"
+    },
+    "notes": "The SYCL get_rows implementation, unlike the CUDA reference (ggml-cuda/getrows.cu, which reads src1->data directly as a device pointer with no host-side involvement), did an unconditional host round-trip on EVERY call: sycl::malloc_shared for the row-index buffer, a blocking q.memcpy(...).wait(), a host-side CPU loop bounds-checking every row index, kernel dispatch, then a final q.wait_and_throw() plus sycl::free(). This is pure per-call overhead unrelated to the actual gather work (which the kernel itself already performs correctly, indexing only the requested rows -- the benchmark's inflated GB/s figure for r=1 is a test-harness artifact: op_size() sums the FULL src0 tensor's ggml_nbytes, not the bytes actually gathered, so the reported bandwidth numbers are not meaningful here; the fix targets the measured absolute us/run, which is real). Fix: read src1->data directly as a device pointer inside the kernel (src1 already lives in device-accessible USM as a SYCL backend tensor, exactly like binbcast.cpp already does for its src1), and drop the host validation loop and both blocking waits -- mirroring the CUDA kernel's approach exactly, since it needs no such round-trip either. This removes 2 blocking host<->device syncs and a malloc/free pair from every single GET_ROWS call, which in this workload happens once per decode step (token embedding lookup / output layer selection)."
+  },
+  "stop_reason": "diminishing-returns",
+  "trials": [
+    {
+      "n": 1,
+      "hypothesis": "Read the row-index tensor (src1->data) directly as a device USM pointer inside the kernel, removing the malloc_shared+blocking-memcpy+host-bounds-check-loop+wait_and_throw() round-trip that the CUDA reference implementation does not have.",
+      "bottleneck_class": "host-device-synchronization",
+      "commit": "pending",
+      "build": "ok",
+      "correctness": "pass",
+      "metric_before": 635.22,
+      "metric_after": 41.49,
+      "decision": "keep",
+      "root_cause": "Two blocking host<->device syncs (memcpy.wait() and wait_and_throw()) plus a malloc_shared/free pair were paid on every call regardless of how little data was actually gathered. Removing them and reading src1->data directly (already device-accessible, matching binbcast.cpp's existing pattern and the CUDA reference) cuts the fixed per-call overhead. r=1 (decode, single token): 635.22->41.49 us/run (15.31x). r=512 (batched): 798.51->202.03 us/run (3.95x).",
+      "combination": false,
+      "evidence": {
+        "test": "test-getrows-20260907T001813Z-ad7441",
+        "test_regression": "test-getrows-regression-20260907T001824Z-19a252",
+        "bench_before": "bench-getrows-20260907T001734Z-417588",
+        "bench_after": "bench-getrows-20260907T002213Z-0513aa"
+      },
+      "ts": "2026-09-07T00:22:13Z"
+    }
+  ],
+  "updated_at": "2026-09-07T00:22:13Z"
+}

@@ -1,0 +1,25 @@
+{
+  "schema": "optimization.schema.json",
+  "kernel_id": "rms-norm",
+  "metric": "us/run (test-backend-ops perf, RMS_NORM type=f32,ne=[1024,1,1,1] decode-shape single-token row normalization)",
+  "baseline": 4.49,
+  "target": null,
+  "best": {
+    "value": 4.49,
+    "commit": "n/a"
+  },
+  "status": "skipped",
+  "diagnosis": {
+    "bottleneck_class": "launch-overhead-floor",
+    "dominant_stall": "n/a",
+    "occupancy_pct": null,
+    "register_spills": false,
+    "xmx_used": false,
+    "tools": "test-backend-ops perf measurement + source read of norm.cpp (rms_norm_f32, ggml_sycl_pick_norm_wg)",
+    "artifacts": {},
+    "notes": "The decode-shape RMS_NORM call (ne=1024,1,1,1, one row) measures 4.49 us/run moving only 8 KB total -- again dominated by fixed kernel-dispatch overhead, not GPU execution or memory bandwidth. Unlike FLASH_ATTN_EXT, there genuinely is only one row to reduce at decode time (nrows=1), so the CUDA-mirroring one-work-group-per-row design launches exactly 1 work-group; the row's 1024 elements are already fully parallelized within that single work-group (256 threads x 4 elements each, sub-group + work-group collective reduction via ggml_sycl_work_group_sum, matching the required parallel-reduction recipe -- not a serial loop). A flash-decoding-style split (partition the single row's reduction across multiple work-groups, merge with a second kernel) was considered but rejected: the per-row work is only 1024 floats (a few dozen sub-group reduce steps), so a second kernel launch's own dispatch overhead would exceed any savings from spreading such a tiny reduction across more compute units -- unlike FLASH_ATTN_EXT's KV loop, where each split still does a substantial, multi-microsecond amount of independent work. The batched case (ne=1024, 512 rows, 4.80 us/run at 813 GB/s) confirms the kernel scales correctly with real per-row-count parallelism once there is more than one row to distribute across work-groups; the single-row decode number is a launch-overhead floor, not an under-parallelization defect."
+  },
+  "stop_reason": "already-at-launch-overhead-floor; single-row decode-time reduction has no further parallelism to extract (already one-work-group-per-row with full intra-group parallel reduction), and a flash-decoding-style multi-kernel split would add more dispatch overhead than it could save at this data size",
+  "trials": [],
+  "updated_at": "2026-09-07T00:22:13Z"
+}

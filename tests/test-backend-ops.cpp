@@ -10782,6 +10782,18 @@ static std::vector<std::unique_ptr<test_case>> make_test_cases_perf() {
     test_cases.emplace_back(new test_bin_bcast(ggml_add, GGML_TYPE_F32, {4096, 1, 1, 1}, {1,   1, 1, 1}));
     test_cases.emplace_back(new test_bin_bcast(ggml_add, GGML_TYPE_F32, {4096, 1, 1, 1}, {1, 512, 1, 1}));
 
+    // MUL at a small-model decode width (Qwen3-0.6B-like n_embd), one token vs a 512-token batch
+    test_cases.emplace_back(new test_bin_bcast(ggml_mul, GGML_TYPE_F32, {1024, 1, 1, 1}, {1,   1, 1, 1}));
+    test_cases.emplace_back(new test_bin_bcast(ggml_mul, GGML_TYPE_F32, {1024, 1, 1, 1}, {1, 512, 1, 1}));
+
+    // RMS_NORM at a small-model decode width, one token vs a 512-token batch
+    test_cases.emplace_back(new test_rms_norm(GGML_TYPE_F32, {1024, 1,   1, 1}));
+    test_cases.emplace_back(new test_rms_norm(GGML_TYPE_F32, {1024, 512, 1, 1}));
+
+    // GET_ROWS: token embedding lookup at a small-model vocab size, one token vs a 512-token batch
+    test_cases.emplace_back(new test_get_rows(GGML_TYPE_Q8_0, 1024, 151936, 1,   1, 1));
+    test_cases.emplace_back(new test_get_rows(GGML_TYPE_Q8_0, 1024, 151936, 512, 1, 1));
+
     test_cases.emplace_back(new test_cpy(GGML_TYPE_F32,  GGML_TYPE_F16,  {512, 3072, 1, 1}));
     test_cases.emplace_back(new test_cpy(GGML_TYPE_F32,  GGML_TYPE_F32,  {8192, 512, 2, 1}, {-1,-1,-1,-1}, {0, 2, 1, 3}));
     test_cases.emplace_back(new test_cpy(GGML_TYPE_F32,  GGML_TYPE_F32,  {3072, 512, 2, 1}, {-1,-1,-1,-1}, {0, 2, 1, 3}));

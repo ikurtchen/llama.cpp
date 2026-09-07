@@ -1,0 +1,25 @@
+{
+  "schema": "optimization.schema.json",
+  "kernel_id": "binbcast",
+  "metric": "us/run (test-backend-ops perf, MUL type=f32,ne=[1024,1,1,1] decode-shape RMSNorm-weight-scale/SwiGLU-gate elementwise multiply)",
+  "baseline": 4.71,
+  "target": null,
+  "best": {
+    "value": 4.71,
+    "commit": "n/a"
+  },
+  "status": "skipped",
+  "diagnosis": {
+    "bottleneck_class": "launch-overhead-floor",
+    "dominant_stall": "n/a",
+    "occupancy_pct": null,
+    "register_spills": false,
+    "xmx_used": false,
+    "tools": "test-backend-ops perf measurement + source read of ggml_sycl_op_mul/launch_binbcast",
+    "artifacts": {},
+    "notes": "The decode-shape MUL call (ne=1024,1,1,1, a single RMSNorm-weight-scale or SwiGLU-gate elementwise multiply on one token) measures 4.71 us/run moving only 12 KB total across 3 tensors -- effectively zero achievable bandwidth headroom to reclaim; the entire measured time is dominated by fixed SYCL kernel-dispatch/queue-submission latency, not GPU execution. The kernel itself (launch_binbcast) is already a flat, correctly-indexed nd_range parallel_for with no host round-trip or redundant synchronization (unlike the getrows anti-pattern found and fixed this session). Increasing occupancy (more work-groups) cannot help: the workload has only 1024 elements total, already spread across 4 work-groups of 256 threads each, and adding more parallelism only adds more dispatch/combine overhead for a task that already completes in a handful of microseconds. This is the batched case (ne=1024, nr=[1,512,1,1], 37.45 us/run at 156 GB/s) that shows the kernel scales properly with real work -- the decode-shape number is simply at the launch-overhead floor common to any tiny single-token elementwise op on this hardware, and is not a profitable optimization target. Contrast with FLASH_ATTN_EXT (this session's kernel 2) and GET_ROWS (kernel 5), where measured absolute latency was hundreds of us to ms and a real architectural fix produced double-digit x speedups -- MUL's decode-shape absolute cost (4.71us) is already ~2 orders of magnitude below those, consistent with a kernel that is at its floor rather than under-parallelized."
+  },
+  "stop_reason": "already-at-launch-overhead-floor; no profitable optimization identified for the decode-dominated shape (absolute latency ~4.7us, dominated by fixed dispatch cost not GPU execution; batched/prefill shape already scales correctly at 156 GB/s)",
+  "trials": [],
+  "updated_at": "2026-09-07T00:22:13Z"
+}

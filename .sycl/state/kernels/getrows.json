@@ -132,5 +132,19 @@
     "result": "pass",
     "evidence": "test-getrows-20260906T214955Z-2dfec3"
   },
-  "sycl_impl": "ggml/src/ggml-sycl/getrows.hpp,ggml/src/ggml-sycl/getrows.cpp"
+  "sycl_impl": "ggml/src/ggml-sycl/getrows.hpp,ggml/src/ggml-sycl/getrows.cpp",
+  "performance": {
+    "optimization": ".sycl/state/optimization/getrows.json",
+    "e2e_rank": "5th (~6.64% of e2e wall-clock, low call count but expensive per call)",
+    "technique": "Removed an unconditional per-call host round-trip (malloc_shared + blocking memcpy + host bounds-check loop + wait_and_throw/free) that the CUDA reference implementation does not have; reads src1->data directly as a device USM pointer instead, matching binbcast.cpp's existing pattern and the CUDA kernel.",
+    "speedup": {
+      "r=1 (decode, single token)": "635.22 -> 41.49 us/run (15.31x)",
+      "r=512 (batched)": "798.51 -> 202.03 us/run (3.95x)"
+    },
+    "unit_test_after_optimization": {
+      "result": "pass",
+      "evidence": "test-getrows-20260907T001813Z-ad7441",
+      "regression_evidence": "test-getrows-regression-20260907T001824Z-19a252 (8456/8456)"
+    }
+  }
 }

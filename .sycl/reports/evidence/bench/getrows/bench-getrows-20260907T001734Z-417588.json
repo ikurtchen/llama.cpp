@@ -1,0 +1,33 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "bench-getrows-20260907T001734Z-417588",
+  "class": "bench",
+  "subject": "getrows",
+  "label": "baseline",
+  "phase": "optimize",
+  "ts": "2026-09-07T00:17:44Z",
+  "duration_s": 9.583,
+  "command": "cd build && ./bin/test-backend-ops perf -b SYCL0 -o GET_ROWS,MUL,RMS_NORM",
+  "via": "run.sh bench",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "683de374e",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/bench/getrows/bench-getrows-20260907T001734Z-417588.log",
+  "log_sha256": "664604f55b28a15a3ffd215c18f49517a0bf7f5dca3130a4417e065de7004b6a",
+  "log_bytes": 1928,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "bandwidth_gbps": 196.18,
+    "shape": "n=1024,m=151936,r=1,type=q8_0",
+    "shape_class": "decode"
+  },
+  "extracted": {}
+}

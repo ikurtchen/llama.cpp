@@ -194,16 +194,12 @@ void ggml_sycl_op_get_rows(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
     GGML_ASSERT(dst->nb[0]  == ggml_type_size(dst->type));
 
     sycl::queue & q = ctx.stream();
-    const int64_t nr = src1->ne[0] * src1->ne[1] * src1->ne[2];
-    int32_t * rows = sycl::malloc_shared<int32_t>(nr, q);
-
-    GGML_ASSERT(rows != nullptr);
-
-    q.memcpy(rows, src1->data, (size_t) nr * sizeof(int32_t)).wait();
-
-    for (int64_t i = 0; i < nr; ++i) {
-        GGML_ASSERT(rows[i] >= 0 && rows[i] < src0->ne[1]);
-    }
+    // Row indices already live in device-accessible USM (src1 is a SYCL backend tensor), so the
+    // kernel can read them directly -- no host copy/validation round-trip needed. This mirrors the
+    // CUDA get_rows kernel, which also reads src1->data as a device pointer with no host bounds
+    // check; the ~600us/call malloc_shared+memcpy(wait)+host-loop+wait_and_throw() this replaces
+    // was pure self-inflicted overhead, dominating decode-time GET_ROWS wall-clock.
+    const int32_t * rows = (const int32_t *) src1->data;
 
     switch (dst->type) {
         case GGML_TYPE_F32:
@@ -215,9 +211,6 @@ void ggml_sycl_op_get_rows(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {
         default:
             GGML_ABORT("%s: unsupported dst type for SYCL get_rows: %s", __func__, ggml_type_name(dst->type));
     }
-
-    q.wait_and_throw();
-    sycl::free(rows, q);
 }
 
 bool ggml_sycl_supports_get_rows(const ggml_tensor * op) {
