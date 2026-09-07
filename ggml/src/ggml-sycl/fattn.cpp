@@ -8,6 +8,8 @@
 
 #include <sycl/sycl.hpp>
 
+#include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -16,6 +18,58 @@
 namespace {
 
 static constexpr size_t FATTN_WG = 128;
+
+// Flash-decoding style KV split: decode (few Q rows) launches too few work-groups to fill
+// the GPU (e.g. 8 work-groups for nh=8,nb=1), leaving most execution units idle. When the
+// query-row count is small and kv is long, split the KV range across multiple work-groups
+// per row (each producing a partial online-softmax state), then combine them in a second
+// pass. This raises the work-group count without changing the math.
+static constexpr int64_t FATTN_SPLIT_MAX_NROWS = 64;
+static constexpr int64_t FATTN_SPLIT_MIN_KV    = 512;
+static constexpr int64_t FATTN_SPLIT_MIN_CHUNK = 256;
+static constexpr int     FATTN_SPLIT_MAX_N     = 16;
+static constexpr int64_t FATTN_SPLIT_TARGET_WG = 256;
+
+struct fattn_split_scratch {
+    float * ptr = nullptr;
+    size_t  capacity = 0;
+};
+
+static fattn_split_scratch & ggml_sycl_fattn_get_split_scratch(int device) {
+    static std::array<fattn_split_scratch, GGML_SYCL_MAX_DEVICES> scratch = {};
+    GGML_ASSERT(device >= 0 && device < GGML_SYCL_MAX_DEVICES);
+    return scratch[device];
+}
+
+static float * ggml_sycl_fattn_reserve_split_scratch(ggml_backend_sycl_context & ctx, size_t nelements) {
+    auto & scratch = ggml_sycl_fattn_get_split_scratch(ctx.device);
+    sycl::queue & q = ctx.stream();
+
+    if (scratch.capacity >= nelements) {
+        return scratch.ptr;
+    }
+
+    SYCL_CHECK(q.wait_and_throw());
+    if (scratch.ptr != nullptr) {
+        sycl::free(scratch.ptr, q);
+    }
+
+    scratch.ptr = sycl::malloc_device<float>(std::max<size_t>(nelements, 1), q);
+    GGML_ASSERT(scratch.ptr != nullptr);
+    scratch.capacity = nelements;
+    return scratch.ptr;
+}
+
+// Pick a KV split factor: only worth it when few Q rows would otherwise starve the GPU.
+static int ggml_sycl_fattn_pick_nsplit(int64_t nrows, int64_t kv) {
+    if (nrows > FATTN_SPLIT_MAX_NROWS || kv < FATTN_SPLIT_MIN_KV) {
+        return 1;
+    }
+    int64_t nsplit = (FATTN_SPLIT_TARGET_WG + nrows - 1) / nrows;
+    nsplit = std::min<int64_t>(nsplit, FATTN_SPLIT_MAX_N);
+    nsplit = std::min<int64_t>(nsplit, kv / FATTN_SPLIT_MIN_CHUNK);
+    return (int) std::max<int64_t>(nsplit, 1);
+}
 
 struct fattn_params {
     const void * q;
@@ -218,6 +272,206 @@ static void ggml_sycl_flash_attn_ext_launch(sycl::queue & q, const fattn_params 
     });
 }
 
+// Split-KV variant of the kernel above: each work-group handles one (query row, KV slice)
+// pair and writes an unnormalized partial online-softmax state (m, l, acc[dv]) to scratch
+// instead of the final normalized output. Used only when nrows is too small on its own to
+// occupy the GPU (see ggml_sycl_fattn_pick_nsplit); the math is identical to the single-pass
+// kernel, just computed over a KV sub-range and merged afterwards by the combine kernel.
+template <typename QType, typename MaskType, bool has_mask>
+static void ggml_sycl_flash_attn_ext_split_launch(
+        sycl::queue & q, const fattn_params & p, int nsplit, float * scratch) {
+    const int64_t nrows = p.q_ne1 * p.q_ne2 * p.q_ne3;
+    const int64_t slice = (p.k_ne1 + nsplit - 1) / nsplit;
+    const size_t  state_stride = (size_t) (2 + p.dv);
+
+    q.submit([&](sycl::handler & cgh) {
+        sycl::local_accessor<float, 1> q_row(sycl::range<1>((size_t) p.dk), cgh);
+        sycl::local_accessor<float, 1> state(sycl::range<1>(4), cgh);
+
+        cgh.parallel_for(
+            sycl::nd_range<1>(sycl::range<1>((size_t) nrows * nsplit * FATTN_WG), sycl::range<1>(FATTN_WG)),
+            [=](sycl::nd_item<1> item) {
+                const int64_t group = (int64_t) item.get_group(0);
+                const int lid = (int) item.get_local_id(0);
+
+                const int64_t row = group / nsplit;
+                const int64_t split_idx = group % nsplit;
+                const int64_t ic_begin = split_idx * slice;
+                const int64_t ic_end = std::min(ic_begin + slice, p.k_ne1);
+
+                const int64_t rows_per_batch = p.q_ne2 * p.q_ne1;
+                const int64_t iq3 = row / rows_per_batch;
+                const int64_t row_rem = row - iq3 * rows_per_batch;
+                const int64_t iq2 = row_rem / p.q_ne1;
+                const int64_t iq1 = row_rem - iq2 * p.q_ne1;
+
+                const char * q_ptr = (const char *) p.q + iq1 * p.q_nb1 + iq2 * p.q_nb2 + iq3 * p.q_nb3;
+
+                for (int64_t d = lid; d < p.dk; d += (int64_t) FATTN_WG) {
+                    q_row[d] = ggml_sycl_fattn_to_f32(((const QType *) q_ptr)[d]);
+                }
+
+                if (lid == 0) {
+                    state[0] = -std::numeric_limits<float>::infinity();
+                    state[1] = 0.0f;
+                }
+                item.barrier(sycl::access::fence_space::local_space);
+
+                const int64_t ik2 = iq2 / p.rk2;
+                const int64_t ik3 = iq3 / p.rk3;
+                const int64_t iv2 = iq2 / p.rv2;
+                const int64_t iv3 = iq3 / p.rv3;
+
+                const float slope = ggml_sycl_fattn_get_alibi_slope(
+                    p.max_bias, (uint32_t) iq2, p.n_head_log2, p.m0, p.m1);
+
+                const MaskType * mask_row = nullptr;
+                if constexpr (has_mask) {
+                    mask_row = (const MaskType *) ((const char *) p.mask +
+                        iq1 * p.mask_nb1 +
+                        (iq2 % p.mask_ne2) * p.mask_nb2 +
+                        (iq3 % p.mask_ne3) * p.mask_nb3);
+                }
+
+                float acc0 = 0.0f;
+                float acc1 = 0.0f;
+                const int64_t d0 = lid;
+                const int64_t d1 = lid + (int64_t) FATTN_WG;
+                const bool has_d0 = d0 < p.dv;
+                const bool has_d1 = d1 < p.dv;
+
+                for (int64_t ic = ic_begin; ic < ic_end; ++ic) {
+                    float mv = 0.0f;
+                    if constexpr (has_mask) {
+                        mv = slope * ggml_sycl_fattn_to_f32(mask_row[ic]);
+                        if (sycl::isinf(mv) && mv < 0.0f) {
+                            continue;
+                        }
+                    }
+
+                    const sycl::half * k_row_ptr = (const sycl::half *) ((const char *) p.k +
+                        ic * p.k_nb1 + ik2 * p.k_nb2 + ik3 * p.k_nb3);
+
+                    float partial = 0.0f;
+                    for (int64_t d = lid; d < p.dk; d += (int64_t) FATTN_WG) {
+                        partial += q_row[d] * (float) k_row_ptr[d];
+                    }
+
+                    const float score = sycl::reduce_over_group(item.get_group(), partial, sycl::plus<float>());
+
+                    if (lid == 0) {
+                        const float s = score * p.scale + mv;
+                        const float mold = state[0];
+
+                        float scale_old = 1.0f;
+                        float weight = 1.0f;
+
+                        if (s > mold) {
+                            state[0] = s;
+                            scale_old = sycl::exp(mold - s);
+                        } else {
+                            weight = sycl::exp(s - mold);
+                        }
+
+                        state[1] = state[1] * scale_old + weight;
+                        state[2] = scale_old;
+                        state[3] = weight;
+                    }
+                    item.barrier(sycl::access::fence_space::local_space);
+
+                    const sycl::half * v_row_ptr = (const sycl::half *) ((const char *) p.v +
+                        ic * p.v_nb1 + iv2 * p.v_nb2 + iv3 * p.v_nb3);
+
+                    const float scale_old = state[2];
+                    const float weight = state[3];
+
+                    if (has_d0) {
+                        acc0 = acc0 * scale_old + weight * (float) v_row_ptr[d0];
+                    }
+                    if (has_d1) {
+                        acc1 = acc1 * scale_old + weight * (float) v_row_ptr[d1];
+                    }
+
+                    item.barrier(sycl::access::fence_space::local_space);
+                }
+
+                float * out = scratch + (size_t) group * state_stride;
+                if (lid == 0) {
+                    out[0] = state[0];
+                    out[1] = state[1];
+                }
+                if (has_d0) {
+                    out[2 + d0] = acc0;
+                }
+                if (has_d1) {
+                    out[2 + d1] = acc1;
+                }
+            });
+    });
+}
+
+// Merges the nsplit partial states written by ggml_sycl_flash_attn_ext_split_launch into the
+// final normalized output. nsplit is small (<= FATTN_SPLIT_MAX_N), so every work-item just
+// redoes the tiny max/sum/combine loop over the splits itself -- cheaper than the barriers a
+// shared reduction would need, and it keeps this kernel branch- and barrier-free.
+static void ggml_sycl_flash_attn_ext_combine_launch(
+        sycl::queue & q, const fattn_params & p, int nsplit, const float * scratch) {
+    const int64_t nrows = p.q_ne1 * p.q_ne2 * p.q_ne3;
+    const size_t  state_stride = (size_t) (2 + p.dv);
+
+    q.submit([&](sycl::handler & cgh) {
+        cgh.parallel_for(
+            sycl::nd_range<1>(sycl::range<1>((size_t) nrows * FATTN_WG), sycl::range<1>(FATTN_WG)),
+            [=](sycl::nd_item<1> item) {
+                const int64_t row = (int64_t) item.get_group(0);
+                const int lid = (int) item.get_local_id(0);
+
+                const int64_t rows_per_batch = p.q_ne2 * p.q_ne1;
+                const int64_t iq3 = row / rows_per_batch;
+                const int64_t row_rem = row - iq3 * rows_per_batch;
+                const int64_t iq2 = row_rem / p.q_ne1;
+                const int64_t iq1 = row_rem - iq2 * p.q_ne1;
+
+                const int64_t d0 = lid;
+                const int64_t d1 = lid + (int64_t) FATTN_WG;
+                const bool has_d0 = d0 < p.dv;
+                const bool has_d1 = d1 < p.dv;
+
+                const float * base = scratch + (size_t) row * nsplit * state_stride;
+
+                float m_global = -std::numeric_limits<float>::infinity();
+                for (int s = 0; s < nsplit; ++s) {
+                    m_global = sycl::fmax(m_global, base[(size_t) s * state_stride]);
+                }
+
+                float l_global = 0.0f;
+                float acc0 = 0.0f;
+                float acc1 = 0.0f;
+                for (int s = 0; s < nsplit; ++s) {
+                    const float * part = base + (size_t) s * state_stride;
+                    const float w = sycl::exp(part[0] - m_global);
+                    l_global += part[1] * w;
+                    if (has_d0) {
+                        acc0 += part[2 + d0] * w;
+                    }
+                    if (has_d1) {
+                        acc1 += part[2 + d1] * w;
+                    }
+                }
+
+                const float inv_sum = l_global == 0.0f ? 0.0f : 1.0f / l_global;
+
+                float * dst_row_ptr = (float *) ((char *) p.dst + iq2 * p.dst_nb1 + iq1 * p.dst_nb2 + iq3 * p.dst_nb3);
+                if (has_d0) {
+                    dst_row_ptr[d0] = acc0 * inv_sum;
+                }
+                if (has_d1) {
+                    dst_row_ptr[d1] = acc1 * inv_sum;
+                }
+            });
+    });
+}
+
 static bool ggml_sycl_flash_attn_ext_supports_head_dim(int64_t dim) {
     return dim == 64 || dim == 80 || dim == 128;
 }
@@ -303,6 +557,34 @@ void ggml_sycl_op_flash_attn_ext(ggml_backend_sycl_context & ctx, ggml_tensor * 
     p.m1 = std::pow(2.0f, -(max_bias / 2.0f) / n_head_log2);
 
     sycl::queue & queue = ctx.stream();
+
+    const int64_t nrows = p.q_ne1 * p.q_ne2 * p.q_ne3;
+    const int nsplit = ggml_sycl_fattn_pick_nsplit(nrows, p.k_ne1);
+
+    if (nsplit > 1) {
+        float * scratch = ggml_sycl_fattn_reserve_split_scratch(
+            ctx, (size_t) nrows * nsplit * (2 + p.dv));
+
+        if (q->type == GGML_TYPE_F16) {
+            if (m == nullptr) {
+                ggml_sycl_flash_attn_ext_split_launch<sycl::half, float, false>(queue, p, nsplit, scratch);
+            } else if (m->type == GGML_TYPE_F16) {
+                ggml_sycl_flash_attn_ext_split_launch<sycl::half, sycl::half, true>(queue, p, nsplit, scratch);
+            } else {
+                ggml_sycl_flash_attn_ext_split_launch<sycl::half, float, true>(queue, p, nsplit, scratch);
+            }
+        } else {
+            if (m == nullptr) {
+                ggml_sycl_flash_attn_ext_split_launch<float, float, false>(queue, p, nsplit, scratch);
+            } else if (m->type == GGML_TYPE_F16) {
+                ggml_sycl_flash_attn_ext_split_launch<float, sycl::half, true>(queue, p, nsplit, scratch);
+            } else {
+                ggml_sycl_flash_attn_ext_split_launch<float, float, true>(queue, p, nsplit, scratch);
+            }
+        }
+        ggml_sycl_flash_attn_ext_combine_launch(queue, p, nsplit, scratch);
+        return;
+    }
 
     if (q->type == GGML_TYPE_F16) {
         if (m == nullptr) {

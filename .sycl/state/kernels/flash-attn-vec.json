@@ -118,5 +118,21 @@
     "result": "pass",
     "evidence": "test-flash-attn-20260906T190258Z-822237",
     "result_detail": "test-backend-ops FLASH_ATTN_EXT: 324/324 supported cases passed on SYCL0, 0 failed, unsupported cases fell back per supports_op"
+  },
+  "performance": {
+    "optimization": ".sycl/state/optimization/flash-attn-vec.json",
+    "e2e_rank": "2nd (~17.17% of e2e wall-clock, decode-dominated)",
+    "technique": "flash-decoding KV-split: splits the KV range into nsplit chunks per Q row so decode shapes (nb=1, few nr23) launch nrows*nsplit work-groups instead of nrows, fixing a measured ~3.5% GPU occupancy; falls back unchanged to the original single-pass kernel for prefill/large-nrows shapes",
+    "speedup": {
+      "nr23=[1,1] (nrows=8, nsplit=16)": "2867.84 -> 190.89 us/run (15.02x)",
+      "nr23=[4,1] (nrows=32, nsplit=8)": "2876.17 -> 380.28 us/run (7.56x)",
+      "nr23=[8,1] (nrows=64, nsplit=4)": "2891.53 -> 751.54 us/run (3.85x)"
+    },
+    "prefill_unaffected": "nb=4096 (nrows>>64) falls back to nsplit=1, ~290-294 GFLOPS before and after, no regression",
+    "unit_test_after_optimization": {
+      "result": "pass",
+      "evidence": "test-flash-attn-vec-20260906T235707Z-558d27",
+      "regression_evidence": "test-flash-attn-vec-regression-20260906T235731Z-2847a0 (8456/8456)"
+    }
   }
 }

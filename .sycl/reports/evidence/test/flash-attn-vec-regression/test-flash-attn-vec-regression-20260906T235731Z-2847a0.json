@@ -1,0 +1,31 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-flash-attn-vec-regression-20260906T235731Z-2847a0",
+  "class": "test",
+  "subject": "flash-attn-vec-regression",
+  "label": "split-kv-full-regression",
+  "phase": "optimize",
+  "ts": "2026-09-07T00:01:11Z",
+  "duration_s": 220.031,
+  "command": "cd build && ./bin/test-backend-ops -b SYCL0",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "09aae13a3",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/flash-attn-vec-regression/test-flash-attn-vec-regression-20260906T235731Z-2847a0.log",
+  "log_sha256": "4ace6d865a0804f6333ae8d3a8cd962b24fc0235fb2d7a5e650ac8588220535b",
+  "log_bytes": 2000050,
+  "log_truncated": true,
+  "artifacts": [],
+  "measurements": {
+    "reference": "cpu-oracle, full test-backend-ops suite"
+  },
+  "extracted": {}
+}

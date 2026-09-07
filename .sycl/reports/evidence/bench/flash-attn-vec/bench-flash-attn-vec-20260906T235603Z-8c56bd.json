@@ -1,0 +1,32 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "bench-flash-attn-vec-20260906T235603Z-8c56bd",
+  "class": "bench",
+  "subject": "flash-attn-vec",
+  "label": "baseline",
+  "phase": "optimize",
+  "ts": "2026-09-06T23:56:29Z",
+  "duration_s": 26.211,
+  "command": "cd build && ./bin/test-backend-ops perf -b SYCL0 -o FLASH_ATTN_EXT -p hsk=128,hsv=128,nh=8.*kv=4096,nb=1,mask=1.*type_K=f16,type_V=f16",
+  "via": "run.sh bench",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "09aae13a3",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/bench/flash-attn-vec/bench-flash-attn-vec-20260906T235603Z-8c56bd.log",
+  "log_sha256": "77e42aed682142e8bc82df3485b2985741bc81f3b2df8b1825072773be5ad8d0",
+  "log_bytes": 1963,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "shape": "hsk=128,hsv=128,nh=8,kv=4096,nb=1",
+    "shape_class": "decode"
+  },
+  "extracted": {}
+}

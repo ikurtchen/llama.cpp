@@ -1,0 +1,34 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-flash-attn-vec-20260906T235707Z-558d27",
+  "class": "test",
+  "subject": "flash-attn-vec",
+  "label": "split-kv-optimize",
+  "phase": "optimize",
+  "ts": "2026-09-06T23:57:25Z",
+  "duration_s": 18.087,
+  "command": "cd build && ./bin/test-backend-ops -b SYCL0 -o FLASH_ATTN_EXT",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "09aae13a3",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/flash-attn-vec/test-flash-attn-vec-20260906T235707Z-558d27.log",
+  "log_sha256": "b40c0219772036ce2be14a8b82d3019bd258be5f82e8379cdb55e09028f951f0",
+  "log_bytes": 1187942,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "cpu-oracle (test-backend-ops.cpp built-in ref_flash_attn_ext), inherited tolerance",
+    "tolerance": {
+      "source": "tests/test-backend-ops.cpp"
+    }
+  },
+  "extracted": {}
+}

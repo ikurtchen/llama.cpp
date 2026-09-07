@@ -1,0 +1,32 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "bench-flash-attn-vec-prefill-20260907T000133Z-31f46b",
+  "class": "bench",
+  "subject": "flash-attn-vec-prefill",
+  "label": "split-kv-prefill-fallback-check",
+  "phase": "optimize",
+  "ts": "2026-09-07T00:01:45Z",
+  "duration_s": 11.346,
+  "command": "cd build && ./bin/test-backend-ops perf -b SYCL0 -o FLASH_ATTN_EXT -p hsk=128,hsv=128,nh=8.*kv=4096,nb=4096,mask=1.*type_K=f16,type_V=f16",
+  "via": "run.sh bench",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "09aae13a3",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/bench/flash-attn-vec-prefill/bench-flash-attn-vec-prefill-20260907T000133Z-31f46b.log",
+  "log_sha256": "11f0c67c129c4d83be3cf4791025932728fcc07ead284807b665810ea34068b8",
+  "log_bytes": 1970,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "shape": "hsk=128,hsv=128,nh=8,kv=4096,nb=4096",
+    "shape_class": "prefill"
+  },
+  "extracted": {}
+}
