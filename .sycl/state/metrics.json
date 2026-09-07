@@ -5,24 +5,24 @@
     "cost": "USD (if reported) and/or tokens (uncached + cached) and/or GitHub AI credits / premium requests"
   },
   "session": {
-    "elapsed_wall_seconds": 18121,
+    "elapsed_wall_seconds": 36303,
     "active_wall_seconds": 16237,
-    "observed_span_seconds": 16673,
-    "observed_work_seconds": 15466,
-    "observed_snapshots": 27,
+    "observed_span_seconds": 36303,
+    "observed_work_seconds": 29698,
+    "observed_snapshots": 47,
     "started_at": "2026-09-06T15:44:31Z",
-    "ended_at": "2026-09-06T20:46:32Z"
+    "ended_at": "2026-09-07T01:49:34Z"
   },
   "totals": {
     "wall_clock_seconds": 16237,
     "elapsed_wall_seconds": 17268,
-    "tokens_in": 8803075,
-    "tokens_out": 1255396,
-    "cache_read": 245376631,
-    "cache_write": 1177730,
-    "tokens_total": 256612832,
-    "requests": 2017,
-    "credits": 2011.0,
+    "tokens_in": 12461557,
+    "tokens_out": 1997780,
+    "cache_read": 437457054,
+    "cache_write": 2508639,
+    "tokens_total": 454425030,
+    "requests": 3496,
+    "credits": 3482.0,
     "cost_usd": 0.0
   },
   "phases": {
@@ -65,13 +65,13 @@
     "migrate": {
       "wall_clock_seconds": 15443,
       "elapsed_wall_seconds": 16474,
-      "tokens_in": 8802807,
-      "tokens_out": 1126970,
-      "cache_read": 226403250,
-      "cache_write": 860871,
-      "tokens_total": 237193898,
-      "requests": 1883,
-      "credits": 1878.0,
+      "tokens_in": 12459665,
+      "tokens_out": 1405359,
+      "cache_read": 311803395,
+      "cache_write": 1085063,
+      "tokens_total": 326753482,
+      "requests": 2550,
+      "credits": 2544.0,
       "cost_usd": 0.0
     },
     "integrate": {
@@ -89,25 +89,25 @@
     "profile-e2e": {
       "wall_clock_seconds": 0,
       "elapsed_wall_seconds": 0,
-      "tokens_in": 0,
-      "tokens_out": 0,
-      "cache_read": 0,
-      "cache_write": 0,
-      "tokens_total": 0,
-      "requests": 0,
-      "credits": 0.0,
+      "tokens_in": 228,
+      "tokens_out": 69808,
+      "cache_read": 16199061,
+      "cache_write": 180204,
+      "tokens_total": 16449301,
+      "requests": 114,
+      "credits": 113.0,
       "cost_usd": 0.0
     },
     "optimize": {
       "wall_clock_seconds": 0,
       "elapsed_wall_seconds": 0,
-      "tokens_in": 0,
-      "tokens_out": 0,
-      "cache_read": 0,
-      "cache_write": 0,
-      "tokens_total": 0,
-      "requests": 0,
-      "credits": 0.0,
+      "tokens_in": 1396,
+      "tokens_out": 394187,
+      "cache_read": 90481217,
+      "cache_write": 926513,
+      "tokens_total": 91803313,
+      "requests": 698,
+      "credits": 692.0,
       "cost_usd": 0.0
     },
     "done": {
@@ -135,5 +135,5 @@
       "cost_usd": 0.0
     }
   },
-  "updated_at": "2026-09-06T20:46:33Z"
+  "updated_at": "2026-09-07T01:51:34Z"
 }

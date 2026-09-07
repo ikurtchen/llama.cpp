@@ -126,13 +126,13 @@
       "notes": ""
     },
     "report": {
-      "status": "pending",
-      "entered_at": "",
-      "exited_at": "",
+      "status": "exited",
+      "entered_at": "2026-09-07T01:54:26Z",
+      "exited_at": "2026-09-07T01:54:40Z",
       "gate": {
-        "result": "pending",
-        "attempts": 0,
-        "checked_at": "",
+        "result": "pass",
+        "attempts": 1,
+        "checked_at": "2026-09-07T01:54:40Z",
         "unmet": []
       },
       "waivers": [],
@@ -226,5 +226,5 @@
     },
     "changes": []
   },
-  "updated_at": "2026-09-07T01:49:28Z"
+  "updated_at": "2026-09-07T01:54:40Z"
 }

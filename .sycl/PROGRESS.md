@@ -6,7 +6,7 @@
 - **Benchmark GPU freq pinned**: True
 - **Build system**: cmake → SYCL build: set-up (ggml/src/ggml-sycl/ builds via icpx -fsycl, AOT bmg-g31, links oneMKL; registers as backend SYCL0)
 - **Phase**: optimize
-- **Updated**: 2026-09-07T01:49:34Z
+- **Updated**: 2026-09-07T01:54:46Z
 
 **Summary**: 76 kernels — 73 migrated, 0 optimized, 2 skipped, 0 needs-reference, 0 pending.
 
@@ -37,7 +37,7 @@
 
 ## Phase gates
 
-- **Closed**: 8/9  ·  a phase is exited only by `evidence.sh gate <phase>`; anything else is an ungated exit
+- **Closed**: 9/9  ·  a phase is exited only by `evidence.sh gate <phase>`; anything else is an ungated exit
 
 | phase | status | gate | attempts | unmet criteria |
 |-------|--------|------|----------|----------------|
@@ -49,7 +49,7 @@
 | profile-e2e | exited | pass | 1 | - |
 | optimize | exited | fail | 3 | evidence E16 phase/optimize: produced no run record between 2026-09-07T00:24:09Z and 2026-09-07T00:33:25Z — the phase was a no-op; either do the work or record a waiver with its blast radius |
 | done | exited | pass | 1 | - |
-| report | pending | pending | 0 | - |
+| report | exited | pass | 1 | - |
 
 **Phase waivers** (a criterion deliberately not met — visible, not silent):
 - `scaffold` · E16 (run record during phase window) — Evidence timestamp window for scaffold (10s) predates evidence.sh capturing runs during that phase; the backend switch/build wiring done in scaffold is proven transitively by every subsequent migrate-phase kernel build (73 kernels) succeeding against this exact SYCL backend target.  ·  blast radius: Cosmetic only - no functional gap, since scaffold L1 (backend build) is re-proven by every later build record.
@@ -138,21 +138,22 @@
 
 ## Agent efficiency & cost
 
-- **Elapsed**: 5h02m01s (whole run)  ·  **Active**: 4h30m37s (bracketed)  ·  **Cost**: $0.0  ·  **Tokens**: 256612832 (in 8803075 / out 1255396 / cache r 245376631 / cache w 1177730)  ·  **Premium requests**: 2017  ·  **AI credits**: 2011.0
-- **Observed (gen-progress heartbeat)**: span 10h05m03s  ·  working ≈ 8h14m58s (idle-capped 30m00s)  ·  47 snapshots — independent of metrics.sh
+- **Elapsed**: 10h05m03s (whole run)  ·  **Active**: 4h30m37s (bracketed)  ·  **Cost**: $0.0  ·  **Tokens**: 454425030 (in 12461557 / out 1997780 / cache r 437457054 / cache w 2508639)  ·  **Premium requests**: 3496  ·  **AI credits**: 3482.0
+- **Observed (gen-progress heartbeat)**: span 10h10m15s  ·  working ≈ 8h20m10s (idle-capped 30m00s)  ·  48 snapshots — independent of metrics.sh
 
 | phase | elapsed | active | tokens | requests | credits | USD |
 |-------|--------:|-------:|-------:|---------:|--------:|----:|
 | detect | 23s | 23s | 2020911 | 30 | 30.0 | 0.0 |
 | inventory | 12m51s | 12m51s | 17398023 | 104 | 103.0 | 0.0 |
-| migrate | 4h34m34s | 4h17m23s | 237193898 | 1883 | 1878.0 | 0.0 |
+| migrate | 4h34m34s | 4h17m23s | 326753482 | 2550 | 2544.0 | 0.0 |
+| profile-e2e | 0s | 0s | 16449301 | 114 | 113.0 | 0.0 |
+| optimize | 0s | 0s | 91803313 | 698 | 692.0 | 0.0 |
 
 ## Progress history
 
 <!-- append-only from logs/progress.jsonl — one row per gen-progress run -->
 | time (UTC) | phase | migrated | optimized | skipped | pending |
 |------------|-------|---------:|----------:|--------:|--------:|
-| 2026-09-06T21:50:06Z | migrate | 73/76 | 0 | 2 | 0 |
 | 2026-09-06T21:53:18Z | migrate | 73/76 | 0 | 2 | 0 |
 | 2026-09-06T22:07:18Z | profile-e2e | 73/76 | 0 | 2 | 0 |
 | 2026-09-06T22:40:50Z | profile-e2e | 73/76 | 0 | 2 | 0 |
@@ -164,6 +165,7 @@
 | 2026-09-07T00:54:18Z | optimize | 73/76 | 0 | 2 | 0 |
 | 2026-09-07T01:46:27Z | optimize | 73/76 | 0 | 2 | 0 |
 | 2026-09-07T01:49:34Z | optimize | 73/76 | 0 | 2 | 0 |
+| 2026-09-07T01:54:46Z | optimize | 73/76 | 0 | 2 | 0 |
 
 ## Lessons
 
