@@ -38,7 +38,7 @@
     "crosscheck": "ggml-vulkan also implements this op, useful as a second cross-check"
   },
   "notes": "No CUDA counterpart (per instructions.md sec 2.1); reference taken from ggml-cpu ops.cpp:ggml_compute_forward_conv_3d, cross-checked against ggml-vulkan's implementation. Reference implementation follows the direct CPU/Vulkan indexing path for correctness.",
-  "updated_at": "2026-09-07T01:48:38Z",
+  "updated_at": "2026-09-07T01:58:49Z",
   "loc": {
     "source_lang": "cpu-reference",
     "source": {
@@ -107,8 +107,8 @@
   "sycl_impl": "ggml/src/ggml-sycl/conv3d.hpp,ggml/src/ggml-sycl/conv3d.cpp",
   "unit_test": {
     "harness": "tests/test-backend-ops.cpp",
-    "filter": "CONV_3D",
+    "filter": "IM2COL,CONV_2D,CONV_2D_DW,CONV_TRANSPOSE_2D,CONV_TRANSPOSE_1D,COL2IM_1D,POOL_1D,POOL_2D,UPSCALE,CONV_3D",
     "result": "pass",
-    "evidence": "test-conv-pack-20260906T213659Z-c9eedb"
+    "evidence": "test-conv-pool-image-20260907T015849Z-58aa88"
   }
 }

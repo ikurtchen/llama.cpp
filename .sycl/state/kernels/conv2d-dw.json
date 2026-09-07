@@ -48,7 +48,7 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: depthwise layout transforms and edge handling are moderately tricky. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-07T01:48:10Z",
+  "updated_at": "2026-09-07T01:58:49Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -125,8 +125,8 @@
   "sycl_impl": "ggml/src/ggml-sycl/conv2d-dw.hpp,ggml/src/ggml-sycl/conv2d-dw.cpp",
   "unit_test": {
     "harness": "tests/test-backend-ops.cpp",
-    "filter": "CONV_2D_DW",
+    "filter": "IM2COL,CONV_2D,CONV_2D_DW,CONV_TRANSPOSE_2D,CONV_TRANSPOSE_1D,COL2IM_1D,POOL_1D,POOL_2D,UPSCALE,CONV_3D",
     "result": "pass",
-    "evidence": "test-conv-pack-20260906T213659Z-c9eedb"
+    "evidence": "test-conv-pool-image-20260907T015849Z-58aa88"
   }
 }

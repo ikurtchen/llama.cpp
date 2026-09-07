@@ -6,7 +6,7 @@
 - **Benchmark GPU freq pinned**: True
 - **Build system**: cmake → SYCL build: set-up (ggml/src/ggml-sycl/ builds via icpx -fsycl, AOT bmg-g31, links oneMKL; registers as backend SYCL0)
 - **Phase**: report
-- **Updated**: 2026-09-07T01:55:28Z
+- **Updated**: 2026-09-07T02:00:48Z
 
 **Summary**: 76 kernels — 73 migrated, 0 optimized, 2 skipped, 0 needs-reference, 0 pending.
 
@@ -76,7 +76,7 @@
 | clamp | ggml/src/ggml-cuda/clamp.cu:op_clamp,op_clamp_kernel,clamp_cuda,ggml_cuda_op_clamp | migrated | pass | - | 34→0 | - | - | Risk reason: simple pointwise map. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | col2im-1d | ggml/src/ggml-cuda/col2im-1d.cu:col2im_1d_kernel,ggml_cuda_op_col2im_1d | migrated | pass | - | 61→92 | - | - | Risk reason: inverse window indexing is more error-prone than pure elementwise code. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | concat | ggml/src/ggml-cuda/concat.cu:concat_cont,concat_cont_cuda,concat_cuda,ggml_cuda_op_concat | migrated | pass | - | 210→0 | - | - | Risk reason: direct copy/pack kernels with straightforward branching by concat dimension. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Migrated the general strided element-copy path (mirrors CUDA's non-contiguous kernel) for all dims 0-3, f32/f16/any blck_size==1 type. CUDA's fast contiguous-memcpy fast path not ported (perf-only, correctness unaffected); quantized concat (blck_size>1) not supported, tracked as residual. |
-| conv2d | ggml/src/ggml-cuda/conv2d.cu:calculate_input_coord,conv2d_kernel,conv2d_cuda,conv2d_cuda_f16,conv2d_cuda_f32,ggml_cuda_op_conv2d | migrated | pass | - | 84→145 | - | - | Risk reason: multidimensional indexing and convolution layout handling need care. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Unit test evidence covers representative direct-conv cases because the full CONV_2D matrix exceeded the shared runner budget in this session. |
+| conv2d | ggml/src/ggml-cuda/conv2d.cu:calculate_input_coord,conv2d_kernel,conv2d_cuda,conv2d_cuda_f16,conv2d_cuda_f32,ggml_cuda_op_conv2d | migrated | pass | - | 84→145 | - | - | Risk reason: multidimensional indexing and convolution layout handling need care. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Full backend-op coverage now passes under the repaired serialized runner. |
 | conv2d-dw | ggml/src/ggml-cuda/conv2d-dw.cu:calculate_input_coord,conv2d_dw_kernel,ggml_cuda_op_conv2d_dw | migrated | pass | - | 72→144 | - | - | Risk reason: depthwise layout transforms and edge handling are moderately tricky. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | conv2d-transpose | ggml/src/ggml-cuda/conv2d-transpose.cu:conv2d_transpose_kernel,ggml_cuda_conv_2d_transpose_p0 | migrated | pass | - | 93→119 | - | - | Risk reason: inverse convolution geometry and type handling require validation. Reference oracle: ggml-cpu backend via tests/test-backend-ops. |
 | conv-transpose-1d | ggml/src/ggml-cuda/conv-transpose-1d.cu:conv_transpose_1d_kernel,conv_transpose_1d_f32_f32_cuda,ggml_cuda_op_conv_transpose_1d | migrated | pass | - | 72→92 | - | - | Risk reason: transposed-window index math must match CPU exactly. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Fixed a device-lost bug by removing host-side ggml_tensor pointer dereferences from the device lambda. |
@@ -139,7 +139,7 @@
 ## Agent efficiency & cost
 
 - **Elapsed**: 10h05m03s (whole run)  ·  **Active**: 4h30m37s (bracketed)  ·  **Cost**: $0.0  ·  **Tokens**: 454425030 (in 12461557 / out 1997780 / cache r 437457054 / cache w 2508639)  ·  **Premium requests**: 3496  ·  **AI credits**: 3482.0
-- **Observed (gen-progress heartbeat)**: span 10h10m57s  ·  working ≈ 8h20m52s (idle-capped 30m00s)  ·  49 snapshots — independent of metrics.sh
+- **Observed (gen-progress heartbeat)**: span 10h16m17s  ·  working ≈ 8h26m12s (idle-capped 30m00s)  ·  50 snapshots — independent of metrics.sh
 
 | phase | elapsed | active | tokens | requests | credits | USD |
 |-------|--------:|-------:|-------:|---------:|--------:|----:|
@@ -154,7 +154,6 @@
 <!-- append-only from logs/progress.jsonl — one row per gen-progress run -->
 | time (UTC) | phase | migrated | optimized | skipped | pending |
 |------------|-------|---------:|----------:|--------:|--------:|
-| 2026-09-06T22:07:18Z | profile-e2e | 73/76 | 0 | 2 | 0 |
 | 2026-09-06T22:40:50Z | profile-e2e | 73/76 | 0 | 2 | 0 |
 | 2026-09-06T22:41:28Z | optimize | 73/76 | 0 | 2 | 0 |
 | 2026-09-06T23:06:36Z | optimize | 73/76 | 0 | 2 | 0 |
@@ -166,6 +165,7 @@
 | 2026-09-07T01:49:34Z | optimize | 73/76 | 0 | 2 | 0 |
 | 2026-09-07T01:54:46Z | optimize | 73/76 | 0 | 2 | 0 |
 | 2026-09-07T01:55:28Z | report | 73/76 | 0 | 2 | 0 |
+| 2026-09-07T02:00:48Z | report | 73/76 | 0 | 2 | 0 |
 
 ## Lessons
 

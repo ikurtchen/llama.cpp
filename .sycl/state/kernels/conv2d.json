@@ -50,8 +50,8 @@
     "kind": "cpu",
     "crosscheck": "-"
   },
-  "notes": "Risk reason: multidimensional indexing and convolution layout handling need care. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Unit test evidence covers representative direct-conv cases because the full CONV_2D matrix exceeded the shared runner budget in this session.",
-  "updated_at": "2026-09-07T01:48:10Z",
+  "notes": "Risk reason: multidimensional indexing and convolution layout handling need care. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Full backend-op coverage now passes under the repaired serialized runner.",
+  "updated_at": "2026-09-07T01:58:49Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -131,8 +131,8 @@
   "sycl_impl": "ggml/src/ggml-sycl/conv2d.hpp,ggml/src/ggml-sycl/conv2d.cpp",
   "unit_test": {
     "harness": "tests/test-backend-ops.cpp",
-    "filter": "CONV_2D -p representative-direct-cases",
+    "filter": "IM2COL,CONV_2D,CONV_2D_DW,CONV_TRANSPOSE_2D,CONV_TRANSPOSE_1D,COL2IM_1D,POOL_1D,POOL_2D,UPSCALE,CONV_3D",
     "result": "pass",
-    "evidence": "test-conv2d-20260906T213710Z-54c2cc"
+    "evidence": "test-conv-pool-image-20260907T015849Z-58aa88"
   }
 }

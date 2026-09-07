@@ -1,0 +1,33 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-conv-pool-image-20260907T015849Z-58aa88",
+  "class": "test",
+  "subject": "conv-pool-image",
+  "phase": "report",
+  "ts": "2026-09-07T01:59:43Z",
+  "duration_s": 53.344,
+  "command": "./build/bin/test-backend-ops -o IM2COL,CONV_2D,CONV_2D_DW,CONV_TRANSPOSE_2D,CONV_TRANSPOSE_1D,COL2IM_1D,POOL_1D,POOL_2D,UPSCALE,CONV_3D",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "12b1b47fb",
+  "dirty": false,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/conv-pool-image/test-conv-pool-image-20260907T015849Z-58aa88.log",
+  "log_sha256": "29829133977683c0d33a81f166f61cd6f84cfe7f54c6d14b3023f2177518fc03",
+  "log_bytes": 611178,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {
+    "reference": "cpu",
+    "tolerance": {
+      "source": "cuda-parity"
+    }
+  },
+  "extracted": {}
+}

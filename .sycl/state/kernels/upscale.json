@@ -39,7 +39,7 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: interpolation kernels must match coordinate and edge rules exactly. Reference oracle: ggml-cpu backend via tests/test-backend-ops.",
-  "updated_at": "2026-09-07T01:48:15Z",
+  "updated_at": "2026-09-07T01:58:49Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -123,8 +123,8 @@
   "sycl_impl": "ggml/src/ggml-sycl/upscale.hpp,ggml/src/ggml-sycl/upscale.cpp",
   "unit_test": {
     "harness": "tests/test-backend-ops.cpp",
-    "filter": "UPSCALE",
+    "filter": "IM2COL,CONV_2D,CONV_2D_DW,CONV_TRANSPOSE_2D,CONV_TRANSPOSE_1D,COL2IM_1D,POOL_1D,POOL_2D,UPSCALE,CONV_3D",
     "result": "pass",
-    "evidence": "test-pool-upscale-20260906T213611Z-e96001"
+    "evidence": "test-conv-pool-image-20260907T015849Z-58aa88"
   }
 }

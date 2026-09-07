@@ -32,7 +32,7 @@
     "crosscheck": "-"
   },
   "notes": "Risk reason: transposed-window index math must match CPU exactly. Reference oracle: ggml-cpu backend via tests/test-backend-ops. Fixed a device-lost bug by removing host-side ggml_tensor pointer dereferences from the device lambda.",
-  "updated_at": "2026-09-07T01:48:10Z",
+  "updated_at": "2026-09-07T01:58:49Z",
   "loc": {
     "source_lang": "cuda",
     "source": {
@@ -109,8 +109,8 @@
   "sycl_impl": "ggml/src/ggml-sycl/conv-transpose-1d.hpp,ggml/src/ggml-sycl/conv-transpose-1d.cpp",
   "unit_test": {
     "harness": "tests/test-backend-ops.cpp",
-    "filter": "CONV_TRANSPOSE_1D",
+    "filter": "IM2COL,CONV_2D,CONV_2D_DW,CONV_TRANSPOSE_2D,CONV_TRANSPOSE_1D,COL2IM_1D,POOL_1D,POOL_2D,UPSCALE,CONV_3D",
     "result": "pass",
-    "evidence": "test-convt1d-col2im1d-20260906T213636Z-ab9206"
+    "evidence": "test-conv-pool-image-20260907T015849Z-58aa88"
   }
 }
