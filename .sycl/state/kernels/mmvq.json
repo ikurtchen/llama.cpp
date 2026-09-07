@@ -201,6 +201,10 @@
     "speedup": 2.58,
     "fraction_of_peak": null,
     "meets_expectation": true,
-    "notes": "Fused quantized mat-vec kernel (see optimization/mmvq.json) replaces the dequant-to-F32-scratch + oneMKL GEMM path for the decode-dominated n<=8 case; n=512 prefill shape unchanged (still routed to oneMKL GEMM). 2.58x speedup on the e2e-dominant n=1 shape."
+    "notes": "Fused quantized mat-vec kernel (see optimization/mmvq.json) replaces the dequant-to-F32-scratch + oneMKL GEMM path for the decode-dominated n<=8 case; n=512 prefill shape unchanged (still routed to oneMKL GEMM). 2.58x speedup on the e2e-dominant n=1 shape.",
+    "evidence": {
+      "baseline": "bench-mmvq-20260906T225238Z-d327b0",
+      "optimized": "bench-mmvq-20260906T225331Z-401bed"
+    }
   }
 }

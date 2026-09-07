@@ -1,0 +1,29 @@
+{
+  "schema": "sycl-agent/run-record",
+  "run_id": "test-optimize-phase-confirmation-20260907T003354Z-7b0285",
+  "class": "test",
+  "subject": "optimize-phase-confirmation",
+  "label": "optimize-phase-final-regression",
+  "phase": "optimize",
+  "ts": "2026-09-07T00:34:19Z",
+  "duration_s": 24.865,
+  "command": "cd build && ./bin/test-backend-ops test -b SYCL0 -o GET_ROWS,FLASH_ATTN_EXT,MUL,RMS_NORM",
+  "via": "run.sh test",
+  "runner": {
+    "mode": "remote",
+    "host": "10.239.98.41",
+    "workdir": "/workspace/sycl-agent-runs/llama.cpp"
+  },
+  "env_fingerprint": "env-68d8b007",
+  "commit": "50818fe1b",
+  "dirty": true,
+  "exit_code": 0,
+  "verdict": "pass",
+  "log": "evidence/test/optimize-phase-confirmation/test-optimize-phase-confirmation-20260907T003354Z-7b0285.log",
+  "log_sha256": "d4aaaba53583d4d145034d9b07b114f405d066d82d87fb2f0871006e59a8ddb2",
+  "log_bytes": 1208823,
+  "log_truncated": false,
+  "artifacts": [],
+  "measurements": {},
+  "extracted": {}
+}

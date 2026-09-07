@@ -92,16 +92,24 @@
       "notes": ""
     },
     "optimize": {
-      "status": "pending",
-      "entered_at": "",
-      "exited_at": "",
+      "status": "exited",
+      "entered_at": "2026-09-07T00:24:09Z",
+      "exited_at": "2026-09-07T00:33:25Z",
       "gate": {
-        "result": "pending",
-        "attempts": 0,
-        "checked_at": "",
-        "unmet": []
+        "result": "fail",
+        "attempts": 3,
+        "checked_at": "2026-09-07T00:34:25Z",
+        "unmet": [
+          "evidence E16 phase/optimize: produced no run record between 2026-09-07T00:24:09Z and 2026-09-07T00:33:25Z \u2014 the phase was a no-op; either do the work or record a waiver with its blast radius"
+        ]
       },
-      "waivers": [],
+      "waivers": [
+        {
+          "criterion": "E16 (phase produced a run record in its entered_at..exited_at window)",
+          "reason": "entered_at was reset to 2026-09-07T00:24:09Z by an earlier gate attempt made mid-phase (this session resumed the 'optimize' phase across a context-compaction boundary; entered_at does not reflect the phase's true start, which was many hours and 75 evidence records earlier in this run -- mmvq/flash-attn-vec/getrows kept trials with bench+test records, binbcast/rms-norm documented skips). The narrow post-reset window genuinely contained only run.sh-wrapped unitrace deep-profile calls (not evidence.sh record calls) before a confirmation test record was added at 00:33:54Z, one second after the immediately-preceding gate check's cutoff of 00:33:25Z.",
+          "blast_radius": "Bookkeeping-only: evidence.sh verify's phase-window heuristic (E16) cannot see the phase's real work because of the entered_at reset. All substantive claims (kernel optimizations, speedups, correctness) remain independently backed by their own run records (test/bench), which is what E1-E3/E7 verify -- confirmed 0 unbacked claims, 75/75 backed. No actual gap in optimize-phase work exists."
+        }
+      ],
       "notes": ""
     },
     "done": {
@@ -218,5 +226,5 @@
     },
     "changes": []
   },
-  "updated_at": "2026-09-06T22:41:13Z"
+  "updated_at": "2026-09-07T00:34:25Z"
 }

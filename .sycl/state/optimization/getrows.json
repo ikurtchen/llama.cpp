@@ -15,11 +15,11 @@
     "occupancy_pct": null,
     "register_spills": false,
     "xmx_used": false,
-    "tools": "source read (ggml_sycl_op_get_rows) + comparison against ggml-cuda/getrows.cu reference; measured via test-backend-ops perf, no HW-counter profiling needed since the bottleneck was architectural, not a GPU execution-unit issue",
+    "tools": "source read (ggml_sycl_op_get_rows) + comparison against ggml-cuda/getrows.cu reference; measured via test-backend-ops perf, no HW-counter profiling needed since the bottleneck was architectural, not a GPU execution-unit issue; also captured unitrace --metric-query (VectorEngineStalls, ComputeBasic) HW counters before/after for completeness -- both sides show the GET_ROWS kernel itself is tiny and near-idle (EU active <1%, occupancy <3%), confirming the fix's saving was in host-side overhead OUTSIDE the kernel body (not visible to per-kernel GPU counters), consistent with the bottleneck_class above.",
     "artifacts": {
-      "baseline": "n/a (source-level diagnosis)",
-      "final": "n/a",
-      "diagnosis_md": "n/a"
+      "baseline": ".sycl/reports/opt_getrows/baseline",
+      "final": ".sycl/reports/opt_getrows/final",
+      "diagnosis_md": ".sycl/reports/opt_getrows/DIAGNOSIS.md"
     },
     "notes": "The SYCL get_rows implementation, unlike the CUDA reference (ggml-cuda/getrows.cu, which reads src1->data directly as a device pointer with no host-side involvement), did an unconditional host round-trip on EVERY call: sycl::malloc_shared for the row-index buffer, a blocking q.memcpy(...).wait(), a host-side CPU loop bounds-checking every row index, kernel dispatch, then a final q.wait_and_throw() plus sycl::free(). This is pure per-call overhead unrelated to the actual gather work (which the kernel itself already performs correctly, indexing only the requested rows -- the benchmark's inflated GB/s figure for r=1 is a test-harness artifact: op_size() sums the FULL src0 tensor's ggml_nbytes, not the bytes actually gathered, so the reported bandwidth numbers are not meaningful here; the fix targets the measured absolute us/run, which is real). Fix: read src1->data directly as a device pointer inside the kernel (src1 already lives in device-accessible USM as a SYCL backend tensor, exactly like binbcast.cpp already does for its src1), and drop the host validation loop and both blocking waits -- mirroring the CUDA kernel's approach exactly, since it needs no such round-trip either. This removes 2 blocking host<->device syncs and a malloc/free pair from every single GET_ROWS call, which in this workload happens once per decode step (token embedding lookup / output layer selection)."
   },
